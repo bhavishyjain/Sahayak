@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Workspace logs/temp
+*.log
+*.tmp
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Node dependencies
+node_modules/
+backend/node_modules/
+mobile/node_modules/
+
+# Expo / React Native caches
+.expo/
+.metro-cache/
+mobile/.expo/
+mobile/.metro-cache/
+mobile/node_modules/.cache/
+
+# IDE/editor
+.vscode/
+.idea/

@@ -124,3 +124,49 @@ exports.me = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.updateMe = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { fullName, email, phone, preferredLanguage } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (email && email !== user.email) {
+      const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingEmail) {
+        return res.status(409).json({ message: "Email is already in use" });
+      }
+      user.email = email;
+    }
+
+    if (phone && phone !== user.phone) {
+      const existingPhone = await User.findOne({ phone, _id: { $ne: userId } });
+      if (existingPhone) {
+        return res.status(409).json({ message: "Phone is already in use" });
+      }
+      user.phone = phone;
+    }
+
+    if (typeof fullName === "string" && fullName.trim()) {
+      user.fullName = fullName.trim();
+    }
+
+    if (preferredLanguage) {
+      user.preferredLanguage = preferredLanguage;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "Profile updated",
+      user: userPayload(user),
+    });
+  } catch (error) {
+    console.error("update me error", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

@@ -1,15 +1,23 @@
 // services/geminiService.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+function getGeminiApiKey() {
+  const raw = process.env.GEMINI_API_KEY;
+  if (!raw) return "";
+  return String(raw).trim().replace(/^['"]|['"]$/g, "");
+}
+
+const genAI = getGeminiApiKey()
+  ? new GoogleGenerativeAI(getGeminiApiKey())
   : null;
+const GEMINI_ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-3-flash-preview"];
+const GEMINI_PRIMARY_MODEL = GEMINI_ALLOWED_MODELS[0];
 
 // Analyze raw text and return structured complaint or FAQ info
 async function analyze(rawText) {
   if (!genAI) return { error: "Gemini API not configured" };
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
 
     // Prompt for Gemini
     const prompt = `

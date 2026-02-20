@@ -1,13 +1,17 @@
 import "./global.css";
-import "./src/i18n";
+import "./i18n";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { api } from "./src/api/client";
-import { useAuth, AuthProvider } from "./src/contexts/AuthContext";
-import AppNavigator from "./src/navigation/AppNavigator";
-import { PreferencesProvider, usePreferences } from "./src/contexts/PreferencesContext";
-import { getExpoPushToken } from "./src/utils/pushNotifications";
+import Toast from "react-native-toast-message";
+import { api } from "./api/client";
+import { useAuth, AuthProvider } from "./contexts/AuthContext";
+import AppNavigator from "./navigation/AppNavigator";
+import {
+  PreferencesProvider,
+  usePreferences,
+} from "./contexts/PreferencesContext";
+import { getExpoPushToken } from "./utils/pushNotifications";
 
 function Root() {
   const { theme } = usePreferences();
@@ -31,6 +35,7 @@ function Root() {
     <>
       <StatusBar style={theme === "dark" ? "light" : "dark"} />
       <AppNavigator />
+      <Toast swipeable position="bottom" />
     </>
   );
 }
