@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Metro/Hermes caches
+.metro-cache/
+node_modules/.cache/
+
+# logs
+*.log
+
+# env
+.env
+.env.*
+!.env.example

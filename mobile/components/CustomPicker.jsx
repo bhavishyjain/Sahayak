@@ -8,11 +8,8 @@ import {
 } from "react";
 import { FlatList, Modal, Text, TouchableOpacity, View } from "react-native";
 import { TextInput as PaperTextInput } from "react-native-paper";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
-
-// ✅ Proper import (no try/catch hacks)
-import { stopBgAudioService } from "../utils/mediaPlayerHandler";
 
 const CustomPicker = forwardRef(
   (
@@ -42,9 +39,10 @@ const CustomPicker = forwardRef(
       click: () => setIsVisible(true),
     }));
 
-    const filteredData = data?.filter((item) =>
-      item?.label?.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
+    const filteredData =
+      data?.filter((item) =>
+        item?.label?.toLowerCase().includes(searchQuery.toLowerCase()),
+      ) || [];
 
     const selectedItem = data?.find((item) => item.value === value);
 
@@ -62,15 +60,6 @@ const CustomPicker = forwardRef(
         setIsVisible(false);
       }
     };
-
-    // 🛑 Stop sound when modal closes (regardless of how it was closed)
-    useEffect(() => {
-      if (!isVisible) {
-        stopBgAudioService?.();
-        // reset for next open
-        userSelectedItemRef.current = false;
-      }
-    }, [isVisible]);
 
     return (
       <>

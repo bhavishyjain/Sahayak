@@ -1,158 +1,189 @@
-const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-// Register User
-exports.registerUser = async (req, res) => {
+function issueToken(user) {
+  return jwt.sign(
+    {
+      userId: user._id,
+      username: user.username,
+      role: user.role,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      preferredLanguage: user.preferredLanguage || "en",
+    },
+    process.env.JWT_SECRET || "api_dev_secret",
+    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
+  );
+}
+
+function userPayload(user) {
+  return {
+    id: user._id,
+    username: user.username,
+    role: user.role,
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone,
+    department: user.department,
+    preferredLanguage: user.preferredLanguage || "en",
+  };
+}
+
+exports.register = async (req, res) => {
   try {
-    const { username, password, role, fullName, email, phone } = req.body;
+    const { username, password, fullName, email, phone, role } = req.body;
 
-    // Validation
-    if (!username || !password) {
+    if (!username || !password || !fullName || !email || !phone) {
+      return res.status(400).json({
+        message: "username, password, fullName, email and phone are required",
+      });
+    }
+
+    const existing = await User.findOne({
+      $or: [{ username }, { email }, { phone }],
+    });
+
+    if (existing) {
       return res
-        .status(400)
-        .json({ message: "Please provide username and password" });
+        .status(409)
+        .json({ message: "User already exists with provided details" });
     }
 
-    if (!fullName) {
-      return res.status(400).json({ message: "Please provide your full name" });
-    }
-
-    if (!email) {
-      return res
-        .status(400)
-        .json({ message: "Please provide your email address" });
-    }
-
-    if (!phone) {
-      return res
-        .status(400)
-        .json({ message: "Please provide your phone number" });
-    }
-
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(400).json({ message: "Username already exists" });
-    }
-
-    // Check if email already exists
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
-
-    // Check if phone already exists
-    const existingPhone = await User.findOne({ phone });
-    if (existingPhone) {
-      return res.status(400).json({ message: "Phone number already exists" });
-    }
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const user = await User.create({
       username,
       password: hashedPassword,
-      role: role || "user",
       fullName,
       email,
       phone,
+      role: role || "user",
     });
 
-    res
-      .status(201)
-      .json({ message: "User registered successfully", userId: user._id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
+    const token = issueToken(user);
+
+    return res.status(201).json({
+      message: "Account created",
+      token,
+      user: userPayload(user),
+    });
+  } catch (error) {
+    console.error("register error", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-// Login User
-exports.loginUser = async (req, res) => {
+exports.login = async (req, res) => {
   try {
-    const { emailOrPhone, password, username } = req.body;
+    const { loginId, password } = req.body;
 
-    // Support both old username field and new emailOrPhone field for backward compatibility
-    const loginIdentifier = emailOrPhone || username;
-
-    // Validation
-    if (!loginIdentifier || !password) {
+    if (!loginId || !password) {
       return res
         .status(400)
-        .json({ message: "Please provide email/phone and password" });
+        .json({ message: "loginId and password are required" });
     }
 
-    // Find user by email or phone number
     const user = await User.findOne({
-      $or: [
-        { email: loginIdentifier },
-        { phone: loginIdentifier },
-        { username: loginIdentifier }, // Keep username for backward compatibility
-      ],
+      $or: [{ username: loginId }, { email: loginId }, { phone: loginId }],
     });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Create session
-    req.session.user = {
-      id: user._id,
-      username: user.username,
-      role: user.role,
-      fullName: user.fullName,
-      email: user.email,
-      phone: user.phone,
-      department: user.department,
-    };
+    const token = issueToken(user);
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Login successful",
-      user: req.session.user,
+      token,
+      user: userPayload(user),
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
+  } catch (error) {
+    console.error("login error", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-// Logout
-exports.logoutUser = (req, res) => {
-  const sessionId = req.sessionID;
-
-  req.session.destroy((err) => {
-    if (err) {
-      console.error("Session destroy error:", err);
-      return res.status(500).json({ message: "Failed to logout" });
+exports.me = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Clear the session cookie
-    res.clearCookie("connect.sid", {
-      path: "/",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    });
-
-    console.log(`User logged out, session ${sessionId} destroyed`);
-    res.status(200).json({ message: "Logout successful" });
-  });
+    return res.status(200).json({ user: userPayload(user) });
+  } catch (error) {
+    console.error("me error", error);
+    return res.status(500).json({ message: "Server error" });
+  }
 };
 
-// Check authentication status
-exports.getMe = (req, res) => {
-  console.log("Auth check - Session exists:", !!req.session);
-  console.log("Auth check - Session user:", req.session?.user);
-  console.log("Auth check - Session ID:", req.sessionID);
+exports.updateMe = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { fullName, email, phone, password, preferredLanguage } = req.body;
 
-  if (req.session && req.session.user) {
-    res.status(200).json({ user: req.session.user });
-  } else {
-    res.status(401).json({ message: "Not authenticated" });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (email && email !== user.email) {
+      const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          email_phone_already_used: true,
+          message: "Email is already in use",
+        });
+      }
+      user.email = email;
+    }
+
+    if (phone && phone !== user.phone) {
+      const existingPhone = await User.findOne({ phone, _id: { $ne: userId } });
+      if (existingPhone) {
+        return res.status(400).json({
+          success: false,
+          email_phone_already_used: true,
+          message: "Phone is already in use",
+        });
+      }
+      user.phone = phone;
+    }
+
+    if (typeof fullName === "string" && fullName.trim()) {
+      user.fullName = fullName.trim();
+    }
+
+    if (preferredLanguage) {
+      user.preferredLanguage = preferredLanguage;
+    }
+
+    // Update password if provided
+    if (password && password.trim()) {
+      const hashedPassword = await bcrypt.hash(password.trim(), 10);
+      user.password = hashedPassword;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated",
+      user: userPayload(user),
+    });
+  } catch (error) {
+    console.error("update me error", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };

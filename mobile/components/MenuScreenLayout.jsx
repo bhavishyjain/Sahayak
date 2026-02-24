@@ -2,7 +2,7 @@ import * as Clarity from "@microsoft/react-native-clarity";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 import { useTranslation } from "../utils/i18n/LanguageProvider";
 import BackButtonHeader from "./BackButtonHeader";

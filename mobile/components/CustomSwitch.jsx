@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, ActivityIndicator } from "react-native";
-import { colors } from "../app/(app)/colors";
+import { colors } from "../colors";
 
 export default function CustomSwitch({
   value,

@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react-native";
 import { ActivityIndicator } from "react-native";
 import RNSwipeButton from "rn-swipe-button";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 import getReadableTextColor from "./ColorHelper";
 

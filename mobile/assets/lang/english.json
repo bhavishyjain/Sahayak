@@ -1,0 +1,1125 @@
+{
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "error": "Error",
+    "success": "Success",
+    "exit": "Exit",
+    "openSettings": "Open Settings",
+    "allow": "Allow",
+    "goToSettings": "Go to Settings",
+    "printerSettings": "Printer Settings"
+  },
+  "storeSelection": {
+    "title": "Select Store",
+    "noStores": "No Stores Linked",
+    "noStoresMessage": "Please contact support",
+    "updateProfile": "Update Profile",
+    "logout": "Logout",
+    "loadingError": "Failed to load stores",
+    "selectError": "Failed to select store"
+  },
+  "tabs": {
+    "home": "Home",
+    "menu": "Menu",
+    "pastOrders": "Past",
+    "more": "More"
+  },
+  "dashboard": {
+    "greeting": {
+      "goodMorning": "Good Morning",
+      "goodAfternoon": "Good Afternoon",
+      "goodEvening": "Good Evening",
+      "hello": "Hello"
+    },
+    "storeStatus": {
+      "status": "Status",
+      "statusLabel": "STATUS",
+      "openNow": "Open Now",
+      "closedNow": "Closed Now",
+      "onVacation": "On Vacation",
+      "deactivated": "Deactivated",
+      "autoScheduleOn": "Auto Schedule: ON",
+      "autoScheduleActive": "Active",
+      "autoScheduleInactive": "Inactive",
+      "todayWorkingHours": "Today's Working Hours:",
+      "today": "Today:",
+      "manualMode": "Manual Mode",
+      "youControlOpenClose": "You control when to open/close",
+      "ordersPausedUntil": "Orders paused until",
+      "unpaidBalance": "Unpaid balance:",
+      "closeStore": "Close Store",
+      "openStore": "Open Store",
+      "editVacationDates": "Edit Vacation Dates",
+      "payNow": "Pay Now"
+    },
+    "schedule": {
+      "yourAutoScheduleIs": "Your Auto Schedule is",
+      "editWeeklySchedule": "Edit Weekly Schedule",
+      "setVacationDates": "Set Vacation Dates"
+    },
+    "submitRequest": {
+      "title": "Submit Request",
+      "subtitle": "Send a request to your manager"
+    },
+    "revenue": {
+      "totalRevenueWith": "Total Revenue with",
+      "sales": "Sales"
+    },
+    "cancelled": {
+      "cancelledIn7Days": "Cancelled in 7 Days"
+    },
+    "story": {
+      "addStory": "Add Story"
+    },
+    "unpaidCommission": {
+      "due": "Due",
+      "unpaidCommissions": "Unpaid Commissions",
+      "payBeforeDueDate": "Please pay before due date to avoid deactivation"
+    },
+    "latestNotice": {
+      "title": "Latest Notice",
+      "readMore": "Read more...",
+      "noticeReceivedAt": "Notice Received at"
+    },
+    "confirmation": {
+      "title": "Confirmation",
+      "scheduleOverrideMessage": "has auto-scheduling enabled. Turning off the store will override the schedule. Are you sure?",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "storeOpenedSuccess": "Store opened successfully",
+      "storeClosedSuccess": "Store closed successfully",
+      "failedToToggleStatus": "Failed to toggle store status",
+      "failedToLoadDashboard": "Failed to load dashboard"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome Back!",
+      "subtitleEmail": "Sign in to your account to continue managing your store",
+      "emailPlaceholder": "Email Address",
+      "passwordPlaceholder": "Password",
+      "button": "Sign In",
+      "loading": "Signing In...",
+      "changeLanguage": "Language"
+    },
+    "register": {
+      "button": "Register as Store Partner",
+      "driverRegistrationRedirect": {
+        "title": "Partner Registration",
+        "message": "You will be redirected to our partner registration form. Continue?"
+      }
+    },
+    "logout": {
+      "title": "See you soon!",
+      "subtitle": "Logging you out..."
+    }
+  },
+  "permissions": {
+    "background": {
+      "title": "Allow All The Time",
+      "message": "This app needs continuous location access to assign nearby delivery orders even when the app is closed."
+    },
+    "required": {
+      "title": "Permission Required",
+      "message": "Location permission is mandatory to use this app."
+    }
+  },
+  "toast": {
+    "success": "Success",
+    "error": "Error",
+    "loginError": {
+      "title": "Login Error",
+      "enterEmail": "Please enter your email address",
+      "enterPassword": "Please enter your password",
+      "failed": "Login failed. Please try again",
+      "invalidToken": "Invalid response from server - no authentication token"
+    },
+    "loginSuccess": {
+      "title": "Welcome!",
+      "message": "You have successfully logged in"
+    }
+  },
+  "pastOrders": {
+    "title": "Past Orders",
+    "searchPlaceholder": "Search with Order ID...",
+    "searchHelpMessage": "Please enter at least 3 characters",
+    "resultsFor": "Results for:",
+    "noOrders": "No past orders",
+    "noSearchResults": "No orders found",
+    "delivery": "Delivery",
+    "selfPickup": "Self Pickup",
+    "canceledIn": "Canceled in ",
+    "completedIn": "Completed in ",
+    "orderCompleted": "Completed",
+    "orderCanceled": "Canceled",
+    "orderClosed": "Closed",
+    "onGoing": "On Going"
+  },
+  "order": {
+    "ready": "Ready",
+    "processing": "Processing Order...",
+    "printing": "Printing...",
+    "print": {
+      "title": "Print Options",
+      "invoice": "Invoice",
+      "kot": "KOT",
+      "preparing": "Preparing preview...",
+      "previewInvoice": "Preview Invoice",
+      "previewKOT": "Preview KOT",
+      "paper": "Paper",
+      "cancel": "Cancel",
+      "printButton": "Print",
+      "printingButton": "Printing...",
+      "done": "Done",
+      "success": "Success",
+      "error": "Print Error",
+      "errorMessage": "Failed to print. Please check your printer connection and settings.",
+      "invoicePrinted": "Invoice printed successfully!",
+      "kotPrinted": "KOT printed successfully!",
+      "noPrinter": "Printer Not Configured",
+      "noPrinterMessage": "Please configure your printer in settings before printing."
+    }
+  },
+  "runningOrders": {
+    "title": "Running Orders",
+    "ordersToday": "Orders Today",
+    "revenueToday": "Revenue Today",
+    "noOrders": "No Orders",
+    "items": "Items",
+    "more": "more",
+    "filters": {
+      "new": "New",
+      "preparing": "Preparing",
+      "selfPickup": "Self-Pickup",
+      "ongoing": "Ongoing"
+    },
+    "deliveryType": {
+      "delivery": "D",
+      "selfPickup": "SP"
+    }
+  },
+  "orderDetails": {
+    "title": "View Order",
+    "defaultStoreName": "Delivery KPG",
+    "verificationMessage": "Hand over the order only to the driver with the matching code!",
+    "orderTypes": {
+      "delivery": "Delivery Order",
+      "selfPickup": "Self Pickup"
+    },
+    "orderStatus": {
+      "newOrder": "New Order",
+      "preparing": "Preparing",
+      "deliveryAssigned": "Delivery Assigned",
+      "pickedUp": "Picked Up",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "readyForPickup": "Ready for Pickup",
+      "scheduled": "Scheduled",
+      "confirmScheduleOrder": "Confirm Schedule Order",
+      "closed": "Closed"
+    },
+    "driverStatus": {
+      "canceled": "Canceled",
+      "completed": "Completed",
+      "pickedUp": "Picked Up",
+      "deliveryAssigned": "Delivery Assigned",
+      "preparing": "Preparing"
+    },
+    "cancelReason": "Cancel Reason",
+    "customerDetails": {
+      "title": "Customer Details",
+      "name": "Name:",
+      "email": "Email:",
+      "phone": "Phone:",
+      "address": "Address:",
+      "notAvailable": "N/A"
+    },
+    "orderItems": {
+      "title": "Order Items",
+      "noCutlery": "No Cutlery"
+    },
+    "pricing": {
+      "subtotal": "Subtotal",
+      "receiveFromDriver": "Receive from Driver"
+    },
+    "actions": {
+      "acceptOrder": "Accept Order",
+      "cancelOrder": "Cancel Order",
+      "readyAt": "READY AT",
+      "markReady": "Mark Ready",
+      "markComplete": "Mark Complete"
+    },
+    "waitToMarkReady": "Wait",
+    "beforeMarking": "to mark ready",
+    "waitRequired": "Please Wait",
+    "modals": {
+      "confirmOrder": {
+        "title": "Confirmation",
+        "question": "How much time will it take to prepare this order?",
+        "minutes": "minutes",
+        "acceptButton": "Accept Order"
+      },
+      "cancelOrder": {
+        "title": "Confirmation",
+        "question": "Are you sure you want to cancel this order?",
+        "reasons": {
+          "outOfStock": "Out of stock",
+          "restaurantBusy": "Restaurant too busy",
+          "customerRequested": "Customer requested cancellation",
+          "unableToDeliver": "Unable to deliver",
+          "other": "Other"
+        },
+        "customReasonPlaceholder": "Enter cancel reason here",
+        "dontCancel": "Don't Cancel",
+        "confirmCancel": "Cancel Order"
+      }
+    },
+    "deliveryBy": "Delivery By :",
+    "phone": "Phone :",
+    "orderNotFound": "Order not found"
+  },
+  "menu": {
+    "title": "Menu Manager",
+    "inactiveItems": "Inactive Items",
+    "searchItems": "Search items...",
+    "itemsFound": "items found",
+    "searching": "Searching...",
+    "noItemsMatchSearch": "No items match your search",
+    "failedToLoadInactiveItems": "Failed to load inactive items",
+    "failedToLoadItems": "Failed to load items",
+    "itemActivatedSuccessfully": "Item activated successfully",
+    "itemActivated": "Item activated",
+    "itemDeactivated": "Item deactivated",
+    "failedToUpdateItemStatus": "Failed to update item status",
+    "items": {
+      "title": "Items",
+      "subtitle": "Add/Edit Items And more",
+      "addItem": "Add Item",
+      "searchPlaceholder": "Search for items...",
+      "noItems": "No items found",
+      "editItem": "Edit Item",
+      "addNewItem": "Add Item",
+      "noImage": "No Image",
+      "addImage": "Add Image",
+      "changeImage": "Change Image",
+      "browseMedia": "Browse Media",
+      "itemName": "Item Name",
+      "enterItemName": "Enter item name",
+      "price": "Price",
+      "pricePlaceholder": "0.00",
+      "description": "Description",
+      "enterDescription": "Enter description",
+      "itemCategory": "Item Category",
+      "selectCategory": "Select category",
+      "addons": "Addons",
+      "selectAddons": "Select addons",
+      "tags": "Tags",
+      "selectTags": "Select tags",
+      "new": "New",
+      "popular": "Popular",
+      "recommended": "Recommended",
+      "manageStock": "Manage Stock",
+      "stockQuantity": "Stock Quantity",
+      "stockWarning": "Item would not be sellable when stock goes 0, and would require manual stock update again.",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "create": "Create",
+      "update": "Update",
+      "deleteConfirmTitle": "Delete Item",
+      "deleteConfirmMessage": "Are you sure you want to delete this item? This action cannot be undone.",
+      "itemNotFound": "Item not found",
+      "failedToLoadItem": "Failed to load item",
+      "itemCreatedSuccess": "Item created successfully",
+      "itemUpdatedSuccess": "Item updated successfully",
+      "itemDeletedSuccess": "Item deleted successfully",
+      "pleaseEnterItemName": "Please enter item name",
+      "pleaseEnterValidPrice": "Please enter a valid price",
+      "pleaseSelectCategory": "Please select a category",
+      "permissionDenied": "Permission Denied",
+      "allowMediaAccess": "Please allow access to your media library",
+      "failedToPickImage": "Failed to pick image",
+      "selectMedia": "Select Media",
+      "failedToLoadMedia": "Failed to load media",
+      "noMediaFound": "No media found",
+      "categories": "Categories"
+    },
+    "itemCategories": {
+      "title": "Item Categories",
+      "subtitle": "Add/Edit Items Categories And more",
+      "addCategory": "Add Category",
+      "sortCategory": "Sort Category",
+      "edit": "Edit",
+      "categoryName": "Category Name",
+      "categoryNameRequired": "Category name is required",
+      "categoryCreatedSuccess": "Category created successfully",
+      "categoryUpdatedSuccess": "Category updated successfully",
+      "categoryStatusUpdated": "Category status updated",
+      "failedToLoadCategories": "Failed to load categories",
+      "failedToUpdateStatus": "Failed to update category status",
+      "failedToSaveCategory": "Failed to save category",
+      "noCategoriesFound": "No Categories Found",
+      "addFirstCategory": "Add your first category to get started",
+      "sortCategories": "Sort Categories",
+      "longPressToDrag": "Long press and drag to reorder categories",
+      "saveOrder": "Save Order",
+      "categoriesSortedSuccess": "Categories sorted successfully",
+      "failedToSortCategories": "Failed to sort categories",
+      "validationError": "Validation Error"
+    },
+    "addons": {
+      "title": "Addons & Categories",
+      "subtitle": "Add/Edit Addon, Categories And more",
+      "addonCategories": "Addon Categories",
+      "edit": "Edit",
+      "addAddonCategory": "Add Addon Category",
+      "editAddonCategory": "Edit Addon Category",
+      "categoryName": "Category Name",
+      "addonCategoryName": "Addon Category Name",
+      "selectionType": "Selection Type",
+      "selectType": "Select Type",
+      "singleSelection": "Single Selection",
+      "multiSelection": "Multi Selection",
+      "addonSelectionLimit": "Addon Selection Limit",
+      "unlimitedSelection": "Leave 0 for unlimited selection",
+      "addons": "Addons",
+      "addonName": "Addon Name",
+      "price": "Price",
+      "active": "Active",
+      "inactive": "Inactive",
+      "addAddon": "Add Addon",
+      "create": "Create",
+      "update": "Update",
+      "cancel": "Cancel",
+      "categoryNameRequired": "Category name is required",
+      "selectSelectionType": "Please select selection type",
+      "allAddonsMustHaveName": "All addons must have a name",
+      "addonCategoryCreatedSuccess": "Addon category created successfully",
+      "addonCategoryUpdatedSuccess": "Addon category updated successfully",
+      "addonDeletedSuccess": "deleted successfully",
+      "failedToLoadAddonCategories": "Failed to load addon categories",
+      "failedToSaveAddonCategory": "Failed to save addon category",
+      "failedToDeleteAddon": "Failed to delete addon",
+      "noAddonCategoriesFound": "No Addon Categories Found",
+      "addFirstAddonCategory": "Add your first addon category to get started",
+      "validationError": "Validation Error"
+    }
+  },
+  "more": {
+    "vacationEnabled": "🏖️ Vacation Mode Enabled",
+    "menu": {
+      "storeInfo": {
+        "title": "Store Info",
+        "subtitle": "Check Store Info"
+      },
+      "storeSchedule": {
+        "title": "Store Schedule Setting",
+        "subtitle": "Set Open/Close time for your store"
+      },
+      "vacationMode": {
+        "title": "Vacation Mode",
+        "subtitle": "Set up a vacation mode"
+      },
+      "commission": {
+        "title": "Commission Invoices",
+        "subtitle": "Invoices for Service Commissions and Order Details"
+      },
+      "ratings": {
+        "title": "Ratings",
+        "subtitle": "Manage Your customer ratings"
+      },
+      "promotions": {
+        "title": "Promotions",
+        "subtitle": "Send Notifications, Manage Coupons and more"
+      },
+      "notices": {
+        "title": "Notices",
+        "subtitle": "Important notifications from KPS Team"
+      },
+      "reports": {
+        "title": "Reports",
+        "subtitle": "Check out your financials"
+      },
+      "submitRequest": {
+        "title": "Submit Request",
+        "subtitle": "Send a request to your manager"
+      },
+      "changeStore": {
+        "title": "Change Store",
+        "subtitle": "Switch to a different store"
+      },
+      "settings": {
+        "title": "Settings",
+        "subtitle": "Account Settings, Printer Settings and more..."
+      },
+      "logout": {
+        "title": "Logout",
+        "subtitle": "Sign out from your account"
+      },
+      "updateProfile": {
+        "title": "Update Profile",
+        "subtitle": "Update your account information"
+      }
+    },
+    "header": {
+      "title": "Account"
+    },
+    "updateProfile": {
+      "title": "Update Profile",
+      "emailAddress": "Email Address",
+      "name": "Name",
+      "phone": "Phone",
+      "newPassword": "New Password",
+      "selectCountry": "Select your country",
+      "enterName": "Enter your name",
+      "enterPhone": "Leave empty if no change",
+      "enterPassword": "Leave empty if no change",
+      "updateButton": "Update Profile",
+      "deleteButton": "Delete Account",
+      "deleteTitle": "Delete Account",
+      "deleteMessage": "Are you sure you want to delete your account? You won't be able to manage your store anymore. We cannot reverse this action!",
+      "deleteConfirm": "Delete",
+      "deleteCancel": "Cancel",
+      "nameRequired": "Please enter your name",
+      "updateSuccess": "Profile updated successfully",
+      "updateFailed": "Failed to update profile",
+      "emailPhoneUsed": "Email or Phone already used",
+      "deleteSuccess": "Account deleted successfully",
+      "deleteFailed": "Failed to delete account",
+      "runningOrders": "You have running orders. Complete them before deleting account."
+    },
+    "dialog": {
+      "logout": {
+        "title": "Logout",
+        "message": "Are you sure you want to logout?",
+        "confirm": "Logout",
+        "cancel": "Cancel"
+      }
+    },
+    "notices": {
+      "title": "Notices",
+      "noticeReceivedAt": "Notice Received at",
+      "noNotices": "No notices available",
+      "errorLoading": "Error Loading Notices"
+    },
+    "ratings": {
+      "title": "Ratings",
+      "anonymous": "Anonymous",
+      "viewOrderDetails": "View Order Details",
+      "yourReply": "Your Reply:",
+      "basedOnReviews": "Based on {{count}} reviews",
+      "noRatings": "No Ratings Yet",
+      "noRatingsDesc": "Customer ratings and reviews will appear here",
+      "replyOnReview": "Reply on Review",
+      "customerReview": "Customer Review",
+      "enterReply": "Enter your reply",
+      "cancel": "Cancel",
+      "submit": "Submit",
+      "submitting": "Submitting...",
+      "replyRequired": "Please enter a reply",
+      "replySubmitted": "Reply submitted successfully",
+      "replyFailed": "Failed to submit reply"
+    },
+    "storeInfo": {
+      "title": "Store Info",
+      "subtitle": "Check Store Info",
+      "storeLogo": "Store Logo",
+      "storeBanner": "Store Banner",
+      "storeName": "Store Name",
+      "storeDescription": "Store Description",
+      "storeUrl": "Store URL",
+      "storeSupportPhone": "Store Support Phone",
+      "storeAddress": "Store Address",
+      "latLong": "Lat/Long",
+      "scheduleStatus": "Schedule Status",
+      "scheduleActive": "Your Auto Schedule is Active",
+      "scheduleInactive": "Your Auto Schedule is Inactive",
+      "storeSchedule": "Store Schedule",
+      "vacationStatus": "Vacation Status",
+      "notOnVacation": "Not on Vacation",
+      "onVacation": "On Vacation",
+      "removeVacation": "Remove Vacation",
+      "setOnVacation": "Set on Vacation",
+      "autoAcceptOrders": "Auto-Accept Orders",
+      "auto": "Auto",
+      "manual": "Manual",
+      "commissionRate": "Commission Rate %",
+      "adWalletBalance": "Ad Wallet Balance",
+      "vatIdNumber": "VAT Identification Number",
+      "storeCompanyName": "Store Company Name",
+      "notSet": "Not set",
+      "phoneSupportNote": "This number will be used by us to contact you for order support/queries.",
+      "adWalletNote": "This balance will be used for running advertisements on Delivery KPG",
+      "vatIdNote": "Adding a VAT ID may lead to additional tax of 7% on your commission invoices.",
+      "companyNameNote": "For Invoicing Purposes",
+      "copied": "Copied",
+      "copiedToClipboard": "Text copied to clipboard",
+      "noData": "No Data",
+      "noStoreInfo": "No store information available",
+      "error": "Error",
+      "failedToLoad": "Failed to load store information",
+      "missingAuthData": "Missing authentication data",
+      "noImageAvailable": "No image available",
+      "scheduleEnabled": "Schedule Enabled",
+      "scheduleDisabled": "Schedule Disabled",
+      "scheduleEnabledSuccess": "Store schedule has been enabled successfully",
+      "scheduleDisabledSuccess": "Store schedule has been disabled",
+      "errorTogglingSchedule": "Error toggling schedule",
+      "autoAcceptUpdated": "Auto-accept updated",
+      "warning": "Warning",
+      "unableToUpdate": "Unable to update",
+      "errorTogglingAutoAccept": "Error toggling auto-accept",
+      "storeInfoUpdated": "Store info updated",
+      "failedToUpdate": "Failed to update",
+      "errorUpdatingStoreInfo": "Error updating store info",
+      "updateStoreDescription": "Update Store Description",
+      "updateVatId": "Update VAT ID Number",
+      "updateCompanyName": "Update Store Company Name",
+      "updateSupportPhone": "Update Support Phone",
+      "description": "Description",
+      "vatIdNumberLabel": "VAT ID Number",
+      "companyName": "Company Name",
+      "phoneNumber": "Phone Number",
+      "enterStoreDescription": "Enter store description",
+      "enterVatId": "Enter VAT ID",
+      "enterCompanyName": "Enter company name",
+      "enterPhoneNumber": "Enter phone number",
+      "updating": "Updating...",
+      "update": "Update"
+    },
+    "submitRequest": {
+      "title": "Submit Request"
+    },
+    "commission": {
+      "title": "Commission Invoices",
+      "searchInvoice": "Search Invoice",
+      "invoiceNo": "Invoice No.",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "search": "Search",
+      "noInvoices": "No invoices found",
+      "amount": "Amount",
+      "orders": "Orders",
+      "viewDetails": "View Details",
+      "viewInvoice": "View Invoice",
+      "payNow": "Pay Now",
+      "invoiceGeneratedAt": "Invoice Generated at",
+      "paidAt": "Paid at",
+      "paymentStatus": "Payment Status",
+      "unpaid": "Unpaid",
+      "pending": "Pending",
+      "manual": "Manual",
+      "promptpay": "Promptpay",
+      "paymentMethods": "Payment Methods",
+      "payWithPromptpay": "Pay with Promptpay",
+      "paymentQrCode": "Payment QR Code",
+      "scanQrCode": "Scan this QR code with your PromptPay app to complete the payment",
+      "checkingPayment": "Checking payment status...",
+      "paymentCompleted": "Payment completed successfully",
+      "paymentFailed": "Payment failed. Please try again.",
+      "failedToGenerateQr": "Failed to generate payment QR code",
+      "failedToInitiatePayment": "Failed to initiate payment",
+      "failedToLoadInvoice": "Failed to load invoice",
+      "commission": "Commission",
+      "deliveryType": {
+        "delivery": "Delivery",
+        "selfPickup": "Self Pickup"
+      },
+      "filterInvoice": "Filter Invoice",
+      "enterInvoiceNo": "Enter Invoice No",
+      "searchInvoices": "Search Invoices",
+      "noInvoicesFound": "No Invoices Found",
+      "invoicesWillAppear": "Your commission invoices will appear here",
+      "subtitle": "Invoices for Service Commissions and Order Details",
+      "payInvoice": "Pay Invoice",
+      "cancel": "Cancel",
+      "payUsingPromptpay": "Pay using PromptPay QR code",
+      "scanToPay": "Scan to Pay",
+      "scanWithBanking": "Scan the QR code with your banking app",
+      "waitingForPayment": "Waiting for payment confirmation...",
+      "invoiceActions": "Invoice Actions",
+      "invoice": "Invoice",
+      "receipt": "Receipt",
+      "view": "View",
+      "download": "Download",
+      "whatsapp": "WhatsApp",
+      "close": "Close",
+      "openingInvoice": "Opening invoice...",
+      "failedToDownload": "Failed to download invoice",
+      "failedToShare": "Failed to share invoice",
+      "cannotOpenInvoice": "Cannot open invoice URL",
+      "failedToOpenInvoice": "Failed to open invoice",
+      "receiptDownloading": "Receipt is being downloaded",
+      "invoiceDownloading": "Invoice is being downloaded",
+      "cannotOpenLink": "Cannot open download link",
+      "failedToGetLink": "Failed to get download link",
+      "sentToWhatsapp": "Document sent to WhatsApp",
+      "failedToSendWhatsapp": "Failed to send on WhatsApp",
+      "failedToSendDocument": "Failed to send document on WhatsApp",
+      "ordersCount": "Orders Count",
+      "generatedAt": "Generated at",
+      "billedTo": "Billed To",
+      "invoiceItems": "Invoice Items",
+      "particulars": "Particulars",
+      "rate": "Rate",
+      "total": "Total",
+      "showInvoiceOrders": "Show Invoice Orders",
+      "viewFullInvoice": "View Full Invoice",
+      "invoiceNotFound": "Invoice Not Found",
+      "loadingInvoice": "Loading invoice details...",
+      "vatId": "VAT ID"
+    },
+    "promotion": {
+      "title": "Promotions",
+      "freeItems": {
+        "title": "Free Items",
+        "subtitle": "Woo your customers with free items on order subtotal",
+        "status": "Status",
+        "enabled": "Free item enabled successfully",
+        "disabled": "Free item disabled successfully",
+        "errorLoading": "Error Loading Data",
+        "minimumSubtotalFor": "Minimum Subtotal for Free Items",
+        "amountPlaceholder": "Amount *",
+        "freeItems": "Free Items",
+        "selectFreeItems": "Select Free Items",
+        "updateSettings": "Update Free Items Settings",
+        "resetSettings": "Reset Free Item Settings",
+        "searchItems": "Search items...",
+        "settingsUpdated": "Free items settings updated successfully"
+      },
+      "coupons": {
+        "title": "Coupons",
+        "subtitle": "Manage and Create Coupons",
+        "createCoupon": "Create Coupon",
+        "editCoupon": "Edit Coupon",
+        "noCoupons": "No coupons found",
+        "edit": "Edit",
+        "delete": "Delete",
+        "expiring": "Expiring",
+        "couponName": "Coupon Name",
+        "couponCode": "Coupon Code",
+        "description": "Description",
+        "deductionTarget": "Deduction Target",
+        "discountType": "Discount Type",
+        "discount": "Discount",
+        "maxDiscount": "Maximum Discount",
+        "expiryDate": "Expiry Date",
+        "maxUsageCount": "Maximum Usage Count",
+        "minSubtotal": "Minimum Subtotal",
+        "subtotalMessage": "Subtotal Message",
+        "userType": "User Type",
+        "visibility": "Visibility",
+        "showInRestaurant": "Show in Restaurant",
+        "showInCart": "Show in Cart",
+        "showInHome": "Show on Home Page",
+        "save": "Save Coupon",
+        "cancel": "Cancel",
+        "created": "Coupon created successfully",
+        "updated": "Coupon updated successfully",
+        "deleted": "Coupon deleted successfully",
+        "errorCreating": "Error creating coupon",
+        "errorUpdating": "Error updating coupon",
+        "errorDeleting": "Error deleting coupon",
+        "fillAllFields": "Please fill all required fields",
+        "confirmDelete": "Are you sure you want to delete this coupon?",
+        "deleteTitle": "Delete Coupon",
+        "onSubtotal": "On SubTotal",
+        "onDeliveryCharge": "On Delivery Charge",
+        "fixedAmount": "Fixed Amount Discount",
+        "percentage": "Percentage Discount",
+        "allUsers": "Unlimited times for all users",
+        "newUsers": "Once for new user for first order",
+        "oncePerUser": "Once per user",
+        "customLimit": "Define custom limit per user",
+        "selectDeductionType": "Select Deduction Type",
+        "selectDiscountType": "Select Discount Type",
+        "selectUserType": "Select User Type",
+        "couponDescription": "Coupon Description",
+        "couponNamePlaceholder": "Coupon Name",
+        "couponCodePlaceholder": "Coupon Code",
+        "couponDescriptionPlaceholder": "Coupon Description",
+        "maxDiscountPlaceholder": "Max Discount",
+        "discountPlaceholder": "Discount",
+        "expiryDatePlaceholder": "DD-MM-YYYY",
+        "maxCountPlaceholder": "Max number of use in total",
+        "minSubtotalPlaceholder": "Min Subtotal",
+        "subtotalMessagePlaceholder": "Subtotal not reached message",
+        "percentOff": "% off on",
+        "upto": "upto",
+        "off": "off on",
+        "na": "N/A",
+        "activated": "Coupon activated",
+        "deactivated": "Coupon deactivated",
+        "toggleError": "Failed to toggle coupon",
+        "validationError": "Validation Error",
+        "loadError": "Failed to load coupons",
+        "saveError": "Failed to save coupon",
+        "noCouponsFound": "No Coupons Found",
+        "createFirstCoupon": "Create your first coupon to offer discounts",
+        "required": "*",
+        "update": "Update",
+        "create": "Create",
+        "maxCount": "Max Count"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "subtitle": "Send Push Notifications to your customers",
+        "sendPushNotification": "+ Send Push Notification",
+        "noNotifications": "No notifications sent yet",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "pending": "Pending",
+        "sentBy": "Sent by",
+        "requestedAt": "Requested at",
+        "approvedAt": "Approved at",
+        "rejectedAt": "Rejected at",
+        "updatedAt": "Updated at",
+        "sendPushNotifications": "Send Push Notifications",
+        "send": "Send",
+        "cancel": "Cancel",
+        "titleLabel": "Title:",
+        "messageLabel": "Message:",
+        "titlePlaceholder": "Title",
+        "messagePlaceholder": "Message",
+        "addImage": "Add Image",
+        "permissionRequired": "Permission Required",
+        "photoLibraryPermission": "Please allow access to your photo library to upload images.",
+        "imageAdded": "Image Added",
+        "imageSelectedSuccess": "Image selected successfully",
+        "errorPickingImage": "Failed to pick image",
+        "validationError": "Validation Error",
+        "enterTitle": "Please enter a title",
+        "enterMessage": "Please enter a message",
+        "notificationSentSuccess": "Push notification sent successfully!",
+        "errorSendingNotification": "Failed to send notification",
+        "errorLoadingNotifications": "Error Loading Notifications",
+        "notificationDetails": "Notification Details",
+        "id": "ID",
+        "message": "Message",
+        "image": "Image",
+        "status": "Status",
+        "createdAt": "Created At",
+        "close": "Close",
+        "success": "Success",
+        "error": "Error"
+      },
+      "stories": {
+        "title": "Stories",
+        "subtitle": "Share your promotions with Delivery KPG customers",
+        "uploadStory": "Upload Story",
+        "noStoriesFound": "No Stories Found",
+        "noStoriesDescription": "Upload your first story to promote your restaurant",
+        "views": "Views",
+        "storyUploadedAt": "Story uploaded at",
+        "storyDeletedAt": "Story deleted at",
+        "storyTitle": "Story Title :",
+        "storyTitlePlaceholder": "Story Title",
+        "storyLinkTo": "Story Link To:",
+        "selectLink": "Select Link",
+        "storeName": "Store Name",
+        "selectItem": "Select Item",
+        "searchItems": "Search items...",
+        "selectItemPlaceholder": "Select Item",
+        "linkTo": "Link To",
+        "storyLink": "Story Link",
+        "linkMustStartHttps": "Link must start with https://",
+        "storyType": "Story Type :",
+        "selectStoryUploadType": "Select Story Upload Type",
+        "image": "Image",
+        "video": "Video",
+        "change": "Change",
+        "select": "Select",
+        "videoSelected": "Video Selected:",
+        "storyMedia": "Story Media",
+        "linkToLabel": "Link To",
+        "storyTypeLabel": "Story Type",
+        "viewsCount": "Views Count",
+        "uploadedAt": "Uploaded At",
+        "deletedAt": "Deleted At",
+        "uploadStoryTitle": "Upload Story",
+        "upload": "Upload",
+        "cancel": "Cancel",
+        "storyDetails": "Story Details",
+        "deleteStory": "Delete Story",
+        "close": "Close",
+        "permissionRequired": "Permission Required",
+        "grantMediaLibraryAccess": "Please grant media library access",
+        "validationError": "Validation Error",
+        "storyTitleRequired": "Story title is required",
+        "selectStoryType": "Please select story type",
+        "selectMediaRequired": "Please select an image or video",
+        "success": "Success",
+        "storyUploadedSuccess": "Story uploaded successfully",
+        "storyDeletedSuccess": "Story deleted successfully",
+        "error": "Error",
+        "failedToLoadStories": "Failed to load stories",
+        "failedToPickMedia": "Failed to pick media",
+        "failedToUploadStory": "Failed to upload story",
+        "failedToDeleteStory": "Failed to delete story"
+      }
+    },
+    "reports": {
+      "title": "Financial Reports",
+      "orderWise": {
+        "title": "Order-wise Report",
+        "subtitle": "Order-wise Commission Data, Earnings and more",
+        "titleAlt": "Orderwise Report",
+        "filterOrders": "Filter Orders",
+        "enterOrderId": "Enter Unique Order ID",
+        "search": "Search",
+        "searchOrders": "Search Orders",
+        "loading": "Loading...",
+        "noOrdersFound": "No Orders Found",
+        "noOrdersDescription": "Order-wise commission data and earnings will appear here",
+        "items": "Items",
+        "orderType": "Order Type",
+        "view": "View",
+        "delivery": "Delivery",
+        "pickup": "Pickup",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "ongoing": "On-going",
+        "receiveFromCustomer": "Receive From Customer",
+        "receiveFromDriver": "Receive From Driver",
+        "orderFinancials": "Order Financials",
+        "subtotal": "Subtotal",
+        "coupon": "Coupon",
+        "storeCharge": "Store Charge",
+        "serviceCharge": "Service Charge",
+        "commissionCharged": "Commission Charged",
+        "commissionRate": "Commission Rate",
+        "orderReceivedAt": "Order Received at",
+        "completedAt": "Completed at",
+        "cancelledAt": "Cancelled at",
+        "noAddress": "No address"
+      },
+      "partnerStatement": {
+        "title": "Partner Statement",
+        "subtitle": "Commission Invoice and Payment Logs",
+        "filterStatement": "Filter Statement",
+        "search": "Search",
+        "amount": "Amount",
+        "balance": "Balance",
+        "transactionHistory": "Transaction History",
+        "allTransactions": "All partner statement transactions",
+        "noStatementsFound": "No Statements Found",
+        "noStatementsDescription": "Partner statement transactions will appear here",
+        "errorLoadingStatements": "Error Loading Statements",
+        "somethingWentWrong": "Something went wrong"
+      },
+      "adWallet": {
+        "title": "Ad Wallet Statement",
+        "subtitle": "Statement for Ad Wallet Spends and Deposits",
+        "balance": "Ad Wallet Balance",
+        "amount": "Amount",
+        "transactionHistory": "Transaction History",
+        "allTransactions": "All ad wallet transactions",
+        "filterStatement": "Filter Statement",
+        "search": "Search",
+        "noTransactionsFound": "No Transactions Found",
+        "noTransactionsDescription": "Ad wallet transactions will appear here",
+        "errorLoadingStatements": "Error Loading Statements",
+        "somethingWentWrong": "Something went wrong",
+        "success": "Success",
+        "error": "Error"
+      }
+    },
+    "schedule": {
+      "workSchedule": {
+        "title": "Work Schedule",
+        "addSlot": "+ Add Slot",
+        "open": "Open",
+        "close": "Close",
+        "update": "Update Schedule",
+        "toast": {
+          "errorLoading": "Error loading schedule",
+          "scheduleUpdated": "Schedule Updated",
+          "scheduleUpdatedDesc": "Your work schedule has been updated successfully",
+          "updateFailed": "Update Failed"
+        }
+      },
+      "vacation": {
+        "title": "Vacation Mode",
+        "activeVacation": "Vacation Mode Active",
+        "activeVacationDesc": "Your store is currently on vacation",
+        "vacationPeriod": "Vacation Period",
+        "startTime": "Start Date",
+        "endTime": "End Date",
+        "infoMessage": "During vacation mode, your store will not accept new orders. Customers will be notified that you are on vacation.",
+        "setVacation": "Set Vacation",
+        "update": "Update Vacation",
+        "endVacation": "End Vacation",
+        "toast": {
+          "errorLoading": "Error loading vacation details",
+          "vacationEnded": "Vacation Ended",
+          "vacationEndedDesc": "Your store is now accepting orders",
+          "actionFailed": "Action Failed",
+          "invalidDates": "Invalid Dates",
+          "invalidDatesDesc": "End date must be after start date",
+          "vacationUpdated": "Vacation Updated",
+          "vacationUpdatedDesc": "Your vacation mode has been updated",
+          "updateFailed": "Update Failed"
+        }
+      }
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "App preferences & configuration",
+      "preferencesTitle": "App Preferences",
+      "preferencesDesc": "Customize your app experience",
+      "menu": {
+        "notification": {
+          "title": "Notification Sounds",
+          "subtitle": "Customize notification sounds"
+        },
+        "printer": {
+          "title": "Printer Settings",
+          "subtitle": "Configure printer for orders"
+        },
+        "printerSettings": {
+          "title": "Printer Settings",
+          "printerType": "Printer Type",
+          "printerTypeOptions": {
+            "ip": "IP / LAN / Network",
+            "bluetooth": "Bluetooth",
+            "webprint": "WebPrint"
+          },
+          "paperWidth": "Paper Width",
+          "paperWidthOptions": {
+            "58mm": "58 mm (Small)",
+            "80mm": "80 mm (Large)"
+          },
+          "placeholders": {
+            "selectPrinterType": "Select printer type",
+            "selectPaperWidth": "Select paper width",
+            "ipAddress": "IP Address (e.g., 192.168.1.100)",
+            "port": "Port (default: 9100)",
+            "selectPrinter": "Select your printer..."
+          },
+          "buttons": {
+            "testConnection": "Test Connection",
+            "saveSettings": "Save Settings",
+            "scanBluetooth": "🔍 Scan for Bluetooth Devices",
+            "scanning": "Scanning... {count} found • Tap to Stop",
+            "quickTest": "⚡ Quick Test Print",
+            "fullTest": "Full Test Print",
+            "printing": "Printing..."
+          },
+          "bluetooth": {
+            "foundDevices": "Found Devices ({count})",
+            "connectedPrinter": "✓ Connected Printer",
+            "tip": "💡 Tip: If you don't see your printer, make sure it's turned on and in pairing mode",
+            "noDevicesYet": "📱 No devices found yet.\nTap \"Scan\" to search for nearby Bluetooth devices."
+          },
+          "webprint": {
+            "title": "ℹ️ WebPrint Mode",
+            "description": "WebPrint uses the system's native print dialog. This mode is primarily for web-based applications and may have limited functionality in mobile apps."
+          },
+          "savedPrinter": {
+            "networkPrinter": "🖨️ Network Printer",
+            "bluetoothPrinter": "Bluetooth Printer",
+            "webprintEnabled": "🌐 WebPrint Enabled",
+            "usesSystemDialog": "Uses system print dialog",
+            "paper": "Paper: {width}mm"
+          },
+          "thaiPrint": {
+            "title": "Thai Print Support (Slower)",
+            "description": "Use this option if you have Thai or any other asian languages in item name or restaurant name. Recommended for all Thai receipts."
+          },
+          "showPreview": {
+            "title": "Show Print Preview",
+            "description": "Display preview before printing. Disable for instant printing without confirmation."
+          },
+          "testPrint": {
+            "subtitle": "Test your printer with sample receipts"
+          },
+          "errors": {
+            "enterIpPort": "Please enter both IP address and port",
+            "invalidIpFormat": "Invalid IP address format",
+            "failedToSave": "Failed to save settings",
+            "bluetoothPermissionDenied": "Bluetooth permission denied. Please enable in settings.",
+            "bluetoothNotEnabled": "Bluetooth is not enabled. Please turn on Bluetooth.",
+            "noPrinterSelected": "No Bluetooth printer selected",
+            "ipPortRequired": "IP address and port are required",
+            "webprintNotSupported": "Web print not supported in mobile app",
+            "pleaseConfigure": "Please configure a printer first",
+            "enterIpFirst": "Please enter IP address and port first",
+            "printFailed": "Print failed: {error}",
+            "couldNotConnect": "Could not connect to printer. Please check:\n\n• Printer is turned on\n• Printer has paper\n• Connection settings are correct",
+            "scanFailed": "Failed to scan for devices: {error}"
+          },
+          "status": {
+            "settingsSaved": "Network printer settings saved",
+            "connectedTo": "Connected to {name}",
+            "printerReachable": "✓ Network printer is reachable",
+            "cannotReach": "✗ Cannot reach printer at this address",
+            "connectionTestFailed": "Connection test failed: {error}",
+            "testPrintSuccess": "✓ Test print successful!",
+            "testPrintSuccessAlert": "Test print completed successfully!",
+            "noDevicesAfterScan": "No devices found. Make sure printer is on and in pairing mode.",
+            "devicesFoundAfterScan": "Found {count} device(s). Select your printer below.",
+            "scanStopped": "Scan stopped. Found {count} device(s).",
+            "scanStoppedNoDevices": "Scan stopped. No devices found.",
+            "noPrinterConfigured": "⚠️ No printer configured yet. Please set up your printer above."
+          },
+          "alerts": {
+            "success": "Success",
+            "printFailed": "Print Failed",
+            "ok": "OK"
+          }
+        },
+        "theme": {
+          "title": "Theme",
+          "subtitle": {
+            "light": "Light Mode",
+            "dark": "Dark Mode"
+          }
+        },
+        "language": {
+          "title": "Language",
+          "subtitle": "Change app language"
+        },
+        "tracking": {
+          "title": "Tracking Consent",
+          "subtitle": "Manage app analytics tracking preferences",
+          "modalTitle": "Analytics Consent",
+          "modalMessage": "We use Microsoft Clarity & Google Analytics only for analytics to improve app performance and user experience. We do NOT collect data for ads. Do you allow analytics tracking?"
+        },
+        "deleteAccount": {
+          "title": "Account Deletion",
+          "subtitle": "Request account deletion",
+          "modalTitle": "Account Deletion",
+          "modalMessage": "As a registered delivery partner with DeliveryKPG, you are currently unable to delete your account directly. This restriction is in place to ensure proper handling of settlements, cash-in-hand balances, and other transaction-related matters. If you would like to stop working with DeliveryKPG, please contact your manager for assistance."
+        }
+      },
+      "notification": {
+        "title": "Notification Settings",
+        "incomingOrder": "Incoming Order",
+        "orderReady": "Order Ready",
+        "selectSound": "Select Sound",
+        "description": "Customize notification sounds for different order events",
+        "incomingOrderDesc": "Sound when new orders arrive",
+        "orderReadyDesc": "Sound when orders are ready",
+        "toast": {
+          "incomingSaved": "Incoming order sound updated",
+          "readySaved": "Order ready sound updated"
+        }
+      },
+      "theme": {
+        "title": "Theme",
+        "light": "Light Mode",
+        "dark": "Dark Mode",
+        "system": "Device Default",
+        "toggle": "Toggle",
+        "selectTheme": "Select your preferred theme",
+        "currentlyActive": "Currently active",
+        "selectThemeLabel": "Select theme",
+        "lightDesc": "Bright interface for daytime use",
+        "darkDesc": "Dark interface for nighttime use",
+        "systemDesc": "Follow device settings"
+      }
+    }
+  }
+}

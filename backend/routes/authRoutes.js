@@ -1,15 +1,13 @@
 const express = require("express");
-const {
-  registerUser,
-  loginUser,
-  logoutUser,
-  getMe,
-} = require("../controllers/authController");
+const controller = require("../controllers/authController");
+const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
+
 const router = express.Router();
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
-router.post("/logout", logoutUser); // Changed to POST for better security
-router.get("/me", getMe);
+router.post("/register", controller.register);
+router.post("/login", controller.login);
+router.get("/me", attachAuth, requireAuth, controller.me);
+router.put("/me", attachAuth, requireAuth, controller.updateMe);
+router.post("/update-profile", attachAuth, requireAuth, controller.updateMe); // Alias for mobile app
 
 module.exports = router;

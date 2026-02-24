@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { GET_PRESIGNED_UPLOAD_URL } from "../url";
 import apiCall from "../utils/api";
 import { useTheme } from "../utils/context/theme";

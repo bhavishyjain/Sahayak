@@ -1,9 +1,14 @@
-var express = require('express');
-var router = express.Router();
+const express = require("express");
 
-/* GET home page. */
-router.get('/', function(req, res, next) {
-  res.render('index', { title: 'Express' });
+const router = express.Router();
+
+router.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", service: "sahayak-api" });
 });
+
+router.use("/auth", require("./authRoutes"));
+router.use("/complaints", require("./complaintRoutes"));
+router.use("/dashboard", require("./dashboardRoutes"));
+router.use("/notifications", require("./notificationRoutes"));
 
 module.exports = router;

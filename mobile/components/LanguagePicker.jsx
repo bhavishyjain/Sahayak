@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { Text, View } from "react-native";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 import { useLanguage, useTranslation } from "../utils/i18n/LanguageProvider";
 import { LANGUAGES } from "../utils/i18n/languages";

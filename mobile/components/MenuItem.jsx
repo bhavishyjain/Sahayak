@@ -1,12 +1,14 @@
 import { cloneElement } from "react";
 import { Text, View } from "react-native";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { getShadows } from "../assets/style";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 import PressableBlock from "./PressableBlock";
 
 export default function MenuItem({ icon, title, subtitle, onPress, danger }) {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const shadows = getShadows(colorScheme);
 
   const iconColor = danger ? colors.danger : colors.textPrimary;
 
@@ -16,6 +18,7 @@ export default function MenuItem({ icon, title, subtitle, onPress, danger }) {
       className="flex-row items-center rounded-xl p-4 mb-4"
       style={{
         backgroundColor: colors.backgroundSecondary,
+        ...shadows.sm,
       }}
     >
       <View className="w-6 h-6 items-center justify-center">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Modal, Text, Vibration, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 import { useTranslation } from "../utils/i18n/LanguageProvider";
 import PressableBlock from "./PressableBlock";

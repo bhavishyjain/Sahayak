@@ -1,6 +1,6 @@
 import { Circle, Pause, Plane, Power } from "lucide-react-native";
 import { Text, View } from "react-native";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 
 export default function StatusPill({ user }) {

@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 import { TextInput as PaperTextInput } from "react-native-paper";
-import { darkColors, lightColors } from "../app/(app)/colors";
+import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 import PressableBlock from "./PressableBlock";
 

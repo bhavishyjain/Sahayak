@@ -68,7 +68,7 @@ app.use(
 require("./config/passport")(passport);
 app.use(passport.initialize());
 app.use(passport.session());
-app.use("/api", require("./routes/api"));
+app.use("/api", require("./routes"));
 app.use("/api/chat", require("./routes/chatRoutes"));
 app.use("/api/workers", require("./routes/workerRoutes"));
 app.use("/api/hod", require("./routes/hodRoutes"));

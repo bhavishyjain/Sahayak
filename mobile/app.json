@@ -1,39 +1,125 @@
 {
   "expo": {
-    "name": "Sahayak – Next Gen Assistance",
-    "slug": "sahayak-next-gen-assistance",
-    "version": "1.0.0",
+    "name": "Sahayak",
+    "slug": "sahayak-mobile",
+    "version": "5.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "icon": "./assets/images/logo-ios.png",
+    "scheme": "sahayak",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "buildNumber": "44",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.sahayak.mobile",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["whatsapp"],
+        "UIBackgroundModes": ["remote-notification", "location", "fetch"],
+        "NSCameraUsageDescription": "We need camera access to take photos of civic issues and complaints for reporting to your local municipal authorities.",
+        "NSLocationWhenInUseUsageDescription": "We use your location to automatically detect the location of complaints you report and to show nearby civic issues on the heatmap.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location to help you report civic complaints at their exact location and to show you relevant issues in your area.",
+        "NSLocationAlwaysUsageDescription": "Location access helps us accurately pinpoint civic complaints and show you relevant issues in your community.",
+        "NSPhotoLibraryUsageDescription": "We need photo library access so you can attach photos of civic issues and complaints when reporting problems to municipal authorities.",
+        "NSMicrophoneUsageDescription": "Microphone access is required by certain libraries in the application. However, we do not use the microphone for any features in our app, and we do not access or collect any audio data from users."
+      },
+      "associatedDomains": [],
+      "appleTeamId": "ZLV8X465V5"
     },
     "android": {
+      "versionCode": 44,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "INTERNET",
+        "POST_NOTIFICATIONS",
+        "READ_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0F172A"
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/images/logo-android.png",
+        "monochromeImage": "./assets/images/splash.png"
       },
-      "package": "com.sevaai.sahayak"
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["DEFAULT", "BROWSABLE"],
+          "data": [
+            {
+              "scheme": "sahayak"
+            },
+            {
+              "scheme": "https",
+              "host": "sahayak.app"
+            }
+          ]
+        }
+      ],
+      "queries": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE"],
+          "data": [
+            {
+              "scheme": "https"
+            }
+          ]
+        }
+      ],
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sahayak.mobile",
+      "useNextNotificationsApi": true,
+      "statusBar": {
+        "translucent": false,
+        "backgroundColor": "#191918",
+        "barStyle": "light-content"
+      },
+      "navigationBar": {
+        "backgroundColor": "#191918",
+        "barStyle": "light-content"
+      },
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
-    },
-    "extra": {
-      "apiUrl": "http://localhost:3000/api"
+      "output": "static",
+      "favicon": "./assets/images/splash.png"
     },
     "plugins": [
-      "expo-asset",
-      "expo-font"
-    ]
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "backgroundColor": "#000000",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/ic_stat.png",
+          "color": "#FFCC00"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
   }
 }

@@ -1,0 +1,77 @@
+Sahayak Mobile - Components Reference
+
+1) components/BackButtonHeader.jsx
+- Top header with title + optional back button.
+- Handles fallback navigation when back stack is missing.
+
+2) components/Card.jsx
+- Reusable card wrapper.
+- Supports plain color background or image background.
+- Optional onPress behavior.
+
+3) components/ColorHelper.jsx
+- Utility: returns readable text color based on background luminance.
+
+4) components/CurvedTabBar.jsx
+- Custom curved tab bar background (SVG path).
+- Includes helper useTabBarHeight() for bottom spacing.
+
+5) components/CustomPicker.jsx
+- Searchable modal picker.
+- Supports opening from parent via ref.click().
+
+6) components/CustomSwitch.jsx
+- Animated switch toggle.
+- Supports disabled/loading states and multiple sizes.
+
+7) components/DateTimePickerModal.jsx
+- Custom date/time wheel picker modal.
+- Supports constraints and formatted value handling.
+
+8) components/DialogBox.jsx
+- Reusable modal dialog.
+- Supports title/message, confirm/cancel, input mode, OTP mode, loading states.
+
+9) components/ImageUploadBox.jsx
+- Pick/capture image, compress, upload via presigned URL.
+- Caches uploaded URL in local storage.
+
+10) components/InfoCard.jsx
+- Label-value row with optional icon.
+- Optional divider behavior via isLast.
+
+11) components/LanguagePicker.jsx
+- Language selector based on CustomPicker.
+- Supports inline mode and modalOnly mode via ref.openModal().
+
+12) components/MenuItem.jsx
+- Menu row (icon + title + subtitle).
+- Supports danger styling.
+
+13) components/MenuScreenLayout.jsx
+- Page scaffold for menu screens.
+- Renders BackButtonHeader + list of MenuItem + optional header/footer sections.
+
+14) components/PressableBlock.tsx
+- Animated press wrapper used as base clickable container.
+- Adds scale/opacity press feedback.
+
+15) components/StatusPill.jsx
+- Small status badge with colored dot.
+- States include online/offline/paused/vacation.
+
+16) components/SwipeButton.jsx
+- Swipe-to-confirm button wrapper around rn-swipe-button.
+
+17) components/AutoSkeleton/AutoSkeleton.native.tsx
+- Native skeleton wrapper.
+- iOS custom pulse + Android react-native-auto-skeleton.
+
+18) components/AutoSkeleton/AutoSkeleton.web.tsx
+- Web fallback skeleton (returns children directly).
+
+19) components/AutoSkeleton/index.ts
+- AutoSkeleton barrel export.
+
+20) components/AutoSkeleton/types.ts
+- Shared AutoSkeleton prop types.

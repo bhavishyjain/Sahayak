@@ -1,25 +1,66 @@
+const { darkColors, lightColors } = require("./colors");
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  content: [
+    "./app/**/*.{js,jsx,ts,tsx}",
+    "./components/**/*.{js,jsx,ts,tsx}",
+    // "./global.css",
+  ],
   presets: [require("nativewind/preset")],
-  content: ["./App.{js,jsx}", "./app/**/*.{js,jsx}"],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: "#E6FFFC",
-          100: "#BCFFF7",
-          200: "#8AFFF0",
-          300: "#52F7E5",
-          400: "#2EC4B6",
-          500: "#209A8F",
-          600: "#19756E",
-          700: "#135552",
-          800: "#0D3A37",
-          900: "#081F1E"
-        }
-      }
-    }
+        // Use simple nested structure that works with dark: variant
+        background: {
+          primary: {
+            DEFAULT: lightColors.backgroundPrimary,
+            dark: darkColors.backgroundPrimary,
+          },
+          secondary: {
+            DEFAULT: lightColors.backgroundSecondary,
+            dark: darkColors.backgroundSecondary,
+          },
+          darker: {
+            DEFAULT: lightColors.backgroundDark,
+            dark: darkColors.backgroundDark,
+          },
+          success: lightColors.backgroundSuccess,
+        },
+        text: {
+          primary: {
+            DEFAULT: lightColors.textPrimary,
+            dark: darkColors.textPrimary,
+          },
+          secondary: {
+            DEFAULT: lightColors.textSecondary,
+            dark: darkColors.textSecondary,
+          },
+        },
+        placeholder: lightColors.placeholder,
+        primary: lightColors.primary,
+        secondary: lightColors.secondary,
+        info: lightColors.info,
+        success: lightColors.success,
+        warning: lightColors.warning,
+        danger: lightColors.danger,
+        error: lightColors.error,
+        dark: lightColors.dark,
+        light: lightColors.light,
+        muted: lightColors.muted,
+      },
+      fontFamily: {
+        sans: ["Inter-Regular"],
+        inter: ["Inter-Regular"],
+        "inter-medium": ["Inter-Medium"],
+        "inter-semibold": ["Inter-SemiBold"],
+        "inter-bold": ["Inter-Bold"],
+        fira: ["Fira-Regular"],
+        "fira-medium": ["Fira-Medium"],
+        "fira-bold": ["Fira-Bold"],
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };

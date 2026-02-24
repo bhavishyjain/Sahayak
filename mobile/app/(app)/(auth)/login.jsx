@@ -1,0 +1,295 @@
+import * as Clarity from "@microsoft/react-native-clarity";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Image, Keyboard, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { TextInput as PaperTextInput } from "react-native-paper";
+import Toast from "react-native-toast-message";
+import { darkColors, lightColors } from "../../../colors";
+import LanguagePicker from "../../../components/LanguagePicker";
+import PressableBlock from "../../../components/PressableBlock";
+import apiCall from "../../../utils/api";
+import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import { setUserAuth } from "../../../utils/userAuth";
+
+export default function Login() {
+  const { colorScheme } = useTheme();
+  const colors = colorScheme === "dark" ? darkColors : lightColors;
+
+  const router = useRouter();
+  const { t } = useTranslation();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [secure, setSecure] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const userData = await AsyncStorage.getItem("user");
+      if (
+        userData !== null &&
+        userData !== undefined &&
+        userData !== "undefined" &&
+        JSON.parse(userData)?.auth_token
+      ) {
+        router.replace("/(app)/(tabs)/home");
+      }
+    };
+    checkAuth();
+    Clarity.setCurrentScreenName("Login");
+  }, []);
+
+  const handleLogin = async () => {
+    Keyboard.dismiss();
+    if (!email || email.trim() === "") {
+      Toast.show({
+        type: "error",
+        text1: t("toast.loginError.title"),
+        text2: t("toast.loginError.enterEmail"),
+      });
+      return;
+    }
+
+    if (!password || password.trim() === "") {
+      Toast.show({
+        type: "error",
+        text1: t("toast.loginError.title"),
+        text2: t("toast.loginError.enterPassword"),
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const baseUrl =
+        process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
+      const response = await apiCall({
+        method: "POST",
+        url: `${baseUrl}/auth/login`,
+        data: {
+          loginId: email.trim(),
+          password: password,
+        },
+      });
+      const responseData = response?.data || {};
+      const authToken = responseData?.token;
+      const userData = responseData?.user || {};
+
+      if (authToken) {
+        const userToStore = {
+          ...userData,
+          auth_token: authToken,
+          token: authToken,
+        };
+
+        await setUserAuth(userToStore);
+
+        Toast.show({
+          type: "success",
+          text1: t("toast.loginSuccess.title") || "Success",
+          text2: responseData?.message || t("toast.loginSuccess.message"),
+        });
+        router.replace("/(app)/(tabs)/home");
+      } else {
+        console.error("No auth token in response:", userData);
+        Toast.show({
+          type: "error",
+          text1: t("toast.loginError.title"),
+          text2: t("toast.loginError.invalidToken"),
+        });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      console.error("Error response:", error?.response?.data);
+      Toast.show({
+        type: "error",
+        text1: t("toast.loginError.title"),
+        text2: error?.response?.data?.message || t("toast.loginError.failed"),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAwareScrollView
+      style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingVertical: 20,
+        flexGrow: 1,
+      }}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid={true}
+      extraScrollHeight={25}
+      showsVerticalScrollIndicator={false}
+    >
+      <View className="items-center mt-10">
+        <View className="w-full items-start mb-5">
+          <Image
+            source={require("../../../assets/images/mono-logo.png")}
+            style={{
+              width: 120,
+              height: 40,
+              filter: colorScheme === "dark" ? "none" : "invert(1)",
+            }}
+            resizeMode="contain"
+          />
+        </View>
+        <Image
+          source={require("../../../assets/images/login-image-hero.webp")}
+          style={{ width: 250, height: 250, marginBottom: 24 }}
+          resizeMode="contain"
+        />
+        <Text
+          className="text-[28px] font-fira-bold mb-4 text-center"
+          style={{ color: colors.textPrimary }}
+        >
+          {t("auth.login.title")}
+        </Text>
+        <Text
+          className="text-sm mb-8 text-center px-5"
+          style={{ color: colors.textSecondary }}
+        >
+          {t("auth.login.subtitleEmail")}
+        </Text>
+
+        {/* Email Input */}
+        <View
+          className="flex-row items-center w-full rounded-lg px-4 mb-4 h-[50px]"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.muted,
+          }}
+        >
+          <PaperTextInput
+            mode="flat"
+            value={email}
+            onChangeText={setEmail}
+            placeholder={t("auth.login.emailPlaceholder")}
+            placeholderTextColor={colors.placeholder}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{
+              flex: 1,
+              backgroundColor: "transparent",
+            }}
+            underlineStyle={{ display: "none" }}
+            contentStyle={{
+              color: colors.textPrimary,
+              fontSize: 16,
+              fontWeight: "600",
+              paddingHorizontal: 0,
+            }}
+            theme={{
+              colors: {
+                text: colors.textPrimary,
+              },
+            }}
+          />
+        </View>
+
+        {/* Password Input */}
+        <View
+          className="flex-row items-center w-full rounded-lg px-4 mb-5 h-[50px]"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.muted,
+          }}
+        >
+          <PaperTextInput
+            mode="flat"
+            value={password}
+            onChangeText={setPassword}
+            placeholder={t("auth.login.passwordPlaceholder")}
+            placeholderTextColor={colors.placeholder}
+            secureTextEntry={secure}
+            autoCapitalize="none"
+            style={{
+              flex: 1,
+              backgroundColor: "transparent",
+            }}
+            underlineStyle={{ display: "none" }}
+            contentStyle={{
+              color: colors.textPrimary,
+              fontSize: 16,
+              fontWeight: "600",
+              paddingHorizontal: 0,
+            }}
+            theme={{
+              colors: {
+                text: colors.textPrimary,
+              },
+            }}
+            right={
+              <PaperTextInput.Icon
+                icon={secure ? "eye-off" : "eye"}
+                onPress={() => setSecure(!secure)}
+              />
+            }
+          />
+        </View>
+
+        {/* Login Button */}
+        <PressableBlock
+          className="w-full py-4 rounded-lg items-center mb-4"
+          style={{
+            backgroundColor: colors.primary,
+          }}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator size="small" color={colors.dark} />
+              <Text
+                className="ml-3 text-base font-fira-bold"
+                style={{
+                  color: colors.dark,
+                  opacity: 0.5,
+                }}
+              >
+                {t("auth.login.loading")}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              className="text-base font-fira-bold"
+              style={{ color: colors.dark }}
+            >
+              {t("auth.login.button")}
+            </Text>
+          )}
+        </PressableBlock>
+        <PressableBlock
+          onPress={() => router.push("/(app)/(auth)/register")}
+          className="py-4 mb-8 rounded-xl active:opacity-80 w-full"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.muted,
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "center",
+              fontSize: 16,
+              fontWeight: "600",
+              color: colors.textSecondary,
+            }}
+          >
+            {t("auth.register.button")}
+          </Text>
+        </PressableBlock>
+
+        {/* Language Selector */}
+        <LanguagePicker />
+      </View>
+    </KeyboardAwareScrollView>
+  );
+}
