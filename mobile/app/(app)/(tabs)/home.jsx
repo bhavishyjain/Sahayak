@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import {
   AlertCircle,
   CheckCircle2,
@@ -6,8 +7,12 @@ import {
   Flame,
   ListChecks,
   Map,
+  MapPin,
   MessageCircle,
   Search,
+  TrendingUp,
+  Bell,
+  ChevronRight,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -15,16 +20,24 @@ import {
   ScrollView,
   Text,
   View,
+  Dimensions,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
-import { getStatusColor, getSeverityColor } from "../../../utils/colorHelpers";
+import {
+  getStatusColor,
+  getSeverityColor,
+  getPriorityColor,
+} from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import getUserAuth from "../../../utils/userAuth";
 
+const { width } = Dimensions.get("window");
+
 export default function HomeScreen() {
+  const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
@@ -35,8 +48,6 @@ export default function HomeScreen() {
     recent: [],
   });
   const [spots, setSpots] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [trackId, setTrackId] = useState("");
   const [user, setUser] = useState(null);
 
   const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
@@ -88,13 +99,7 @@ export default function HomeScreen() {
       });
   }, []);
 
-  const myComplaints = useMemo(() => {
-    const rows = summary?.recent || [];
-    if (statusFilter === "all") return rows;
-    return rows.filter(
-      (item) => String(item.status || "").toLowerCase() === statusFilter,
-    );
-  }, [summary?.recent, statusFilter]);
+  const myComplaints = useMemo(() => summary?.recent || [], [summary?.recent]);
 
   const topHotspots = useMemo(() => (spots || []).slice(0, 6), [spots]);
   const reminders = useMemo(() => {
@@ -121,74 +126,19 @@ export default function HomeScreen() {
   const actions = [
     {
       key: "register",
-      label: "Register Complaint",
+      label: "New Complaint",
       icon: FilePlus2,
-      onPress: () =>
-        Toast.show({
-          type: "info",
-          text1: "Next",
-          text2: "Complaint form page next.",
-        }),
+      color: colors.primary,
+      onPress: () => router.push("/(tabs)/complaints"),
     },
     {
-      key: "my",
-      label: "My Complaints",
-      icon: ListChecks,
-      onPress: () => setStatusFilter("all"),
-    },
-    {
-      key: "track",
-      label: "Track by ID",
-      icon: Search,
-      onPress: () => {
-        const id = trackId.trim();
-        if (!id) {
-          Toast.show({ type: "info", text1: "Enter ticket ID first" });
-          return;
-        }
-        Toast.show({
-          type: "info",
-          text1: "Next",
-          text2: `Track ${id} page next.`,
-        });
-      },
-    },
-    {
-      key: "assistant",
-      label: "Assistant Chat",
-      icon: MessageCircle,
-      onPress: () =>
-        Toast.show({
-          type: "info",
-          text1: "Next",
-          text2: "Assistant page next.",
-        }),
+      key: "heatmap",
+      label: "Heat Map",
+      icon: Map,
+      color: colors.danger,
+      onPress: () => router.push("/(tabs)/heatmap"),
     },
   ];
-
-  const StatCard = ({ icon: Icon, title, value, tone }) => (
-    <View
-      className="w-[48.5%] rounded-2xl p-3.5 mb-2.5"
-      style={{
-        backgroundColor: colors.backgroundSecondary,
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}
-    >
-      <View className="flex-row items-center mb-2">
-        <Icon size={16} color={tone} />
-        <Text className="ml-2 text-xs" style={{ color: colors.textSecondary }}>
-          {title}
-        </Text>
-      </View>
-      <Text
-        className="text-[26px] font-bold"
-        style={{ color: colors.textPrimary }}
-      >
-        {value ?? 0}
-      </Text>
-    </View>
-  );
 
   return (
     <ScrollView
@@ -203,236 +153,423 @@ export default function HomeScreen() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => loadData(true)}
+          colors={[colors.primary]}
+          tintColor={colors.primary}
         />
       }
       showsVerticalScrollIndicator={false}
     >
-      <Text
-        className="text-[32px] font-extrabold"
-        style={{ color: colors.textPrimary }}
-      >
-        {getGreeting()},
-      </Text>
-      <Text
-        className="text-[32px] font-extrabold mb-4"
-        style={{ color: colors.textPrimary }}
-      >
-        {user?.fullName}
-      </Text>
-      <View className="flex-row flex-wrap justify-between">
-        <StatCard
-          icon={ListChecks}
-          title="Total"
-          value={summary?.stats?.total}
-          tone={colors.primary}
-        />
-        <StatCard
-          icon={AlertCircle}
-          title="Pending"
-          value={summary?.stats?.pending}
-          tone={colors.danger}
-        />
-        <StatCard
-          icon={Clock3}
-          title="In Progress"
-          value={summary?.stats?.inProgress}
-          tone={colors.warning}
-        />
-        <StatCard
-          icon={CheckCircle2}
-          title="Resolved"
-          value={summary?.stats?.resolved}
-          tone={colors.success}
-        />
+      {/* Header */}
+      <View className="mb-8">
+        <Text
+          className="text-sm font-medium mb-1"
+          style={{ color: colors.textSecondary }}
+        >
+          {getGreeting()} 👋
+        </Text>
+        <Text
+          className="text-3xl font-extrabold mb-3"
+          style={{ color: colors.textPrimary }}
+        >
+          {user?.fullName || "User"}
+        </Text>
+        {summary?.stats?.pending > 0 && (
+          <Text className="text-sm" style={{ color: colors.textSecondary }}>
+            You have{" "}
+            <Text style={{ color: colors.danger, fontWeight: "700" }}>
+              {summary.stats.pending} pending
+            </Text>{" "}
+            {summary.stats.pending === 1 ? "complaint" : "complaints"}
+          </Text>
+        )}
       </View>
 
+      {/* Unified Stats Card */}
       <View
-        className="mt-1 rounded-2xl p-3"
+        className="rounded-3xl p-5 mb-6"
         style={{
           backgroundColor: colors.backgroundSecondary,
           borderWidth: 1,
           borderColor: colors.border,
         }}
       >
-        <Text
-          className="text-[15px] font-bold mb-1.5"
-          style={{ color: colors.textPrimary }}
-        >
-          Smart reminders
-        </Text>
-        <Text className="text-[13px]" style={{ color: colors.textSecondary }}>
-          {reminders.pendingText}
-        </Text>
-        <Text
-          className="text-[13px] mt-1"
-          style={{ color: colors.textSecondary }}
-        >
-          {reminders.lastUpdatedText}
-        </Text>
-      </View>
-
-      <View className="mt-3.5">
-        <Text
-          className="text-lg font-bold mb-2.5"
-          style={{ color: colors.textPrimary }}
-        >
-          My complaints
-        </Text>
-
-        <View className="flex-row mb-2.5">
-          {[
-            { key: "all", label: "All" },
-            { key: "pending", label: "Pending" },
-            { key: "in-progress", label: "In progress" },
-            { key: "resolved", label: "Resolved" },
-          ].map((chip) => (
-            <PressableBlock
-              key={chip.key}
-              onPress={() => setStatusFilter(chip.key)}
-              className="mr-2 px-3 py-[7px] rounded-full border"
-              style={{
-                borderColor:
-                  statusFilter === chip.key ? colors.primary : colors.border,
-                backgroundColor:
-                  statusFilter === chip.key
-                    ? `${colors.primary}22`
-                    : colors.backgroundSecondary,
-              }}
-            >
-              <Text
-                className="text-xs font-semibold"
-                style={{ color: colors.textPrimary }}
-              >
-                {chip.label}
-              </Text>
-            </PressableBlock>
-          ))}
-        </View>
-
-        {(myComplaints || []).length === 0 && !loading ? (
-          <View
-            className="rounded-xl border p-3.5"
-            style={{
-              borderColor: colors.border,
-              backgroundColor: colors.backgroundSecondary,
-            }}
-          >
-            <Text style={{ color: colors.textSecondary }}>
-              No complaints found.
-            </Text>
-          </View>
-        ) : (
-          (myComplaints || []).map((item) => (
-            <View
-              key={item.id || item.ticketId}
-              className="rounded-xl border p-3 mb-2"
-              style={{
-                borderColor: colors.border,
-                backgroundColor: colors.backgroundSecondary,
-              }}
-            >
-              <View className="flex-row justify-between mb-1.5">
-                <Text
-                  className="font-bold"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {item.ticketId}
-                </Text>
-                <Text
-                  className="font-bold capitalize"
-                  style={{
-                    color: getStatusColor(item.status, colors),
-                  }}
-                >
-                  {item.status}
-                </Text>
-              </View>
-              <Text
-                className="text-[13px]"
-                style={{ color: colors.textPrimary }}
-              >
-                {item.title || "Complaint"}
-              </Text>
-              <Text
-                className="text-xs mt-1"
-                style={{ color: colors.textSecondary }}
-              >
-                {item.department} | {item.priority} |{" "}
-                {item.locationName || "Location not set"}
-              </Text>
-            </View>
-          ))
-        )}
-      </View>
-
-      <View className="mt-3.5">
-        <View className="flex-row items-center mb-2.5">
-          <Map size={18} color={colors.primary} />
+        <View className="flex-row items-center justify-between mb-4">
           <Text
-            className="text-lg font-bold ml-2"
+            className="text-lg font-extrabold"
             style={{ color: colors.textPrimary }}
           >
-            All complaints (city hotspots)
+            Overview
           </Text>
-        </View>
-
-        {topHotspots.length === 0 && !loading ? (
-          <View
-            className="rounded-xl border p-3.5"
-            style={{
-              borderColor: colors.border,
-              backgroundColor: colors.backgroundSecondary,
-            }}
-          >
-            <Text style={{ color: colors.textSecondary }}>
-              No hotspot data available.
+          <View className="flex-row items-center">
+            <TrendingUp size={14} color={colors.success} />
+            <Text
+              className="text-xs font-semibold ml-1"
+              style={{ color: colors.success }}
+            >
+              Active
             </Text>
           </View>
-        ) : (
-          topHotspots.map((spot, idx) => (
+        </View>
+
+        <View className="flex-row justify-between">
+          <View className="items-center" style={{ width: "22%" }}>
             <View
-              key={`${spot.locationName}-${idx}`}
-              className="rounded-xl border p-3 mb-2"
-              style={{
-                borderColor: colors.border,
-                backgroundColor: colors.backgroundSecondary,
-              }}
+              className="w-12 h-12 rounded-2xl items-center justify-center mb-2"
+              style={{ backgroundColor: `${colors.primary}15` }}
             >
-              <View className="flex-row justify-between mb-1.5">
-                <Text
-                  className="font-bold"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {spot.locationName}
-                </Text>
-                <View className="flex-row items-center">
-                  <Flame
-                    size={14}
-                    color={getSeverityColor(spot.severity, colors)}
-                  />
-                  <Text
-                    className="text-xs ml-1 font-bold capitalize"
-                    style={{
-                      color: getSeverityColor(spot.severity, colors),
-                    }}
-                  >
-                    {spot.severity}
-                  </Text>
-                </View>
-              </View>
-              <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                Total: {spot.totalComplaints} | Open: {spot.openComplaints} |
-                High: {spot.highPriorityComplaints}
-              </Text>
+              <ListChecks size={22} color={colors.primary} />
+            </View>
+            <Text
+              className="text-2xl font-extrabold mb-1"
+              style={{ color: colors.textPrimary }}
+            >
+              {summary?.stats?.total ?? 0}
+            </Text>
+            <Text
+              className="text-[11px] font-medium text-center"
+              style={{ color: colors.textSecondary }}
+            >
+              Total
+            </Text>
+          </View>
+
+          <View className="items-center" style={{ width: "22%" }}>
+            <View
+              className="w-12 h-12 rounded-2xl items-center justify-center mb-2"
+              style={{ backgroundColor: `${colors.danger}15` }}
+            >
+              <AlertCircle size={22} color={colors.danger} />
+            </View>
+            <Text
+              className="text-2xl font-extrabold mb-1"
+              style={{ color: colors.textPrimary }}
+            >
+              {summary?.stats?.pending ?? 0}
+            </Text>
+            <Text
+              className="text-[11px] font-medium text-center"
+              style={{ color: colors.textSecondary }}
+            >
+              Pending
+            </Text>
+          </View>
+
+          <View className="items-center" style={{ width: "22%" }}>
+            <View
+              className="w-12 h-12 rounded-2xl items-center justify-center mb-2"
+              style={{ backgroundColor: `${colors.warning}15` }}
+            >
+              <Clock3 size={22} color={colors.warning} />
+            </View>
+            <Text
+              className="text-2xl font-extrabold mb-1"
+              style={{ color: colors.textPrimary }}
+            >
+              {summary?.stats?.inProgress ?? 0}
+            </Text>
+            <Text
+              className="text-[11px] font-medium text-center"
+              style={{ color: colors.textSecondary }}
+            >
+              Active
+            </Text>
+          </View>
+
+          <View className="items-center" style={{ width: "22%" }}>
+            <View
+              className="w-12 h-12 rounded-2xl items-center justify-center mb-2"
+              style={{ backgroundColor: `${colors.success}15` }}
+            >
+              <CheckCircle2 size={22} color={colors.success} />
+            </View>
+            <Text
+              className="text-2xl font-extrabold mb-1"
+              style={{ color: colors.textPrimary }}
+            >
+              {summary?.stats?.resolved ?? 0}
+            </Text>
+            <Text
+              className="text-[11px] font-medium text-center"
+              style={{ color: colors.textSecondary }}
+            >
+              Done
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Quick Actions - Horizontal Pills */}
+      <View className="flex-row mb-6">
+        {actions.map((action) => (
+          <PressableBlock
+            key={action.key}
+            onPress={action.onPress}
+            className="flex-1 mr-3 rounded-full py-3.5 flex-row items-center justify-center"
+            style={{
+              backgroundColor: action.color,
+            }}
+          >
+            <action.icon size={18} color={colors.dark} />
+            <Text
+              className="text-sm font-bold ml-2"
+              style={{ color: colors.dark }}
+            >
+              {action.label}
+            </Text>
+          </PressableBlock>
+        ))}
+      </View>
+
+      {/* My Complaints Section */}
+      <View className="mb-6">
+        <View className="flex-row items-center justify-between mb-3">
+          <Text
+            className="text-xl font-extrabold"
+            style={{ color: colors.textPrimary }}
+          >
+            Recent Complaints
+          </Text>
+          <PressableBlock
+            onPress={() => router.push("/(tabs)/complaints")}
+            className="flex-row items-center"
+          >
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: colors.primary }}
+            >
+              View All
+            </Text>
+            <ChevronRight
+              size={16}
+              color={colors.primary}
+              style={{ marginLeft: 4 }}
+            />
+          </PressableBlock>
+        </View>
+
+        <View
+          className="rounded-2xl px-4 py-2"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          {(myComplaints || []).length === 0 && !loading ? (
+            <View className="py-6 items-center">
+              <ListChecks
+                size={32}
+                color={colors.textSecondary}
+                style={{ opacity: 0.5 }}
+              />
               <Text
-                className="text-xs mt-0.5"
+                className="text-sm font-medium mt-2"
                 style={{ color: colors.textSecondary }}
               >
-                Department: {spot.topDepartment}
+                No complaints yet
               </Text>
             </View>
-          ))
-        )}
+          ) : (
+            (myComplaints || []).slice(0, 3).map((item, index) => (
+              <PressableBlock
+                key={item.id || item.ticketId}
+                onPress={() =>
+                  router.push(`/complaints/complaint-details?id=${item.id}`)
+                }
+              >
+                <View
+                  className="flex-row items-center py-3"
+                  style={{
+                    borderBottomWidth:
+                      index < (myComplaints || []).slice(0, 3).length - 1
+                        ? 1
+                        : 0,
+                    borderBottomColor: colors.border,
+                  }}
+                >
+                  <View className="flex-1">
+                    <View className="flex-row items-center mb-2">
+                      <Text
+                        className="text-xs font-bold mr-2"
+                        style={{ color: colors.primary }}
+                      >
+                        #{item.ticketId}
+                      </Text>
+                      <View
+                        className="px-2 py-0.5 rounded-md"
+                        style={{
+                          backgroundColor: `${getStatusColor(item.status, colors)}20`,
+                        }}
+                      >
+                        <Text
+                          className="text-[10px] font-bold capitalize"
+                          style={{
+                            color: getStatusColor(item.status, colors),
+                          }}
+                        >
+                          {item.status}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      className="text-sm font-semibold mb-1"
+                      style={{ color: colors.textPrimary }}
+                      numberOfLines={1}
+                    >
+                      {item.title || "Complaint"}
+                    </Text>
+                    <Text
+                      className="text-xs"
+                      style={{ color: colors.textSecondary }}
+                      numberOfLines={1}
+                    >
+                      {item.department} • {item.priority}
+                    </Text>
+                  </View>
+                  <ChevronRight size={18} color={colors.textSecondary} />
+                </View>
+              </PressableBlock>
+            ))
+          )}
+        </View>
+      </View>
+
+      {/* Hotspots Section */}
+      <View className="mb-4">
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center">
+            <Flame size={20} color={colors.danger} style={{ marginRight: 8 }} />
+            <Text
+              className="text-xl font-extrabold"
+              style={{ color: colors.textPrimary }}
+            >
+              Hotspots
+            </Text>
+          </View>
+          <PressableBlock
+            onPress={() => router.push("/(tabs)/heatmap")}
+            className="flex-row items-center"
+          >
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: colors.primary }}
+            >
+              See Map
+            </Text>
+            <ChevronRight
+              size={16}
+              color={colors.primary}
+              style={{ marginLeft: 4 }}
+            />
+          </PressableBlock>
+        </View>
+
+        <View
+          className="rounded-2xl p-4"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          {topHotspots.length === 0 && !loading ? (
+            <View className="py-6 items-center">
+              <Map
+                size={32}
+                color={colors.textSecondary}
+                style={{ opacity: 0.5 }}
+              />
+              <Text
+                className="text-sm font-medium mt-2"
+                style={{ color: colors.textSecondary }}
+              >
+                No hotspot data
+              </Text>
+            </View>
+          ) : (
+            topHotspots.slice(0, 4).map((spot, idx) => (
+              <PressableBlock
+                key={`${spot.locationName}-${idx}`}
+                onPress={() => router.push("/(tabs)/heatmap")}
+              >
+                <View
+                  className="flex-row items-center py-3"
+                  style={{
+                    borderBottomWidth:
+                      idx < topHotspots.slice(0, 4).length - 1 ? 1 : 0,
+                    borderBottomColor: colors.border,
+                  }}
+                >
+                  <View className="flex-1">
+                    <View className="flex-row items-center mb-2">
+                      <Text
+                        className="text-sm font-bold flex-1"
+                        style={{ color: colors.textPrimary }}
+                        numberOfLines={1}
+                      >
+                        {spot.locationName}
+                      </Text>
+                      <View
+                        className="px-2 py-1 rounded-md ml-2"
+                        style={{
+                          backgroundColor: `${getSeverityColor(spot.severity, colors)}20`,
+                        }}
+                      >
+                        <Text
+                          className="text-[10px] font-bold capitalize"
+                          style={{
+                            color: getSeverityColor(spot.severity, colors),
+                          }}
+                        >
+                          {spot.severity}
+                        </Text>
+                      </View>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Text
+                        className="text-xs mr-3"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        <Text
+                          style={{
+                            color: colors.textPrimary,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {spot.totalComplaints}
+                        </Text>{" "}
+                        total
+                      </Text>
+                      <Text
+                        className="text-xs mr-3"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        <Text
+                          style={{ color: colors.danger, fontWeight: "700" }}
+                        >
+                          {spot.openComplaints}
+                        </Text>{" "}
+                        open
+                      </Text>
+                      <Text
+                        className="text-xs"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        <Text
+                          style={{ color: colors.warning, fontWeight: "700" }}
+                        >
+                          {spot.highPriorityComplaints}
+                        </Text>{" "}
+                        high
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={18} color={colors.textSecondary} />
+                </View>
+              </PressableBlock>
+            ))
+          )}
+        </View>
       </View>
     </ScrollView>
   );

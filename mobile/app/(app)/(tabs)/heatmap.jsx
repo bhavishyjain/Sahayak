@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useState, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
@@ -34,46 +35,117 @@ export default function HeatMap() {
 
   const [userLocation, setUserLocation] = useState(null);
 
-  // Get user's current location
-  useEffect(() => {
-    console.log("🌍 Location effect running");
-    (async () => {
-      try {
-        console.log("📍 Requesting location permission...");
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        console.log("Permission status:", status);
+  // Function to fetch user's current location
+  const fetchUserLocation = useCallback(async () => {
+    try {
+      console.log("📍 Fetching location...");
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log("Permission status:", status);
 
-        if (status === "granted") {
-          // Try to get last known position first (faster)
-          const lastKnown = await Location.getLastKnownPositionAsync({
-            maxAge: 60000, // Accept location from last 60 seconds
-          });
-
-          if (lastKnown) {
-            setUserLocation({
-              lat: lastKnown.coords.latitude,
-              lng: lastKnown.coords.longitude,
-            });
-          }
-
-          // Then get current position (more accurate)
-          const location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-            timeout: 10000,
-          });
-          setUserLocation({
-            lat: location.coords.latitude,
-            lng: location.coords.longitude,
-          });
-        } else {
-          console.log("Location permission denied");
-        }
-      } catch (error) {
-        console.log("Error getting location:", error.message);
-        // Continue with default location if location fails
+      if (status !== "granted") {
+        console.log("Location permission denied");
+        return;
       }
-    })();
+
+      // Get current position with retry logic
+      let retries = 3;
+      let location = null;
+
+      while (retries > 0 && !location) {
+        try {
+          console.log(`Attempting to get location (${4 - retries}/3)...`);
+          location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+            timeout: 15000,
+            maximumAge: 10000,
+          });
+
+          if (location) {
+            console.log("✅ Location fetched successfully:", location.coords);
+            setUserLocation({
+              lat: location.coords.latitude,
+              lng: location.coords.longitude,
+            });
+            break;
+          }
+        } catch (err) {
+          retries--;
+          console.log(
+            `Location attempt failed: ${err.message}, retries left: ${retries}`,
+          );
+
+          if (retries > 0) {
+            // Wait 1 second before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          } else {
+            // Try last known position as fallback
+            console.log("Trying last known position...");
+            const lastKnown = await Location.getLastKnownPositionAsync({
+              maxAge: 300000, // 5 minutes
+            });
+
+            if (lastKnown) {
+              console.log("✅ Using last known position");
+              setUserLocation({
+                lat: lastKnown.coords.latitude,
+                lng: lastKnown.coords.longitude,
+              });
+            } else {
+              console.log("⚠️ No location available, using default");
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.log("❌ Error in fetchUserLocation:", error.message);
+    }
   }, []);
+
+  // Fetch location whenever the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log("🌍 HeatMap screen focused, fetching location...");
+      fetchUserLocation();
+    }, [fetchUserLocation]),
+  );
+
+  // Update map when user location changes
+  useEffect(() => {
+    if (userLocation && webViewRef.current) {
+      const updateScript = `
+        if (typeof map !== 'undefined' && typeof userLocation !== 'undefined') {
+          userLocation = { lat: ${userLocation.lat}, lng: ${userLocation.lng} };
+          
+          // Remove old marker if exists
+          map.eachLayer(function(layer) {
+            if (layer instanceof L.Marker && layer.options.icon && layer.options.icon.options.className === 'user-location-marker') {
+              map.removeLayer(layer);
+            }
+          });
+          
+          // Add new marker
+          L.marker([${userLocation.lat}, ${userLocation.lng}], {
+            icon: L.divIcon({
+              className: 'user-location-marker',
+              html: '<div style="background-color: #3B82F6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>',
+              iconSize: [22, 22],
+              iconAnchor: [11, 11]
+            })
+          })
+          .addTo(map)
+          .bindPopup('Your Location');
+          
+          // Center map on user location
+          map.setView([${userLocation.lat}, ${userLocation.lng}], 15, {
+            animate: true,
+            duration: 0.5
+          });
+        }
+        true;
+      `;
+      webViewRef.current.injectJavaScript(updateScript);
+    }
+  }, [userLocation]);
 
   // Fetch heatmap data
   const {
@@ -143,7 +215,7 @@ export default function HeatMap() {
   const generateMapHTML = () => {
     const mapCenter = userLocation
       ? [userLocation.lat, userLocation.lng]
-      : [28.6139, 77.209]; // Delhi as default
+      : [22.7196, 75.8577]; // Indore as default
 
     const markers = spots
       .map(
@@ -213,10 +285,35 @@ export default function HeatMap() {
             margin-right: 6px;
             border: 1px solid rgba(0,0,0,0.1);
           }
+          .current-location-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            width: 44px;
+            height: 44px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            border: none;
+          }
+          .current-location-btn:active {
+            background: #f3f4f6;
+          }
         </style>
       </head>
       <body>
         <div id="map"></div>
+        <button class="current-location-btn" onclick="goToUserLocation()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="3" fill="#3B82F6"/>
+            <path d="M12 2v4M12 18v4M22 12h-4M6 12H2" stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
         <div class="legend">
           <div class="legend-title">Severity Levels</div>
           <div class="legend-item">
@@ -239,10 +336,13 @@ export default function HeatMap() {
         <script>
           const map = L.map('map').setView([${mapCenter[0]}, ${mapCenter[1]}], 12);
           
-          L.tileLayer('https://maps.dkpg.xyz/get-map-tile.php?x={x}&y={y}&z={z}&lyrs=s', {
+          L.tileLayer('https://maps.dkpg.xyz/get-map-tile.php?x={x}&y={y}&z={z}&lyrs=h', {
             attribution: '',
             maxZoom: 19
           }).addTo(map);
+
+          // Store user location as JavaScript variable
+          const userLocation = ${userLocation ? `{ lat: ${userLocation.lat}, lng: ${userLocation.lng} }` : "null"};
 
           ${
             userLocation
@@ -262,6 +362,21 @@ export default function HeatMap() {
           }
 
           ${markers}
+
+          // Function to center map on user location
+          function goToUserLocation() {
+            if (userLocation) {
+              map.setView([userLocation.lat, userLocation.lng], 15, {
+                animate: true,
+                duration: 0.5
+              });
+            } else {
+              // Send message to React Native to request location
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'requestLocation' }));
+              }
+            }
+          }
         </script>
       </body>
       </html>
@@ -302,6 +417,22 @@ export default function HeatMap() {
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  // Handle messages from WebView
+  const handleWebViewMessage = useCallback(
+    async (event) => {
+      try {
+        const message = JSON.parse(event.nativeEvent.data);
+        if (message.action === "requestLocation") {
+          console.log("🔄 Location requested from WebView");
+          await fetchUserLocation();
+        }
+      } catch (error) {
+        console.log("Error handling webview message:", error);
+      }
+    },
+    [fetchUserLocation],
+  );
 
   return (
     <View
@@ -421,6 +552,7 @@ export default function HeatMap() {
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 startInLoadingState={true}
+                onMessage={handleWebViewMessage}
                 renderLoading={() => (
                   <View
                     style={{

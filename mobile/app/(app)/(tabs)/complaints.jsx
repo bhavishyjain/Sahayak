@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { Search, Plus } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -21,6 +22,7 @@ import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
 
 export default function ComplaintsScreen() {
+  const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
@@ -379,10 +381,7 @@ export default function ComplaintsScreen() {
 
                   <PressableBlock
                     onPress={() =>
-                      Toast.show({
-                        type: "info",
-                        text1: "Complaint detail page next",
-                      })
+                      router.push(`/complaints/complaint-details?id=${c.id}`)
                     }
                     className="mt-1 rounded-lg items-center justify-center py-2.5"
                     style={{ backgroundColor: colors.primary }}
