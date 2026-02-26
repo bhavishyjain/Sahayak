@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { isAuthenticated } = require("../middlewares/authMiddleware");
+const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 const upload = require("../middlewares/multer");
 const {
   createWorker,
@@ -11,23 +11,28 @@ const {
   updateWorkerStatus,
   getWorkerDashboard,
   updateComplaintStatus,
+  getAssignedComplaints,
+  getCompletedComplaints,
 } = require("../controllers/workerController");
 
 // Admin routes for worker management
-router.post("/create", isAuthenticated, createWorker);
-router.put("/:workerId", isAuthenticated, updateWorker);
-router.get("/", isAuthenticated, getAllWorkers);
-router.get("/available/:department", isAuthenticated, getAvailableWorkers);
-router.post("/assign-complaint", isAuthenticated, assignComplaint);
+router.post("/create", attachAuth, requireAuth, createWorker);
+router.put("/:workerId", attachAuth, requireAuth, updateWorker);
+router.get("/", attachAuth, requireAuth, getAllWorkers);
+router.get("/available/:department", attachAuth, requireAuth, getAvailableWorkers);
+router.post("/assign-complaint", attachAuth, requireAuth, assignComplaint);
 
 // Worker routes
-router.get("/dashboard", isAuthenticated, getWorkerDashboard);
-router.put("/status/:workerId", isAuthenticated, updateWorkerStatus);
+router.get("/dashboard", attachAuth, requireAuth, getWorkerDashboard);
+router.get("/assigned-complaints", attachAuth, requireAuth, getAssignedComplaints);
+router.get("/completed-complaints", attachAuth, requireAuth, getCompletedComplaints);
+router.put("/status/:workerId", attachAuth, requireAuth, updateWorkerStatus);
 router.put(
   "/complaint/:complaintId/status",
-  isAuthenticated,
+  attachAuth,
+  requireAuth,
   upload.array("completionPhotos", 5),
-  updateComplaintStatus
+  updateComplaintStatus,
 );
 
 module.exports = router;

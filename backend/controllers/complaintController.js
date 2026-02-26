@@ -20,6 +20,10 @@ function buildComplaintView(complaint) {
     createdAt: complaint.createdAt,
     updatedAt: complaint.updatedAt,
     history: complaint.history || [],
+    upvoteCount: complaint.upvoteCount || 0,
+    upvotes: (complaint.upvotes || []).map((id) => String(id)), // Convert ObjectIds to strings
+    feedback: complaint.feedback,
+    sla: complaint.sla,
   };
 }
 
@@ -30,8 +34,7 @@ exports.createComplaint = async (req, res) => {
 
     if (!title || !description || !department || !locationName) {
       return res.status(400).json({
-        message:
-          "title, description, department and locationName are required",
+        message: "title, description, department and locationName are required",
       });
     }
 
@@ -43,19 +46,23 @@ exports.createComplaint = async (req, res) => {
       }
     }
 
-    let proofImage = null;
-    if (req.file?.buffer) {
-      const uploadResult = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: "sahayak/complaints", resource_type: "image" },
-          (error, result) => {
-            if (error) return reject(error);
-            return resolve(result);
-          }
-        );
-        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+    // Handle multiple proof images
+    let proofImages = [];
+    if (req.files && req.files.length > 0) {
+      const uploadPromises = req.files.map((file) => {
+        return new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: "sahayak/complaints", resource_type: "image" },
+            (error, result) => {
+              if (error) return reject(error);
+              return resolve(result.secure_url);
+            },
+          );
+          streamifier.createReadStream(file.buffer).pipe(uploadStream);
+        });
       });
-      proofImage = uploadResult.secure_url;
+
+      proofImages = await Promise.all(uploadPromises);
     }
 
     const complaint = await Complaint.create({
@@ -74,7 +81,7 @@ exports.createComplaint = async (req, res) => {
       priority: ["Low", "Medium", "High"].includes(priority)
         ? priority
         : "Medium",
-      proofImage,
+      proofImage: proofImages,
       status: "pending",
       history: [
         {
@@ -151,6 +158,115 @@ exports.getComplaintById = async (req, res) => {
     return res.status(200).json({ complaint: buildComplaintView(complaint) });
   } catch (error) {
     console.error("get complaint error", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Upvote a complaint
+exports.upvoteComplaint = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+    const userId = req.user._id;
+
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint) {
+      return res.status(404).json({ message: "Complaint not found" });
+    }
+
+    // Check if user already upvoted
+    const hasUpvoted = complaint.upvotes.some(
+      (id) => String(id) === String(userId),
+    );
+
+    if (hasUpvoted) {
+      // Remove upvote
+      complaint.upvotes = complaint.upvotes.filter(
+        (id) => String(id) !== String(userId),
+      );
+      complaint.upvoteCount = Math.max(0, complaint.upvoteCount - 1);
+    } else {
+      // Add upvote
+      complaint.upvotes.push(userId);
+      complaint.upvoteCount += 1;
+
+      // Auto-escalate if upvotes reach threshold
+      if (complaint.upvoteCount >= 10 && complaint.priority === "Low") {
+        complaint.priority = "Medium";
+      } else if (
+        complaint.upvoteCount >= 25 &&
+        complaint.priority === "Medium"
+      ) {
+        complaint.priority = "High";
+      }
+    }
+
+    await complaint.save();
+
+    return res.status(200).json({
+      message: hasUpvoted ? "Upvote removed" : "Upvoted successfully",
+      upvoteCount: complaint.upvoteCount,
+      hasUpvoted: !hasUpvoted,
+    });
+  } catch (error) {
+    console.error("upvote complaint error", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Submit feedback for a resolved complaint
+exports.submitFeedback = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+    const { rating, comment } = req.body;
+    const userId = req.user._id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res
+        .status(400)
+        .json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint) {
+      return res.status(404).json({ message: "Complaint not found" });
+    }
+
+    // Only allow feedback on resolved/closed complaints
+    if (complaint.status !== "resolved" && complaint.status !== "closed") {
+      return res.status(400).json({
+        message: "Feedback can only be submitted for resolved complaints",
+      });
+    }
+
+    // Check if user is the complaint owner
+    if (String(complaint.userId) !== String(userId)) {
+      return res.status(403).json({
+        message: "Only complaint owner can submit feedback",
+      });
+    }
+
+    // Check if feedback already exists
+    if (complaint.feedback && complaint.feedback.rating) {
+      return res.status(400).json({
+        message: "Feedback already submitted for this complaint",
+      });
+    }
+
+    complaint.feedback = {
+      rating,
+      comment: comment || "",
+      ratedBy: userId,
+      ratedAt: new Date(),
+    };
+
+    await complaint.save();
+
+    return res.status(200).json({
+      message: "Feedback submitted successfully",
+      feedback: complaint.feedback,
+    });
+  } catch (error) {
+    console.error("submit feedback error", error);
     return res.status(500).json({ message: "Server error" });
   }
 };

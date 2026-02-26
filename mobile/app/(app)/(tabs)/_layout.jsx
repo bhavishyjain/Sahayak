@@ -6,11 +6,17 @@ import {
   Map,
   MessageCircle,
   Settings,
+  ClipboardList,
+  CheckCircle,
+  LayoutDashboard,
+  Users,
 } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../../../colors";
 import CurvedTabBar from "../../../components/CurvedTabBar";
 import { useTheme } from "../../../utils/context/theme";
+import getUserAuth from "../../../utils/userAuth";
+import { useEffect, useState } from "react";
 
 function TabIcon({ Icon, color }) {
   return (
@@ -40,46 +46,208 @@ function CenterNewButton({ colors }) {
 export default function TabsLayout() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkUserRole() {
+      const user = await getUserAuth();
+      setUserRole(user?.role || "user");
+      setLoading(false);
+    }
+    checkUserRole();
+  }, []);
 
   const TAB_HEIGHT = 72;
 
+  const commonScreenOptions = {
+    headerShown: false,
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.textSecondary,
+    tabBarStyle: {
+      position: "absolute",
+      bottom: 16,
+      height: TAB_HEIGHT,
+      backgroundColor: "transparent",
+      borderTopWidth: 0,
+      elevation: 0,
+    },
+    tabBarContentContainerStyle: {
+      backgroundColor: "transparent",
+      paddingHorizontal: 18,
+    },
+    tabBarBackground: () => (
+      <CurvedTabBar colors={colors} height={TAB_HEIGHT} />
+    ),
+    tabBarItemStyle: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    tabBarIconStyle: {
+      marginTop: 7,
+    },
+    tabBarLabelStyle: {
+      marginTop: 0,
+      fontSize: 10,
+      fontWeight: "700",
+      backgroundColor: "transparent",
+    },
+  };
+
+  if (loading) {
+    return null; // or a loading screen
+  }
+
+  // Worker/HOD Tabs
+  if (userRole === "worker") {
+    return (
+      <Tabs screenOptions={commonScreenOptions}>
+        <Tabs.Screen
+          name="index"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="worker-dashboard"
+          options={{
+            title: "Dashboard",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={LayoutDashboard} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="worker-assigned"
+          options={{
+            title: "Assigned",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={ClipboardList} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="worker-completed"
+          options={{
+            title: "Completed",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={CheckCircle} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="heatmap"
+          options={{
+            title: "Map",
+            tabBarIcon: ({ color }) => <TabIcon Icon={Map} color={color} />,
+          }}
+        />
+
+        <Tabs.Screen
+          name="setting"
+          options={{
+            title: "Settings",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={Settings} color={color} />
+            ),
+          }}
+        />
+
+        {/* Hide unused tabs */}
+        <Tabs.Screen name="home" options={{ href: null }} />
+        <Tabs.Screen name="worker-home" options={{ href: null }} />
+        <Tabs.Screen name="complaints" options={{ href: null }} />
+        <Tabs.Screen name="assistant" options={{ href: null }} />
+        <Tabs.Screen name="hod-dashboard" options={{ href: null }} />
+        <Tabs.Screen name="hod-workers" options={{ href: null }} />
+        <Tabs.Screen name="hod-complaints" options={{ href: null }} />
+      </Tabs>
+    );
+  }
+
+  if (userRole === "head") {
+    return (
+      <Tabs screenOptions={commonScreenOptions}>
+        <Tabs.Screen
+          name="index"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="hod-dashboard"
+          options={{
+            title: "Dashboard",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={LayoutDashboard} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="hod-workers"
+          options={{
+            title: "Workers",
+            tabBarIcon: ({ color }) => <TabIcon Icon={Users} color={color} />,
+          }}
+        />
+
+        <Tabs.Screen
+          name="hod-complaints"
+          options={{
+            title: "Complaints",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={ListChecks} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="heatmap"
+          options={{
+            title: "Map",
+            tabBarIcon: ({ color }) => <TabIcon Icon={Map} color={color} />,
+          }}
+        />
+
+        <Tabs.Screen
+          name="setting"
+          options={{
+            title: "Settings",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={Settings} color={color} />
+            ),
+          }}
+        />
+
+        {/* Hide unused tabs */}
+        <Tabs.Screen name="home" options={{ href: null }} />
+        <Tabs.Screen name="worker-home" options={{ href: null }} />
+        <Tabs.Screen name="worker-dashboard" options={{ href: null }} />
+        <Tabs.Screen name="complaints" options={{ href: null }} />
+        <Tabs.Screen name="assistant" options={{ href: null }} />
+        <Tabs.Screen name="worker-assigned" options={{ href: null }} />
+        <Tabs.Screen name="worker-completed" options={{ href: null }} />
+      </Tabs>
+    );
+  }
+
+  // Default Citizen Tabs
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: {
-          position: "absolute",
-          bottom: 16,
-          height: TAB_HEIGHT,
-          backgroundColor: "transparent",
-          borderTopWidth: 0,
-          elevation: 0,
-        },
-        tabBarContentContainerStyle: {
-          backgroundColor: "transparent",
-          paddingHorizontal: 18,
-        },
-        tabBarBackground: () => (
-          <CurvedTabBar colors={colors} height={TAB_HEIGHT} />
-        ),
-        tabBarItemStyle: {
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-        },
-        tabBarIconStyle: {
-          marginTop: 7,
-        },
-        tabBarLabelStyle: {
-          marginTop: 0,
-          fontSize: 10,
-          fontWeight: "700",
-          backgroundColor: "transparent",
-        },
-      }}
-    >
+    <Tabs screenOptions={commonScreenOptions}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          href: null,
+        }}
+      />
+
       <Tabs.Screen
         name="home"
         options={{
@@ -126,6 +294,11 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <TabIcon Icon={Settings} color={color} />,
         }}
       />
+
+      {/* Hide worker tabs for citizens */}
+      <Tabs.Screen name="worker-assigned" options={{ href: null }} />
+      <Tabs.Screen name="worker-completed" options={{ href: null }} />
+      <Tabs.Screen name="hod-dashboard" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -14,7 +14,14 @@ export default function Index() {
     (async () => {
       const user = await getUserAuth();
       if (user?.auth_token) {
-        router.replace("/(app)/(tabs)/home");
+        // Redirect based on user role
+        const redirectPath =
+          user.role === "head"
+            ? "/(app)/(tabs)/hod-dashboard"
+            : user.role === "worker"
+              ? "/(app)/(tabs)/worker-dashboard"
+              : "/(app)/(tabs)/home";
+        router.replace(redirectPath);
       } else {
         router.replace("/(app)/(auth)/login");
       }

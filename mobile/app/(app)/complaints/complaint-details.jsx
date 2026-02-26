@@ -6,6 +6,10 @@ import {
   FileText,
   AlertCircle,
   Image as ImageIcon,
+  ThumbsUp,
+  Star,
+  MessageSquare,
+  Users,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -17,18 +21,27 @@ import {
   View,
   Modal,
   Pressable,
+  TextInput,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import PressableBlock from "../../../components/PressableBlock";
-import { GET_COMPLAINT_BY_ID_URL } from "../../../url";
+import {
+  GET_COMPLAINT_BY_ID_URL,
+  UPVOTE_COMPLAINT_URL,
+  SUBMIT_FEEDBACK_URL,
+  HOD_ASSIGN_COMPLAINT_URL,
+  HOD_WORKERS_URL,
+  UPDATE_COMPLAINT_STATUS_URL,
+} from "../../../url";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
+import getUserAuth from "../../../utils/userAuth";
 
-export default function ComplaintDetailsScreen() {
+export default function ComplaintDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { colorScheme } = useTheme();
@@ -37,6 +50,30 @@ export default function ComplaintDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [complaint, setComplaint] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  // Citizen-specific states
+  const [upvoting, setUpvoting] = useState(false);
+  const [hasUpvoted, setHasUpvoted] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  // HOD-specific states
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [workers, setWorkers] = useState([]);
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [assigning, setAssigning] = useState(false);
+
+  // Worker-specific states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [workerNotes, setWorkerNotes] = useState("");
+  const [updating, setUpdating] = useState(false);
+
+  // Common states
   const [imageModalVisible, setImageModalVisible] = useState(false);
 
   const load = async (isRefresh = false) => {
@@ -44,12 +81,32 @@ export default function ComplaintDetailsScreen() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const res = await apiCall({
-        method: "GET",
-        url: GET_COMPLAINT_BY_ID_URL(id),
-      });
+      const [res, user] = await Promise.all([
+        apiCall({
+          method: "GET",
+          url: GET_COMPLAINT_BY_ID_URL(id),
+        }),
+        getUserAuth(),
+      ]);
 
-      setComplaint(res?.data?.complaint || null);
+      const complaintData = res?.data?.complaint || null;
+      setComplaint(complaintData);
+      setUserRole(user?.role);
+      setNewStatus(complaintData?.status || "");
+
+      const userIdString = String(user?.id || user?._id);
+      setCurrentUserId(userIdString);
+
+      // Check if current user has upvoted (for citizens)
+      if (
+        user?.role === "user" &&
+        complaintData?.upvotes &&
+        userIdString &&
+        userIdString !== "undefined"
+      ) {
+        const upvotedByUser = complaintData.upvotes.includes(userIdString);
+        setHasUpvoted(upvotedByUser);
+      }
     } catch (e) {
       Toast.show({
         type: "error",
@@ -57,7 +114,6 @@ export default function ComplaintDetailsScreen() {
         text2:
           e?.response?.data?.message || "Could not load complaint details.",
       });
-      // Navigate back if complaint not found
       if (e?.response?.status === 404) {
         setTimeout(() => router.back(), 1500);
       }
@@ -67,11 +123,190 @@ export default function ComplaintDetailsScreen() {
     }
   };
 
+  const loadWorkers = async () => {
+    try {
+      const res = await apiCall({
+        method: "GET",
+        url: HOD_WORKERS_URL,
+      });
+      setWorkers(res?.data?.workers || []);
+    } catch (e) {
+      console.error("Failed to load workers:", e);
+    }
+  };
+
   useEffect(() => {
     if (id) {
       load(false);
     }
   }, [id]);
+
+  // Citizen: Handle upvote
+  const handleUpvote = async () => {
+    if (upvoting) return;
+
+    try {
+      setUpvoting(true);
+      await apiCall({
+        method: "POST",
+        url: UPVOTE_COMPLAINT_URL(id),
+      });
+
+      setHasUpvoted(!hasUpvoted);
+      setComplaint({
+        ...complaint,
+        upvoteCount: hasUpvoted
+          ? (complaint.upvoteCount || 1) - 1
+          : (complaint.upvoteCount || 0) + 1,
+      });
+
+      Toast.show({
+        type: "success",
+        text1: hasUpvoted ? "Upvote Removed" : "Upvoted",
+        text2: hasUpvoted
+          ? "Your support has been removed"
+          : "Thanks for supporting this complaint",
+      });
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Failed",
+        text2: e?.response?.data?.message || "Could not process upvote",
+      });
+    } finally {
+      setUpvoting(false);
+    }
+  };
+
+  // Citizen: Submit feedback
+  const handleSubmitFeedback = async () => {
+    if (!feedbackRating) {
+      Toast.show({
+        type: "error",
+        text1: "Rating Required",
+        text2: "Please select a rating",
+      });
+      return;
+    }
+
+    try {
+      setSubmittingFeedback(true);
+
+      await apiCall({
+        method: "POST",
+        url: SUBMIT_FEEDBACK_URL(id),
+        data: {
+          rating: feedbackRating,
+          comment: feedbackComment.trim(),
+        },
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Feedback Submitted",
+        text2: "Thank you for your feedback!",
+      });
+
+      setFeedbackModalVisible(false);
+      setFeedbackRating(0);
+      setFeedbackComment("");
+      await load(true);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Submission Failed",
+        text2: e?.response?.data?.message || "Could not submit feedback",
+      });
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
+  // HOD: Assign complaint
+  const handleAssignComplaint = async () => {
+    if (!selectedWorker) {
+      Toast.show({
+        type: "error",
+        text1: "Worker Required",
+        text2: "Please select a worker",
+      });
+      return;
+    }
+
+    try {
+      setAssigning(true);
+
+      await apiCall({
+        method: "POST",
+        url: HOD_ASSIGN_COMPLAINT_URL,
+        data: {
+          complaintId: id,
+          workerId: selectedWorker,
+        },
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Complaint Assigned",
+        text2: "Worker has been notified",
+      });
+
+      setAssignModalVisible(false);
+      setSelectedWorker(null);
+      await load(true);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Assignment Failed",
+        text2: e?.response?.data?.message || "Could not assign complaint",
+      });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  // Worker: Update status
+  const handleUpdateStatus = async () => {
+    if (!newStatus) {
+      Toast.show({
+        type: "error",
+        text1: "Status Required",
+        text2: "Please select a status",
+      });
+      return;
+    }
+
+    try {
+      setUpdating(true);
+
+      await apiCall({
+        method: "PUT",
+        url: UPDATE_COMPLAINT_STATUS_URL(id),
+        data: {
+          status: newStatus,
+          workerNotes: workerNotes,
+        },
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Status Updated",
+        text2: `Complaint marked as ${newStatus}`,
+      });
+
+      setStatusModalVisible(false);
+      setWorkerNotes("");
+      await load(true);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Update Failed",
+        text2: e?.response?.data?.message || "Could not update status",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -135,12 +370,18 @@ export default function ComplaintDetailsScreen() {
             className="text-sm mt-2 text-center"
             style={{ color: colors.textSecondary }}
           >
-            This complaint could not be loaded.
+            This complaint may have been removed or you don't have access to it.
           </Text>
         </View>
       </View>
     );
   }
+
+  const statusOptions = [
+    { value: "assigned", label: "Assigned" },
+    { value: "in-progress", label: "In Progress" },
+    { value: "resolved", label: "Resolved" },
+  ];
 
   return (
     <View
@@ -150,7 +391,7 @@ export default function ComplaintDetailsScreen() {
       <BackButtonHeader title="Complaint Details" />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -204,6 +445,130 @@ export default function ComplaintDetailsScreen() {
             </Text>
           </Card>
         </View>
+
+        {/* Citizen: Upvote Button (Interactive) */}
+        {userRole === "user" && (
+          <PressableBlock onPress={handleUpvote} disabled={upvoting}>
+            <Card
+              style={{
+                margin: 0,
+                marginBottom: 12,
+                flex: 0,
+                backgroundColor: hasUpvoted
+                  ? colors.primary + "20"
+                  : colors.backgroundSecondary,
+              }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center flex-1">
+                  <ThumbsUp
+                    size={24}
+                    color={hasUpvoted ? colors.primary : colors.textSecondary}
+                    fill={hasUpvoted ? colors.primary : "transparent"}
+                  />
+                  <View className="ml-3 flex-1">
+                    <Text
+                      className="text-base font-semibold"
+                      style={{
+                        color: hasUpvoted ? colors.primary : colors.textPrimary,
+                      }}
+                    >
+                      {hasUpvoted ? "You support this" : "Support this complaint"}
+                    </Text>
+                    <Text
+                      className="text-sm mt-0.5"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {complaint.upvoteCount || 0}{" "}
+                      {(complaint.upvoteCount || 0) === 1 ? "person" : "people"}{" "}
+                      affected
+                    </Text>
+                  </View>
+                </View>
+                {upvoting && (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                )}
+              </View>
+            </Card>
+          </PressableBlock>
+        )}
+
+        {/* HOD/Worker: Upvote Count (Read-only) */}
+        {(userRole === "head" || userRole === "worker") && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="flex-row items-center">
+              <ThumbsUp size={20} color={colors.primary} />
+              <Text
+                className="text-base font-semibold ml-2"
+                style={{ color: colors.textPrimary }}
+              >
+                Community Support
+              </Text>
+            </View>
+            <Text
+              className="text-sm mt-2"
+              style={{ color: colors.textSecondary }}
+            >
+              {complaint.upvoteCount || 0}{" "}
+              {(complaint.upvoteCount || 0) === 1 ? "person" : "people"} affected
+              by this issue
+            </Text>
+          </Card>
+        )}
+
+        {/* HOD: Assign Worker Button */}
+        {userRole === "head" &&
+          complaint.status !== "resolved" &&
+          complaint.status !== "closed" && (
+            <PressableBlock
+              onPress={() => {
+                loadWorkers();
+                setAssignModalVisible(true);
+              }}
+            >
+              <Card
+                style={{
+                  margin: 0,
+                  marginBottom: 12,
+                  flex: 0,
+                  backgroundColor: colors.primary,
+                }}
+              >
+                <View className="flex-row items-center justify-center">
+                  <Users size={20} color="#FFFFFF" />
+                  <Text
+                    className="text-base font-semibold ml-2"
+                    style={{ color: "#FFFFFF" }}
+                  >
+                    {complaint.assignedTo ? "Reassign Worker" : "Assign to Worker"}
+                  </Text>
+                </View>
+              </Card>
+            </PressableBlock>
+          )}
+
+        {/* Worker: Update Status Button */}
+        {userRole === "worker" &&
+          complaint.status !== "resolved" &&
+          complaint.status !== "closed" && (
+            <PressableBlock onPress={() => setStatusModalVisible(true)}>
+              <Card
+                style={{
+                  margin: 0,
+                  marginBottom: 12,
+                  flex: 0,
+                  backgroundColor: colors.primary,
+                }}
+              >
+                <Text
+                  className="text-base font-semibold text-center"
+                  style={{ color: "#FFFFFF" }}
+                >
+                  Update Status
+                </Text>
+              </Card>
+            </PressableBlock>
+          )}
 
         {/* Title and Description */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -304,39 +669,59 @@ export default function ComplaintDetailsScreen() {
         </Card>
 
         {/* Proof Image */}
-        {complaint.proofImage && (
-          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <View className="flex-row items-center mb-3">
-              <ImageIcon size={20} color={colors.primary} />
-              <Text
-                className="text-base font-semibold ml-2"
-                style={{ color: colors.textPrimary }}
-              >
-                Proof Image
-              </Text>
-            </View>
-            <PressableBlock onPress={() => setImageModalVisible(true)}>
-              <Image
-                source={{ uri: complaint.proofImage }}
-                className="w-full h-48 rounded-xl"
-                resizeMode="cover"
-              />
-              <View className="absolute inset-0 items-center justify-center bg-black/10 rounded-xl">
-                <View
-                  className="px-3 py-1.5 rounded-lg"
-                  style={{ backgroundColor: colors.backgroundPrimary }}
+        {complaint.proofImage &&
+          (Array.isArray(complaint.proofImage)
+            ? complaint.proofImage.length > 0
+            : true) && (
+            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+              <View className="flex-row items-center mb-3">
+                <ImageIcon size={20} color={colors.primary} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
                 >
-                  <Text
-                    className="text-xs font-semibold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    Tap to view full size
-                  </Text>
-                </View>
+                  Proof Image{Array.isArray(complaint.proofImage) && complaint.proofImage.length > 1 ? "s" : ""}
+                </Text>
               </View>
-            </PressableBlock>
-          </Card>
-        )}
+              {Array.isArray(complaint.proofImage) ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {complaint.proofImage.map((img, idx) => (
+                    <PressableBlock
+                      key={idx}
+                      onPress={() => setImageModalVisible(true)}
+                    >
+                      <Image
+                        source={{ uri: img }}
+                        className="w-32 h-32 rounded-xl mr-2"
+                        resizeMode="cover"
+                      />
+                    </PressableBlock>
+                  ))}
+                </ScrollView>
+              ) : (
+                <PressableBlock onPress={() => setImageModalVisible(true)}>
+                  <Image
+                    source={{ uri: complaint.proofImage }}
+                    className="w-full h-48 rounded-xl"
+                    resizeMode="cover"
+                  />
+                  <View className="absolute inset-0 items-center justify-center bg-black/10 rounded-xl">
+                    <View
+                      className="px-3 py-1.5 rounded-lg"
+                      style={{ backgroundColor: colors.backgroundPrimary }}
+                    >
+                      <Text
+                        className="text-xs font-semibold"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        Tap to view full size
+                      </Text>
+                    </View>
+                  </View>
+                </PressableBlock>
+              )}
+            </Card>
+          )}
 
         {/* Timeline */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -380,7 +765,7 @@ export default function ComplaintDetailsScreen() {
           </View>
         </Card>
 
-        {/* History */}
+        {/* Status History */}
         {complaint.history && complaint.history.length > 0 && (
           <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
             <Text
@@ -425,9 +810,137 @@ export default function ComplaintDetailsScreen() {
             ))}
           </Card>
         )}
+
+        {/* Citizen Feedback - Visible to HOD and Worker */}
+        {(userRole === "head" || userRole === "worker") &&
+          complaint.feedback &&
+          complaint.feedback.rating && (
+            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+              <Text
+                className="text-base font-semibold mb-3"
+                style={{ color: colors.textPrimary }}
+              >
+                Citizen Feedback
+              </Text>
+
+              <View className="flex-row items-center mb-2">
+                <Star
+                  size={18}
+                  color={colors.warning || "#ffc107"}
+                  fill={colors.warning || "#ffc107"}
+                />
+                <Text
+                  className="text-lg font-bold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {complaint.feedback.rating}/5
+                </Text>
+              </View>
+
+              {complaint.feedback.comment && (
+                <View className="mt-2">
+                  <View className="flex-row items-start mb-1">
+                    <MessageSquare size={16} color={colors.textSecondary} />
+                    <Text
+                      className="text-sm font-semibold ml-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Comment:
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-sm ml-6"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {complaint.feedback.comment}
+                  </Text>
+                </View>
+              )}
+            </Card>
+          )}
+
+        {/* Citizen: Rate Resolution Button */}
+        {userRole === "user" &&
+          (complaint.status === "resolved" || complaint.status === "closed") &&
+          String(complaint.userId) === String(currentUserId) &&
+          !complaint.feedback?.rating && (
+            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+              <View className="items-center">
+                <Text
+                  className="text-base font-semibold mb-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  Rate this resolution
+                </Text>
+                <Text
+                  className="text-sm text-center mb-4"
+                  style={{ color: colors.textSecondary }}
+                >
+                  Help us improve by rating the service quality
+                </Text>
+                <PressableBlock onPress={() => setFeedbackModalVisible(true)}>
+                  <View
+                    className="px-6 py-3 rounded-xl"
+                    style={{ backgroundColor: colors.primary }}
+                  >
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: "#FFFFFF" }}
+                    >
+                      Submit Feedback
+                    </Text>
+                  </View>
+                </PressableBlock>
+              </View>
+            </Card>
+          )}
+
+        {/* Citizen: Your Feedback Display */}
+        {userRole === "user" && complaint.feedback?.rating && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="flex-row items-center mb-2">
+              <Star size={20} color={colors.primary} fill={colors.primary} />
+              <Text
+                className="text-base font-semibold ml-2"
+                style={{ color: colors.textPrimary }}
+              >
+                Your Feedback
+              </Text>
+            </View>
+            <View className="flex-row items-center mt-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  size={20}
+                  color={colors.primary}
+                  fill={
+                    star <= (complaint.feedback?.rating || 0)
+                      ? colors.primary
+                      : "transparent"
+                  }
+                  style={{ marginRight: 4 }}
+                />
+              ))}
+              <Text
+                className="ml-2 text-sm"
+                style={{ color: colors.textSecondary }}
+              >
+                {complaint.feedback?.rating}/5
+              </Text>
+            </View>
+            {complaint.feedback?.comment && (
+              <Text
+                className="text-sm mt-3"
+                style={{ color: colors.textPrimary }}
+              >
+                {complaint.feedback.comment}
+              </Text>
+            )}
+          </Card>
+        )}
       </ScrollView>
 
-      {/* Full Image Modal */}
+      {/* Image Modal */}
       <Modal
         visible={imageModalVisible}
         transparent={true}
@@ -446,13 +959,365 @@ export default function ComplaintDetailsScreen() {
               <Text className="text-white text-2xl font-bold">×</Text>
             </Pressable>
             <Image
-              source={{ uri: complaint.proofImage }}
+              source={{
+                uri: Array.isArray(complaint.proofImage)
+                  ? complaint.proofImage[0]
+                  : complaint.proofImage,
+              }}
               className="w-full h-full"
               resizeMode="contain"
             />
           </View>
         </View>
       </Modal>
+
+      {/* Citizen: Feedback Modal */}
+      {userRole === "user" && (
+        <Modal
+          visible={feedbackModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setFeedbackModalVisible(false)}
+        >
+          <View
+            className="flex-1 justify-end"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+            <View
+              className="rounded-t-3xl p-6"
+              style={{ backgroundColor: colors.backgroundPrimary }}
+            >
+              <Text
+                className="text-xl font-bold mb-2 text-center"
+                style={{ color: colors.textPrimary }}
+              >
+                Rate this Resolution
+              </Text>
+              <Text
+                className="text-sm mb-6 text-center"
+                style={{ color: colors.textSecondary }}
+              >
+                How satisfied are you with the resolution?
+              </Text>
+
+              <View className="flex-row justify-center mb-6">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Pressable
+                    key={star}
+                    onPress={() => setFeedbackRating(star)}
+                    style={{ padding: 8 }}
+                  >
+                    <Star
+                      size={40}
+                      color={colors.primary}
+                      fill={
+                        star <= feedbackRating ? colors.primary : "transparent"
+                      }
+                    />
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text
+                className="text-sm mb-2"
+                style={{ color: colors.textSecondary }}
+              >
+                Additional Comments (Optional)
+              </Text>
+              <TextInput
+                value={feedbackComment}
+                onChangeText={setFeedbackComment}
+                placeholder="Share your experience..."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={4}
+                className="rounded-xl p-4 mb-6"
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  color: colors.textPrimary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  textAlignVertical: "top",
+                }}
+              />
+
+              <View className="flex-row">
+                <Pressable
+                  onPress={() => {
+                    setFeedbackModalVisible(false);
+                    setFeedbackRating(0);
+                    setFeedbackComment("");
+                  }}
+                  className="flex-1 mr-2 py-3 rounded-xl items-center"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <Text
+                    className="text-base font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    Cancel
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSubmitFeedback}
+                  disabled={submittingFeedback || !feedbackRating}
+                  className="flex-1 ml-2 py-3 rounded-xl items-center"
+                  style={{
+                    backgroundColor: feedbackRating
+                      ? colors.primary
+                      : colors.backgroundSecondary,
+                    opacity: submittingFeedback || !feedbackRating ? 0.5 : 1,
+                  }}
+                >
+                  {submittingFeedback ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: "#FFFFFF" }}
+                    >
+                      Submit
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* HOD: Assign Worker Modal */}
+      {userRole === "head" && (
+        <Modal
+          visible={assignModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setAssignModalVisible(false)}
+        >
+          <View
+            className="flex-1 justify-end"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+            <View
+              className="rounded-t-3xl p-6"
+              style={{ backgroundColor: colors.backgroundPrimary }}
+            >
+              <Text
+                className="text-xl font-bold mb-4 text-center"
+                style={{ color: colors.textPrimary }}
+              >
+                Assign to Worker
+              </Text>
+
+              <ScrollView
+                className="max-h-96 mb-4"
+                showsVerticalScrollIndicator={false}
+              >
+                {workers.map((worker) => (
+                  <Pressable
+                    key={worker.id}
+                    onPress={() => setSelectedWorker(worker.id)}
+                    className="mb-2"
+                  >
+                    <Card
+                      style={{
+                        margin: 0,
+                        backgroundColor:
+                          selectedWorker === worker.id
+                            ? colors.primary + "20"
+                            : colors.backgroundSecondary,
+                        borderWidth: selectedWorker === worker.id ? 2 : 0,
+                        borderColor: colors.primary,
+                      }}
+                    >
+                      <Text
+                        className="text-base font-semibold"
+                        style={{
+                          color:
+                            selectedWorker === worker.id
+                              ? colors.primary
+                              : colors.textPrimary,
+                        }}
+                      >
+                        {worker.fullName}
+                      </Text>
+                      <Text
+                        className="text-sm mt-1"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {worker.specializations?.join(", ") || "General worker"}
+                      </Text>
+                    </Card>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <View className="flex-row">
+                <Pressable
+                  onPress={() => {
+                    setAssignModalVisible(false);
+                    setSelectedWorker(null);
+                  }}
+                  className="flex-1 mr-2 py-3 rounded-xl items-center"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <Text
+                    className="text-base font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    Cancel
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleAssignComplaint}
+                  disabled={assigning}
+                  className="flex-1 ml-2 py-3 rounded-xl items-center"
+                  style={{
+                    backgroundColor: colors.primary,
+                    opacity: assigning ? 0.5 : 1,
+                  }}
+                >
+                  {assigning ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: "#FFFFFF" }}
+                    >
+                      Assign
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Worker: Status Update Modal */}
+      {userRole === "worker" && (
+        <Modal
+          visible={statusModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setStatusModalVisible(false)}
+        >
+          <View
+            className="flex-1 justify-end"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+            <View
+              className="rounded-t-3xl p-6"
+              style={{ backgroundColor: colors.backgroundPrimary }}
+            >
+              <Text
+                className="text-xl font-bold mb-4 text-center"
+                style={{ color: colors.textPrimary }}
+              >
+                Update Complaint Status
+              </Text>
+
+              <View className="mb-4">
+                {statusOptions.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setNewStatus(option.value)}
+                    className="mb-2"
+                  >
+                    <Card
+                      style={{
+                        margin: 0,
+                        backgroundColor:
+                          newStatus === option.value
+                            ? colors.primary + "20"
+                            : colors.backgroundSecondary,
+                        borderWidth: newStatus === option.value ? 2 : 0,
+                        borderColor: colors.primary,
+                      }}
+                    >
+                      <Text
+                        className="text-base font-semibold"
+                        style={{
+                          color:
+                            newStatus === option.value
+                              ? colors.primary
+                              : colors.textPrimary,
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                    </Card>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text
+                className="text-sm mb-2"
+                style={{ color: colors.textSecondary }}
+              >
+                Notes (Optional)
+              </Text>
+              <TextInput
+                value={workerNotes}
+                onChangeText={setWorkerNotes}
+                placeholder="Add notes about the work..."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={3}
+                className="rounded-xl p-4 mb-6"
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  color: colors.textPrimary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  textAlignVertical: "top",
+                }}
+              />
+
+              <View className="flex-row">
+                <Pressable
+                  onPress={() => {
+                    setStatusModalVisible(false);
+                    setWorkerNotes("");
+                  }}
+                  className="flex-1 mr-2 py-3 rounded-xl items-center"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <Text
+                    className="text-base font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    Cancel
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleUpdateStatus}
+                  disabled={updating}
+                  className="flex-1 ml-2 py-3 rounded-xl items-center"
+                  style={{
+                    backgroundColor: colors.primary,
+                    opacity: updating ? 0.5 : 1,
+                  }}
+                >
+                  {updating ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: "#FFFFFF" }}
+                    >
+                      Update
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }

@@ -3,7 +3,9 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 function getGeminiApiKey() {
   const raw = process.env.GEMINI_API_KEY;
   if (!raw) return "";
-  return String(raw).trim().replace(/^['"]|['"]$/g, "");
+  return String(raw)
+    .trim()
+    .replace(/^['"]|['"]$/g, "");
 }
 
 const genAI = getGeminiApiKey()
@@ -31,7 +33,7 @@ Instructions:
    - "statusQuery" => user wants complaint status
    - "faq" => general question
 2. For new complaints, extract:
-   - "department": road, water, drainage, electricity, waste, other
+  - "department": Road, Water, Drainage, Electricity, Waste, Other
    - "refinedText": a concise, clear version of the complaint
    - "priority": 
        • Default to "Medium".
@@ -59,7 +61,7 @@ Input: "There is a water pipe leakage near Central Park. It's urgent!"
 Output:
 {
   "type": "newComplaint",
-  "department": "water",
+  "department": "Water",
   "refinedText": "Water pipe leakage near Central Park",
   "priority": "High",
   "locationName": "Central Park"
@@ -69,7 +71,7 @@ Input: "Streetlight not working in my area"
 Output:
 {
   "type": "newComplaint",
-  "department": "electricity",
+  "department": "Electricity",
   "refinedText": "Streetlight not working in my area",
   "priority": "Medium",
   "locationName": null

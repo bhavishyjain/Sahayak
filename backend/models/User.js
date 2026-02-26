@@ -10,8 +10,8 @@ const userSchema = new mongoose.Schema({
   },
   department: {
     type: String,
-    enum: ["road", "water", "electricity", "waste", "drainage", "other"],
-    default: "other",
+    enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
+    default: "Other",
   },
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true, unique: true },

@@ -1,9 +1,6 @@
 const User = require("../models/User");
 const Complaint = require("../models/Complaint");
 const bcrypt = require("bcryptjs");
-
-// const Complaint = require("../models/Complaint");
-// const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 const streamifier = require("streamifier");
 
@@ -202,7 +199,7 @@ exports.getAllWorkers = async (req, res) => {
               activeComplaints < 5 && worker.workStatus === "available", // Max 5 active complaints
           },
         };
-      })
+      }),
     );
 
     res.json({
@@ -288,32 +285,21 @@ exports.getAvailableWorkers = async (req, res) => {
 // Assign complaint to worker
 exports.assignComplaint = async (req, res) => {
   try {
-    console.log("Assign complaint request body:", req.body);
-    console.log("Current user:", req.currentUser);
-
     const { complaintId, workerId, estimatedTime } = req.body;
 
     // Check if user is admin or head
     if (!req.currentUser || !["admin", "head"].includes(req.currentUser.role)) {
-      console.log("Authorization failed - user role:", req.currentUser?.role);
       return res.status(403).json({
         success: false,
         message: "Only admins and department heads can assign complaints",
       });
     }
 
-    console.log("Finding complaint with ID:", complaintId);
-    console.log("Finding worker with ID:", workerId);
-
     // Find complaint and worker
     const complaint = await Complaint.findById(complaintId);
     const worker = await User.findById(workerId);
 
-    console.log("Found complaint:", complaint ? "Yes" : "No");
-    console.log("Found worker:", worker ? "Yes" : "No");
-
     if (!complaint) {
-      console.log("Complaint not found");
       return res.status(404).json({
         success: false,
         message: "Complaint not found",
@@ -321,20 +307,13 @@ exports.assignComplaint = async (req, res) => {
     }
 
     if (!worker || worker.role !== "worker") {
-      console.log("Worker not found or not a worker. Role:", worker?.role);
       return res.status(404).json({
         success: false,
         message: "Worker not found",
       });
     }
 
-    // Check if worker is available and in same department
-    console.log("Worker status:", worker.workStatus);
-    console.log("Worker department:", worker.department);
-    console.log("Complaint department:", complaint.department);
-
     if (worker.workStatus !== "available") {
-      console.log("Worker not available");
       return res.status(400).json({
         success: false,
         message: "Worker is not available",
@@ -342,7 +321,6 @@ exports.assignComplaint = async (req, res) => {
     }
 
     if (worker.department !== complaint.department) {
-      console.log("Department mismatch");
       return res.status(400).json({
         success: false,
         message: "Worker department does not match complaint department",
@@ -363,14 +341,12 @@ exports.assignComplaint = async (req, res) => {
     }
 
     // Assign complaint
-    console.log("Starting assignment process");
     complaint.assignedTo = workerId;
     complaint.status = "assigned";
     complaint.assignedAt = new Date();
     complaint.assignedBy = req.currentUser.id || req.currentUser._id;
     complaint.estimatedCompletionTime = estimatedTime;
 
-    console.log("Adding to complaint history");
     // Add to complaint history
     complaint.history.push({
       status: "assigned",
@@ -379,21 +355,16 @@ exports.assignComplaint = async (req, res) => {
       note: `Assigned to ${worker.username} with estimated completion time of ${estimatedTime} hours`,
     });
 
-    console.log("Saving complaint");
     await complaint.save();
 
-    console.log("Updating worker assigned complaints");
     // Update worker's assigned complaints
     await User.findByIdAndUpdate(workerId, {
       $push: { assignedComplaints: complaintId },
     });
 
-    console.log("Populating complaint data");
     // Populate the assigned complaint for response
     await complaint.populate("assignedTo", "username fullName department");
     await complaint.populate("assignedBy", "username");
-
-    console.log("Assignment completed successfully");
     res.json({
       success: true,
       message: "Complaint assigned successfully",
@@ -472,11 +443,6 @@ exports.getWorkerDashboard = async (req, res) => {
       })
       .sort({ priority: -1, createdAt: -1 });
 
-    console.log(
-      "Assigned complaints with populated user data:",
-      JSON.stringify(assignedComplaints, null, 2)
-    );
-
     // Get worker's completed complaints for today
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -537,9 +503,6 @@ exports.updateComplaintStatus = async (req, res) => {
     const { status, workerNotes } = req.body;
     const workerId = req.currentUser.id || req.currentUser._id;
 
-    console.log("Request body:", req.body);
-    console.log("Request files:", req.files);
-
     const complaint = await Complaint.findById(complaintId);
     if (!complaint) {
       return res
@@ -549,12 +512,10 @@ exports.updateComplaintStatus = async (req, res) => {
 
     // Ensure worker is assigned
     if (complaint.assignedTo.toString() !== workerId.toString()) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "You are not assigned to this complaint",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this complaint",
+      });
     }
 
     // Upload images to Cloudinary
@@ -568,7 +529,7 @@ exports.updateComplaintStatus = async (req, res) => {
               (error, result) => {
                 if (error) reject(error);
                 else resolve(result);
-              }
+              },
             );
             streamifier.createReadStream(file.buffer).pipe(uploadStream);
           });
@@ -673,11 +634,76 @@ exports.updateComplaintStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating complaint status:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while updating complaint status",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating complaint status",
+    });
+  }
+};
+
+// Get assigned complaints for logged-in worker (for mobile app)
+exports.getAssignedComplaints = async (req, res) => {
+  try {
+    const workerId = req.currentUser.id || req.currentUser._id;
+
+    const complaints = await Complaint.find({
+      assignedTo: workerId,
+      status: { $in: ["assigned", "in-progress"] },
+    })
+      .populate("userId", "fullName email phone")
+      .sort({ assignedAt: -1 });
+
+    const complaintsList = complaints.map((c) => ({
+      id: c._id,
+      ticketId: c.ticketId,
+      title: c.rawText?.split(":")[0] || "Complaint",
+      description: c.refinedText || c.rawText,
+      department: c.department,
+      priority: c.priority,
+      status: c.status,
+      locationName: c.locationName,
+      coordinates: c.coordinates,
+      assignedAt: c.assignedAt,
+      createdAt: c.createdAt,
+    }));
+
+    return res.status(200).json({ complaints: complaintsList });
+  } catch (error) {
+    console.error("Get assigned complaints error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get completed complaints for logged-in worker (for mobile app)
+exports.getCompletedComplaints = async (req, res) => {
+  try {
+    const workerId = req.currentUser.id || req.currentUser._id;
+
+    const complaints = await Complaint.find({
+      assignedTo: workerId,
+      status: { $in: ["resolved", "closed"] },
+    })
+      .populate("userId", "fullName email phone")
+      .sort({ updatedAt: -1 })
+      .limit(50);
+
+    const complaintsList = complaints.map((c) => ({
+      id: c._id,
+      ticketId: c.ticketId,
+      title: c.rawText?.split(":")[0] || "Complaint",
+      description: c.refinedText || c.rawText,
+      department: c.department,
+      status: c.status,
+      locationName: c.locationName,
+      coordinates: c.coordinates,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      feedback: c.feedback,
+    }));
+
+    return res.status(200).json({ complaints: complaintsList });
+  } catch (error) {
+    console.error("Get completed complaints error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };

@@ -26,6 +26,10 @@ export const UPDATE_USER_PROFILE_URL = API_BASE + "/auth/update-profile";
 export const CREATE_COMPLAINT_URL = API_BASE + "/complaints";
 export const GET_MY_COMPLAINTS_URL = API_BASE + "/complaints";
 export const GET_COMPLAINT_BY_ID_URL = (id) => API_BASE + `/complaints/${id}`;
+export const UPVOTE_COMPLAINT_URL = (id) =>
+  API_BASE + `/complaints/${id}/upvote`;
+export const SUBMIT_FEEDBACK_URL = (id) =>
+  API_BASE + `/complaints/${id}/feedback`;
 
 // ============================================================================
 // DASHBOARD URLs
@@ -47,11 +51,19 @@ export const CHAT_URL = API_BASE + "/chat";
 // WORKER URLs
 // ============================================================================
 export const WORKERS_URL = API_BASE + "/workers";
+export const WORKER_DASHBOARD_URL = API_BASE + "/workers/dashboard";
+export const WORKER_ASSIGNED_URL = API_BASE + "/workers/assigned-complaints";
+export const WORKER_COMPLETED_URL = API_BASE + "/workers/completed-complaints";
+export const UPDATE_COMPLAINT_STATUS_URL = (id) =>
+  API_BASE + `/workers/complaint/${id}/status`;
 
 // ============================================================================
 // HOD URLs
 // ============================================================================
 export const HOD_URL = API_BASE + "/hod";
+export const HOD_DASHBOARD_URL = API_BASE + "/hod/dashboard";
+export const HOD_WORKERS_URL = API_BASE + "/hod/workers";
+export const HOD_ASSIGN_COMPLAINT_URL = API_BASE + "/hod/assign-complaint";
 
 // ============================================================================
 // HEALTH CHECK

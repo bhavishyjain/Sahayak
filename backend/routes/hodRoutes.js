@@ -1,13 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const { isAuthenticated, isHoD } = require("../middlewares/authMiddleware");
-const { getComplaintsByDepartment, assignWorker, updateComplaintStatus } = require("../controllers/hodController");
+const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
+const {
+  getHodDashboard,
+  getHodWorkers,
+  assignComplaintToWorker,
+} = require("../controllers/hodController");
 
-// Only HoD access
-// router.use(isAuthenticated, isHoD);
-
-router.get("/department/:department", getComplaintsByDepartment);
-router.post("/assign", assignWorker);
-router.post("/update-status", updateComplaintStatus);
+router.get("/dashboard", attachAuth, requireAuth, getHodDashboard);
+router.get("/workers", attachAuth, requireAuth, getHodWorkers);
+router.post(
+  "/assign-complaint",
+  attachAuth,
+  requireAuth,
+  assignComplaintToWorker,
+);
 
 module.exports = router;

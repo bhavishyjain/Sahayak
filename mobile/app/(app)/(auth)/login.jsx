@@ -34,7 +34,14 @@ export default function Login() {
         userData !== "undefined" &&
         JSON.parse(userData)?.auth_token
       ) {
-        router.replace("/(app)/(tabs)/home");
+        const user = JSON.parse(userData);
+        const redirectPath =
+          user.role === "head"
+            ? "/(app)/(tabs)/hod-dashboard"
+            : user.role === "worker"
+              ? "/(app)/(tabs)/worker-dashboard"
+              : "/(app)/(tabs)/home";
+        router.replace(redirectPath);
       }
     };
     checkAuth();
@@ -91,7 +98,15 @@ export default function Login() {
           text1: t("toast.loginSuccess.title") || "Success",
           text2: responseData?.message || t("toast.loginSuccess.message"),
         });
-        router.replace("/(app)/(tabs)/home");
+
+        // Redirect based on user role
+        const redirectPath =
+          userData.role === "head"
+            ? "/(app)/(tabs)/hod-dashboard"
+            : userData.role === "worker"
+              ? "/(app)/(tabs)/worker-dashboard"
+              : "/(app)/(tabs)/home";
+        router.replace(redirectPath);
       } else {
         console.error("No auth token in response:", userData);
         Toast.show({

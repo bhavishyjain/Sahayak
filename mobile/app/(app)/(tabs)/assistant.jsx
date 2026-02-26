@@ -10,7 +10,7 @@ import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 
-export default function AssistantScreen() {
+export default function Assistant() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 

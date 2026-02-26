@@ -1,5 +1,12 @@
 import { useRouter } from "expo-router";
-import { Search, Plus } from "lucide-react-native";
+import {
+  Search,
+  Plus,
+  MapPin,
+  Camera,
+  X,
+  Navigation,
+} from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
   Modal,
@@ -8,8 +15,12 @@ import {
   Text,
   TextInput,
   View,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import Toast from "react-native-toast-message";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { darkColors, lightColors } from "../../../colors";
 import AutoSkeleton from "../../../components/AutoSkeleton";
 import BackButtonHeader from "../../../components/BackButtonHeader";
@@ -21,7 +32,7 @@ import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
 
-export default function ComplaintsScreen() {
+export default function Complaints() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -40,14 +51,17 @@ export default function ComplaintsScreen() {
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdTicket, setCreatedTicket] = useState("");
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [coordinates, setCoordinates] = useState(null);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
 
   const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
 
   const DEPARTMENT_OPTIONS = [
-    { label: "Road", value: "road" },
-    { label: "Water", value: "water" },
-    { label: "Electricity", value: "electricity" },
-    { label: "Sanitation", value: "sanitation" },
+    { label: "Road", value: "Road" },
+    { label: "Water", value: "Water" },
+    { label: "Electricity", value: "Electricity" },
+    { label: "Sanitation", value: "Sanitation" },
     { label: "Other", value: "other" },
   ];
 
@@ -102,6 +116,130 @@ export default function ComplaintsScreen() {
     });
   }, [complaints, search]);
 
+  const pickImages = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Toast.show({
+          type: "error",
+          text1: "Permission Denied",
+          text2: "Camera roll permission is required",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        selectionLimit: 5,
+      });
+
+      if (!result.canceled && result.assets) {
+        const totalImages = selectedImages.length + result.assets.length;
+        if (totalImages > 5) {
+          Toast.show({
+            type: "error",
+            text1: "Too Many Images",
+            text2: "Maximum 5 images allowed",
+          });
+          return;
+        }
+        setSelectedImages([...selectedImages, ...result.assets]);
+      }
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Could not select images",
+      });
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Toast.show({
+          type: "error",
+          text1: "Permission Denied",
+          text2: "Camera permission is required",
+        });
+        return;
+      }
+
+      if (selectedImages.length >= 5) {
+        Toast.show({
+          type: "error",
+          text1: "Maximum Reached",
+          text2: "You can only upload 5 images",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.8,
+        allowsEditing: true,
+      });
+
+      if (!result.canceled && result.assets) {
+        setSelectedImages([...selectedImages, ...result.assets]);
+      }
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Could not take photo",
+      });
+    }
+  };
+
+  const removeImage = (index) => {
+    setSelectedImages(selectedImages.filter((_, i) => i !== index));
+  };
+
+  const fetchCurrentLocation = async () => {
+    try {
+      setFetchingLocation(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        Toast.show({
+          type: "error",
+          text1: "Permission Denied",
+          text2: "Location permission is required",
+        });
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeout: 15000,
+      });
+
+      setCoordinates({
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Location Captured",
+        text2: `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`,
+      });
+    } catch (error) {
+      console.error("Location error:", error);
+      Toast.show({
+        type: "error",
+        text1: "Location Error",
+        text2: "Could not get current location",
+      });
+    } finally {
+      setFetchingLocation(false);
+    }
+  };
+
   const onSubmit = async () => {
     if (
       !title.trim() ||
@@ -119,15 +257,38 @@ export default function ComplaintsScreen() {
 
     try {
       setSaving(true);
+
+      const formData = new FormData();
+      formData.append("title", title.trim());
+      formData.append("description", description.trim());
+      formData.append("department", department.trim());
+      formData.append("locationName", locationName.trim());
+      formData.append("priority", priority);
+
+      if (coordinates) {
+        formData.append("coordinates", JSON.stringify(coordinates));
+      }
+
+      // Add multiple images
+      selectedImages.forEach((image, index) => {
+        const uri = image.uri;
+        const filename = uri.split("/").pop();
+        const match = /\.([\w]+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : "image/jpeg";
+
+        formData.append("images", {
+          uri,
+          name: filename,
+          type,
+        });
+      });
+
       const res = await apiCall({
         method: "POST",
         url: `${baseUrl}/complaints`,
-        data: {
-          title: title.trim(),
-          description: description.trim(),
-          department: department.trim(),
-          locationName: locationName.trim(),
-          priority,
+        data: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
         },
       });
 
@@ -141,6 +302,8 @@ export default function ComplaintsScreen() {
       setDepartment("road");
       setLocationName("");
       setPriority("Medium");
+      setSelectedImages([]);
+      setCoordinates(null);
       setModalVisible(false);
 
       // Reload complaints
@@ -523,6 +686,133 @@ export default function ComplaintsScreen() {
                     height: 48,
                   }}
                 />
+              </View>
+
+              {/* GPS Location */}
+              <View className="mb-2.5">
+                <Text
+                  className="text-base font-bold mb-1"
+                  style={{ color: colors.textPrimary }}
+                >
+                  GPS Coordinates (Optional)
+                </Text>
+                <View className="flex-row">
+                  <PressableBlock
+                    onPress={fetchCurrentLocation}
+                    disabled={fetchingLocation}
+                    className="flex-1 flex-row items-center justify-center py-3 rounded-xl border"
+                    style={{
+                      borderColor: coordinates ? colors.primary : colors.border,
+                      backgroundColor: coordinates
+                        ? `${colors.primary}22`
+                        : colors.backgroundSecondary,
+                    }}
+                  >
+                    {fetchingLocation ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <>
+                        <Navigation
+                          size={18}
+                          color={
+                            coordinates ? colors.primary : colors.textSecondary
+                          }
+                        />
+                        <Text
+                          className="text-sm font-semibold ml-2"
+                          style={{
+                            color: coordinates
+                              ? colors.primary
+                              : colors.textPrimary,
+                          }}
+                        >
+                          {coordinates
+                            ? `${coordinates.lat.toFixed(4)}, ${coordinates.lng.toFixed(4)}`
+                            : "Capture Location"}
+                        </Text>
+                      </>
+                    )}
+                  </PressableBlock>
+                  {coordinates && (
+                    <PressableBlock
+                      onPress={() => setCoordinates(null)}
+                      className="ml-2 px-3 py-3 rounded-xl"
+                      style={{ backgroundColor: colors.danger + "22" }}
+                    >
+                      <X size={18} color={colors.danger} />
+                    </PressableBlock>
+                  )}
+                </View>
+              </View>
+
+              {/* Photo Upload */}
+              <View className="mb-2.5">
+                <Text
+                  className="text-base font-bold mb-1"
+                  style={{ color: colors.textPrimary }}
+                >
+                  Proof Images (Optional, Max 5)
+                </Text>
+
+                {/* Selected Images Preview */}
+                {selectedImages.length > 0 && (
+                  <View className="flex-row flex-wrap mb-2">
+                    {selectedImages.map((image, index) => (
+                      <View key={index} className="mr-2 mb-2 relative">
+                        <Image
+                          source={{ uri: image.uri }}
+                          className="w-20 h-20 rounded-lg"
+                        />
+                        <PressableBlock
+                          onPress={() => removeImage(index)}
+                          className="absolute -top-1 -right-1 w-6 h-6 rounded-full items-center justify-center"
+                          style={{ backgroundColor: colors.danger }}
+                        >
+                          <X size={14} color="#FFFFFF" />
+                        </PressableBlock>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Image Selection Buttons */}
+                {selectedImages.length < 5 && (
+                  <View className="flex-row">
+                    <PressableBlock
+                      onPress={takePhoto}
+                      className="flex-1 mr-2 flex-row items-center justify-center py-3 rounded-xl border"
+                      style={{
+                        borderColor: colors.border,
+                        backgroundColor: colors.backgroundSecondary,
+                      }}
+                    >
+                      <Camera size={18} color={colors.textPrimary} />
+                      <Text
+                        className="text-sm font-semibold ml-2"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        Take Photo
+                      </Text>
+                    </PressableBlock>
+
+                    <PressableBlock
+                      onPress={pickImages}
+                      className="flex-1 ml-2 flex-row items-center justify-center py-3 rounded-xl border"
+                      style={{
+                        borderColor: colors.border,
+                        backgroundColor: colors.backgroundSecondary,
+                      }}
+                    >
+                      <Plus size={18} color={colors.textPrimary} />
+                      <Text
+                        className="text-sm font-semibold ml-2"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        Choose Photos
+                      </Text>
+                    </PressableBlock>
+                  </View>
+                )}
               </View>
 
               <PressableBlock

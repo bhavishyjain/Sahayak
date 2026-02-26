@@ -17,12 +17,12 @@ const complaintSchema = new mongoose.Schema(
 
     department: {
       type: String,
-      enum: ["road", "water", "electricity", "waste", "drainage", "other"],
+      enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
       required: true,
     },
     aiSuggestedDepartment: {
       type: String,
-      enum: ["road", "water", "electricity", "waste", "drainage", "other"],
+      enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
       default: null,
     },
     aiConfidence: { type: Number, min: 0, max: 1, default: null },
@@ -74,8 +74,48 @@ const complaintSchema = new mongoose.Schema(
     actualCompletionTime: { type: Number }, // in hours
     workerNotes: { type: String },
     completionPhotos: [{ type: String }], // URLs to completion photos
-    proofImage: { type: String, default: null },
+    proofImage: [{ type: String }], // Changed to array for multiple photos
     note: { type: String },
+
+    // Public Voting/Support
+    upvotes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    upvoteCount: { type: Number, default: 0 },
+
+    // Citizen Feedback & Rating
+    feedback: {
+      rating: { type: Number, min: 1, max: 5, default: null },
+      comment: { type: String, default: null },
+      ratedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+      ratedAt: { type: Date, default: null },
+    },
+
+    // SLA Tracking
+    sla: {
+      dueDate: { type: Date, default: null },
+      isOverdue: { type: Boolean, default: false },
+      escalated: { type: Boolean, default: false },
+      escalationLevel: { type: Number, default: 0 },
+      escalationHistory: [
+        {
+          level: Number,
+          escalatedAt: Date,
+          escalatedTo: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+          },
+        },
+      ],
+    },
+
     history: [
       {
         status: String,
@@ -90,7 +130,7 @@ const complaintSchema = new mongoose.Schema(
     ],
     chatHistory: [{ role: String, content: String }], // stores conversation
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // auto-generate ticketId
@@ -102,6 +142,30 @@ complaintSchema.pre("save", function (next) {
       .slice(2, 6)
       .toUpperCase()}`;
   }
+
+  // Calculate SLA due date based on priority
+  if (this.isNew && !this.sla.dueDate) {
+    const now = new Date();
+    let hoursToAdd = 72; // Default: 3 days for Medium
+
+    if (this.priority === "High") {
+      hoursToAdd = 24; // 1 day for High
+    } else if (this.priority === "Low") {
+      hoursToAdd = 168; // 7 days for Low
+    }
+
+    this.sla.dueDate = new Date(now.getTime() + hoursToAdd * 60 * 60 * 1000);
+  }
+
+  // Check if overdue
+  if (
+    this.sla.dueDate &&
+    this.status !== "resolved" &&
+    this.status !== "closed"
+  ) {
+    this.sla.isOverdue = new Date() > this.sla.dueDate;
+  }
+
   next();
 });
 

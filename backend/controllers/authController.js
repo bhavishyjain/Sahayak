@@ -19,7 +19,7 @@ function issueToken(user) {
 }
 
 function userPayload(user) {
-  return {
+  const payload = {
     id: user._id,
     username: user.username,
     role: user.role,
@@ -29,6 +29,19 @@ function userPayload(user) {
     department: user.department,
     preferredLanguage: user.preferredLanguage || "en",
   };
+
+  // Include rating and performance metrics for workers
+  if (user.role === "worker") {
+    payload.rating = user.rating || 4.5;
+    payload.performanceMetrics = user.performanceMetrics || {
+      totalCompleted: 0,
+      averageCompletionTime: 0,
+      currentWeekCompleted: 0,
+      customerRating: 4.5,
+    };
+  }
+
+  return payload;
 }
 
 exports.register = async (req, res) => {

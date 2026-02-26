@@ -6,15 +6,14 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const cors = require("cors");
-const session = require("express-session");
-const MongoStore = require("connect-mongo");
-const passport = require("passport");
 const connectDB = require("./config/db");
 
 const app = express();
 
 connectDB();
 require("./utils/eventPriorityUpdater");
+const { setupSLAEscalationJob } = require("./utils/slaEscalation");
+setupSLAEscalationJob();
 
 const defaultOrigins = [
   "http://localhost:5173",
@@ -38,7 +37,7 @@ app.use(
       return cb(new Error("Not allowed by CORS"));
     },
     credentials: true,
-  })
+  }),
 );
 
 if (process.env.NODE_ENV !== "test") {
@@ -48,26 +47,6 @@ if (process.env.NODE_ENV !== "test") {
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "hackathon_secret",
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
-    name: "connect.sid",
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24,
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    },
-  })
-);
-
-require("./config/passport")(passport);
-app.use(passport.initialize());
-app.use(passport.session());
 app.use("/api", require("./routes"));
 app.use("/api/chat", require("./routes/chatRoutes"));
 app.use("/api/workers", require("./routes/workerRoutes"));

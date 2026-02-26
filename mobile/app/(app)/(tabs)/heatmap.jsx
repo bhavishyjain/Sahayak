@@ -189,12 +189,12 @@ export default function HeatMap() {
   // Filter options
   const departments = [
     { label: t("all_departments") || "All Departments", value: "all" },
-    { label: t("roads") || "Roads", value: "road" },
-    { label: t("water") || "Water Supply", value: "water" },
-    { label: t("electricity") || "Electricity", value: "electricity" },
-    { label: t("waste") || "Waste Management", value: "waste" },
-    { label: t("drainage") || "Drainage", value: "drainage" },
-    { label: t("other") || "Other", value: "other" },
+    { label: t("roads") || "Roads", value: "Road" },
+    { label: t("water") || "Water Supply", value: "Water" },
+    { label: t("electricity") || "Electricity", value: "Electricity" },
+    { label: t("waste") || "Waste Management", value: "Waste" },
+    { label: t("drainage") || "Drainage", value: "Drainage" },
+    { label: t("other") || "Other", value: "Other" },
   ];
 
   const priorities = [
@@ -217,6 +217,19 @@ export default function HeatMap() {
       ? [userLocation.lat, userLocation.lng]
       : [22.7196, 75.8577]; // Indore as default
 
+    // Group complaints by department for clustering
+    const getDepartmentColor = (dept) => {
+      const colors = {
+        Water: "#3B82F6", // blue
+        Road: "#6B7280", // gray
+        Electricity: "#FBBF24", // yellow
+        waste: "#10B981", // green
+        drainage: "#8B5CF6", // purple
+        other: "#6B7280", // gray
+      };
+      return colors[dept] || "#6B7280";
+    };
+
     const markers = spots
       .map(
         (spot, index) => `
@@ -226,7 +239,7 @@ export default function HeatMap() {
           fillOpacity: 0.6,
           radius: Math.min(${spot.totalComplaints} * 2 + 5, 20)
         })
-        .addTo(map)
+        .addTo(markers)
         .bindPopup(\`
           <div style="font-family: system-ui; min-width: 200px;">
             <h3 style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">${spot.locationName}</h3>
@@ -234,7 +247,7 @@ export default function HeatMap() {
               <div><strong>Total Complaints:</strong> ${spot.totalComplaints}</div>
               <div><strong>Open:</strong> ${spot.openComplaints}</div>
               <div><strong>High Priority:</strong> ${spot.highPriorityComplaints}</div>
-              <div><strong>Department:</strong> ${spot.topDepartment}</div>
+              <div><strong>Department:</strong> <span style="color: ${getDepartmentColor(spot.topDepartment)}; font-weight: 600;">${spot.topDepartment}</span></div>
               <div><strong>Severity:</strong> <span style="color: ${getSeverityColor(spot.severity)}; font-weight: 600;">${getSeverityLabel(spot.severity)}</span></div>
             </div>
           </div>
@@ -251,10 +264,48 @@ export default function HeatMap() {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Heat Map</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
         <style>
           body { margin: 0; padding: 0; }
           #map { height: 100vh; width: 100%; }
+          
+          /* Custom cluster styles */
+          .marker-cluster-small {
+            background-color: rgba(59, 130, 246, 0.6);
+          }
+          .marker-cluster-small div {
+            background-color: rgba(59, 130, 246, 0.8);
+          }
+          .marker-cluster-medium {
+            background-color: rgba(251, 191, 36, 0.6);
+          }
+          .marker-cluster-medium div {
+            background-color: rgba(251, 191, 36, 0.8);
+          }
+          .marker-cluster-large {
+            background-color: rgba(220, 38, 38, 0.6);
+          }
+          .marker-cluster-large div {
+            background-color: rgba(220, 38, 38, 0.8);
+          }
+          .marker-cluster {
+            border-radius: 50%;
+          }
+          .marker-cluster div {
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            font-family: system-ui;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
           .legend {
             position: absolute;
             bottom: 20px;
@@ -266,12 +317,26 @@ export default function HeatMap() {
             font-family: system-ui;
             font-size: 11px;
             z-index: 1000;
+            max-width: 200px;
           }
           .legend-title {
             font-weight: 600;
             margin-bottom: 6px;
             color: #1f2937;
             font-size: 12px;
+          }
+          .legend-section {
+            margin-bottom: 8px;
+          }
+          .legend-section:last-child {
+            margin-bottom: 0;
+          }
+          .legend-section-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #1f2937;
+            font-size: 10px;
+            text-transform: uppercase;
           }
           .legend-item {
             display: flex;
@@ -315,22 +380,43 @@ export default function HeatMap() {
           </svg>
         </button>
         <div class="legend">
-          <div class="legend-title">Severity Levels</div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #DC2626;"></div>
-            <span>Critical</span>
+          <div class="legend-section">
+            <div class="legend-section-title">Severity</div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #DC2626;"></div>
+              <span>Critical</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #F59E0B;"></div>
+              <span>High</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #10B981;"></div>
+              <span>Medium</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #3B82F6;"></div>
+              <span>Low</span>
+            </div>
           </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #F59E0B;"></div>
-            <span>High</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #10B981;"></div>
-            <span>Medium</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #3B82F6;"></div>
-            <span>Low</span>
+          <div class="legend-section">
+            <div class="legend-section-title">Departments</div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #3B82F6;"></div>
+              <span>Water</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #6B7280;"></div>
+              <span>Road</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #FBBF24;"></div>
+              <span>Electricity</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #10B981;"></div>
+              <span>Waste</span>
+            </div>
           </div>
         </div>
         <script>
@@ -340,6 +426,31 @@ export default function HeatMap() {
             attribution: '',
             maxZoom: 19
           }).addTo(map);
+
+          // Create marker cluster group
+          const markers = L.markerClusterGroup({
+            maxClusterRadius: 50,
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true,
+            iconCreateFunction: function(cluster) {
+              const childCount = cluster.getChildCount();
+              let c = ' marker-cluster-';
+              if (childCount < 5) {
+                c += 'small';
+              } else if (childCount < 15) {
+                c += 'medium';
+              } else {
+                c += 'large';
+              }
+              
+              return new L.DivIcon({ 
+                html: '<div><span>' + childCount + '</span></div>', 
+                className: 'marker-cluster' + c, 
+                iconSize: new L.Point(40, 40) 
+              });
+            }
+          });
 
           // Store user location as JavaScript variable
           const userLocation = ${userLocation ? `{ lat: ${userLocation.lat}, lng: ${userLocation.lng} }` : "null"};
@@ -362,6 +473,9 @@ export default function HeatMap() {
           }
 
           ${markers}
+
+          // Add markers to map
+          map.addLayer(markers);
 
           // Function to center map on user location
           function goToUserLocation() {

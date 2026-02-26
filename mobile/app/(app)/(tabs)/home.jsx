@@ -36,7 +36,7 @@ import getUserAuth from "../../../utils/userAuth";
 
 const { width } = Dimensions.get("window");
 
-export default function HomeScreen() {
+export default function Home() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
