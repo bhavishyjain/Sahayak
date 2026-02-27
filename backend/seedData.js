@@ -586,19 +586,21 @@ function generateComplaint(userId, ticketNum, allUsers) {
   }
 
   // More realistic status distribution
-  // pending: 40%, assigned: 25%, in-progress: 20%, resolved: 12%, closed: 3%
+  // pending: 40%, assigned: 24%, in-progress: 18%, needs-rework: 3%, resolved: 12%, cancelled: 3%
   const statusRandom = Math.random();
   let status;
   if (statusRandom < 0.4) {
     status = "pending";
-  } else if (statusRandom < 0.65) {
+  } else if (statusRandom < 0.64) {
     status = "assigned";
-  } else if (statusRandom < 0.85) {
+  } else if (statusRandom < 0.82) {
     status = "in-progress";
+  } else if (statusRandom < 0.85) {
+    status = "needs-rework";
   } else if (statusRandom < 0.97) {
     status = "resolved";
   } else {
-    status = "closed";
+    status = "cancelled";
   }
 
   // More realistic temporal distribution (weighted towards recent)
@@ -662,7 +664,7 @@ function generateComplaint(userId, ticketNum, allUsers) {
     },
   ];
 
-  if (["assigned", "in-progress", "resolved", "closed"].includes(status)) {
+  if (["assigned", "in-progress", "needs-rework", "resolved"].includes(status)) {
     const assignedDate = new Date(createdAt);
     assignedDate.setHours(
       assignedDate.getHours() + Math.floor(Math.random() * 24),
@@ -674,7 +676,7 @@ function generateComplaint(userId, ticketNum, allUsers) {
     });
   }
 
-  if (["in-progress", "resolved", "closed"].includes(status)) {
+  if (["in-progress", "needs-rework", "resolved"].includes(status)) {
     const inProgressDate = new Date(
       complaint.history[complaint.history.length - 1].timestamp,
     );
@@ -688,7 +690,31 @@ function generateComplaint(userId, ticketNum, allUsers) {
     });
   }
 
-  if (["resolved", "closed"].includes(status)) {
+  if (status === "needs-rework") {
+    const approvalDate = new Date(
+      complaint.history[complaint.history.length - 1].timestamp,
+    );
+    approvalDate.setHours(
+      approvalDate.getHours() + Math.floor(Math.random() * 12),
+    );
+    complaint.history.push({
+      status: "pending-approval",
+      timestamp: approvalDate,
+      note: "Submitted for approval",
+    });
+
+    const reworkDate = new Date(approvalDate);
+    reworkDate.setHours(
+      reworkDate.getHours() + Math.floor(Math.random() * 12) + 1,
+    );
+    complaint.history.push({
+      status: "needs-rework",
+      timestamp: reworkDate,
+      note: "Marked as needs rework by HOD",
+    });
+  }
+
+  if (status === "resolved") {
     const resolvedDate = new Date(
       complaint.history[complaint.history.length - 1].timestamp,
     );
@@ -731,6 +757,18 @@ function generateComplaint(userId, ticketNum, allUsers) {
         ), // 1-25 hours after resolution
       };
     }
+  }
+
+  if (status === "cancelled") {
+    const cancelledDate = new Date(createdAt);
+    cancelledDate.setHours(
+      cancelledDate.getHours() + Math.floor(Math.random() * 12) + 1,
+    );
+    complaint.history.push({
+      status: "cancelled",
+      timestamp: cancelledDate,
+      note: "Complaint cancelled by HOD before assignment",
+    });
   }
 
   return complaint;
@@ -792,7 +830,6 @@ async function seedDatabase() {
           email: `worker.${dept}.${i}@indore.gov.in`,
           phone: `91${9200000000 + users.length}`,
           fullName: `Worker ${dept.charAt(0).toUpperCase() + dept.slice(1)} ${i}`,
-          workStatus: ["available", "busy"][Math.floor(Math.random() * 2)],
           rating: 3.5 + Math.random() * 1.5,
           performanceMetrics: {
             totalCompleted: Math.floor(Math.random() * 50),
@@ -939,7 +976,7 @@ async function seedDatabase() {
 
       // Assign worker if status is assigned or beyond
       if (
-        ["assigned", "in-progress", "resolved", "closed"].includes(
+        ["assigned", "in-progress", "needs-rework", "resolved"].includes(
           complaint.status,
         )
       ) {
@@ -980,7 +1017,10 @@ async function seedDatabase() {
       `   - ${createdComplaints.filter((c) => c.status === "resolved").length} Resolved`,
     );
     console.log(
-      `   - ${createdComplaints.filter((c) => c.status === "closed").length} Closed`,
+      `   - ${createdComplaints.filter((c) => c.status === "needs-rework").length} Needs Rework`,
+    );
+    console.log(
+      `   - ${createdComplaints.filter((c) => c.status === "cancelled").length} Cancelled`,
     );
 
     // Update worker assigned complaints
@@ -992,11 +1032,13 @@ async function seedDatabase() {
       );
 
       worker.assignedComplaints = assignedComplaints
-        .filter((c) => ["assigned", "in-progress"].includes(c.status))
+        .filter((c) =>
+          ["assigned", "in-progress", "needs-rework"].includes(c.status),
+        )
         .map((c) => c._id);
 
       worker.completedComplaints = assignedComplaints
-        .filter((c) => ["resolved", "closed"].includes(c.status))
+        .filter((c) => c.status === "resolved")
         .map((c) => c._id);
 
       await worker.save();
@@ -1015,7 +1057,7 @@ async function seedDatabase() {
     console.error("❌ Error seeding database:", error);
   } finally {
     await mongoose.connection.close();
-    console.log("\n👋 Database connection closed");
+    console.log("\n👋 Database disconnected");
   }
 }
 

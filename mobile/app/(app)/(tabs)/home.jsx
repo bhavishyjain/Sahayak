@@ -71,8 +71,10 @@ export default function Home() {
         apiCall({ method: "GET", url: `${baseUrl}/dashboard/heatmap` }),
       ]);
 
-      setSummary(summaryRes?.data || { stats: {}, recent: [] });
-      setSpots(heatmapRes?.data?.spots || []);
+      const summaryPayload = summaryRes?.data;
+      const heatmapPayload = heatmapRes?.data;
+      setSummary(summaryPayload || { stats: {}, recent: [] });
+      setSpots(heatmapPayload?.spots || []);
     } catch (error) {
       Toast.show({
         type: "error",

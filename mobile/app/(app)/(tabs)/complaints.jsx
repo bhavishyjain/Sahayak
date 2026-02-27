@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import {
   Search,
   Plus,
+  Clock,
   MapPin,
   Camera,
   X,
@@ -82,7 +83,8 @@ export default function Complaints() {
         method: "GET",
         url: `${baseUrl}/complaints${q}`,
       });
-      setComplaints(res?.data?.complaints || []);
+      const payload = res?.data;
+      setComplaints(payload?.complaints || []);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -293,7 +295,8 @@ export default function Complaints() {
         },
       });
 
-      const ticketId = res?.data?.complaint?.ticketId || "";
+      const payload = res?.data;
+      const ticketId = payload?.complaint?.ticketId || "";
       setCreatedTicket(ticketId);
       setShowSuccess(true);
 

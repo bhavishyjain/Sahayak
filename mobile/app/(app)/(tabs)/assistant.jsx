@@ -48,12 +48,25 @@ export default function Assistant() {
           })),
         },
       });
+      const payload = res?.data;
 
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: res?.data?.response || "No response" },
+        { role: "assistant", text: payload?.response || "No response" },
       ]);
     } catch (e) {
+      const status = e?.response?.status;
+      if (status === 401 || status === 403) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text:
+              "Please login to check ticket status. I can still help with general questions.",
+          },
+        ]);
+        return;
+      }
       Toast.show({
         type: "error",
         text1: "Assistant failed",

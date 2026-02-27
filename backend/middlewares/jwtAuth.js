@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const AppError = require("../core/AppError");
 
 function normalizeUser(userObj) {
   return {
@@ -43,7 +44,7 @@ function attachAuth(req, res, next) {
       req.currentUser = req.user;
       return next();
     } catch (_error) {
-      return res.status(401).json({ message: "Invalid or expired token" });
+      return next(new AppError("Invalid or expired token", 401));
     }
   }
 
@@ -57,7 +58,7 @@ function attachAuth(req, res, next) {
 
 function requireAuth(req, res, next) {
   if (!req.user?._id) {
-    return res.status(401).json({ message: "Authentication required" });
+    return next(new AppError("Authentication required", 401));
   }
   return next();
 }

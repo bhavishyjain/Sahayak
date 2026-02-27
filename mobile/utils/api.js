@@ -99,6 +99,7 @@ const apiCall = async ({
   method,
   url,
   data = null,
+  params = undefined,
   headers = {},
   auth = null,
 }) => {
@@ -145,6 +146,7 @@ const apiCall = async ({
       method,
       url,
       data: payload,
+      params,
       headers: authHeaders,
       timeout: 30000,
       validateStatus: (status) => status < 500,
@@ -160,7 +162,25 @@ const apiCall = async ({
       throw error;
     }
 
-    return response;
+    const rawData = response.data;
+    const normalizedData =
+      rawData && typeof rawData === "object" && "data" in rawData
+        ? rawData.data
+        : rawData;
+
+    return {
+      ...response,
+      data: normalizedData,
+      rawData,
+      success:
+        rawData && typeof rawData === "object" && "success" in rawData
+          ? rawData.success
+          : true,
+      message:
+        rawData && typeof rawData === "object" && "message" in rawData
+          ? rawData.message
+          : undefined,
+    };
   } catch (error) {
     console.error("API Call Error:", error.message);
     console.error(error);

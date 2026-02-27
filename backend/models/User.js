@@ -32,11 +32,6 @@ const userSchema = new mongoose.Schema({
       ref: "Complaint",
     },
   ],
-  workStatus: {
-    type: String,
-    enum: ["available", "busy", "on-break", "offline"],
-    default: "available",
-  },
   workLocation: {
     lat: { type: Number },
     lng: { type: Number },

@@ -31,7 +31,7 @@ const CustomPicker = forwardRef(
     const [isVisible, setIsVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
 
-    // 🔥 Track HOW modal was closed
+    // Track how modal was dismissed
     const userSelectedItemRef = useRef(false);
 
     // Expose method to open modal from parent

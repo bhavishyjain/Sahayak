@@ -49,7 +49,8 @@ export default function WorkerCompleted() {
         url: WORKER_COMPLETED_URL,
       });
 
-      const data = res?.data?.complaints || [];
+      const payload = res?.data;
+      const data = payload?.complaints || [];
       setComplaints(data);
       setFilteredComplaints(data);
     } catch (e) {

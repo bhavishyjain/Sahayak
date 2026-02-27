@@ -73,8 +73,9 @@ export default function WorkerLeaderboard() {
         url: `${WORKER_LEADERBOARD_URL}?period=${period}${departmentParam}`,
       });
 
-      setLeaderboard(res?.data?.data?.leaderboard || []);
-      setCurrentUser(res?.data?.data?.currentUser || null);
+      const payload = res?.data;
+      setLeaderboard(payload?.leaderboard || []);
+      setCurrentUser(payload?.currentUser || null);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -649,8 +650,8 @@ export default function WorkerLeaderboard() {
                   className="text-sm leading-5"
                   style={{ color: colors.textSecondary }}
                 >
-                  Lifetime count of all resolved + closed complaints. This never
-                  decreases - it's your career achievement counter. Incremented
+                  Lifetime count of all resolved complaints. This never
+                  decreases - it&apos;s your career achievement counter. Incremented
                   on every HOD approval.
                 </Text>
               </View>

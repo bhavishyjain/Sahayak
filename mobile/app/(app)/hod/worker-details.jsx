@@ -69,13 +69,16 @@ export default function WorkerDetails() {
         ]);
 
       // Find specific worker
-      const workers = workerRes?.data?.workers || [];
+      const workersPayload = workerRes?.data;
+      const activePayload = activeComplaintsRes?.data;
+      const completedPayload = completedComplaintsRes?.data;
+      const workers = workersPayload?.workers || [];
       const workerData = workers.find((w) => w.id === id || w._id === id);
       setWorker(workerData || null);
 
       // Set complaints from dedicated endpoints
-      setActiveComplaints(activeComplaintsRes?.data?.complaints || []);
-      setCompletedComplaints(completedComplaintsRes?.data?.complaints || []);
+      setActiveComplaints(activePayload?.complaints || []);
+      setCompletedComplaints(completedPayload?.complaints || []);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -175,31 +178,6 @@ export default function WorkerDetails() {
                 @{worker.username}
               </Text>
 
-              <View
-                className="px-3 py-1 rounded-full mt-2"
-                style={{
-                  backgroundColor:
-                    worker.workStatus === "available"
-                      ? colors.success + "20" || "#10B98120"
-                      : worker.workStatus === "busy"
-                        ? colors.warning + "20" || "#F59E0B20"
-                        : colors.textSecondary + "20",
-                }}
-              >
-                <Text
-                  className="text-xs font-semibold capitalize"
-                  style={{
-                    color:
-                      worker.workStatus === "available"
-                        ? colors.success || "#10B981"
-                        : worker.workStatus === "busy"
-                          ? colors.warning || "#F59E0B"
-                          : colors.textSecondary,
-                  }}
-                >
-                  {worker.workStatus || "offline"}
-                </Text>
-              </View>
             </View>
 
             <View

@@ -4,7 +4,8 @@ const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 
 const router = express.Router();
 
-router.get("/summary", attachAuth, requireAuth, controller.summary);
-router.get("/heatmap", attachAuth, requireAuth, controller.heatmap);
+router.use(attachAuth, requireAuth);
+router.get("/summary", controller.summary);
+router.get("/heatmap", controller.heatmap);
 
 module.exports = router;

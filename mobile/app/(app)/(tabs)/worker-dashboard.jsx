@@ -21,6 +21,7 @@ import {
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import Card from "../../../components/Card";
+import MetricCard from "../../../components/MetricCard";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import apiCall from "../../../utils/api";
@@ -56,14 +57,8 @@ export default function WorkerDashboard() {
         url: WORKER_DASHBOARD_URL,
       });
 
-      console.log(
-        "📱 [Frontend] Response:",
-        JSON.stringify(res?.data, null, 2),
-      );
-
-      if (res?.data?.data) {
-        // Backend returns { success: true, data: { assignedComplaints, statistics } }
-        const backendData = res.data.data;
+      const backendData = res?.data;
+      if (backendData) {
         const transformed = {
           activeCount: backendData.statistics?.activeComplaints || 0,
           completedCount: backendData.statistics?.totalCompleted || 0,
@@ -78,14 +73,9 @@ export default function WorkerDashboard() {
             status: c.status,
           })),
         };
-        console.log(
-          "📱 [Frontend] Transformed:",
-          JSON.stringify(transformed, null, 2),
-        );
         setDashboardData(transformed);
       }
     } catch (e) {
-      console.error("📱 [Frontend] Error:", e);
       Toast.show({
         type: "error",
         text1: "Failed",
@@ -168,70 +158,29 @@ export default function WorkerDashboard() {
           <View className="px-4">
             {/* Main Stats Row */}
             <View className="flex-row mb-4">
-              <Card style={{ margin: 0, marginRight: 6, flex: 1 }}>
-                <View className="flex-row items-center justify-between mb-3">
-                  <View
-                    className="w-10 h-10 rounded-full items-center justify-center"
-                    style={{
-                      backgroundColor: colors.warning + "20" || "#F59E0B20",
-                    }}
-                  >
-                    <Clock size={20} color={colors.warning || "#F59E0B"} />
-                  </View>
-                </View>
-                <Text
-                  className="text-xs mb-1"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Active Tasks
-                </Text>
-                <Text
-                  className="text-3xl font-bold"
-                  style={{ color: colors.warning || "#F59E0B" }}
-                >
-                  {dashboardData.activeCount || 0}
-                </Text>
-                <Text
-                  className="text-xs mt-1"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Assigned to you
-                </Text>
-              </Card>
+              <MetricCard
+                colors={colors}
+                Icon={Clock}
+                iconColor={colors.warning || "#F59E0B"}
+                iconBgColor={(colors.warning || "#F59E0B") + "20"}
+                title="Active Tasks"
+                value={dashboardData.activeCount || 0}
+                subtitle="Assigned to you"
+                valueColor={colors.warning || "#F59E0B"}
+                style={{ marginRight: 6 }}
+              />
 
-              <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
-                <View className="flex-row items-center justify-between mb-3">
-                  <View
-                    className="w-10 h-10 rounded-full items-center justify-center"
-                    style={{
-                      backgroundColor: colors.success + "20" || "#10B98120",
-                    }}
-                  >
-                    <CheckCircle
-                      size={20}
-                      color={colors.success || "#10B981"}
-                    />
-                  </View>
-                </View>
-                <Text
-                  className="text-xs mb-1"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Completed
-                </Text>
-                <Text
-                  className="text-3xl font-bold"
-                  style={{ color: colors.success || "#10B981" }}
-                >
-                  {dashboardData.completedCount || 0}
-                </Text>
-                <Text
-                  className="text-xs mt-1"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Total resolved
-                </Text>
-              </Card>
+              <MetricCard
+                colors={colors}
+                Icon={CheckCircle}
+                iconColor={colors.success || "#10B981"}
+                iconBgColor={(colors.success || "#10B981") + "20"}
+                title="Completed"
+                value={dashboardData.completedCount || 0}
+                subtitle="Total resolved"
+                valueColor={colors.success || "#10B981"}
+                style={{ marginLeft: 6 }}
+              />
             </View>
 
             {/* Pending Approval Alert */}
@@ -558,7 +507,7 @@ export default function WorkerDashboard() {
                     className="text-sm mt-1 text-center"
                     style={{ color: colors.textSecondary }}
                   >
-                    You're all caught up! New assignments will appear here.
+                    You&apos;re all caught up! New assignments will appear here.
                   </Text>
                 </View>
               </Card>

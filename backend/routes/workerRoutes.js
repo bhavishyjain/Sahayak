@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
+const authorize = require("../middlewares/authorize");
 const upload = require("../middlewares/multer");
 const {
   createWorker,
@@ -16,38 +17,24 @@ const {
   getLeaderboard,
 } = require("../controllers/workerController");
 
+router.use(attachAuth, requireAuth);
+
 // Admin routes for worker management
-router.post("/create", attachAuth, requireAuth, createWorker);
-router.put("/:workerId", attachAuth, requireAuth, updateWorker);
-router.get("/", attachAuth, requireAuth, getAllWorkers);
-router.get(
-  "/available/:department",
-  attachAuth,
-  requireAuth,
-  getAvailableWorkers,
-);
-router.post("/assign-complaint", attachAuth, requireAuth, assignComplaint);
+router.post("/create", authorize("admin"), createWorker);
+router.put("/:workerId", authorize("admin"), updateWorker);
+router.get("/", authorize("admin", "head"), getAllWorkers);
+router.get("/available/:department", authorize("admin", "head"), getAvailableWorkers);
+router.post("/assign-complaint", authorize("admin", "head"), assignComplaint);
 
 // Worker routes
-router.get("/dashboard", attachAuth, requireAuth, getWorkerDashboard);
-router.get(
-  "/assigned-complaints",
-  attachAuth,
-  requireAuth,
-  getAssignedComplaints,
-);
-router.get(
-  "/completed-complaints",
-  attachAuth,
-  requireAuth,
-  getCompletedComplaints,
-);
-router.get("/leaderboard", attachAuth, requireAuth, getLeaderboard);
-router.put("/status/:workerId", attachAuth, requireAuth, updateWorkerStatus);
+router.get("/dashboard", authorize("worker", "admin"), getWorkerDashboard);
+router.get("/assigned-complaints", authorize("worker", "admin"), getAssignedComplaints);
+router.get("/completed-complaints", authorize("worker", "admin"), getCompletedComplaints);
+router.get("/leaderboard", authorize("worker", "admin", "head"), getLeaderboard);
+router.put("/status/:workerId", authorize("worker", "admin"), updateWorkerStatus);
 router.put(
   "/complaint/:complaintId/status",
-  attachAuth,
-  requireAuth,
+  authorize("worker", "admin"),
   upload.array("completionPhotos", 5),
   updateComplaintStatus,
 );

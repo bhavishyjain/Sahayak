@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
 // Base URL configuration
-const API_BASE =
+export const API_BASE =
   process.env.EXPO_PUBLIC_API_URL || "https://sahayak-zqp7.onrender.com/api";
 
 export const USER_AGENT_STRING =
@@ -69,8 +69,10 @@ export const HOD_WORKER_COMPLAINTS_URL = (workerId) =>
 export const HOD_ASSIGN_COMPLAINT_URL = API_BASE + "/hod/assign-complaint";
 export const HOD_APPROVE_COMPLETION_URL = (id) =>
   API_BASE + `/hod/approve-completion/${id}`;
-export const HOD_REJECT_COMPLETION_URL = (id) =>
-  API_BASE + `/hod/reject-completion/${id}`;
+export const HOD_NEEDS_REWORK_URL = (id) =>
+  API_BASE + `/hod/needs-rework/${id}`;
+export const HOD_CANCEL_COMPLAINT_URL = (id) =>
+  API_BASE + `/hod/cancel-complaint/${id}`;
 export const HOD_BULK_ASSIGN_URL = API_BASE + "/hod/bulk-assign";
 
 // ============================================================================

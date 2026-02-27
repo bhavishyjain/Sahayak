@@ -3,6 +3,7 @@ import {
   Clock,
   MapPin,
   User,
+  CheckCircle,
   FileText,
   AlertCircle,
   Image as ImageIcon,
@@ -13,7 +14,7 @@ import {
   Search,
   X,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -23,6 +24,7 @@ import {
   View,
   Modal,
   Pressable,
+  TouchableOpacity,
   TextInput,
 } from "react-native";
 import Toast from "react-native-toast-message";
@@ -37,8 +39,10 @@ import {
   HOD_ASSIGN_COMPLAINT_URL,
   HOD_WORKERS_URL,
   HOD_APPROVE_COMPLETION_URL,
-  HOD_REJECT_COMPLETION_URL,
+  HOD_NEEDS_REWORK_URL,
+  HOD_CANCEL_COMPLAINT_URL,
   UPDATE_COMPLAINT_STATUS_URL,
+  WORKERS_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
@@ -72,9 +76,10 @@ export default function ComplaintDetails() {
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [reworkReason, setReworkReason] = useState("");
   const [approving, setApproving] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
+  const [sendingRework, setSendingRework] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   // Worker-specific states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -84,6 +89,39 @@ export default function ComplaintDetails() {
 
   // Common states
   const [imageModalVisible, setImageModalVisible] = useState(false);
+
+  const normalizedWorkers = useMemo(
+    () =>
+      (workers || []).map((w, idx) => {
+        const fallbackId = `worker-${idx}-${w.username || "unknown"}`;
+        return {
+          ...w,
+          workerId: String(w.id || w._id || fallbackId),
+        };
+      }),
+    [workers],
+  );
+
+  const filteredWorkers = useMemo(() => {
+    const q = workerSearchQuery.trim().toLowerCase();
+    if (!q) return normalizedWorkers;
+    return normalizedWorkers.filter((w) => {
+      return (
+        String(w.fullName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(w.username || "")
+          .toLowerCase()
+          .includes(q)
+      );
+    });
+  }, [normalizedWorkers, workerSearchQuery]);
+
+  const currentAssignedWorker = useMemo(() => {
+    if (!complaint?.assignedTo) return null;
+    const assignedId = String(complaint.assignedTo);
+    return normalizedWorkers.find((w) => w.workerId === assignedId) || null;
+  }, [complaint?.assignedTo, normalizedWorkers]);
 
   const load = async (isRefresh = false) => {
     try {
@@ -98,7 +136,8 @@ export default function ComplaintDetails() {
         getUserAuth(),
       ]);
 
-      const complaintData = res?.data?.complaint || null;
+      const payload = res?.data;
+      const complaintData = payload?.complaint || null;
       setComplaint(complaintData);
       setUserRole(user?.role);
       setNewStatus(complaintData?.status || "");
@@ -138,7 +177,40 @@ export default function ComplaintDetails() {
         method: "GET",
         url: HOD_WORKERS_URL,
       });
-      setWorkers(res?.data?.workers || []);
+      const payload = res?.data;
+      let workerList = payload?.workers || [];
+
+      // Fallback for cases where HOD endpoint returns partial data unexpectedly.
+      if (workerList.length <= 1) {
+        const fallbackRes = await apiCall({
+          method: "GET",
+          url: WORKERS_URL,
+        });
+        let fallbackList = fallbackRes?.data?.data || [];
+        if (complaint?.department) {
+          const complaintDept = String(complaint.department).toLowerCase();
+          fallbackList = fallbackList.filter(
+            (worker) =>
+              String(worker.department || "").toLowerCase() === complaintDept,
+          );
+        }
+        const merged = [...workerList, ...fallbackList].reduce((acc, worker) => {
+          const key = String(worker.id || worker._id || worker.username || Math.random());
+          if (!acc.some((w) => String(w.id || w._id || w.username) === key)) {
+            acc.push(worker);
+          }
+          return acc;
+        }, []);
+        workerList = merged;
+      }
+
+      setWorkers((prev) => {
+        // Protect against late responses that would shrink an already-loaded list.
+        if (Array.isArray(prev) && prev.length > workerList.length) {
+          return prev;
+        }
+        return workerList;
+      });
     } catch (e) {
       console.error("Failed to load workers:", e);
     }
@@ -256,8 +328,10 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: "Complaint Assigned",
-        text2: "Worker has been notified",
+        text1: complaint?.assignedTo ? "Assignment Updated" : "Complaint Assigned",
+        text2: complaint?.assignedTo
+          ? "Worker assignment changed successfully"
+          : "Worker has been notified",
       });
 
       setAssignModalVisible(false);
@@ -307,23 +381,23 @@ export default function ComplaintDetails() {
 
   // HOD: Reject completion
   const handleRejectCompletion = async () => {
-    if (!rejectionReason.trim()) {
+    if (!reworkReason.trim()) {
       Toast.show({
         type: "error",
         text1: "Reason Required",
-        text2: "Please provide a reason for rejection",
+        text2: "Please provide rework details",
       });
       return;
     }
 
     try {
-      setRejecting(true);
+      setSendingRework(true);
 
       await apiCall({
         method: "POST",
-        url: HOD_REJECT_COMPLETION_URL(id),
+        url: HOD_NEEDS_REWORK_URL(id),
         data: {
-          rejectionReason: rejectionReason,
+          reworkReason,
         },
       });
 
@@ -334,16 +408,43 @@ export default function ComplaintDetails() {
       });
 
       setApprovalModalVisible(false);
-      setRejectionReason("");
+      setReworkReason("");
       await load(true);
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Rejection Failed",
-        text2: e?.response?.data?.message || "Could not reject completion",
+        text1: "Request Failed",
+        text2: e?.response?.data?.message || "Could not send for rework",
       });
     } finally {
-      setRejecting(false);
+      setSendingRework(false);
+    }
+  };
+
+  // HOD: Cancel complaint
+  const handleCancelComplaint = async () => {
+    try {
+      setCancelling(true);
+      await apiCall({
+        method: "POST",
+        url: HOD_CANCEL_COMPLAINT_URL(id),
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Cancelled",
+        text2: "Complaint has been cancelled",
+      });
+
+      await load(true);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Cancel Failed",
+        text2: e?.response?.data?.message || "Could not cancel complaint",
+      });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -413,6 +514,14 @@ export default function ComplaintDetails() {
     });
   };
 
+  const formatStatusLabel = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "needs-rework") return "Rework Required";
+    if (s === "in-progress") return "In Progress";
+    if (s === "pending-approval") return "Pending Approval";
+    return String(status || "-").replace("-", " ");
+  };
+
   if (loading) {
     return (
       <View
@@ -452,7 +561,7 @@ export default function ComplaintDetails() {
             className="text-sm mt-2 text-center"
             style={{ color: colors.textSecondary }}
           >
-            This complaint may have been removed or you don't have access to it.
+            This complaint may have been removed or you don&apos;t have access to it.
           </Text>
         </View>
       </View>
@@ -512,7 +621,7 @@ export default function ComplaintDetails() {
               className="text-lg font-bold mt-1 capitalize"
               style={{ color: getStatusColor(complaint.status, colors) }}
             >
-              {complaint.status || "-"}
+              {formatStatusLabel(complaint.status)}
             </Text>
           </Card>
           <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
@@ -600,15 +709,43 @@ export default function ComplaintDetails() {
           </Card>
         )}
 
+        {/* HOD: Current Assigned Worker */}
+        {userRole === "head" && complaint.assignedTo && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="flex-row items-center mb-1">
+              <Users size={18} color={colors.primary} />
+              <Text
+                className="text-sm ml-2"
+                style={{ color: colors.textSecondary }}
+              >
+                Currently Assigned
+              </Text>
+            </View>
+            <Text
+              className="text-base font-semibold"
+              style={{ color: colors.textPrimary }}
+            >
+              {currentAssignedWorker?.fullName ||
+                complaint.assignedWorkerName ||
+                "Assigned Worker"}
+            </Text>
+          </Card>
+        )}
+
         {/* HOD: Assign Worker Button */}
         {userRole === "head" &&
           complaint.status !== "resolved" &&
-          complaint.status !== "closed" && (
+          complaint.status !== "cancelled" && (
             <PressableBlock
               onPress={() => {
-                loadWorkers();
+                if (!workers.length) {
+                  loadWorkers();
+                }
                 setAssignModalVisible(true);
                 setWorkerSearchQuery("");
+                setSelectedWorker(
+                  complaint?.assignedTo ? String(complaint.assignedTo) : null,
+                );
               }}
             >
               <Card
@@ -629,6 +766,35 @@ export default function ComplaintDetails() {
                       ? "Reassign Worker"
                       : "Assign to Worker"}
                   </Text>
+                </View>
+              </Card>
+            </PressableBlock>
+          )}
+
+        {userRole === "head" &&
+          complaint.status !== "resolved" &&
+          complaint.status !== "cancelled" &&
+          !complaint.assignedTo && (
+            <PressableBlock onPress={handleCancelComplaint} disabled={cancelling}>
+              <Card
+                style={{
+                  margin: 0,
+                  marginBottom: 12,
+                  flex: 0,
+                  backgroundColor: colors.error || "#EF4444",
+                }}
+              >
+                <View className="flex-row items-center justify-center">
+                  {cancelling ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: "#FFFFFF" }}
+                    >
+                      Cancel Complaint
+                    </Text>
+                  )}
                 </View>
               </Card>
             </PressableBlock>
@@ -690,7 +856,7 @@ export default function ComplaintDetails() {
         {/* Worker: Update Status Button */}
         {userRole === "worker" &&
           complaint.status !== "resolved" &&
-          complaint.status !== "closed" && (
+          complaint.status !== "cancelled" && (
             <PressableBlock onPress={() => setStatusModalVisible(true)}>
               <Card
                 style={{
@@ -712,26 +878,19 @@ export default function ComplaintDetails() {
 
         {/* Title and Description */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-          <View className="flex-row items-start mb-3">
-            <View className="flex-1 ml-3">
-              <FileText
-                size={20}
-                color={colors.primary}
-                style={{ marginTop: 2 }}
-              />
+          <View className="mb-3">
+            <View className="flex-row items-center mb-1">
+              <FileText size={20} color={colors.primary} />
               <Text
-                className="text-sm mb-1"
+                className="text-sm ml-2"
                 style={{ color: colors.textSecondary }}
               >
                 Title
               </Text>
-              <Text
-                className="text-base font-semibold"
-                style={{ color: colors.textPrimary }}
-              >
-                {complaint.title || "Complaint"}
-              </Text>
             </View>
+            <Text className="text-base font-semibold" style={{ color: colors.textPrimary }}>
+              {complaint.title || "Complaint"}
+            </Text>
           </View>
 
           <View
@@ -962,6 +1121,15 @@ export default function ComplaintDetails() {
                       ? `${complaint.estimatedCompletionTime} hours`
                       : `${Math.round(complaint.estimatedCompletionTime / 24)} days`}
                   </Text>
+                  {userRole === "head" && (
+                    <Text
+                      className="text-xs mt-1"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Why ETA: base time by priority, adjusted by worker history,
+                      similar complaints, and current workload.
+                    </Text>
+                  )}
                 </View>
               </>
             )}
@@ -990,7 +1158,7 @@ export default function ComplaintDetails() {
                       className="text-sm font-semibold capitalize"
                       style={{ color: colors.textPrimary }}
                     >
-                      {item.status}
+                      {formatStatusLabel(item.status)}
                     </Text>
                     {item.note && (
                       <Text
@@ -1063,7 +1231,7 @@ export default function ComplaintDetails() {
 
         {/* Citizen: Rate Resolution Button */}
         {userRole === "user" &&
-          (complaint.status === "resolved" || complaint.status === "closed") &&
+          complaint.status === "resolved" &&
           String(complaint.userId) === String(currentUserId) &&
           !complaint.feedback?.rating && (
             <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -1309,7 +1477,7 @@ export default function ComplaintDetails() {
                 className="text-xl font-bold mb-4 text-center"
                 style={{ color: colors.textPrimary }}
               >
-                Assign to Worker
+                {complaint?.assignedTo ? "Change Assignment" : "Assign to Worker"}
               </Text>
 
               {/* Worker Search */}
@@ -1343,50 +1511,49 @@ export default function ComplaintDetails() {
                 className="max-h-96 mb-4"
                 showsVerticalScrollIndicator={false}
               >
-                {workers
-                  .filter((w) =>
-                    w.fullName
-                      ?.toLowerCase()
-                      .includes(workerSearchQuery.toLowerCase()),
-                  )
-                  .map((worker) => (
+                {filteredWorkers.map((worker) => (
                     <Pressable
-                      key={worker.id}
-                      onPress={() => setSelectedWorker(worker.id)}
+                      key={worker.workerId}
+                      onPress={() => setSelectedWorker(worker.workerId)}
                       className="mb-2"
                     >
                       <Card
                         style={{
                           margin: 0,
                           backgroundColor:
-                            selectedWorker === worker.id
+                            selectedWorker === worker.workerId
                               ? colors.primary + "20"
                               : colors.backgroundSecondary,
-                          borderWidth: selectedWorker === worker.id ? 2 : 0,
+                          borderWidth: selectedWorker === worker.workerId ? 2 : 0,
                           borderColor: colors.primary,
                         }}
                       >
-                        <Text
-                          className="text-base font-semibold"
-                          style={{
-                            color:
-                              selectedWorker === worker.id
-                                ? colors.primary
-                                : colors.textPrimary,
-                          }}
-                        >
-                          {worker.fullName}
-                        </Text>
-                        <Text
-                          className="text-sm mt-1"
-                          style={{ color: colors.textSecondary }}
-                        >
-                          {worker.specializations?.join(", ") ||
-                            "General worker"}
-                        </Text>
+                        <View className="flex-row items-center justify-between">
+                          <Text
+                            className="text-base font-semibold"
+                            style={{
+                              color:
+                                selectedWorker === worker.workerId
+                                  ? colors.primary
+                                  : colors.textPrimary,
+                            }}
+                          >
+                            {worker.fullName}
+                          </Text>
+                          {selectedWorker === worker.workerId && (
+                            <CheckCircle size={22} color={colors.primary} />
+                          )}
+                        </View>
                       </Card>
                     </Pressable>
                   ))}
+                {filteredWorkers.length === 0 && (
+                  <Card style={{ margin: 0, flex: 0 }}>
+                    <Text style={{ color: colors.textSecondary }}>
+                      No workers found.
+                    </Text>
+                  </Card>
+                )}
               </ScrollView>
 
               <View className="flex-row">
@@ -1423,7 +1590,7 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      Assign
+                      {complaint?.assignedTo ? "Change Assignment" : "Assign"}
                     </Text>
                   )}
                 </Pressable>
@@ -1556,7 +1723,7 @@ export default function ComplaintDetails() {
         </Modal>
       )}
 
-      {/* HOD: Rejection Reason Modal */}
+      {/* HOD: Rework Reason Modal */}
       {userRole === "head" && (
         <Modal
           visible={approvalModalVisible}
@@ -1583,11 +1750,11 @@ export default function ComplaintDetails() {
                 className="text-sm mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Reason for rejection *
+                Reason for rework *
               </Text>
               <TextInput
-                value={rejectionReason}
-                onChangeText={setRejectionReason}
+                value={reworkReason}
+                onChangeText={setReworkReason}
                 placeholder="Explain what needs to be fixed..."
                 placeholderTextColor={colors.textSecondary}
                 multiline
@@ -1606,7 +1773,7 @@ export default function ComplaintDetails() {
                 <Pressable
                   onPress={() => {
                     setApprovalModalVisible(false);
-                    setRejectionReason("");
+                    setReworkReason("");
                   }}
                   className="flex-1 mr-2 py-3 rounded-xl items-center"
                   style={{ backgroundColor: colors.backgroundSecondary }}
@@ -1621,14 +1788,14 @@ export default function ComplaintDetails() {
 
                 <Pressable
                   onPress={handleRejectCompletion}
-                  disabled={rejecting || !rejectionReason.trim()}
+                  disabled={sendingRework || !reworkReason.trim()}
                   className="flex-1 ml-2 py-3 rounded-xl items-center"
                   style={{
                     backgroundColor: colors.error || "#EF4444",
-                    opacity: rejecting || !rejectionReason.trim() ? 0.5 : 1,
+                    opacity: sendingRework || !reworkReason.trim() ? 0.5 : 1,
                   }}
                 >
-                  {rejecting ? (
+                  {sendingRework ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <Text

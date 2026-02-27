@@ -7,6 +7,8 @@
 export function getStatusColor(status, colors) {
   const s = String(status || "").toLowerCase();
   if (s === "resolved") return colors.success;
+  if (s === "cancelled") return colors.muted;
+  if (s === "needs-rework") return "#F97316";
   if (s === "in-progress" || s === "assigned") return colors.warning;
   if (s === "pending") return colors.danger;
   return colors.muted;

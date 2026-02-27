@@ -7,7 +7,6 @@ import {
   Clock,
   AlertTriangle,
   Award,
-  Activity,
   ThumbsUp,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
@@ -21,6 +20,7 @@ import {
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import Card from "../../../components/Card";
+import MetricCard from "../../../components/MetricCard";
 import { useTheme } from "../../../utils/context/theme";
 import apiCall from "../../../utils/api";
 import { HOD_DASHBOARD_URL } from "../../../url";
@@ -43,7 +43,8 @@ export default function HodDashboard() {
         url: HOD_DASHBOARD_URL,
       });
 
-      setStats(res?.data?.stats || null);
+      const payload = res?.data;
+      setStats(payload?.stats || null);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -226,55 +227,32 @@ export default function HodDashboard() {
 
               {/* Completion Stats */}
               <View className="flex-row mb-4">
-                <Card style={{ margin: 0, marginRight: 6, flex: 1 }}>
-                  <View className="flex-row items-center justify-between mb-2">
-                    <TrendingUp size={18} color={colors.success || "#10B981"} />
-                  </View>
-                  <Text
-                    className="text-xs mb-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    Resolved
-                  </Text>
-                  <Text
-                    className="text-3xl font-bold"
-                    style={{ color: colors.success || "#10B981" }}
-                  >
-                    {stats.resolved || 0}
-                  </Text>
-                  <Text
-                    className="text-xs mt-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {stats.total > 0
+                <MetricCard
+                  colors={colors}
+                  Icon={TrendingUp}
+                  iconColor={colors.success || "#10B981"}
+                  iconBgColor={(colors.success || "#10B981") + "20"}
+                  title="Resolved"
+                  value={stats.resolved || 0}
+                  subtitle={
+                    stats.total > 0
                       ? `${Math.round((stats.resolved / stats.total) * 100)}% completion`
-                      : "0% completion"}
-                  </Text>
-                </Card>
+                      : "0% completion"
+                  }
+                  valueColor={colors.success || "#10B981"}
+                  style={{ marginRight: 6 }}
+                />
 
-                <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
-                  <View className="flex-row items-center justify-between mb-2">
-                    <TrendingDown size={18} color={colors.textSecondary} />
-                  </View>
-                  <Text
-                    className="text-xs mb-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    Closed
-                  </Text>
-                  <Text
-                    className="text-3xl font-bold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {stats.closed || 0}
-                  </Text>
-                  <Text
-                    className="text-xs mt-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    Archived cases
-                  </Text>
-                </Card>
+                <MetricCard
+                  colors={colors}
+                  Icon={TrendingDown}
+                  iconColor={colors.textSecondary}
+                  iconBgColor={colors.backgroundSecondary}
+                  title="Cancelled"
+                  value={stats.cancelled || 0}
+                  subtitle="Cancelled cases"
+                  style={{ marginLeft: 6 }}
+                />
               </View>
 
               {/* Department Efficiency */}
@@ -316,7 +294,7 @@ export default function HodDashboard() {
                         style={{ color: colors.primary }}
                       >
                         {stats.total > 0
-                          ? `${Math.round(((stats.resolved + stats.closed) / stats.total) * 100)}%`
+                          ? `${Math.round(((stats.resolved + stats.cancelled) / stats.total) * 100)}%`
                           : "0%"}
                       </Text>
                     </View>
@@ -329,7 +307,7 @@ export default function HodDashboard() {
                         style={{
                           width:
                             stats.total > 0
-                              ? `${Math.round(((stats.resolved + stats.closed) / stats.total) * 100)}%`
+                              ? `${Math.round(((stats.resolved + stats.cancelled) / stats.total) * 100)}%`
                               : "0%",
                           backgroundColor: colors.success || "#10B981",
                         }}
@@ -505,53 +483,27 @@ export default function HodDashboard() {
 
               {/* Worker Performance & Response Time */}
               <View className="flex-row mb-4">
-                <Card style={{ margin: 0, marginRight: 6, flex: 1 }}>
-                  <View className="flex-row items-center mb-2">
-                    <Users size={16} color={colors.info || "#3B82F6"} />
-                    <Text
-                      className="text-xs ml-2 font-semibold"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Active Workers
-                    </Text>
-                  </View>
-                  <Text
-                    className="text-2xl font-bold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {stats.activeWorkers || 0}
-                  </Text>
-                  <Text
-                    className="text-xs mt-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {stats.totalWorkers || 0} total workers
-                  </Text>
-                </Card>
+                <MetricCard
+                  colors={colors}
+                  Icon={Users}
+                  iconColor={colors.info || "#3B82F6"}
+                  iconBgColor={(colors.info || "#3B82F6") + "20"}
+                  title="Active Workers"
+                  value={stats.activeWorkers || 0}
+                  subtitle={`${stats.totalWorkers || 0} total workers`}
+                  style={{ marginRight: 6 }}
+                />
 
-                <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
-                  <View className="flex-row items-center mb-2">
-                    <Clock size={16} color={colors.purple || "#8B5CF6"} />
-                    <Text
-                      className="text-xs ml-2 font-semibold"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Avg Response
-                    </Text>
-                  </View>
-                  <Text
-                    className="text-2xl font-bold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {stats.avgResponseTime || "N/A"}
-                  </Text>
-                  <Text
-                    className="text-xs mt-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {stats.avgResponseTime ? "hours to assign" : "No data"}
-                  </Text>
-                </Card>
+                <MetricCard
+                  colors={colors}
+                  Icon={Clock}
+                  iconColor={colors.purple || "#8B5CF6"}
+                  iconBgColor={(colors.purple || "#8B5CF6") + "20"}
+                  title="Avg Response"
+                  value={stats.avgResponseTime || "N/A"}
+                  subtitle={stats.avgResponseTime ? "hours to assign" : "No data"}
+                  style={{ marginLeft: 6 }}
+                />
               </View>
 
               {/* Public Engagement */}

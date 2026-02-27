@@ -11,6 +11,7 @@ export default function StatusPill({ user, status }) {
   let Icon = Power;
   let dotColorHex = "#EF4444"; // red-500
   let pulse = false;
+  let backgroundColor = colors.backgroundSecondary;
 
   // If status prop is provided (for complaints), use complaint status logic
   if (status) {
@@ -19,30 +20,37 @@ export default function StatusPill({ user, status }) {
       case "pending":
         label = "Pending";
         dotColorHex = "#F59E0B"; // amber-500
+        backgroundColor = "#F59E0B22";
         break;
       case "assigned":
         label = "Assigned";
         dotColorHex = "#3B82F6"; // blue-500
+        backgroundColor = "#3B82F622";
         break;
       case "in-progress":
         label = "In Progress";
         dotColorHex = "#8B5CF6"; // purple-500
+        backgroundColor = "#8B5CF622";
         break;
       case "resolved":
         label = "Resolved";
         dotColorHex = "#22C55E"; // green-500
+        backgroundColor = "#22C55E22";
         break;
-      case "closed":
-        label = "Closed";
+      case "cancelled":
+        label = "Cancelled";
         dotColorHex = "#6B7280"; // gray-500
+        backgroundColor = "#6B728022";
         break;
-      case "rejected":
-        label = "Rejected";
-        dotColorHex = "#EF4444"; // red-500
+      case "needs-rework":
+        label = "Rework Required";
+        dotColorHex = "#F97316"; // orange-500
+        backgroundColor = "#F9731622";
         break;
       default:
         label = status;
         dotColorHex = "#6B7280"; // gray-500
+        backgroundColor = colors.backgroundSecondary;
     }
   } else if (user) {
     // Original user online/offline status logic
@@ -90,7 +98,7 @@ export default function StatusPill({ user, status }) {
   return (
     <View
       className="px-4 py-2 rounded flex-row items-center gap-2"
-      style={{ backgroundColor: colors.backgroundSecondary }}
+      style={{ backgroundColor }}
     >
       {/* 🔵 STATUS DOT */}
       <View className="relative">

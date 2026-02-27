@@ -1,42 +1,34 @@
 const User = require("../models/User");
+const AppError = require("../core/AppError");
+const asyncHandler = require("../core/asyncHandler");
+const { sendSuccess } = require("../core/response");
 const { sendExpoPushNotifications } = require("../services/pushNotificationService");
 
-exports.registerPushToken = async (req, res) => {
-  try {
-    const { pushToken } = req.body;
-
-    if (!pushToken || typeof pushToken !== "string") {
-      return res.status(400).json({ message: "pushToken is required" });
-    }
-
-    await User.findByIdAndUpdate(
-      req.user._id,
-      { $addToSet: { pushTokens: pushToken } },
-      { new: true }
-    );
-
-    return res.status(200).json({ message: "Push token registered" });
-  } catch (error) {
-    console.error("register push token error", error);
-    return res.status(500).json({ message: "Server error" });
+exports.registerPushToken = asyncHandler(async (req, res) => {
+  const { pushToken } = req.body;
+  if (!pushToken || typeof pushToken !== "string") {
+    throw new AppError("pushToken is required", 400);
   }
-};
 
-exports.sendTestNotification = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select("pushTokens");
-    const result = await sendExpoPushNotifications(user?.pushTokens || [], {
-      title: "Sahayak",
-      body: "This is a test notification.",
-      data: { type: "test" },
-    });
+  await User.findByIdAndUpdate(
+    req.user._id,
+    { $addToSet: { pushTokens: pushToken } },
+    { new: true },
+  );
 
-    return res.status(200).json({ message: "Notification request sent", result });
-  } catch (error) {
-    console.error("send test notification error", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+  return sendSuccess(res, {}, "Push token registered");
+});
+
+exports.sendTestNotification = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select("pushTokens");
+  const result = await sendExpoPushNotifications(user?.pushTokens || [], {
+    title: "Sahayak",
+    body: "This is a test notification.",
+    data: { type: "test" },
+  });
+
+  return sendSuccess(res, { result }, "Notification request sent");
+});
 
 exports.notifyUser = async (userId, payload) => {
   try {

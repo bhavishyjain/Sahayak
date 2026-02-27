@@ -61,6 +61,12 @@ function extractTicketId(message = "") {
   return match ? match[0].toUpperCase() : null;
 }
 
+function canAccessComplaint(user, complaint) {
+  if (!user?._id) return false;
+  if (["admin", "head", "worker"].includes(user.role)) return true;
+  return String(complaint.userId) === String(user._id);
+}
+
 function resolveAudioMimeType(mimetype = "", originalname = "") {
   const normalized = String(mimetype || "").toLowerCase();
   const fileName = String(originalname || "").toLowerCase();
@@ -212,6 +218,12 @@ router.post("/message", async (req, res) => {
 
     const ticketId = extractTicketId(message);
     if (ticketId && (lowerMessage.includes("status") || lowerMessage.includes("track"))) {
+      if (!req.user?._id) {
+        return res.status(401).json({
+          error: "Authentication required to check ticket status",
+        });
+      }
+
       const complaint = await Complaint.findOne({ ticketId });
       if (!complaint) {
         return res.json({
@@ -220,6 +232,13 @@ router.post("/message", async (req, res) => {
           timestamp: new Date().toISOString(),
         });
       }
+
+      if (!canAccessComplaint(req.user, complaint)) {
+        return res.status(403).json({
+          error: "You are not allowed to access this ticket",
+        });
+      }
+
       return res.json({
         response: `Ticket ${complaint.ticketId} ka status ${complaint.status} hai.`,
         assistant: {
@@ -352,7 +371,7 @@ Respond in a conversational tone.`;
   }
 
   if (lowerMessage.includes("office hours") || lowerMessage.includes("timing")) {
-    return "Our office hours are:\nMonday-Friday: 9:00 AM - 6:00 PM\nSaturday: 9:00 AM - 2:00 PM\nClosed on Sundays and public holidays.";
+    return "Our office hours are:\nMonday-Friday: 9:00 AM - 6:00 PM\nSaturday: 9:00 AM - 2:00 PM\nNo service on Sundays and public holidays.";
   }
 
   if (lowerMessage.includes("contact") || lowerMessage.includes("phone")) {

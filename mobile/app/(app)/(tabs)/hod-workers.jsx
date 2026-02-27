@@ -47,7 +47,8 @@ export default function HodWorkersTab() {
         url: HOD_WORKERS_URL,
       });
 
-      setWorkers(res?.data?.workers || []);
+      const payload = res?.data;
+      setWorkers(payload?.workers || []);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -73,9 +74,9 @@ export default function HodWorkersTab() {
         <BackButtonHeader title="Manage Workers" hasBackButton={false} />
 
         {/* Search Bar */}
-        <View className="px-4 pb-4 pt-4">
+        <View className="px-4 py-4">
           <View
-            className="flex-row items-center px-4 py-3.5 rounded-2xl"
+            className="flex-row items-center px-4 py-1 rounded-2xl"
             style={{
               backgroundColor: colors.backgroundSecondary,
               borderWidth: 1.5,
@@ -116,12 +117,12 @@ export default function HodWorkersTab() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Manage Workers" showBack={false} />
+      <BackButtonHeader title="Manage Workers" hasBackButton={false} />
 
       {/* Search Bar */}
-      <View className="px-4 pb-4 pt-4">
+      <View className="px-4 py-4">
         <View
-          className="flex-row items-center px-4 py-3.5 rounded-2xl"
+          className="flex-row items-center px-4 py-1 rounded-2xl"
           style={{
             backgroundColor: colors.backgroundSecondary,
             borderWidth: 1.5,
@@ -201,31 +202,6 @@ export default function HodWorkersTab() {
                     </View>
                   </View>
 
-                  <View
-                    className="px-2 py-1 rounded"
-                    style={{
-                      backgroundColor:
-                        worker.workStatus === "available"
-                          ? colors.success + "20" || "#10B98120"
-                          : worker.workStatus === "busy"
-                            ? colors.warning + "20" || "#F59E0B20"
-                            : colors.textSecondary + "20",
-                    }}
-                  >
-                    <Text
-                      className="text-xs font-semibold capitalize"
-                      style={{
-                        color:
-                          worker.workStatus === "available"
-                            ? colors.success || "#10B981"
-                            : worker.workStatus === "busy"
-                              ? colors.warning || "#F59E0B"
-                              : colors.textSecondary,
-                      }}
-                    >
-                      {worker.workStatus || "offline"}
-                    </Text>
-                  </View>
                 </View>
 
                 {/* Worker Stats */}

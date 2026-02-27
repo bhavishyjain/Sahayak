@@ -10,5 +10,9 @@ router.use("/auth", require("./authRoutes"));
 router.use("/complaints", require("./complaintRoutes"));
 router.use("/dashboard", require("./dashboardRoutes"));
 router.use("/notifications", require("./notificationRoutes"));
+router.use("/chat", require("./chatRoutes"));
+router.use("/workers", require("./workerRoutes"));
+router.use("/hod", require("./hodRoutes"));
+router.use("/users", require("./users"));
 
 module.exports = router;

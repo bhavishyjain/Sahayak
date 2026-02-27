@@ -10,10 +10,10 @@ async function checkAndEscalateOverdueComplaints() {
   try {
     const now = new Date();
 
-    // Find complaints that are overdue and not resolved/closed
+    // Find complaints that are overdue and not resolved/cancelled
     const overdueComplaints = await Complaint.find({
       "sla.dueDate": { $lt: now },
-      status: { $nin: ["resolved", "closed", "rejected"] },
+      status: { $nin: ["resolved", "cancelled", "needs-rework"] },
       "sla.isOverdue": false,
     });
 

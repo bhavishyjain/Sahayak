@@ -139,6 +139,16 @@ export default function Setting() {
   };
 
   const SETTINGS_ITEMS = [
+    ...(user?.role === "head"
+      ? [
+          {
+            icon: CheckCircle,
+            title: "Resolved Complaints",
+            subtitle: "View resolved complaints",
+            route: "/(app)/settings/hod-resolved",
+          },
+        ]
+      : []),
     // Worker-only: Completed Complaints
     ...(user?.role === "worker"
       ? [

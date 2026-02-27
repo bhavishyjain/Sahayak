@@ -94,7 +94,7 @@ export default function UpdateProfile() {
     onMutate: () => updateUiState({ loading: true }),
     onSuccess: async (response) => {
       const data = response.data;
-      if (data.success) {
+      if (response.success) {
         // Update local user data with auth_token preserved
         const currentUser = await getUserAuth();
         const updatedUser = { 
@@ -110,7 +110,7 @@ export default function UpdateProfile() {
       } else if (data.email_phone_already_used) {
         showToast("error", "Error", "Email or phone already in use");
       } else {
-        showToast("error", "Error", data.message || "Update failed");
+        showToast("error", "Error", response.message || "Update failed");
       }
     },
     onError: (error) => {

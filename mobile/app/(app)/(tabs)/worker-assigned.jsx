@@ -55,7 +55,8 @@ export default function WorkerAssigned() {
         url: WORKER_ASSIGNED_URL,
       });
 
-      const data = res?.data?.complaints || [];
+      const payload = res?.data;
+      const data = payload?.complaints || [];
       setComplaints(data);
       setFilteredComplaints(data);
     } catch (e) {
@@ -598,7 +599,7 @@ export default function WorkerAssigned() {
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                You don't have any active complaints assigned to you
+                You don&apos;t have any active complaints assigned to you
               </Text>
             </View>
           </Card>

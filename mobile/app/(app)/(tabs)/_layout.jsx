@@ -190,10 +190,13 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="hod-complaints"
           options={{
-            title: "Complaints",
-            tabBarIcon: ({ color }) => (
-              <TabIcon Icon={ListChecks} color={color} />
+            title: "",
+            tabBarIcon: () => (
+              <View style={{ position: "absolute", top: -40 }}>
+                <CenterNewButton colors={colors} icon={ListChecks} />
+              </View>
             ),
+            tabBarLabel: () => null,
           }}
         />
 

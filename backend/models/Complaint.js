@@ -56,8 +56,8 @@ const complaintSchema = new mongoose.Schema(
         "in-progress",
         "pending-approval",
         "resolved",
-        "closed",
-        "rejected",
+        "cancelled",
+        "needs-rework",
       ],
       default: "pending",
     },
@@ -162,7 +162,8 @@ complaintSchema.pre("save", function (next) {
   if (
     this.sla.dueDate &&
     this.status !== "resolved" &&
-    this.status !== "closed"
+    this.status !== "cancelled" &&
+    this.status !== "needs-rework"
   ) {
     this.sla.isOverdue = new Date() > this.sla.dueDate;
   }
