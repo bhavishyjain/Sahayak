@@ -31,6 +31,7 @@ import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
+import { API_BASE } from "../../../url";
 
 export default function Complaints() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function Complaints() {
   const [coordinates, setCoordinates] = useState(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
+  const baseUrl = API_BASE;
 
   const DEPARTMENT_OPTIONS = [
     { label: "Road", value: "Road" },
@@ -428,6 +429,19 @@ export default function Complaints() {
                 });
               };
 
+              const formatETA = (etaDate) => {
+                if (!etaDate) return null;
+                const eta = new Date(etaDate);
+                const now = new Date();
+                const diffMs = eta - now;
+                const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+
+                if (diffHours < 0) return "Overdue";
+                if (diffHours < 24) return `${diffHours}h`;
+                const diffDays = Math.round(diffHours / 24);
+                return `${diffDays}d`;
+              };
+
               return (
                 <Card key={c.id} style={{ margin: 0, marginTop: 10, flex: 0 }}>
                   {/* Top Row: Ticket and Date */}
@@ -525,6 +539,42 @@ export default function Complaints() {
                       </Text>
                     </View>
                   </View>
+
+                  {/* ETA Display - Prominent Badge */}
+                  {c.estimatedCompletionTime && (
+                    <View
+                      className="mb-3 px-3 py-2.5 rounded-xl flex-row items-center justify-center"
+                      style={{
+                        backgroundColor:
+                          formatETA(c.estimatedCompletionTime) === "Overdue"
+                            ? "#FEE2E2"
+                            : colors.info
+                              ? colors.info + "20"
+                              : "#DBEAFE",
+                      }}
+                    >
+                      <Clock
+                        size={18}
+                        color={
+                          formatETA(c.estimatedCompletionTime) === "Overdue"
+                            ? "#EF4444"
+                            : colors.info || "#3B82F6"
+                        }
+                      />
+                      <Text
+                        className="text-base font-bold ml-2"
+                        style={{
+                          color:
+                            formatETA(c.estimatedCompletionTime) === "Overdue"
+                              ? "#EF4444"
+                              : colors.info || "#3B82F6",
+                        }}
+                      >
+                        Expected Resolution:{" "}
+                        {formatETA(c.estimatedCompletionTime)}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Full Width: Description/Title */}
                   <View className="mb-3">

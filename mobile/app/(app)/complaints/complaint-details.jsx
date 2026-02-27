@@ -10,6 +10,8 @@ import {
   Star,
   MessageSquare,
   Users,
+  Search,
+  X,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -34,6 +36,8 @@ import {
   SUBMIT_FEEDBACK_URL,
   HOD_ASSIGN_COMPLAINT_URL,
   HOD_WORKERS_URL,
+  HOD_APPROVE_COMPLETION_URL,
+  HOD_REJECT_COMPLETION_URL,
   UPDATE_COMPLAINT_STATUS_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
@@ -65,7 +69,12 @@ export default function ComplaintDetails() {
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [workers, setWorkers] = useState([]);
   const [selectedWorker, setSelectedWorker] = useState(null);
+  const [workerSearchQuery, setWorkerSearchQuery] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [approvalModalVisible, setApprovalModalVisible] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   // Worker-specific states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -265,6 +274,79 @@ export default function ComplaintDetails() {
     }
   };
 
+  // HOD: Approve completion
+  const handleApproveCompletion = async () => {
+    try {
+      setApproving(true);
+
+      await apiCall({
+        method: "POST",
+        url: HOD_APPROVE_COMPLETION_URL(id),
+        data: {
+          hodNotes: "Approved - Work completed satisfactorily",
+        },
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Approved",
+        text2: "Complaint marked as resolved",
+      });
+
+      await load(true);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Approval Failed",
+        text2: e?.response?.data?.message || "Could not approve completion",
+      });
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  // HOD: Reject completion
+  const handleRejectCompletion = async () => {
+    if (!rejectionReason.trim()) {
+      Toast.show({
+        type: "error",
+        text1: "Reason Required",
+        text2: "Please provide a reason for rejection",
+      });
+      return;
+    }
+
+    try {
+      setRejecting(true);
+
+      await apiCall({
+        method: "POST",
+        url: HOD_REJECT_COMPLETION_URL(id),
+        data: {
+          rejectionReason: rejectionReason,
+        },
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Sent for Rework",
+        text2: "Worker has been notified",
+      });
+
+      setApprovalModalVisible(false);
+      setRejectionReason("");
+      await load(true);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Rejection Failed",
+        text2: e?.response?.data?.message || "Could not reject completion",
+      });
+    } finally {
+      setRejecting(false);
+    }
+  };
+
   // Worker: Update status
   const handleUpdateStatus = async () => {
     if (!newStatus) {
@@ -380,7 +462,7 @@ export default function ComplaintDetails() {
   const statusOptions = [
     { value: "assigned", label: "Assigned" },
     { value: "in-progress", label: "In Progress" },
-    { value: "resolved", label: "Resolved" },
+    { value: "pending-approval", label: "Submit for Approval" },
   ];
 
   return (
@@ -473,7 +555,9 @@ export default function ComplaintDetails() {
                         color: hasUpvoted ? colors.primary : colors.textPrimary,
                       }}
                     >
-                      {hasUpvoted ? "You support this" : "Support this complaint"}
+                      {hasUpvoted
+                        ? "You support this"
+                        : "Support this complaint"}
                     </Text>
                     <Text
                       className="text-sm mt-0.5"
@@ -510,8 +594,8 @@ export default function ComplaintDetails() {
               style={{ color: colors.textSecondary }}
             >
               {complaint.upvoteCount || 0}{" "}
-              {(complaint.upvoteCount || 0) === 1 ? "person" : "people"} affected
-              by this issue
+              {(complaint.upvoteCount || 0) === 1 ? "person" : "people"}{" "}
+              affected by this issue
             </Text>
           </Card>
         )}
@@ -524,6 +608,7 @@ export default function ComplaintDetails() {
               onPress={() => {
                 loadWorkers();
                 setAssignModalVisible(true);
+                setWorkerSearchQuery("");
               }}
             >
               <Card
@@ -540,12 +625,67 @@ export default function ComplaintDetails() {
                     className="text-base font-semibold ml-2"
                     style={{ color: "#FFFFFF" }}
                   >
-                    {complaint.assignedTo ? "Reassign Worker" : "Assign to Worker"}
+                    {complaint.assignedTo
+                      ? "Reassign Worker"
+                      : "Assign to Worker"}
                   </Text>
                 </View>
               </Card>
             </PressableBlock>
           )}
+
+        {/* HOD: Review Pending Approval */}
+        {userRole === "head" && complaint.status === "pending-approval" && (
+          <View className="mb-3">
+            <Card
+              style={{
+                margin: 0,
+                marginBottom: 8,
+                flex: 0,
+                backgroundColor: colors.success || "#10B981",
+              }}
+            >
+              <PressableBlock
+                onPress={handleApproveCompletion}
+                disabled={approving}
+              >
+                <View className="flex-row items-center justify-center py-1">
+                  {approving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text
+                        className="text-base font-semibold"
+                        style={{ color: "#FFFFFF" }}
+                      >
+                        ✓ Approve Completion
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </PressableBlock>
+            </Card>
+
+            <Card
+              style={{
+                margin: 0,
+                flex: 0,
+                backgroundColor: colors.error || "#EF4444",
+              }}
+            >
+              <PressableBlock onPress={() => setApprovalModalVisible(true)}>
+                <View className="flex-row items-center justify-center py-1">
+                  <Text
+                    className="text-base font-semibold"
+                    style={{ color: "#FFFFFF" }}
+                  >
+                    ✗ Request Rework
+                  </Text>
+                </View>
+              </PressableBlock>
+            </Card>
+          </View>
+        )}
 
         {/* Worker: Update Status Button */}
         {userRole === "worker" &&
@@ -573,12 +713,12 @@ export default function ComplaintDetails() {
         {/* Title and Description */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
           <View className="flex-row items-start mb-3">
-            <FileText
-              size={20}
-              color={colors.primary}
-              style={{ marginTop: 2 }}
-            />
             <View className="flex-1 ml-3">
+              <FileText
+                size={20}
+                color={colors.primary}
+                style={{ marginTop: 2 }}
+              />
               <Text
                 className="text-sm mb-1"
                 style={{ color: colors.textSecondary }}
@@ -680,7 +820,11 @@ export default function ComplaintDetails() {
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Proof Image{Array.isArray(complaint.proofImage) && complaint.proofImage.length > 1 ? "s" : ""}
+                  Proof Image
+                  {Array.isArray(complaint.proofImage) &&
+                  complaint.proofImage.length > 1
+                    ? "s"
+                    : ""}
                 </Text>
               </View>
               {Array.isArray(complaint.proofImage) ? (
@@ -723,6 +867,36 @@ export default function ComplaintDetails() {
             </Card>
           )}
 
+        {/* Completion Photos (Before/After) - Visible to all roles */}
+        {complaint.completionPhotos &&
+          complaint.completionPhotos.length > 0 && (
+            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+              <View className="flex-row items-center mb-3">
+                <ImageIcon size={20} color={colors.success || "#10B981"} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  Completion Photos (After)
+                </Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {complaint.completionPhotos.map((img, idx) => (
+                  <PressableBlock
+                    key={idx}
+                    onPress={() => setImageModalVisible(true)}
+                  >
+                    <Image
+                      source={{ uri: img }}
+                      className="w-32 h-32 rounded-xl mr-2"
+                      resizeMode="cover"
+                    />
+                  </PressableBlock>
+                ))}
+              </ScrollView>
+            </Card>
+          )}
+
         {/* Timeline */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
           <View className="flex-row items-center mb-3">
@@ -752,7 +926,7 @@ export default function ComplaintDetails() {
             style={{ backgroundColor: colors.border }}
           />
 
-          <View>
+          <View className="mb-3">
             <Text className="text-sm" style={{ color: colors.textSecondary }}>
               Last Updated
             </Text>
@@ -763,6 +937,34 @@ export default function ComplaintDetails() {
               {formatDate(complaint.updatedAt)}
             </Text>
           </View>
+
+          {/* Show ETA for assigned/in-progress complaints */}
+          {complaint.estimatedCompletionTime &&
+            (complaint.status === "assigned" ||
+              complaint.status === "in-progress") && (
+              <>
+                <View
+                  className="h-[1px] mb-3"
+                  style={{ backgroundColor: colors.border }}
+                />
+                <View>
+                  <Text
+                    className="text-sm"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Estimated Completion
+                  </Text>
+                  <Text
+                    className="text-base font-semibold mt-1"
+                    style={{ color: colors.warning || "#f59e0b" }}
+                  >
+                    {complaint.estimatedCompletionTime < 24
+                      ? `${complaint.estimatedCompletionTime} hours`
+                      : `${Math.round(complaint.estimatedCompletionTime / 24)} days`}
+                  </Text>
+                </View>
+              </>
+            )}
         </Card>
 
         {/* Status History */}
@@ -1110,47 +1312,81 @@ export default function ComplaintDetails() {
                 Assign to Worker
               </Text>
 
+              {/* Worker Search */}
+              <View className="mb-3">
+                <View
+                  className="flex-row items-center px-4 py-3 rounded-xl"
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Search size={18} color={colors.textSecondary} />
+                  <TextInput
+                    className="flex-1 ml-2 text-sm"
+                    style={{ color: colors.textPrimary }}
+                    placeholder="Search workers..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={workerSearchQuery}
+                    onChangeText={setWorkerSearchQuery}
+                  />
+                  {workerSearchQuery && (
+                    <TouchableOpacity onPress={() => setWorkerSearchQuery("")}>
+                      <X size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
               <ScrollView
                 className="max-h-96 mb-4"
                 showsVerticalScrollIndicator={false}
               >
-                {workers.map((worker) => (
-                  <Pressable
-                    key={worker.id}
-                    onPress={() => setSelectedWorker(worker.id)}
-                    className="mb-2"
-                  >
-                    <Card
-                      style={{
-                        margin: 0,
-                        backgroundColor:
-                          selectedWorker === worker.id
-                            ? colors.primary + "20"
-                            : colors.backgroundSecondary,
-                        borderWidth: selectedWorker === worker.id ? 2 : 0,
-                        borderColor: colors.primary,
-                      }}
+                {workers
+                  .filter((w) =>
+                    w.fullName
+                      ?.toLowerCase()
+                      .includes(workerSearchQuery.toLowerCase()),
+                  )
+                  .map((worker) => (
+                    <Pressable
+                      key={worker.id}
+                      onPress={() => setSelectedWorker(worker.id)}
+                      className="mb-2"
                     >
-                      <Text
-                        className="text-base font-semibold"
+                      <Card
                         style={{
-                          color:
+                          margin: 0,
+                          backgroundColor:
                             selectedWorker === worker.id
-                              ? colors.primary
-                              : colors.textPrimary,
+                              ? colors.primary + "20"
+                              : colors.backgroundSecondary,
+                          borderWidth: selectedWorker === worker.id ? 2 : 0,
+                          borderColor: colors.primary,
                         }}
                       >
-                        {worker.fullName}
-                      </Text>
-                      <Text
-                        className="text-sm mt-1"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {worker.specializations?.join(", ") || "General worker"}
-                      </Text>
-                    </Card>
-                  </Pressable>
-                ))}
+                        <Text
+                          className="text-base font-semibold"
+                          style={{
+                            color:
+                              selectedWorker === worker.id
+                                ? colors.primary
+                                : colors.textPrimary,
+                          }}
+                        >
+                          {worker.fullName}
+                        </Text>
+                        <Text
+                          className="text-sm mt-1"
+                          style={{ color: colors.textSecondary }}
+                        >
+                          {worker.specializations?.join(", ") ||
+                            "General worker"}
+                        </Text>
+                      </Card>
+                    </Pressable>
+                  ))}
               </ScrollView>
 
               <View className="flex-row">
@@ -1158,6 +1394,7 @@ export default function ComplaintDetails() {
                   onPress={() => {
                     setAssignModalVisible(false);
                     setSelectedWorker(null);
+                    setWorkerSearchQuery("");
                   }}
                   className="flex-1 mr-2 py-3 rounded-xl items-center"
                   style={{ backgroundColor: colors.backgroundSecondary }}
@@ -1310,6 +1547,95 @@ export default function ComplaintDetails() {
                       style={{ color: "#FFFFFF" }}
                     >
                       Update
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* HOD: Rejection Reason Modal */}
+      {userRole === "head" && (
+        <Modal
+          visible={approvalModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setApprovalModalVisible(false)}
+        >
+          <View
+            className="flex-1 justify-end"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+            <View
+              className="rounded-t-3xl p-6"
+              style={{ backgroundColor: colors.backgroundPrimary }}
+            >
+              <Text
+                className="text-xl font-bold mb-4 text-center"
+                style={{ color: colors.textPrimary }}
+              >
+                Request Rework
+              </Text>
+
+              <Text
+                className="text-sm mb-2"
+                style={{ color: colors.textSecondary }}
+              >
+                Reason for rejection *
+              </Text>
+              <TextInput
+                value={rejectionReason}
+                onChangeText={setRejectionReason}
+                placeholder="Explain what needs to be fixed..."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={4}
+                className="rounded-xl p-4 mb-6"
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  color: colors.textPrimary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  textAlignVertical: "top",
+                }}
+              />
+
+              <View className="flex-row">
+                <Pressable
+                  onPress={() => {
+                    setApprovalModalVisible(false);
+                    setRejectionReason("");
+                  }}
+                  className="flex-1 mr-2 py-3 rounded-xl items-center"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <Text
+                    className="text-base font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    Cancel
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleRejectCompletion}
+                  disabled={rejecting || !rejectionReason.trim()}
+                  className="flex-1 ml-2 py-3 rounded-xl items-center"
+                  style={{
+                    backgroundColor: colors.error || "#EF4444",
+                    opacity: rejecting || !rejectionReason.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {rejecting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: "#FFFFFF" }}
+                    >
+                      Send for Rework
                     </Text>
                   )}
                 </Pressable>

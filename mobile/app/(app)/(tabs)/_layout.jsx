@@ -10,6 +10,7 @@ import {
   CheckCircle,
   LayoutDashboard,
   Users,
+  Trophy,
 } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../../../colors";
@@ -26,7 +27,7 @@ function TabIcon({ Icon, color }) {
   );
 }
 
-function CenterNewButton({ colors }) {
+function CenterNewButton({ colors, icon: Icon = MessageCircle }) {
   return (
     <View
       style={{
@@ -38,7 +39,7 @@ function CenterNewButton({ colors }) {
         justifyContent: "center",
       }}
     >
-      <MessageCircle color={colors.dark} size={26} strokeWidth={2.5} />
+      <Icon color={colors.dark} size={26} strokeWidth={2.5} />
     </View>
   );
 }
@@ -104,13 +105,6 @@ export default function TabsLayout() {
     return (
       <Tabs screenOptions={commonScreenOptions}>
         <Tabs.Screen
-          name="index"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
           name="worker-dashboard"
           options={{
             title: "Dashboard",
@@ -131,12 +125,15 @@ export default function TabsLayout() {
         />
 
         <Tabs.Screen
-          name="worker-completed"
+          name="worker-leaderboard"
           options={{
-            title: "Completed",
-            tabBarIcon: ({ color }) => (
-              <TabIcon Icon={CheckCircle} color={color} />
+            title: "",
+            tabBarIcon: () => (
+              <View style={{ position: "absolute", top: -40 }}>
+                <CenterNewButton colors={colors} icon={Trophy} />
+              </View>
             ),
+            tabBarLabel: () => null,
           }}
         />
 
@@ -160,7 +157,6 @@ export default function TabsLayout() {
 
         {/* Hide unused tabs */}
         <Tabs.Screen name="home" options={{ href: null }} />
-        <Tabs.Screen name="worker-home" options={{ href: null }} />
         <Tabs.Screen name="complaints" options={{ href: null }} />
         <Tabs.Screen name="assistant" options={{ href: null }} />
         <Tabs.Screen name="hod-dashboard" options={{ href: null }} />
@@ -173,13 +169,6 @@ export default function TabsLayout() {
   if (userRole === "head") {
     return (
       <Tabs screenOptions={commonScreenOptions}>
-        <Tabs.Screen
-          name="index"
-          options={{
-            href: null,
-          }}
-        />
-
         <Tabs.Screen
           name="hod-dashboard"
           options={{
@@ -228,12 +217,11 @@ export default function TabsLayout() {
 
         {/* Hide unused tabs */}
         <Tabs.Screen name="home" options={{ href: null }} />
-        <Tabs.Screen name="worker-home" options={{ href: null }} />
         <Tabs.Screen name="worker-dashboard" options={{ href: null }} />
         <Tabs.Screen name="complaints" options={{ href: null }} />
         <Tabs.Screen name="assistant" options={{ href: null }} />
         <Tabs.Screen name="worker-assigned" options={{ href: null }} />
-        <Tabs.Screen name="worker-completed" options={{ href: null }} />
+        <Tabs.Screen name="worker-leaderboard" options={{ href: null }} />
       </Tabs>
     );
   }
@@ -241,13 +229,6 @@ export default function TabsLayout() {
   // Default Citizen Tabs
   return (
     <Tabs screenOptions={commonScreenOptions}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          href: null,
-        }}
-      />
-
       <Tabs.Screen
         name="home"
         options={{
@@ -297,7 +278,7 @@ export default function TabsLayout() {
 
       {/* Hide worker tabs for citizens */}
       <Tabs.Screen name="worker-assigned" options={{ href: null }} />
-      <Tabs.Screen name="worker-completed" options={{ href: null }} />
+      <Tabs.Screen name="worker-leaderboard" options={{ href: null }} />
       <Tabs.Screen name="hod-dashboard" options={{ href: null }} />
     </Tabs>
   );

@@ -9,6 +9,7 @@ A comprehensive mobile and web-based complaint management system for municipal c
 
 ## 📋 Table of Contents
 
+- [Latest Features](#-latest-features)
 - [Features](#-features)
 - [Tech Stack](#-tech-stack)
 - [Architecture](#-architecture)
@@ -19,9 +20,69 @@ A comprehensive mobile and web-based complaint management system for municipal c
 - [Screenshots](#-screenshots)
 - [Contributing](#-contributing)
 
+## 🚀 Latest Features
+
+### Recently Implemented (February 2026)
+
+**🎯 Predictive ETA System**
+
+- AI-powered completion time estimates based on:
+  - Priority level baselines
+  - Worker historical performance
+  - Similar complaint completion times
+  - Current workload analysis
+- Prominent ETA display across all complaint cards
+- Real-time overdue alerts with color coding
+
+**📸 Before/After Photo Verification**
+
+- Workers must upload completion photos when marking as complete
+- Photo gallery view in complaint details
+- Quality assurance through visual verification
+- Before/after comparison for transparency
+
+**✅ HOD Approval Workflow**
+
+- New "pending-approval" status after worker completion
+- HODs review completion photos before final approval
+- Ability to reject with notes for rework
+- Dashboard tracking of pending approvals
+- Performance metrics updated only on HOD approval
+
+**⚡ Bulk Operations for HODs**
+
+- Multi-select complaints with intuitive checkboxes
+- Assign multiple complaints to a worker in one action
+- Automatic ETA calculation for all assigned complaints
+- Smart selection (only unassigned complaints selectable)
+- Batch operation confirmation with worker workload display
+
+**🏆 Worker Leaderboard & Gamification**
+
+- Real-time leaderboard with weekly/monthly/yearly views
+- 6 Achievement badges:
+  - ⚡ Speed Demon (avg completion under 24h)
+  - ⭐ Quality Master (4.5+ rating)
+  - 🏆 Community Hero (50+ completions)
+  - 💯 Century Club (100+ completions)
+  - 🔥 Consistent Performer (7+ day streak)
+  - 🌟 Rising Star (20+ monthly completions)
+- Streak tracking with fire emoji indicators
+- Department-wise rankings
+- Personalized performance insights
+
+**📊 Enhanced Upvote System**
+
+- Community-driven prioritization
+- Auto-escalation thresholds:
+  - 100 upvotes: Low → Medium priority
+  - 200 upvotes: Medium → High priority
+- Real-time upvote count on all complaint cards
+
 ## ✨ Features
 
 ### Citizen Features
+
 - 📝 **Multi-Channel Complaint Registration**
   - Submit complaints via mobile app
   - Upload up to 5 proof images
@@ -55,18 +116,37 @@ A comprehensive mobile and web-based complaint management system for municipal c
   - View complete complaint history
   - See timeline of actions taken
   - Search and filter complaints
+  - **Predictive ETA**: See estimated resolution time for assigned complaints
+  - Color-coded ETA badges (overdue alerts)
 
 ### HOD/Admin Features
+
 - 📊 **Comprehensive Dashboard**
   - Overview of all complaints
   - Department-wise filtering
   - Priority-based sorting
   - Performance analytics
+  - Pending approval tracking
 
 - 👥 **Worker Management**
   - Assign complaints to workers
-  - Track worker performance
+  - Bulk assign multiple complaints at once
+  - Track worker performance and leaderboard
   - View worker ratings and feedback
+  - Monitor worker streaks and badges
+
+- ⚡ **Bulk Operations**
+  - Multi-select complaints with checkboxes
+  - Bulk assign to single worker
+  - Automatic ETA calculation for batch assignments
+  - Smart worker selection based on workload
+
+- ✅ **Approval Workflow**
+  - Review worker-submitted completions
+  - Approve/reject with completion photos
+  - Require quality verification before resolution
+  - Add rejection notes for revisions
+  - Track pending approvals in dashboard
 
 - ⏱️ **SLA Tracking & Auto-Escalation**
   - Automatic SLA calculation based on priority
@@ -79,21 +159,37 @@ A comprehensive mobile and web-based complaint management system for municipal c
   - Department performance metrics
   - Seasonal pattern detection
   - Hotspot identification
+  - Predictive ETA for all complaints
 
 ### Worker Features
+
 - 📋 **Assigned Tasks View**
   - See all assigned complaints
   - Update complaint status
   - Add notes and progress updates
-  - Upload completion photos
+  - Upload completion photos (before/after)
 
 - 🗺️ **Route Optimization**
   - View complaints on map
   - Plan efficient routes
 
+- 🏆 **Gamification & Leaderboard**
+  - Real-time leaderboard rankings (weekly/monthly/yearly)
+  - Achievement badge system:
+    - ⚡ **Speed Demon**: Complete tasks in under 24 hours
+    - ⭐ **Quality Master**: Maintain 4.5+ star rating
+    - 🏆 **Community Hero**: Resolve 50+ complaints
+    - 💯 **Century Club**: Resolve 100+ complaints
+    - 🔥 **Consistent Performer**: Maintain 7+ day streak
+    - 🌟 **Rising Star**: 20+ completions per month
+  - Streak tracking for daily performance
+  - Performance metrics dashboard
+  - Competitive rankings by department
+
 ## 🛠️ Tech Stack
 
 ### Mobile App
+
 - **Framework**: React Native with Expo
 - **Navigation**: Expo Router (file-based routing)
 - **State Management**: React Query (@tanstack/react-query)
@@ -106,6 +202,7 @@ A comprehensive mobile and web-based complaint management system for municipal c
 - **Internationalization**: i18next
 
 ### Backend
+
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Database**: MongoDB with Mongoose
@@ -115,6 +212,7 @@ A comprehensive mobile and web-based complaint management system for municipal c
 - **Session Management**: express-session with MongoDB store
 
 ### DevOps & Tools
+
 - **Version Control**: Git
 - **Package Manager**: npm
 - **Environment Management**: dotenv
@@ -177,6 +275,7 @@ Sahayak/
 ## 📦 Installation
 
 ### Prerequisites
+
 - Node.js >= 18.0.0
 - npm or yarn
 - MongoDB
@@ -186,17 +285,20 @@ Sahayak/
 ### Backend Setup
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/yourusername/Sahayak.git
 cd Sahayak/backend
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 ```
 
 3. **Create `.env` file**
+
 ```env
 # Server
 PORT=6000
@@ -224,6 +326,7 @@ ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8081
 ```
 
 4. **Start the server**
+
 ```bash
 npm start
 ```
@@ -233,26 +336,31 @@ The backend will run on `http://localhost:6000`
 ### Mobile App Setup
 
 1. **Navigate to mobile directory**
+
 ```bash
 cd ../mobile
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 ```
 
 3. **Create `.env` file**
+
 ```env
-EXPO_PUBLIC_API_URL=http://your-backend-ip:6000/api
+EXPO_PUBLIC_API_URL=https://sahayak-zqp7.onrender.com/api
 ```
 
 4. **Start Expo development server**
+
 ```bash
 npx expo start
 ```
 
 5. **Run on device/emulator**
+
 - Press `a` for Android emulator
 - Press `i` for iOS simulator
 - Scan QR code with Expo Go app for physical device
@@ -260,6 +368,7 @@ npx expo start
 ## ⚙️ Configuration
 
 ### MongoDB Setup
+
 ```bash
 # Start MongoDB
 mongod --dbpath /path/to/your/data/db
@@ -269,15 +378,18 @@ mongod --dbpath /path/to/your/data/db
 ```
 
 ### Cloudinary Setup
+
 1. Sign up at [Cloudinary](https://cloudinary.com)
 2. Get your credentials from dashboard
 3. Update `.env` with your credentials
 
 ### Google Gemini API
+
 1. Get API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Add to backend `.env`
 
 ### Push Notifications (Optional)
+
 1. Configure Expo push notifications
 2. Add notification tokens to user profiles
 
@@ -314,38 +426,57 @@ mongod --dbpath /path/to/your/data/db
    - View all complaints
    - Filter by department/status
    - See performance metrics
+   - Track pending approvals
 
 2. **Assign Complaints**
-   - Select complaint
-   - Assign to available worker
-   - Set estimated completion time
+   - Single assignment with ETA calculation
+   - **Bulk assign**: Select multiple complaints at once
+   - View worker workload before assignment
+   - Automatic ETA calculation for all assignments
 
-3. **Monitor Progress**
+3. **Approve Completions**
+   - Review completion photos
+   - Approve or reject worker submissions
+   - Add approval notes or rejection reasons
+   - Track pending approvals in dashboard
+
+4. **Monitor Progress**
    - Track worker performance
    - View SLA compliance
    - Check escalated complaints
+   - Access worker leaderboard
+   - Monitor badges and streaks
 
 ### For Workers
 
 1. **View Assigned Tasks**
    - See all assigned complaints
    - View on map for route planning
+   - Check ETA for each complaint
 
 2. **Update Status**
    - Mark as in-progress
    - Add progress notes
-   - Upload completion photos
+   - Upload completion photos (required)
 
 3. **Complete Work**
-   - Upload before/after photos
-   - Mark as resolved
+   - Upload before/after photos (mandatory)
+   - Submit for HOD approval
    - Add completion notes
+
+4. **Track Performance**
+   - View your rank in leaderboard
+   - Monitor your streak
+   - Earn achievement badges
+   - Compare metrics with peers
+   - Filter by weekly/monthly/yearly
 
 ## 📡 API Documentation
 
 ### Authentication
 
 #### Register User
+
 ```http
 POST /api/auth/register
 Content-Type: application/json
@@ -359,6 +490,7 @@ Content-Type: application/json
 ```
 
 #### Login
+
 ```http
 POST /api/auth/login
 Content-Type: application/json
@@ -372,6 +504,7 @@ Content-Type: application/json
 ### Complaints
 
 #### Create Complaint
+
 ```http
 POST /api/complaints
 Authorization: Bearer {token}
@@ -389,24 +522,28 @@ Content-Type: multipart/form-data
 ```
 
 #### Get My Complaints
+
 ```http
 GET /api/complaints?status=pending
 Authorization: Bearer {token}
 ```
 
 #### Get Complaint Details
+
 ```http
 GET /api/complaints/:complaintId
 Authorization: Bearer {token}
 ```
 
 #### Upvote Complaint
+
 ```http
 POST /api/complaints/:complaintId/upvote
 Authorization: Bearer {token}
 ```
 
 #### Submit Feedback
+
 ```http
 POST /api/complaints/:complaintId/feedback
 Authorization: Bearer {token}
@@ -421,12 +558,14 @@ Content-Type: application/json
 ### Dashboard
 
 #### Get Dashboard Summary
+
 ```http
 GET /api/dashboard/summary
 Authorization: Bearer {token}
 ```
 
 #### Get Heatmap Data
+
 ```http
 GET /api/dashboard/heatmap
 Authorization: Bearer {token}
@@ -435,6 +574,7 @@ Authorization: Bearer {token}
 ### HOD Operations
 
 #### Assign Complaint
+
 ```http
 POST /api/hod/assign
 Authorization: Bearer {token}
@@ -446,6 +586,84 @@ Content-Type: application/json
   "estimatedTime": 48
 }
 ```
+
+#### Bulk Assign Complaints
+
+```http
+POST /api/hod/bulk-assign
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "complaintIds": ["64f8a...", "64f8b...", "64f8c..."],
+  "workerId": "64f8d..."
+}
+```
+
+**Response**: Returns assigned complaints with calculated ETAs for each
+
+#### Approve Completion
+
+```http
+POST /api/hod/approve-completion/:complaintId
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "notes": "Excellent quality work"
+}
+```
+
+#### Reject Completion
+
+```http
+POST /api/hod/reject-completion/:complaintId
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "reason": "Photos unclear, please resubmit with better lighting"
+}
+```
+
+### Worker Operations
+
+#### Get Worker Dashboard
+
+```http
+GET /api/workers/dashboard
+Authorization: Bearer {token}
+```
+
+**Response**: Returns active complaints count, pending approvals, and performance stats
+
+#### Update Complaint Status
+
+```http
+PUT /api/workers/complaint/:complaintId/status
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+
+{
+  "status": "pending-approval",
+  "notes": "Work completed, please review",
+  "completionPhotos": [File, File, ...]  // Required for pending-approval
+}
+```
+
+#### Get Leaderboard
+
+```http
+GET /api/workers/leaderboard?period=monthly&department=Road
+Authorization: Bearer {token}
+```
+
+**Query Parameters**:
+
+- `period`: `weekly`, `monthly`, or `yearly` (default: `monthly`)
+- `department`: Filter by department (optional)
+
+**Response**: Returns leaderboard with rankings, badges, streaks, and performance metrics
 
 ## 📸 Screenshots
 
@@ -467,6 +685,7 @@ We welcome contributions! Please follow these steps:
 5. Open a Pull Request
 
 ### Coding Standards
+
 - Follow ESLint configuration
 - Write meaningful commit messages
 - Add comments for complex logic

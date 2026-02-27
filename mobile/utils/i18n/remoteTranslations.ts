@@ -1,11 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { LanguageKey } from "./languages";
+import { API_BASE } from "../../url";
 
 const REMOTE_I18N_VERSION_KEY = "REMOTE_I18N_VERSION_V1";
 const REMOTE_I18N_CACHE_KEY = "REMOTE_I18N_CACHE_V1";
 
-// Put your R2 public URL / worker URL here
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
 const BASE_URL = `${API_BASE.replace(/\/api\/?$/, "")}/i18n`;
 
 type TranslationJson = Record<string, any>;

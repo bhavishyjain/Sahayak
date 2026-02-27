@@ -1,7 +1,7 @@
 import * as Clarity from "@microsoft/react-native-clarity";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { Globe, LogOut, Moon, Pencil, Sun, Trash2 } from "lucide-react-native";
+import { Globe, LogOut, Moon, Pencil, Sun, Trash2, CheckCircle } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../../../colors";
@@ -139,6 +139,17 @@ export default function Setting() {
   };
 
   const SETTINGS_ITEMS = [
+    // Worker-only: Completed Complaints
+    ...(user?.role === "worker"
+      ? [
+          {
+            icon: CheckCircle,
+            title: "Completed",
+            subtitle: "View your completed complaints",
+            route: "/(app)/settings/worker-completed",
+          },
+        ]
+      : []),
     {
       icon: colorScheme === "dark" ? Moon : Sun,
       title: "more.settings.menu.theme.title",

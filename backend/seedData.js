@@ -4,7 +4,7 @@ require("dotenv").config();
 const User = require("./models/User");
 const Complaint = require("./models/Complaint");
 
-// Indore areas with accurate coordinates
+// Indore areas with accurate coordinates - Expanded list for better coverage
 const indoreAreas = [
   { name: "Vijay Nagar", lat: 22.7532, lng: 75.8937 },
   { name: "Palasia", lat: 22.7242, lng: 75.8694 },
@@ -18,6 +18,9 @@ const indoreAreas = [
   { name: "Treasure Island", lat: 22.7538, lng: 75.8682 },
   { name: "Scheme No. 54", lat: 22.7456, lng: 75.8756 },
   { name: "Scheme No. 78", lat: 22.7586, lng: 75.8893 },
+  { name: "Scheme No. 94", lat: 22.7612, lng: 75.8945 },
+  { name: "Scheme No. 114", lat: 22.7523, lng: 75.9123 },
+  { name: "Scheme No. 140", lat: 22.7698, lng: 75.9234 },
   { name: "Bengali Square", lat: 22.7153, lng: 75.8642 },
   { name: "Sarafa Bazaar", lat: 22.7195, lng: 75.8577 },
   { name: "Kanch Mandir", lat: 22.7081, lng: 75.8631 },
@@ -36,6 +39,23 @@ const indoreAreas = [
   { name: "Dewas Road", lat: 22.7582, lng: 75.8235 },
   { name: "Ujjain Road", lat: 22.7425, lng: 75.8265 },
   { name: "Airport Road", lat: 22.7285, lng: 75.8015 },
+  { name: "Kanadiya Road", lat: 22.6423, lng: 75.8156 },
+  { name: "Bicholi Mardana", lat: 22.8234, lng: 75.8567 },
+  { name: "Khajrana", lat: 22.6856, lng: 75.8945 },
+  { name: "Tilak Nagar", lat: 22.7245, lng: 75.8456 },
+  { name: "Geeta Bhawan", lat: 22.7156, lng: 75.8734 },
+  { name: "Navlakha", lat: 22.7089, lng: 75.8512 },
+  { name: "Usha Nagar Extension", lat: 22.7412, lng: 75.8823 },
+  { name: "Super Corridor", lat: 22.7634, lng: 75.9012 },
+  { name: "Bypass Road", lat: 22.7512, lng: 75.9234 },
+  { name: "Nipania", lat: 22.7745, lng: 75.8645 },
+  { name: "Pipliya Kumar", lat: 22.7823, lng: 75.8856 },
+  { name: "Silicon City", lat: 22.7698, lng: 75.9145 },
+  { name: "Sukhliya", lat: 22.7234, lng: 75.9023 },
+  { name: "Limbodi", lat: 22.6789, lng: 75.8234 },
+  { name: "Lasudia Mori", lat: 22.6523, lng: 75.8645 },
+  { name: "Chandan Nagar", lat: 22.7456, lng: 75.8567 },
+  { name: "Nanda Nagar", lat: 22.7123, lng: 75.8923 },
 ];
 
 // Helper: Get location for a specific area with small random offset
@@ -114,6 +134,44 @@ const complaintTemplates = {
         "Missing divider tiles on Bhawarkua main road allowing wrong-side driving. Very risky situation.",
       ],
     },
+    {
+      title: "Poor road surface quality",
+      descriptions: [
+        "Freshly laid road already developing cracks within 2 months. Substandard material used. Needs investigation.",
+        "Road surface peeling off in patches. Very uneven. Looks like poor quality tar was used.",
+        "New road has depression in middle causing water logging. Poor construction standards evident.",
+      ],
+    },
+    {
+      title: "Missing road signs",
+      descriptions: [
+        "No speed limit board on school zone road. Children crossing without drivers slowing down. Urgent sign needed.",
+        "One way sign removed and not replaced for weeks. Vehicles coming from wrong direction daily.",
+        "Warning sign for speed breaker missing. Causing accidents especially at night. Several vehicles damaged.",
+      ],
+    },
+    {
+      title: "Speed breaker issues",
+      descriptions: [
+        "Unmarked speed breaker on main road. No reflectors or yellow paint. Very dangerous at night.",
+        "Excessive speed breakers in 1km stretch. 7 breakers making commute painful. Unnecessary harassment.",
+        "Speed breaker height too much. Scraping vehicle underbody. Not as per BIS standards.",
+      ],
+    },
+    {
+      title: "Road shoulder erosion",
+      descriptions: [
+        "Road edge crumbling after monsoon. Deep drop on side. Dangerous for vehicles taking turns.",
+        "Shoulder completely washed away. Vehicles slipping into roadside ditch. Safety barrier needed.",
+      ],
+    },
+    {
+      title: "Parking issues",
+      descriptions: [
+        "No parking enforcement. Vehicles parked on both sides. Single lane created from double lane road.",
+        "Illegal parking blocking fire engine access. Multiple complaints but no action. Very risky.",
+      ],
+    },
   ],
   Water: [
     {
@@ -148,6 +206,29 @@ const complaintTemplates = {
       descriptions: [
         "Meter showing wrong readings for 2 months. Bill amount doubled without increase in usage. Need recalibration.",
         "Digital meter display blank. Unable to track consumption but bills keep coming.",
+      ],
+    },
+    {
+      title: "Poor water pressure",
+      descriptions: [
+        "Water barely dripping from taps during peak hours. Cannot take bath or fill buckets properly.",
+        "Zero pressure in overhead areas. Need to use electric pump but still insufficient water.",
+        "Ground floor getting all water. Upper floors getting nothing. Pressure distribution problem.",
+      ],
+    },
+    {
+      title: "Water tanker issues",
+      descriptions: [
+        "Tanker coming irregularly. Sometimes 3 days gap. Cannot plan water usage. Need fixed schedule.",
+        "Tanker water quality poor. Has dirt and particles. Not sure if safe for consumption.",
+        "Charged Rs 500 for emergency tanker. Too expensive. Need better crisis management.",
+      ],
+    },
+    {
+      title: "Borewell problems",
+      descriptions: [
+        "Community borewell motor not working for 5 days. 50 families dependent on it. Urgent repair needed.",
+        "Borewell water level dropped drastically. Needs deeper drilling or new borewell altogether.",
       ],
     },
   ],
@@ -185,6 +266,37 @@ const complaintTemplates = {
         "Broken pole with live wires on footpath. Several people got shocks. Needs emergency attention.",
       ],
     },
+    {
+      title: "Electric meter malfunction",
+      descriptions: [
+        "Meter running fast. Bill increased by 300% with same usage. Needs urgent inspection and replacement.",
+        "Smart meter not recording correctly. Showing zero units but charging fixed amount. Very unfair.",
+        "Meter box damaged and exposed to rain. Short circuit risk. Safety hazard needs immediate fixing.",
+      ],
+    },
+    {
+      title: "Billing disputes",
+      descriptions: [
+        "Received bill for 3 months together without prior notice. Amount too high to pay at once.",
+        "Wrong meter reading noted. Bill shows 800 units but my actual usage was 250 units only.",
+        "Getting neighbor's bill repeatedly. Complained 4 times but still not corrected. Very frustrating.",
+      ],
+    },
+    {
+      title: "New connection delay",
+      descriptions: [
+        "Applied for electricity connection 45 days ago. Paid fees but no action. Need connection urgently.",
+        "All documents submitted but file not moving. Told to pay bribe for faster processing. Not acceptable.",
+      ],
+    },
+    {
+      title: "Voltage fluctuation",
+      descriptions: [
+        "Constant voltage variations damaging electronics. Lost TV and refrigerator already. Need stabilizer subsidy.",
+        "Low voltage during summer evenings. AC not working properly. Fan running very slow.",
+        "High voltage spikes during night. Bulbs bursting frequently. Dangerous situation.",
+      ],
+    },
   ],
   Waste: [
     {
@@ -219,6 +331,34 @@ const complaintTemplates = {
         "Municipal workers burning leaves and waste. Dangerous for residents with asthma. Better disposal method needed.",
       ],
     },
+    {
+      title: "Plastic waste accumulation",
+      descriptions: [
+        "Non-biodegradable waste not being collected separately. All mixed together. Plastic pollution increasing.",
+        "Single-use plastic openly sold despite ban. No enforcement. Street vendors using plastic bags freely.",
+      ],
+    },
+    {
+      title: "E-waste dumping",
+      descriptions: [
+        "Old electronics, wires, and batteries dumped in regular bins. Hazardous materials. Need e-waste collection drive.",
+        "Repair shops throwing circuit boards on street. Toxic metals leaching into soil. Environmental hazard.",
+      ],
+    },
+    {
+      title: "Waste segregation issues",
+      descriptions: [
+        "Dry and wet waste collection on same vehicle. Defeats purpose of segregation. Need separate vehicles.",
+        "Residents not trained in segregation. Need awareness campaign and clear guidelines.",
+      ],
+    },
+    {
+      title: "Sanitation worker shortage",
+      descriptions: [
+        "Only 1 worker for 500 houses. Cannot manage workload. Need more staff allocation urgently.",
+        "Workers on leave for weeks. No replacement arranged. Garbage piling up everywhere.",
+      ],
+    },
   ],
   Drainage: [
     {
@@ -244,6 +384,28 @@ const complaintTemplates = {
       descriptions: [
         "Sewage leaking and mixing with groundwater. Hand pump water contaminated. Health risk for entire colony.",
         "Underground sewage pipe broken. Foul smell and wet patches on road. Needs excavation and repair.",
+      ],
+    },
+    {
+      title: "Waterlogging during rains",
+      descriptions: [
+        "Street floods within minutes of rainfall. Water enters ground floor homes. Drainage capacity insufficient.",
+        "No proper slope in road design. Water accumulates in low-lying areas for hours. Mosquito breeding spot.",
+        "Rain water mixed with sewage backing up into houses. Happened 3 times this monsoon. Nightmare situation.",
+      ],
+    },
+    {
+      title: "Storm drain maintenance",
+      descriptions: [
+        "Pre-monsoon cleaning not done. Drain full of silt. Will overflow in first heavy rain. Clean urgently.",
+        "Never been cleaned in 5 years. Completely clogged with plastic and silt. Disaster waiting to happen.",
+      ],
+    },
+    {
+      title: "Septic tank overflow",
+      descriptions: [
+        "Community septic tank overflowing. No sewage line in our area. Tank not emptied for months. Unhygienic emergency.",
+        "Septic tank cleaning vehicle not coming despite repeated requests. Tank full and starting to leak.",
       ],
     },
   ],
@@ -273,6 +435,74 @@ const complaintTemplates = {
       descriptions: [
         "Large old tree leaning badly. May fall on houses anytime. Termite damage visible. Urgent inspection needed.",
         "Dead tree branches hanging over school. Storm may cause them to fall. Children's safety at risk.",
+      ],
+    },
+    {
+      title: "Park maintenance",
+      descriptions: [
+        "Children's park equipment broken and rusted. Swings, slides all damaged. Kids getting injured. Urgent repair needed.",
+        "Park lawn not maintained. Overgrown grass and weeds. Snakes spotted. Unsafe for morning walkers.",
+        "Park lights not working. Dark after evening. Drug peddlers and anti-social elements gathering. Need security.",
+      ],
+    },
+    {
+      title: "Public toilet unavailable",
+      descriptions: [
+        "No public toilet in market area. Shopkeepers and customers facing major inconvenience. Hygiene issue.",
+        "Existing public toilet locked for months. No maintenance. Open defecation increasing as result.",
+        "Public toilet in filthy condition. No water, no cleaning. Unusable. Better than having nothing but barely.",
+      ],
+    },
+    {
+      title: "Noise pollution",
+      descriptions: [
+        "Loudspeaker noise from temple till midnight daily. Disturbing students' studies and sleep. Decibel limit violations.",
+        "Construction work starting at 6 AM with heavy machinery. Weekends also no peace. Need time restrictions.",
+        "Marriage garden noise till 2 AM. Every weekend disturbance. Local residents suffering. Enforce noise rules.",
+      ],
+    },
+    {
+      title: "Air pollution",
+      descriptions: [
+        "Factory emitting black smoke daily. Air quality very poor. Residents facing breathing issues. Need pollution board action.",
+        "Dust from construction site spreading everywhere. Houses getting dirty. Health affected. Need dust control measures.",
+        "Vehicle pollution at traffic signal unbearable. Need pollution checking drive and stricter norms.",
+      ],
+    },
+    {
+      title: "CCTV camera issues",
+      descriptions: [
+        "Public CCTV cameras not working. Multiple thefts happening. Cameras just for show. Need functional surveillance.",
+        "CCTV footage not being monitored. Vandalism happening right under camera. What's the point?",
+      ],
+    },
+    {
+      title: "Street animal issues",
+      descriptions: [
+        "Stray cattle blocking roads. Causing traffic jams. Also aggressive sometimes. Need cattle pound.",
+        "Pigs roaming in residential area. Coming from nearby slum. Creating unhygienic conditions. Control needed.",
+        "Monkey menace in colony. Entering houses, destroying property. Already bit 2 children. Urgent relocation.",
+      ],
+    },
+    {
+      title: "Waterlogged park",
+      descriptions: [
+        "Park floods during rain. Water stagnant for days. Mosquito breeding. Children cannot play. Drainage needed.",
+      ],
+    },
+    {
+      title: "Illegal construction",
+      descriptions: [
+        "Building being constructed without permission. Blocking our sunlight and air. Violating norms. Stop construction.",
+        "Commercial activity in residential zone. Converting house to warehouse. Increased truck traffic. Against rules.",
+        "Balcony extended illegally onto road. Municipality approved plan different. Encroachment removal needed.",
+      ],
+    },
+    {
+      title: "Bus stop shelter damaged",
+      descriptions: [
+        "Bus stop roof collapsed. Commuters standing in sun and rain. Needs rebuilding urgently.",
+        "No seating, no roof at bus stop. Elderly and women waiting in discomfort. Basic facility required.",
       ],
     },
   ],
@@ -343,20 +573,58 @@ function generateComplaint(userId, ticketNum, allUsers) {
 
   const locationData = getRandomLocation();
 
-  const priorities = ["Low", "Medium", "High"];
-  const priority = priorities[Math.floor(Math.random() * priorities.length)];
+  // More realistic priority distribution
+  // High: 15%, Medium: 45%, Low: 40%
+  const priorityRandom = Math.random();
+  let priority;
+  if (priorityRandom < 0.15) {
+    priority = "High";
+  } else if (priorityRandom < 0.6) {
+    priority = "Medium";
+  } else {
+    priority = "Low";
+  }
 
-  const statuses = ["pending", "assigned", "in-progress", "resolved", "closed"];
-  const status = statuses[Math.floor(Math.random() * statuses.length)];
+  // More realistic status distribution
+  // pending: 40%, assigned: 25%, in-progress: 20%, resolved: 12%, closed: 3%
+  const statusRandom = Math.random();
+  let status;
+  if (statusRandom < 0.4) {
+    status = "pending";
+  } else if (statusRandom < 0.65) {
+    status = "assigned";
+  } else if (statusRandom < 0.85) {
+    status = "in-progress";
+  } else if (statusRandom < 0.97) {
+    status = "resolved";
+  } else {
+    status = "closed";
+  }
 
-  // Generate past date (within last 60 days)
-  const daysAgo = Math.floor(Math.random() * 60);
+  // More realistic temporal distribution (weighted towards recent)
+  // 40% in last week, 30% in last month, 30% older
+  const timeRandom = Math.random();
+  let daysAgo;
+  if (timeRandom < 0.4) {
+    // Last 7 days
+    daysAgo = Math.floor(Math.random() * 7);
+  } else if (timeRandom < 0.7) {
+    // 7-30 days ago
+    daysAgo = 7 + Math.floor(Math.random() * 23);
+  } else {
+    // 30-90 days ago
+    daysAgo = 30 + Math.floor(Math.random() * 60);
+  }
   const createdAt = new Date();
   createdAt.setDate(createdAt.getDate() - daysAgo);
 
-  // Generate upvotes (more for urgent issues and older complaints)
-  const upvoteCount =
-    Math.floor(Math.random() * 50) + (priority === "High" ? 20 : 0);
+  // More realistic upvote distribution
+  // Recent and high priority complaints get more upvotes
+  const baseUpvotes = Math.floor(Math.random() * 15);
+  const priorityBonus =
+    priority === "High" ? 30 : priority === "Medium" ? 10 : 0;
+  const ageBonus = daysAgo > 7 ? Math.floor(daysAgo / 3) : 0; // Older complaints accumulate upvotes
+  const upvoteCount = baseUpvotes + priorityBonus + ageBonus;
   const upvotesArray = [];
   if (allUsers && allUsers.length > 0) {
     const numUpvotes = Math.min(upvoteCount, allUsers.length);
@@ -513,9 +781,9 @@ async function seedDatabase() {
       });
     });
 
-    // Worker users (15 - 3 per department)
+    // Worker users (30 - 6 per department for better load distribution)
     for (let dept of departments) {
-      for (let i = 1; i <= 3; i++) {
+      for (let i = 1; i <= 6; i++) {
         users.push({
           username: `worker_${dept}_${i}`,
           password: hashedPassword,
@@ -535,7 +803,7 @@ async function seedDatabase() {
       }
     }
 
-    // Regular user accounts (30)
+    // Regular user accounts (150 - more realistic for 2000 complaints)
     const firstNames = [
       "Rahul",
       "Priya",
@@ -552,6 +820,47 @@ async function seedDatabase() {
       "Deepak",
       "Neha",
       "Sanjay",
+      "Meera",
+      "Arjun",
+      "Divya",
+      "Manoj",
+      "Swati",
+      "Karan",
+      "Nisha",
+      "Vishal",
+      "Aarti",
+      "Rohit",
+      "Simran",
+      "Aakash",
+      "Riya",
+      "Nitin",
+      "Pallavi",
+      "Gaurav",
+      "Shruti",
+      "Ashish",
+      "Megha",
+      "Santosh",
+      "Preeti",
+      "Hemant",
+      "Jyoti",
+      "Pankaj",
+      "Seema",
+      "Ramesh",
+      "Sunita",
+      "Dinesh",
+      "Rekha",
+      "Mahesh",
+      "Geeta",
+      "Prakash",
+      "Manju",
+      "Sachin",
+      "Anita",
+      "Ravi",
+      "Sangeeta",
+      "Ajay",
+      "Alka",
+      "Vijay",
+      "Vandana",
     ];
     const lastNames = [
       "Sharma",
@@ -564,9 +873,29 @@ async function seedDatabase() {
       "Jain",
       "Tiwari",
       "Agarwal",
+      "Mishra",
+      "Pandey",
+      "Chauhan",
+      "Rajput",
+      "Parmar",
+      "Malhotra",
+      "Shukla",
+      "Saxena",
+      "Mehta",
+      "Soni",
+      "Joshi",
+      "Desai",
+      "Reddy",
+      "Nair",
+      "Iyer",
+      "Kulkarni",
+      "Menon",
+      "Rao",
+      "Varma",
+      "Bhatia",
     ];
 
-    for (let i = 1; i <= 30; i++) {
+    for (let i = 1; i <= 150; i++) {
       const firstName =
         firstNames[Math.floor(Math.random() * firstNames.length)];
       const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
@@ -602,7 +931,8 @@ async function seedDatabase() {
     const regularUsers = createdUsers.filter((u) => u.role === "user");
     const workers = createdUsers.filter((u) => u.role === "worker");
 
-    for (let i = 1; i <= 500; i++) {
+    // Generate 2000 complaints with realistic distribution
+    for (let i = 1; i <= 2000; i++) {
       const randomUser =
         regularUsers[Math.floor(Math.random() * regularUsers.length)];
       const complaint = generateComplaint(randomUser._id, i, regularUsers);
@@ -628,8 +958,8 @@ async function seedDatabase() {
 
       complaints.push(complaint);
 
-      if (i % 100 === 0) {
-        console.log(`   Created ${i} complaints...`);
+      if (i % 250 === 0) {
+        console.log(`   Generated ${i}/2000 complaints...`);
       }
     }
 

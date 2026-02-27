@@ -27,9 +27,8 @@ import PressableBlock from "../../../components/PressableBlock";
 import StatusPill from "../../../components/StatusPill";
 import { useTheme } from "../../../utils/context/theme";
 import apiCall from "../../../utils/api";
-import { HOD_WORKERS_URL, HOD_DASHBOARD_URL } from "../../../url";
+import { HOD_WORKERS_URL, HOD_WORKER_COMPLAINTS_URL } from "../../../url";
 import { getPriorityColor } from "../../../utils/colorHelpers";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function WorkerDetails() {
   const { id } = useLocalSearchParams();
@@ -51,37 +50,32 @@ export default function WorkerDetails() {
       else setLoading(true);
 
       // Fetch worker details and their complaints
-      const [workerRes, dashboardRes] = await Promise.all([
-        apiCall({
-          method: "GET",
-          url: HOD_WORKERS_URL,
-        }),
-        apiCall({
-          method: "GET",
-          url: HOD_DASHBOARD_URL,
-        }),
-      ]);
+      const [workerRes, activeComplaintsRes, completedComplaintsRes] =
+        await Promise.all([
+          apiCall({
+            method: "GET",
+            url: HOD_WORKERS_URL,
+          }),
+          apiCall({
+            method: "GET",
+            url: HOD_WORKER_COMPLAINTS_URL(id),
+            params: { status: "active" },
+          }),
+          apiCall({
+            method: "GET",
+            url: HOD_WORKER_COMPLAINTS_URL(id),
+            params: { status: "completed" },
+          }),
+        ]);
 
       // Find specific worker
       const workers = workerRes?.data?.workers || [];
       const workerData = workers.find((w) => w.id === id || w._id === id);
       setWorker(workerData || null);
 
-      // Filter complaints for this worker
-      const allComplaints = dashboardRes?.data?.complaints || [];
-      const active = allComplaints.filter(
-        (c) =>
-          (c.assignedTo === id || c.assignedTo?._id === id) &&
-          ["assigned", "in-progress"].includes(c.status),
-      );
-      const completed = allComplaints.filter(
-        (c) =>
-          (c.assignedTo === id || c.assignedTo?._id === id) &&
-          ["resolved", "closed"].includes(c.status),
-      );
-
-      setActiveComplaints(active);
-      setCompletedComplaints(completed.slice(0, 20)); // Limit to 20 recent
+      // Set complaints from dedicated endpoints
+      setActiveComplaints(activeComplaintsRes?.data?.complaints || []);
+      setCompletedComplaints(completedComplaintsRes?.data?.complaints || []);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -141,15 +135,11 @@ export default function WorkerDetails() {
   }
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}
-      edges={["top"]}
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <View
-        className="flex-1"
-        style={{ backgroundColor: colors.backgroundPrimary }}
-      >
-        <BackButtonHeader title="Worker Details" />
+      <BackButtonHeader title="Worker Details" />
 
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
@@ -259,7 +249,8 @@ export default function WorkerDetails() {
                     className="text-2xl font-bold ml-1"
                     style={{ color: colors.textPrimary }}
                   >
-                    {worker.metrics?.activeComplaints ||
+                    {worker.activeComplaints ||
+                      worker.metrics?.activeComplaints ||
                       activeComplaints.length}
                   </Text>
                 </View>
@@ -280,7 +271,8 @@ export default function WorkerDetails() {
                     className="text-2xl font-bold ml-1"
                     style={{ color: colors.textPrimary }}
                   >
-                    {worker.metrics?.completedCount ||
+                    {worker.completedCount ||
+                      worker.metrics?.completedCount ||
                       worker.performanceMetrics?.totalCompleted ||
                       0}
                   </Text>
@@ -527,6 +519,5 @@ export default function WorkerDetails() {
           )}
         </ScrollView>
       </View>
-    </SafeAreaView>
-  );
-}
+    );
+  }

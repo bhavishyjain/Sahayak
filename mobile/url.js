@@ -1,8 +1,8 @@
 import { Platform } from "react-native";
 
 // Base URL configuration
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
-const BACKEND_ORIGIN = API_BASE.replace(/\/api\/?$/, "");
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_URL || "https://sahayak-zqp7.onrender.com/api";
 
 export const USER_AGENT_STRING =
   Platform.OS === "ios"
@@ -54,6 +54,7 @@ export const WORKERS_URL = API_BASE + "/workers";
 export const WORKER_DASHBOARD_URL = API_BASE + "/workers/dashboard";
 export const WORKER_ASSIGNED_URL = API_BASE + "/workers/assigned-complaints";
 export const WORKER_COMPLETED_URL = API_BASE + "/workers/completed-complaints";
+export const WORKER_LEADERBOARD_URL = API_BASE + "/workers/leaderboard";
 export const UPDATE_COMPLAINT_STATUS_URL = (id) =>
   API_BASE + `/workers/complaint/${id}/status`;
 
@@ -63,7 +64,14 @@ export const UPDATE_COMPLAINT_STATUS_URL = (id) =>
 export const HOD_URL = API_BASE + "/hod";
 export const HOD_DASHBOARD_URL = API_BASE + "/hod/dashboard";
 export const HOD_WORKERS_URL = API_BASE + "/hod/workers";
+export const HOD_WORKER_COMPLAINTS_URL = (workerId) =>
+  API_BASE + `/hod/workers/${workerId}/complaints`;
 export const HOD_ASSIGN_COMPLAINT_URL = API_BASE + "/hod/assign-complaint";
+export const HOD_APPROVE_COMPLETION_URL = (id) =>
+  API_BASE + `/hod/approve-completion/${id}`;
+export const HOD_REJECT_COMPLETION_URL = (id) =>
+  API_BASE + `/hod/reject-completion/${id}`;
+export const HOD_BULK_ASSIGN_URL = API_BASE + "/hod/bulk-assign";
 
 // ============================================================================
 // HEALTH CHECK

@@ -13,6 +13,7 @@ import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { setUserAuth } from "../../../utils/userAuth";
+import { API_BASE } from "../../../url";
 
 export default function Login() {
   const { colorScheme } = useTheme();
@@ -70,8 +71,7 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const baseUrl =
-        process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
+      const baseUrl = API_BASE;
       const response = await apiCall({
         method: "POST",
         url: `${baseUrl}/auth/login`,

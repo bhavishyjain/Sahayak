@@ -190,10 +190,10 @@ exports.upvoteComplaint = async (req, res) => {
       complaint.upvoteCount += 1;
 
       // Auto-escalate if upvotes reach threshold
-      if (complaint.upvoteCount >= 10 && complaint.priority === "Low") {
+      if (complaint.upvoteCount >= 100 && complaint.priority === "Low") {
         complaint.priority = "Medium";
       } else if (
-        complaint.upvoteCount >= 25 &&
+        complaint.upvoteCount >= 200 &&
         complaint.priority === "Medium"
       ) {
         complaint.priority = "High";

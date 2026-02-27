@@ -6,7 +6,9 @@ import {
   TrendingUp,
   ClipboardList,
   Star,
-  Activity,
+  Award,
+  Target,
+  Flame,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -66,6 +68,7 @@ export default function WorkerDashboard() {
           activeCount: backendData.statistics?.activeComplaints || 0,
           completedCount: backendData.statistics?.totalCompleted || 0,
           weekCompleted: backendData.statistics?.weekCompleted || 0,
+          pendingApproval: backendData.statistics?.pendingApproval || 0,
           activeComplaints: (backendData.assignedComplaints || []).map((c) => ({
             id: c._id,
             ticketId: c.ticketId,
@@ -134,40 +137,54 @@ export default function WorkerDashboard() {
           />
         }
       >
-        {/* Header */}
+        {/* Header with Gradient Effect */}
         <View className="px-4 pt-12 pb-6">
           <Text className="text-sm" style={{ color: colors.textSecondary }}>
             {getGreeting()}
           </Text>
           <Text
-            className="text-2xl font-bold mt-1"
+            className="text-3xl font-bold mt-1"
             style={{ color: colors.textPrimary }}
           >
             {user?.fullName || "Worker"}
           </Text>
-          <Text
-            className="text-sm mt-1"
-            style={{ color: colors.textSecondary }}
-          >
-            {user?.department || ""} Department
-          </Text>
+          <View className="flex-row items-center mt-2">
+            <View
+              className="px-3 py-1 rounded-full"
+              style={{ backgroundColor: colors.primary + "20" }}
+            >
+              <Text
+                className="text-xs font-semibold"
+                style={{ color: colors.primary }}
+              >
+                {user?.department || ""} Department
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Statistics Grid */}
         {dashboardData && (
           <View className="px-4">
-            {/* Work Status Cards */}
+            {/* Main Stats Row */}
             <View className="flex-row mb-4">
               <Card style={{ margin: 0, marginRight: 6, flex: 1 }}>
-                <View className="flex-row items-center mb-2">
-                  <Clock size={16} color={colors.warning || "#F59E0B"} />
-                  <Text
-                    className="text-xs ml-2 font-semibold"
-                    style={{ color: colors.textSecondary }}
+                <View className="flex-row items-center justify-between mb-3">
+                  <View
+                    className="w-10 h-10 rounded-full items-center justify-center"
+                    style={{
+                      backgroundColor: colors.warning + "20" || "#F59E0B20",
+                    }}
                   >
-                    Active
-                  </Text>
+                    <Clock size={20} color={colors.warning || "#F59E0B"} />
+                  </View>
                 </View>
+                <Text
+                  className="text-xs mb-1"
+                  style={{ color: colors.textSecondary }}
+                >
+                  Active Tasks
+                </Text>
                 <Text
                   className="text-3xl font-bold"
                   style={{ color: colors.warning || "#F59E0B" }}
@@ -183,15 +200,25 @@ export default function WorkerDashboard() {
               </Card>
 
               <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
-                <View className="flex-row items-center mb-2">
-                  <CheckCircle size={16} color={colors.success || "#10B981"} />
-                  <Text
-                    className="text-xs ml-2 font-semibold"
-                    style={{ color: colors.textSecondary }}
+                <View className="flex-row items-center justify-between mb-3">
+                  <View
+                    className="w-10 h-10 rounded-full items-center justify-center"
+                    style={{
+                      backgroundColor: colors.success + "20" || "#10B98120",
+                    }}
                   >
-                    Completed
-                  </Text>
+                    <CheckCircle
+                      size={20}
+                      color={colors.success || "#10B981"}
+                    />
+                  </View>
                 </View>
+                <Text
+                  className="text-xs mb-1"
+                  style={{ color: colors.textSecondary }}
+                >
+                  Completed
+                </Text>
                 <Text
                   className="text-3xl font-bold"
                   style={{ color: colors.success || "#10B981" }}
@@ -207,9 +234,50 @@ export default function WorkerDashboard() {
               </Card>
             </View>
 
-            {/* Performance Card */}
+            {/* Pending Approval Alert */}
+            {dashboardData.pendingApproval > 0 && (
+              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center flex-1">
+                    <View
+                      className="w-10 h-10 rounded-full items-center justify-center"
+                      style={{
+                        backgroundColor: colors.purple + "20" || "#8B5CF620",
+                      }}
+                    >
+                      <AlertCircle
+                        size={20}
+                        color={colors.purple || "#8B5CF6"}
+                      />
+                    </View>
+                    <View className="flex-1 ml-3">
+                      <Text
+                        className="text-xs font-semibold"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        Awaiting Approval
+                      </Text>
+                      <Text
+                        className="text-sm mt-1"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        HOD review pending
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    className="text-3xl font-bold"
+                    style={{ color: colors.purple || "#8B5CF6" }}
+                  >
+                    {dashboardData.pendingApproval}
+                  </Text>
+                </View>
+              </Card>
+            )}
+
+            {/* Performance Card with Progress Bars */}
             <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-              <View className="flex-row items-center mb-3">
+              <View className="flex-row items-center mb-4">
                 <View
                   className="w-10 h-10 rounded-full items-center justify-center"
                   style={{ backgroundColor: colors.primary + "20" }}
@@ -217,27 +285,28 @@ export default function WorkerDashboard() {
                   <TrendingUp size={20} color={colors.primary} />
                 </View>
                 <Text
-                  className="text-base font-semibold ml-3"
+                  className="text-base font-bold ml-3"
                   style={{ color: colors.textPrimary }}
                 >
-                  Performance Metrics
+                  Performance Overview
                 </Text>
               </View>
 
               <View
-                className="h-[1px] mb-3"
+                className="h-[1px] mb-4"
                 style={{ backgroundColor: colors.border }}
               />
 
-              <View className="flex-row justify-between">
-                <View className="flex-1 items-center px-2">
-                  <View className="flex-row items-center mb-1">
-                    <Star size={14} color={colors.primary} />
+              {/* Rating Section */}
+              <View className="mb-4">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center">
+                    <Star size={16} color="#EAB308" fill="#EAB308" />
                     <Text
-                      className="text-xs ml-1 font-semibold"
+                      className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      Rating
+                      Average Rating
                     </Text>
                   </View>
                   <Text
@@ -245,29 +314,38 @@ export default function WorkerDashboard() {
                     style={{ color: colors.textPrimary }}
                   >
                     {user?.rating ? user.rating.toFixed(1) : "4.5"}
-                  </Text>
-                  <Text
-                    className="text-xs mt-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    out of 5
+                    <Text
+                      className="text-sm font-normal"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      /5.0
+                    </Text>
                   </Text>
                 </View>
-
                 <View
-                  className="w-[1px]"
-                  style={{ backgroundColor: colors.border }}
-                />
+                  className="h-2 rounded-full overflow-hidden"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <View
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${((user?.rating || 4.5) / 5) * 100}%`,
+                      backgroundColor: "#EAB308",
+                    }}
+                  />
+                </View>
+              </View>
 
-                <View className="flex-1 items-center px-2">
-                  <View className="flex-row items-center mb-1">
-                    <Activity size={14} color={colors.info || "#3B82F6"} />
+              {/* Week Performance */}
+              <View className="mb-4">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center">
+                    <Flame size={16} color={colors.info || "#3B82F6"} />
                     <Text
-                      className="text-xs ml-1 font-semibold"
+                      className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
-                      numberOfLines={1}
                     >
-                      Week
+                      This Week
                     </Text>
                   </View>
                   <Text
@@ -275,16 +353,109 @@ export default function WorkerDashboard() {
                     style={{ color: colors.textPrimary }}
                   >
                     {dashboardData?.weekCompleted || 0}
-                  </Text>
-                  <Text
-                    className="text-xs mt-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    completed
+                    <Text
+                      className="text-sm font-normal"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {" "}
+                      completed
+                    </Text>
                   </Text>
                 </View>
               </View>
+
+              {/* Completion Rate */}
+              <View>
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center">
+                    <Target size={16} color={colors.success || "#10B981"} />
+                    <Text
+                      className="text-sm font-semibold ml-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Completion Rate
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-xl font-bold"
+                    style={{ color: colors.success || "#10B981" }}
+                  >
+                    {dashboardData.activeCount > 0
+                      ? Math.round(
+                          (dashboardData.completedCount /
+                            (dashboardData.completedCount +
+                              dashboardData.activeCount)) *
+                            100,
+                        )
+                      : 100}
+                    %
+                  </Text>
+                </View>
+                <View
+                  className="h-2 rounded-full overflow-hidden"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <View
+                    className="h-full rounded-full"
+                    style={{
+                      width:
+                        dashboardData.activeCount > 0
+                          ? `${Math.round((dashboardData.completedCount / (dashboardData.completedCount + dashboardData.activeCount)) * 100)}%`
+                          : "100%",
+                      backgroundColor: colors.success || "#10B981",
+                    }}
+                  />
+                </View>
+              </View>
             </Card>
+
+            {/* Achievement Badge */}
+            {dashboardData.completedCount > 0 && (
+              <Card
+                style={{
+                  margin: 0,
+                  marginBottom: 16,
+                  flex: 0,
+                  backgroundColor:
+                    colorScheme === "dark"
+                      ? colors.primary + "15"
+                      : colors.primary + "10",
+                  borderWidth: 1,
+                  borderColor: colors.primary + "30",
+                }}
+              >
+                <View className="flex-row items-center">
+                  <View
+                    className="w-12 h-12 rounded-full items-center justify-center"
+                    style={{ backgroundColor: colors.primary + "30" }}
+                  >
+                    <Award size={24} color={colors.primary} />
+                  </View>
+                  <View className="flex-1 ml-3">
+                    <Text
+                      className="text-sm font-bold"
+                      style={{ color: colors.primary }}
+                    >
+                      {dashboardData.completedCount >= 100
+                        ? "Century Club! 🎉"
+                        : dashboardData.completedCount >= 50
+                          ? "Community Hero! 🌟"
+                          : "Keep Going! 💪"}
+                    </Text>
+                    <Text
+                      className="text-xs mt-1"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {dashboardData.completedCount >= 100
+                        ? "You've completed 100+ tasks!"
+                        : dashboardData.completedCount >= 50
+                          ? "50+ tasks completed - Amazing work!"
+                          : `${50 - dashboardData.completedCount} more to Community Hero`}
+                    </Text>
+                  </View>
+                </View>
+              </Card>
+            )}
 
             {/* Active Assignments Section */}
             <View className="flex-row items-center justify-between mb-3">
@@ -294,14 +465,19 @@ export default function WorkerDashboard() {
               >
                 Active Assignments
               </Text>
-              <PressableBlock onPress={() => router.push("/worker-assigned")}>
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.primary }}
-                >
-                  View All
-                </Text>
-              </PressableBlock>
+              {dashboardData.activeComplaints &&
+                dashboardData.activeComplaints.length > 3 && (
+                  <PressableBlock
+                    onPress={() => router.push("/worker-assigned")}
+                  >
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: colors.primary }}
+                    >
+                      View All
+                    </Text>
+                  </PressableBlock>
+                )}
             </View>
 
             {dashboardData.activeComplaints &&

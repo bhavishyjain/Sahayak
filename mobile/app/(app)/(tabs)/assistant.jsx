@@ -9,6 +9,7 @@ import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
+import { API_BASE } from "../../../url";
 
 export default function Assistant() {
   const { colorScheme } = useTheme();
@@ -18,10 +19,13 @@ export default function Assistant() {
   const [loading, setLoading] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hi, I am Sahayak. Ask me about your complaints." },
+    {
+      role: "assistant",
+      text: "Hi, I am Sahayak. Ask me about your complaints.",
+    },
   ]);
 
-  const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
+  const baseUrl = API_BASE;
 
   const sendMessage = async () => {
     const msg = text.trim();
@@ -38,7 +42,10 @@ export default function Assistant() {
         url: `${baseUrl}/chat/message`,
         data: {
           message: msg,
-          conversationHistory: nextMessages.map((m) => ({ role: m.role, text: m.text })),
+          conversationHistory: nextMessages.map((m) => ({
+            role: m.role,
+            text: m.text,
+          })),
         },
       });
 
@@ -58,10 +65,16 @@ export default function Assistant() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
+    >
       <BackButtonHeader title="Assistant" hasBackButton={false} />
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View className="flex-row justify-end mb-2">
           <PressableBlock
             onPress={() => setShowClearDialog(true)}
@@ -69,7 +82,10 @@ export default function Assistant() {
             style={{ backgroundColor: colors.backgroundSecondary }}
           >
             <Trash2 size={16} color={colors.textSecondary} />
-            <Text className="ml-2 text-xs font-semibold" style={{ color: colors.textSecondary }}>
+            <Text
+              className="ml-2 text-xs font-semibold"
+              style={{ color: colors.textSecondary }}
+            >
               Clear chat
             </Text>
           </PressableBlock>
@@ -84,19 +100,30 @@ export default function Assistant() {
               flex: 0,
               alignSelf: m.role === "user" ? "flex-end" : "flex-start",
               width: "88%",
-              backgroundColor: m.role === "user" ? colors.primary : colors.backgroundSecondary,
+              backgroundColor:
+                m.role === "user" ? colors.primary : colors.backgroundSecondary,
             }}
           >
-            <Text style={{ color: m.role === "user" ? colors.dark : colors.textPrimary }}>
+            <Text
+              style={{
+                color: m.role === "user" ? colors.dark : colors.textPrimary,
+              }}
+            >
               {m.text}
             </Text>
           </Card>
         ))}
       </ScrollView>
 
-      <View className="px-4 pb-24 pt-2" style={{ backgroundColor: colors.backgroundPrimary }}>
+      <View
+        className="px-4 pb-24 pt-2"
+        style={{ backgroundColor: colors.backgroundPrimary }}
+      >
         <Card style={{ margin: 0, flex: 0 }}>
-          <View className="flex-row items-center rounded-xl border px-3 py-2" style={{ borderColor: colors.border }}>
+          <View
+            className="flex-row items-center rounded-xl border px-3 py-2"
+            style={{ borderColor: colors.border }}
+          >
             <TextInput
               value={text}
               onChangeText={setText}
@@ -120,7 +147,12 @@ export default function Assistant() {
         cancelText="Cancel"
         onConfirm={() => {
           setShowClearDialog(false);
-          setMessages([{ role: "assistant", text: "Hi, I am Sahayak. Ask me about your complaints." }]);
+          setMessages([
+            {
+              role: "assistant",
+              text: "Hi, I am Sahayak. Ask me about your complaints.",
+            },
+          ]);
         }}
         onCancel={() => setShowClearDialog(false)}
       />

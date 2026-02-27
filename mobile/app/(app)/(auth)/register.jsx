@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Keyboard, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { TextInput as PaperTextInput } from "react-native-paper";
+import { API_BASE } from "../../../url";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import LanguagePicker from "../../../components/LanguagePicker";
@@ -34,7 +35,13 @@ export default function Register() {
   const handleRegister = async () => {
     Keyboard.dismiss();
 
-    if (!fullName.trim() || !username.trim() || !email.trim() || !phone.trim() || !password.trim()) {
+    if (
+      !fullName.trim() ||
+      !username.trim() ||
+      !email.trim() ||
+      !phone.trim() ||
+      !password.trim()
+    ) {
       Toast.show({
         type: "error",
         text1: "Missing fields",
@@ -45,7 +52,7 @@ export default function Register() {
 
     try {
       setLoading(true);
-      const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
+      const baseUrl = API_BASE;
 
       const response = await apiCall({
         method: "POST",
@@ -116,7 +123,8 @@ export default function Register() {
             style={{
               width: 120,
               height: 40,
-              tintColor: colorScheme === "dark" ? undefined : colors.textPrimary,
+              tintColor:
+                colorScheme === "dark" ? undefined : colors.textPrimary,
             }}
             resizeMode="contain"
           />
@@ -243,7 +251,10 @@ export default function Register() {
               </Text>
             </View>
           ) : (
-            <Text className="text-base font-fira-bold" style={{ color: colors.dark }}>
+            <Text
+              className="text-base font-fira-bold"
+              style={{ color: colors.dark }}
+            >
               Register
             </Text>
           )}

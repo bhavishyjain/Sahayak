@@ -134,62 +134,94 @@ export default function HodDashboard() {
                   style={{ backgroundColor: colors.border }}
                 />
 
-                <View className="flex-row justify-between">
-                  <View className="flex-1 items-center">
-                    <Text
-                      className="text-xs mb-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Pending
-                    </Text>
-                    <Text
-                      className="text-xl font-bold"
-                      style={{ color: colors.warning || "#F59E0B" }}
-                    >
-                      {stats.pending || 0}
-                    </Text>
-                  </View>
+                <View className="mb-3">
+                  <View className="flex-row justify-between">
+                    <View className="flex-1 items-center">
+                      <Text
+                        className="text-xs mb-1"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        Pending
+                      </Text>
+                      <Text
+                        className="text-xl font-bold"
+                        style={{ color: colors.warning || "#F59E0B" }}
+                      >
+                        {stats.pending || 0}
+                      </Text>
+                    </View>
 
-                  <View
-                    className="w-[1px]"
-                    style={{ backgroundColor: colors.border }}
-                  />
+                    <View
+                      className="w-[1px]"
+                      style={{ backgroundColor: colors.border }}
+                    />
 
-                  <View className="flex-1 items-center">
-                    <Text
-                      className="text-xs mb-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Assigned
-                    </Text>
-                    <Text
-                      className="text-xl font-bold"
-                      style={{ color: colors.info || "#3B82F6" }}
-                    >
-                      {stats.assigned || 0}
-                    </Text>
-                  </View>
+                    <View className="flex-1 items-center">
+                      <Text
+                        className="text-xs mb-1"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        Assigned
+                      </Text>
+                      <Text
+                        className="text-xl font-bold"
+                        style={{ color: colors.info || "#3B82F6" }}
+                      >
+                        {stats.assigned || 0}
+                      </Text>
+                    </View>
 
-                  <View
-                    className="w-[1px]"
-                    style={{ backgroundColor: colors.border }}
-                  />
+                    <View
+                      className="w-[1px]"
+                      style={{ backgroundColor: colors.border }}
+                    />
 
-                  <View className="flex-1 items-center">
-                    <Text
-                      className="text-xs mb-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      In Progress
-                    </Text>
-                    <Text
-                      className="text-xl font-bold"
-                      style={{ color: colors.purple || "#8B5CF6" }}
-                    >
-                      {stats.inProgress || 0}
-                    </Text>
+                    <View className="flex-1 items-center">
+                      <Text
+                        className="text-xs mb-1"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        In Progress
+                      </Text>
+                      <Text
+                        className="text-xl font-bold"
+                        style={{ color: colors.purple || "#8B5CF6" }}
+                      >
+                        {stats.inProgress || 0}
+                      </Text>
+                    </View>
                   </View>
                 </View>
+
+                {/* Pending Approval Row */}
+                {stats.pendingApproval > 0 && (
+                  <>
+                    <View
+                      className="h-[1px] mb-3"
+                      style={{ backgroundColor: colors.border }}
+                    />
+                    <View className="flex-row items-center justify-between px-2">
+                      <View className="flex-row items-center">
+                        <AlertTriangle
+                          size={18}
+                          color={colors.purple || "#8B5CF6"}
+                        />
+                        <Text
+                          className="text-xs ml-2"
+                          style={{ color: colors.textSecondary }}
+                        >
+                          Awaiting Approval
+                        </Text>
+                      </View>
+                      <Text
+                        className="text-xl font-bold"
+                        style={{ color: colors.purple || "#8B5CF6" }}
+                      >
+                        {stats.pendingApproval}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </Card>
 
               {/* Completion Stats */}

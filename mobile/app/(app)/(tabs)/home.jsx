@@ -33,6 +33,7 @@ import {
 } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import getUserAuth from "../../../utils/userAuth";
+import { API_BASE } from "../../../url";
 
 const { width } = Dimensions.get("window");
 
@@ -50,7 +51,7 @@ export default function Home() {
   const [spots, setSpots] = useState([]);
   const [user, setUser] = useState(null);
 
-  const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:6000/api";
+  const baseUrl = API_BASE;
 
   const getGreeting = () => {
     const hour = new Date().getHours();

@@ -434,7 +434,7 @@ exports.getWorkerDashboard = async (req, res) => {
     // Get worker's assigned complaints with user details populated
     const assignedComplaints = await Complaint.find({
       assignedTo: workerId,
-      status: { $in: ["assigned", "in-progress"] },
+      status: { $in: ["assigned", "in-progress", "pending-approval"] },
     })
       .populate({
         path: "userId",
@@ -472,6 +472,12 @@ exports.getWorkerDashboard = async (req, res) => {
       updatedAt: { $gte: weekStart },
     });
 
+    // Get pending approval count
+    const pendingApproval = await Complaint.countDocuments({
+      assignedTo: workerId,
+      status: "pending-approval",
+    });
+
     res.json({
       success: true,
       data: {
@@ -483,6 +489,7 @@ exports.getWorkerDashboard = async (req, res) => {
           completedToday: completedToday.length,
           weekCompleted,
           activeComplaints: assignedComplaints.length,
+          pendingApproval,
         },
       },
     });
@@ -557,7 +564,22 @@ exports.updateComplaintStatus = async (req, res) => {
       ];
     }
 
-    // If resolved, update worker metrics
+    // If marking as pending-approval (worker completing work)
+    if (status === "pending-approval") {
+      // Require completion photos for pending-approval
+      if (
+        completionPhotos.length === 0 &&
+        (!complaint.completionPhotos || complaint.completionPhotos.length === 0)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Completion photos are required when submitting for approval",
+        });
+      }
+    }
+
+    // If resolved, update worker metrics (now handled by HOD approval)
     if (status === "resolved" && oldStatus !== "resolved") {
       let completionTime = 0;
 
@@ -705,5 +727,211 @@ exports.getCompletedComplaints = async (req, res) => {
   } catch (error) {
     console.error("Get completed complaints error:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get leaderboard with gamification (badges, streaks)
+exports.getLeaderboard = async (req, res) => {
+  try {
+    const currentWorkerId = req.currentUser.id || req.currentUser._id;
+    const { period = "monthly", department } = req.query;
+
+    // Calculate date range based on period
+    let startDate = new Date();
+    if (period === "weekly") {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (period === "monthly") {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (period === "yearly") {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    }
+
+    // Find all workers
+    const query = { role: "worker" };
+    if (department) {
+      query.department = department;
+    }
+
+    const workers = await User.find(query).select(
+      "fullName username department performanceMetrics rating",
+    );
+
+    // Get period-specific completions for each worker
+    const leaderboardData = await Promise.all(
+      workers.map(async (worker) => {
+        const periodCompleted = await Complaint.countDocuments({
+          assignedTo: worker._id,
+          status: { $in: ["resolved", "closed"] },
+          updatedAt: { $gte: startDate },
+        });
+
+        // Get recent completions for streak calculation (last 30 days)
+        const last30Days = new Date();
+        last30Days.setDate(last30Days.getDate() - 30);
+
+        const recentCompletions = await Complaint.find({
+          assignedTo: worker._id,
+          status: { $in: ["resolved", "closed"] },
+          updatedAt: { $gte: last30Days },
+        })
+          .select("updatedAt")
+          .sort({ updatedAt: -1 });
+
+        // Calculate streak (consecutive days with completions)
+        let currentStreak = 0;
+        if (recentCompletions.length > 0) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          let checkDate = new Date(today);
+          const completionDates = new Set(
+            recentCompletions.map((c) => {
+              const date = new Date(c.updatedAt);
+              date.setHours(0, 0, 0, 0);
+              return date.getTime();
+            }),
+          );
+
+          // Check if there's a completion today or yesterday (to maintain streak)
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+
+          if (
+            completionDates.has(today.getTime()) ||
+            completionDates.has(yesterday.getTime())
+          ) {
+            // Start counting from yesterday if no completion today
+            if (!completionDates.has(today.getTime())) {
+              checkDate = yesterday;
+            }
+
+            while (completionDates.has(checkDate.getTime())) {
+              currentStreak++;
+              checkDate.setDate(checkDate.getDate() - 1);
+            }
+          }
+        }
+
+        // Calculate badges
+        const badges = [];
+        const metrics = worker.performanceMetrics || {};
+        const totalCompleted = metrics.totalCompleted || 0;
+        const avgTime = metrics.averageCompletionTime || 0;
+        const rating = worker.rating || 0;
+
+        // Speed Demon Badge (Fast completion time)
+        if (totalCompleted >= 10 && avgTime > 0 && avgTime <= 24) {
+          badges.push({
+            id: "speed-demon",
+            name: "Speed Demon",
+            description: "Completes tasks in under 24 hours on average",
+            icon: "⚡",
+            color: "#F59E0B",
+          });
+        }
+
+        // Quality Master Badge (High ratings)
+        if (totalCompleted >= 10 && rating >= 4.5) {
+          badges.push({
+            id: "quality-master",
+            name: "Quality Master",
+            description: "Maintains 4.5+ star rating",
+            icon: "⭐",
+            color: "#EAB308",
+          });
+        }
+
+        // Community Hero Badge (High volume)
+        if (totalCompleted >= 50) {
+          badges.push({
+            id: "community-hero",
+            name: "Community Hero",
+            description: "Resolved 50+ complaints",
+            icon: "🏆",
+            color: "#10B981",
+          });
+        }
+
+        // Century Club Badge (100+ completions)
+        if (totalCompleted >= 100) {
+          badges.push({
+            id: "century-club",
+            name: "Century Club",
+            description: "Resolved 100+ complaints",
+            icon: "💯",
+            color: "#8B5CF6",
+          });
+        }
+
+        // Consistency Badge (Strong streak)
+        if (currentStreak >= 7) {
+          badges.push({
+            id: "consistent-performer",
+            name: "Consistent Performer",
+            description: "7+ day streak",
+            icon: "🔥",
+            color: "#EF4444",
+          });
+        }
+
+        // Rising Star Badge (High recent performance)
+        if (periodCompleted >= 20 && period === "monthly") {
+          badges.push({
+            id: "rising-star",
+            name: "Rising Star",
+            description: "20+ completions this month",
+            icon: "🌟",
+            color: "#06B6D4",
+          });
+        }
+
+        return {
+          id: worker._id,
+          fullName: worker.fullName,
+          username: worker.username,
+          department: worker.department,
+          totalCompleted: totalCompleted,
+          periodCompleted: periodCompleted,
+          averageCompletionTime: avgTime,
+          rating: rating,
+          currentStreak: currentStreak,
+          badges: badges,
+          isCurrentUser: worker._id.toString() === currentWorkerId.toString(),
+        };
+      }),
+    );
+
+    // Sort by period completions, then by rating
+    leaderboardData.sort((a, b) => {
+      if (b.periodCompleted !== a.periodCompleted) {
+        return b.periodCompleted - a.periodCompleted;
+      }
+      return b.rating - a.rating;
+    });
+
+    // Add rank
+    leaderboardData.forEach((worker, index) => {
+      worker.rank = index + 1;
+    });
+
+    // Find current user's data
+    const currentUserData = leaderboardData.find((w) => w.isCurrentUser);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        leaderboard: leaderboardData,
+        currentUser: currentUserData,
+        period: period,
+        totalWorkers: leaderboardData.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get leaderboard error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
