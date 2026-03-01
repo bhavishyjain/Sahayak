@@ -146,7 +146,7 @@ export default function TabsLayout() {
         />
 
         <Tabs.Screen
-          name="setting"
+          name="more"
           options={{
             title: "Settings",
             tabBarIcon: ({ color }) => (
@@ -209,7 +209,7 @@ export default function TabsLayout() {
         />
 
         <Tabs.Screen
-          name="setting"
+          name="more"
           options={{
             title: "Settings",
             tabBarIcon: ({ color }) => (
@@ -272,7 +272,7 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="setting"
+        name="more"
         options={{
           title: "Settings",
           tabBarIcon: ({ color }) => <TabIcon Icon={Settings} color={color} />,

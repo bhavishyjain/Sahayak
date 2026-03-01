@@ -32,12 +32,14 @@ import {
   getPriorityColor,
 } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
 import { API_BASE } from "../../../url";
 
 const { width } = Dimensions.get("window");
 
 export default function Home() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -55,10 +57,10 @@ export default function Home() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    if (hour < 21) return "Good Evening";
-    return "Good Night";
+    if (hour < 12) return t("greetings.morning");
+    if (hour < 17) return t("greetings.afternoon");
+    if (hour < 21) return t("greetings.evening");
+    return t("greetings.night");
   };
 
   const loadData = async (pullToRefresh = false) => {
@@ -78,8 +80,9 @@ export default function Home() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: error?.response?.data?.message || "Could not load home data.",
+        text1: t("toast.error.failed"),
+        text2:
+          error?.response?.data?.message || t("toast.error.loadHomeFailed"),
       });
     } finally {
       setLoading(false);
@@ -110,33 +113,39 @@ export default function Home() {
     const recent = summary?.recent || [];
     const latest = recent[0];
 
-    let lastUpdatedText = "No recent complaint updates yet.";
+    let lastUpdatedText = t("home.noRecent");
     if (latest?.createdAt) {
       const diffMs = Date.now() - new Date(latest.createdAt).getTime();
       const diffHrs = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
-      lastUpdatedText = `Last complaint was filed ${diffHrs}h ago (${latest.ticketId}).`;
+      lastUpdatedText = t("home.lastUpdate", {
+        hours: diffHrs,
+        ticketId: latest.ticketId,
+      });
     }
 
     return {
       pendingText:
         pending > 0
-          ? `You have ${pending} pending complaint${pending > 1 ? "s" : ""}.`
-          : "No pending complaints right now.",
+          ? t("home.pendingText", {
+              count: pending,
+              plural: pending > 1 ? "s" : "",
+            })
+          : t("home.noPending"),
       lastUpdatedText,
     };
-  }, [summary]);
+  }, [summary, t]);
 
   const actions = [
     {
       key: "register",
-      label: "New Complaint",
+      label: t("home.actions.newComplaint"),
       icon: FilePlus2,
       color: colors.primary,
       onPress: () => router.push("/(tabs)/complaints"),
     },
     {
       key: "heatmap",
-      label: "Heat Map",
+      label: t("home.actions.heatMap"),
       icon: Map,
       color: colors.danger,
       onPress: () => router.push("/(tabs)/heatmap"),
@@ -178,11 +187,13 @@ export default function Home() {
         </Text>
         {summary?.stats?.pending > 0 && (
           <Text className="text-sm" style={{ color: colors.textSecondary }}>
-            You have{" "}
+            {t("home.youHave") || "You have"}{" "}
             <Text style={{ color: colors.danger, fontWeight: "700" }}>
-              {summary.stats.pending} pending
+              {summary.stats.pending} {t("home.stats.pending").toLowerCase()}
             </Text>{" "}
-            {summary.stats.pending === 1 ? "complaint" : "complaints"}
+            {summary.stats.pending === 1
+              ? t("home.stats.complaints").toLowerCase().slice(0, -1)
+              : t("home.stats.complaints").toLowerCase()}
           </Text>
         )}
       </View>
@@ -201,7 +212,7 @@ export default function Home() {
             className="text-lg font-extrabold"
             style={{ color: colors.textPrimary }}
           >
-            Overview
+            {t("home.overview")}
           </Text>
           <View className="flex-row items-center">
             <TrendingUp size={14} color={colors.success} />
@@ -209,7 +220,7 @@ export default function Home() {
               className="text-xs font-semibold ml-1"
               style={{ color: colors.success }}
             >
-              Active
+              {t("home.active")}
             </Text>
           </View>
         </View>
@@ -232,7 +243,7 @@ export default function Home() {
               className="text-[11px] font-medium text-center"
               style={{ color: colors.textSecondary }}
             >
-              Total
+              {t("home.stats.total")}
             </Text>
           </View>
 
@@ -253,7 +264,7 @@ export default function Home() {
               className="text-[11px] font-medium text-center"
               style={{ color: colors.textSecondary }}
             >
-              Pending
+              {t("home.stats.pending")}
             </Text>
           </View>
 
@@ -274,7 +285,7 @@ export default function Home() {
               className="text-[11px] font-medium text-center"
               style={{ color: colors.textSecondary }}
             >
-              Active
+              {t("home.stats.inProgress")}
             </Text>
           </View>
 
@@ -295,7 +306,7 @@ export default function Home() {
               className="text-[11px] font-medium text-center"
               style={{ color: colors.textSecondary }}
             >
-              Done
+              {t("home.stats.resolved")}
             </Text>
           </View>
         </View>
@@ -330,7 +341,7 @@ export default function Home() {
             className="text-xl font-extrabold"
             style={{ color: colors.textPrimary }}
           >
-            Recent Complaints
+            {t("home.recentComplaints")}
           </Text>
           <PressableBlock
             onPress={() => router.push("/(tabs)/complaints")}
@@ -340,7 +351,7 @@ export default function Home() {
               className="text-sm font-semibold"
               style={{ color: colors.primary }}
             >
-              View All
+              {t("home.actions.viewAll")}
             </Text>
             <ChevronRight
               size={16}
@@ -369,7 +380,7 @@ export default function Home() {
                 className="text-sm font-medium mt-2"
                 style={{ color: colors.textSecondary }}
               >
-                No complaints yet
+                {t("home.noComplaints") || "No complaints yet"}
               </Text>
             </View>
           ) : (
@@ -419,7 +430,7 @@ export default function Home() {
                       style={{ color: colors.textPrimary }}
                       numberOfLines={1}
                     >
-                      {item.title || "Complaint"}
+                      {item.title || t("complaints.complaint")}
                     </Text>
                     <Text
                       className="text-xs"

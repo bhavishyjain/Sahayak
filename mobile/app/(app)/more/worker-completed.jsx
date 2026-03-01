@@ -23,10 +23,12 @@ import Card from "../../../components/Card";
 import PressableBlock from "../../../components/PressableBlock";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import { WORKER_COMPLETED_URL } from "../../../url";
 
 export default function WorkerCompleted() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -56,9 +58,9 @@ export default function WorkerCompleted() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
+        text1: t("worker.completedWork.failed"),
         text2:
-          e?.response?.data?.message || "Could not load completed complaints",
+          e?.response?.data?.message || t("worker.completedWork.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -121,7 +123,7 @@ export default function WorkerCompleted() {
             className="text-sm mt-3"
             style={{ color: colors.textSecondary }}
           >
-            Loading completed work...
+            {t("worker.completedWork.loading")}
           </Text>
         </View>
       </View>
@@ -133,7 +135,10 @@ export default function WorkerCompleted() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Completed Work" hasBackButton={true} />
+      <BackButtonHeader
+        title={t("worker.completedWork.title")}
+        hasBackButton={true}
+      />
 
       <ScrollView
         className="flex-1 px-4"
@@ -166,7 +171,7 @@ export default function WorkerCompleted() {
                     className="text-xs"
                     style={{ color: colors.textSecondary }}
                   >
-                    Completed Tasks
+                    {t("worker.completedWork.completedTasks")}
                   </Text>
                   <Text
                     className="text-2xl font-bold mt-1"
@@ -208,7 +213,7 @@ export default function WorkerCompleted() {
                 className="text-base font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Filter by Date Range
+                {t("worker.completedWork.filterByDateRange")}
               </Text>
               {(startDate || endDate) && (
                 <PressableBlock onPress={clearFilters}>
@@ -218,7 +223,7 @@ export default function WorkerCompleted() {
                       className="text-sm font-semibold ml-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      Clear
+                      {t("worker.completedWork.clear")}
                     </Text>
                   </View>
                 </PressableBlock>
@@ -236,14 +241,14 @@ export default function WorkerCompleted() {
                   className="text-xs font-semibold mb-2"
                   style={{ color: colors.textSecondary }}
                 >
-                  Start Date
+                  {t("worker.completedWork.startDate")}
                 </Text>
                 <DateTimePickerModal
                   mode="date"
                   value={startDate}
                   onChange={setStartDate}
                   icon={Calendar}
-                  placeholder="Select date"
+                  placeholder={t("worker.completedWork.selectDate")}
                   maxDateToday={true}
                 />
               </View>
@@ -253,14 +258,14 @@ export default function WorkerCompleted() {
                   className="text-xs font-semibold mb-2"
                   style={{ color: colors.textSecondary }}
                 >
-                  End Date
+                  {t("worker.completedWork.endDate")}
                 </Text>
                 <DateTimePickerModal
                   mode="date"
                   value={endDate}
                   onChange={setEndDate}
                   icon={Calendar}
-                  placeholder="Select date"
+                  placeholder={t("worker.completedWork.selectDate")}
                   maxDateToday={true}
                 />
               </View>
@@ -275,8 +280,10 @@ export default function WorkerCompleted() {
                   className="text-xs text-center"
                   style={{ color: colors.info || "#3B82F6" }}
                 >
-                  Showing {filteredComplaints.length} of {complaints.length}{" "}
-                  tasks
+                  {t("worker.completedWork.showing", {
+                    filtered: filteredComplaints.length,
+                    total: complaints.length,
+                  })}
                 </Text>
               </View>
             )}
@@ -290,13 +297,13 @@ export default function WorkerCompleted() {
                 className="text-base font-semibold"
                 style={{ color: colors.textSecondary }}
               >
-                No tasks found
+                {t("worker.completedWork.noTasksFound")}
               </Text>
               <Text
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                Try adjusting your date filters
+                {t("worker.completedWork.tryAdjustingFilters")}
               </Text>
             </View>
           </Card>
@@ -307,13 +314,13 @@ export default function WorkerCompleted() {
                 className="text-base font-semibold"
                 style={{ color: colors.textSecondary }}
               >
-                No completed complaints
+                {t("worker.completedWork.noComplaints")}
               </Text>
               <Text
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                Your completed work will appear here
+                {t("worker.completedWork.noComplaintsDesc")}
               </Text>
             </View>
           </Card>
@@ -371,7 +378,8 @@ export default function WorkerCompleted() {
                     className="text-xs ml-1 flex-1"
                     style={{ color: colors.textSecondary }}
                   >
-                    {complaint.locationName || "No location"}
+                    {complaint.locationName ||
+                      t("worker.completedWork.noLocation")}
                   </Text>
                 </View>
 
@@ -381,7 +389,8 @@ export default function WorkerCompleted() {
                     className="text-xs ml-1"
                     style={{ color: colors.textSecondary }}
                   >
-                    Completed {formatDate(complaint.updatedAt)}
+                    {t("worker.completedWork.completed")}{" "}
+                    {formatDate(complaint.updatedAt)}
                   </Text>
                 </View>
               </Card>

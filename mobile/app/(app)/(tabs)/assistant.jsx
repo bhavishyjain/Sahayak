@@ -9,9 +9,11 @@ import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { API_BASE } from "../../../url";
 
 export default function Assistant() {
+  const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
@@ -21,7 +23,7 @@ export default function Assistant() {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
-      text: "Hi, I am Sahayak. Ask me about your complaints.",
+      text: t("assistant.welcomeMessage"),
     },
   ]);
 
@@ -52,7 +54,10 @@ export default function Assistant() {
 
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: payload?.response || "No response" },
+        {
+          role: "assistant",
+          text: payload?.response || t("assistant.noResponse"),
+        },
       ]);
     } catch (e) {
       const status = e?.response?.status;
@@ -61,16 +66,15 @@ export default function Assistant() {
           ...prev,
           {
             role: "assistant",
-            text:
-              "Please login to check ticket status. I can still help with general questions.",
+            text: t("assistant.loginRequired"),
           },
         ]);
         return;
       }
       Toast.show({
         type: "error",
-        text1: "Assistant failed",
-        text2: e?.response?.data?.error || "Could not get response.",
+        text1: t("assistant.assistantFailed"),
+        text2: e?.response?.data?.error || t("assistant.errorResponse"),
       });
     } finally {
       setLoading(false);
@@ -82,7 +86,7 @@ export default function Assistant() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Assistant" hasBackButton={false} />
+      <BackButtonHeader title={t("assistant.title")} hasBackButton={false} />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
@@ -99,7 +103,7 @@ export default function Assistant() {
               className="ml-2 text-xs font-semibold"
               style={{ color: colors.textSecondary }}
             >
-              Clear chat
+              {t("assistant.clearChat")}
             </Text>
           </PressableBlock>
         </View>
@@ -140,7 +144,7 @@ export default function Assistant() {
             <TextInput
               value={text}
               onChangeText={setText}
-              placeholder="Type your message..."
+              placeholder={t("assistant.inputPlaceholder")}
               placeholderTextColor={colors.placeholder}
               className="flex-1"
               style={{ color: colors.textPrimary }}
@@ -154,16 +158,16 @@ export default function Assistant() {
 
       <DialogBox
         visible={showClearDialog}
-        title="Clear chat"
-        message="Are you sure you want to clear all assistant messages?"
-        confirmText="Clear"
-        cancelText="Cancel"
+        title={t("assistant.clearChat")}
+        message={t("assistant.clearChatConfirm")}
+        confirmText={t("assistant.clear")}
+        cancelText={t("common.cancel")}
         onConfirm={() => {
           setShowClearDialog(false);
           setMessages([
             {
               role: "assistant",
-              text: "Hi, I am Sahayak. Ask me about your complaints.",
+              text: t("assistant.welcomeMessage"),
             },
           ]);
         }}

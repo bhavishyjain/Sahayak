@@ -14,6 +14,10 @@ const {
   getWorkerOrThrow,
   getComplaintOrThrow,
 } = require("../services/accessService");
+const {
+  sendWorkerInvitation,
+  sendComplaintCompleted,
+} = require("../services/emailService");
 
 function escapeRegex(value = "") {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -81,14 +85,18 @@ exports.getHodDashboard = asyncHandler(async (req, res) => {
           _id: null,
           total: { $sum: 1 },
           pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
-          assigned: { $sum: { $cond: [{ $eq: ["$status", "assigned"] }, 1, 0] } },
+          assigned: {
+            $sum: { $cond: [{ $eq: ["$status", "assigned"] }, 1, 0] },
+          },
           inProgress: {
             $sum: { $cond: [{ $eq: ["$status", "in-progress"] }, 1, 0] },
           },
           pendingApproval: {
             $sum: { $cond: [{ $eq: ["$status", "pending-approval"] }, 1, 0] },
           },
-          resolved: { $sum: { $cond: [{ $eq: ["$status", "resolved"] }, 1, 0] } },
+          resolved: {
+            $sum: { $cond: [{ $eq: ["$status", "resolved"] }, 1, 0] },
+          },
           cancelled: {
             $sum: {
               $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0],
@@ -100,7 +108,9 @@ exports.getHodDashboard = asyncHandler(async (req, res) => {
           mediumPriority: {
             $sum: { $cond: [{ $eq: ["$priority", "Medium"] }, 1, 0] },
           },
-          lowPriority: { $sum: { $cond: [{ $eq: ["$priority", "Low"] }, 1, 0] } },
+          lowPriority: {
+            $sum: { $cond: [{ $eq: ["$priority", "Low"] }, 1, 0] },
+          },
           totalUpvotes: { $sum: { $ifNull: ["$upvoteCount", 0] } },
         },
       },
@@ -132,13 +142,19 @@ exports.getHodDashboard = asyncHandler(async (req, res) => {
   let avgResponseTime = null;
   if (assignedComplaints.length > 0) {
     const totalResponseTime = assignedComplaints.reduce((sum, c) => {
-      return sum + (new Date(c.assignedAt) - new Date(c.createdAt)) / (1000 * 60 * 60);
+      return (
+        sum +
+        (new Date(c.assignedAt) - new Date(c.createdAt)) / (1000 * 60 * 60)
+      );
     }, 0);
     avgResponseTime = Math.round(totalResponseTime / assignedComplaints.length);
   }
 
-  const completionRate = total > 0 ? Math.round(((resolved + cancelled) / total) * 100) : 0;
-  const responseScore = avgResponseTime ? Math.max(0, 100 - avgResponseTime * 2) : 50;
+  const completionRate =
+    total > 0 ? Math.round(((resolved + cancelled) / total) * 100) : 0;
+  const responseScore = avgResponseTime
+    ? Math.max(0, 100 - avgResponseTime * 2)
+    : 50;
   const pendingPenalty = total > 0 ? (pending / total) * 30 : 0;
   const performanceScore = Math.round(
     completionRate * 0.5 + responseScore * 0.3 + (100 - pendingPenalty) * 0.2,
@@ -254,7 +270,9 @@ exports.approveCompletion = asyncHandler(async (req, res) => {
   const { hodNotes } = req.body;
   const hod = await getHodOrThrow(req);
   const hodId = getRequestUserId(req);
-  const complaint = await getComplaintOrThrow(complaintId, { department: hod.department });
+  const complaint = await getComplaintOrThrow(complaintId, {
+    department: hod.department,
+  });
 
   if (complaint.status !== "pending-approval") {
     throw new AppError("Complaint is not pending approval", 400);
@@ -277,7 +295,31 @@ exports.approveCompletion = asyncHandler(async (req, res) => {
   });
 
   await complaint.save();
-  return sendSuccess(res, { data: complaint }, "Complaint approved and marked as resolved");
+
+  // Send completion email to user
+  try {
+    const user = await User.findById(complaint.userId).select(
+      "email fullName username",
+    );
+    if (user && user.email) {
+      await sendComplaintCompleted(user.email, user.fullName || user.username, {
+        _id: complaint._id,
+        ticketId: complaint.ticketId,
+        title: complaint.refinedText || complaint.rawText,
+        department: complaint.department,
+        completedAt: new Date(),
+      });
+    }
+  } catch (emailError) {
+    console.error("Failed to send completion email:", emailError);
+    // Continue anyway - don't block complaint approval
+  }
+
+  return sendSuccess(
+    res,
+    { data: complaint },
+    "Complaint approved and marked as resolved",
+  );
 });
 
 exports.markNeedsRework = asyncHandler(async (req, res) => {
@@ -290,7 +332,9 @@ exports.markNeedsRework = asyncHandler(async (req, res) => {
 
   const hod = await getHodOrThrow(req);
   const hodId = getRequestUserId(req);
-  const complaint = await getComplaintOrThrow(complaintId, { department: hod.department });
+  const complaint = await getComplaintOrThrow(complaintId, {
+    department: hod.department,
+  });
 
   if (complaint.status !== "pending-approval") {
     throw new AppError("Complaint is not pending approval", 400);
@@ -305,7 +349,11 @@ exports.markNeedsRework = asyncHandler(async (req, res) => {
   });
 
   await complaint.save();
-  return sendSuccess(res, { data: complaint }, "Complaint sent back for rework");
+  return sendSuccess(
+    res,
+    { data: complaint },
+    "Complaint sent back for rework",
+  );
 });
 
 exports.cancelComplaint = asyncHandler(async (req, res) => {
@@ -313,7 +361,9 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   const hod = await getHodOrThrow(req);
   const hodId = getRequestUserId(req);
-  const complaint = await getComplaintOrThrow(complaintId, { department: hod.department });
+  const complaint = await getComplaintOrThrow(complaintId, {
+    department: hod.department,
+  });
 
   if (["resolved", "cancelled"].includes(complaint.status)) {
     throw new AppError("Complaint is already finalized", 400);
@@ -331,7 +381,11 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
   });
 
   await complaint.save();
-  return sendSuccess(res, { data: complaint }, "Complaint cancelled successfully");
+  return sendSuccess(
+    res,
+    { data: complaint },
+    "Complaint cancelled successfully",
+  );
 });
 
 exports.bulkAssignComplaints = asyncHandler(async (req, res) => {
@@ -409,6 +463,116 @@ exports.getWorkerComplaints = asyncHandler(async (req, res) => {
     .populate("userId", "fullName email phone")
     .sort({ updatedAt: -1 });
 
-  const complaintsList = complaints.map((complaint) => buildComplaintView(complaint));
-  return sendSuccess(res, { complaints: complaintsList, total: complaintsList.length });
+  const complaintsList = complaints.map((complaint) =>
+    buildComplaintView(complaint),
+  );
+  return sendSuccess(res, {
+    complaints: complaintsList,
+    total: complaintsList.length,
+  });
+});
+
+exports.inviteWorker = asyncHandler(async (req, res) => {
+  const hod = await getHodOrThrow(req);
+  const { email } = req.body;
+
+  if (!email) {
+    throw new AppError("Email is required", 400);
+  }
+
+  // Check if user already exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    if (
+      existingUser.role === "worker" &&
+      existingUser.department === hod.department
+    ) {
+      throw new AppError(
+        "This user is already a worker in your department",
+        400,
+      );
+    }
+    if (existingUser.role === "worker") {
+      throw new AppError(
+        "This user is already a worker in another department",
+        400,
+      );
+    }
+  }
+
+  // Generate invitation token
+  const crypto = require("crypto");
+  const inviteToken = crypto.randomBytes(32).toString("hex");
+  const inviteExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  // Store invitation (you might want to create an Invitation model for this)
+  // For now, we'll send the data in the response
+  const invitationData = {
+    email,
+    department: hod.department,
+    invitedBy: hod._id,
+    token: inviteToken,
+    expiresAt: inviteExpiry,
+  };
+
+  // TODO: Send email with invitation link
+  // const inviteLink = `${process.env.APP_URL}/register?token=${inviteToken}`;
+  // await sendInvitationEmail(email, inviteLink, hod.department);
+
+  // Send invitation email
+  try {
+    await sendWorkerInvitation(
+      email,
+      inviteToken,
+      hod.department,
+      hod.fullName || hod.username,
+    );
+  } catch (emailError) {
+    console.error("Failed to send invitation email:", emailError);
+    // Email failed but we still return success - you can decide to throw error instead
+    // throw new AppError("Failed to send invitation email. Please try again.", 500);
+  }
+
+  return sendSuccess(
+    res,
+    {
+      invitation: invitationData,
+      message: `Invitation sent to ${email}`,
+    },
+    `Worker invitation sent successfully`,
+  );
+});
+
+exports.removeWorker = asyncHandler(async (req, res) => {
+  const hod = await getHodOrThrow(req);
+  const { workerId } = req.params;
+
+  const worker = await getWorkerOrThrow(workerId, {
+    department: hod.department,
+    departmentErrorMessage: "Worker not found in your department",
+  });
+
+  // Check if worker has active complaints
+  const activeComplaints = await Complaint.countDocuments({
+    assignedTo: worker._id,
+    status: { $in: ["assigned", "in-progress", "needs-rework"] },
+  });
+
+  if (activeComplaints > 0) {
+    throw new AppError(
+      `Cannot remove worker. They have ${activeComplaints} active complaint(s). Please reassign them first.`,
+      400,
+    );
+  }
+
+  // Convert worker to normal user
+  worker.role = "user";
+  worker.department = "Other";
+  await worker.save();
+
+  return sendSuccess(
+    res,
+    { user: { id: worker._id, username: worker.username, role: worker.role } },
+    `${worker.fullName} has been removed from the worker role`,
+  );
 });

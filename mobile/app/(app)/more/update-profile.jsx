@@ -97,10 +97,10 @@ export default function UpdateProfile() {
       if (response.success) {
         // Update local user data with auth_token preserved
         const currentUser = await getUserAuth();
-        const updatedUser = { 
+        const updatedUser = {
           ...currentUser,
           ...data.user,
-          auth_token: currentUser?.auth_token // Preserve token
+          auth_token: currentUser?.auth_token, // Preserve token
         };
         await setUserAuth(updatedUser);
 
@@ -158,7 +158,7 @@ export default function UpdateProfile() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Edit Profile" />
+      <BackButtonHeader title={t("settings.profile.editProfile")} />
 
       <ScrollView
         className="flex-1"
@@ -171,7 +171,7 @@ export default function UpdateProfile() {
             className="text-base font-bold mb-2"
             style={{ color: colors.textPrimary }}
           >
-            Email Address
+            {t("settings.profile.email")}
           </Text>
           <TextInput
             className="rounded-xl px-4 py-3"
@@ -184,7 +184,7 @@ export default function UpdateProfile() {
             }}
             value={formData.email}
             editable={false}
-            placeholder="Email Address"
+            placeholder={t("settings.profile.emailPlaceholder")}
             placeholderTextColor={colors.placeholder}
           />
         </View>
@@ -195,7 +195,7 @@ export default function UpdateProfile() {
             className="text-base font-bold mb-2"
             style={{ color: colors.textPrimary }}
           >
-            Full Name
+            {t("settings.profile.fullName")}
           </Text>
           <TextInput
             className="rounded-xl px-4 py-3"
@@ -208,7 +208,7 @@ export default function UpdateProfile() {
             }}
             value={formData.fullName}
             onChangeText={(text) => updateFormField("fullName", text)}
-            placeholder="Enter your full name"
+            placeholder={t("settings.profile.fullNamePlaceholder")}
             placeholderTextColor={colors.placeholder}
           />
         </View>
@@ -219,7 +219,7 @@ export default function UpdateProfile() {
             className="text-base font-bold mb-2"
             style={{ color: colors.textPrimary }}
           >
-            Phone Number
+            {t("settings.profile.phone")}
           </Text>
           <TextInput
             className="rounded-xl px-4 py-3"
@@ -232,7 +232,7 @@ export default function UpdateProfile() {
             }}
             value={formData.phone}
             onChangeText={(text) => updateFormField("phone", text)}
-            placeholder="Enter phone number"
+            placeholder={t("settings.profile.phonePlaceholder")}
             placeholderTextColor={colors.placeholder}
             keyboardType="phone-pad"
           />
@@ -244,7 +244,7 @@ export default function UpdateProfile() {
             className="text-base font-bold mb-2"
             style={{ color: colors.textPrimary }}
           >
-            New Password (Optional)
+            {t("settings.profile.newPassword")}
           </Text>
           <View className="flex-row items-center">
             <TextInput
@@ -258,7 +258,7 @@ export default function UpdateProfile() {
               }}
               value={formData.password}
               onChangeText={(text) => updateFormField("password", text)}
-              placeholder="Leave blank to keep current password"
+              placeholder={t("settings.profile.passwordPlaceholder")}
               placeholderTextColor={colors.placeholder}
               secureTextEntry={!uiState.showPassword}
             />
@@ -286,7 +286,7 @@ export default function UpdateProfile() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text className="text-base font-bold" style={{ color: "#FFFFFF" }}>
-              Update Profile
+              {t("settings.profile.updateProfile")}
             </Text>
           )}
         </PressableBlock>

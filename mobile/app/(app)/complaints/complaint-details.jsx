@@ -47,12 +47,14 @@ import {
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
 
 export default function ComplaintDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { colorScheme } = useTheme();
+  const { t } = useTranslation();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
   const [loading, setLoading] = useState(true);
@@ -158,9 +160,9 @@ export default function ComplaintDetails() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
+        text1: t("common.failed"),
         text2:
-          e?.response?.data?.message || "Could not load complaint details.",
+          e?.response?.data?.message || t("complaints.details.couldNotLoad"),
       });
       if (e?.response?.status === 404) {
         setTimeout(() => router.back(), 1500);
@@ -194,13 +196,18 @@ export default function ComplaintDetails() {
               String(worker.department || "").toLowerCase() === complaintDept,
           );
         }
-        const merged = [...workerList, ...fallbackList].reduce((acc, worker) => {
-          const key = String(worker.id || worker._id || worker.username || Math.random());
-          if (!acc.some((w) => String(w.id || w._id || w.username) === key)) {
-            acc.push(worker);
-          }
-          return acc;
-        }, []);
+        const merged = [...workerList, ...fallbackList].reduce(
+          (acc, worker) => {
+            const key = String(
+              worker.id || worker._id || worker.username || Math.random(),
+            );
+            if (!acc.some((w) => String(w.id || w._id || w.username) === key)) {
+              acc.push(worker);
+            }
+            return acc;
+          },
+          [],
+        );
         workerList = merged;
       }
 
@@ -243,16 +250,19 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: hasUpvoted ? "Upvote Removed" : "Upvoted",
+        text1: hasUpvoted
+          ? t("complaints.details.upvoteRemoved")
+          : t("complaints.details.upvotedSuccess"),
         text2: hasUpvoted
-          ? "Your support has been removed"
-          : "Thanks for supporting this complaint",
+          ? t("complaints.details.supportRemoved")
+          : t("complaints.details.thanksForSupporting"),
       });
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not process upvote",
+        text1: t("common.failed"),
+        text2:
+          e?.response?.data?.message || t("complaints.details.couldNotUpvote"),
       });
     } finally {
       setUpvoting(false);
@@ -264,8 +274,8 @@ export default function ComplaintDetails() {
     if (!feedbackRating) {
       Toast.show({
         type: "error",
-        text1: "Rating Required",
-        text2: "Please select a rating",
+        text1: t("complaints.details.ratingRequired"),
+        text2: t("complaints.details.pleaseSelectRating"),
       });
       return;
     }
@@ -284,8 +294,8 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: "Feedback Submitted",
-        text2: "Thank you for your feedback!",
+        text1: t("complaints.details.feedbackSubmitted"),
+        text2: t("complaints.details.thankYouFeedback"),
       });
 
       setFeedbackModalVisible(false);
@@ -295,8 +305,10 @@ export default function ComplaintDetails() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Submission Failed",
-        text2: e?.response?.data?.message || "Could not submit feedback",
+        text1: t("complaints.details.submissionFailed"),
+        text2:
+          e?.response?.data?.message ||
+          t("complaints.details.couldNotSubmitFeedback"),
       });
     } finally {
       setSubmittingFeedback(false);
@@ -308,8 +320,8 @@ export default function ComplaintDetails() {
     if (!selectedWorker) {
       Toast.show({
         type: "error",
-        text1: "Worker Required",
-        text2: "Please select a worker",
+        text1: t("complaints.details.workerRequired"),
+        text2: t("complaints.details.pleaseSelectWorker"),
       });
       return;
     }
@@ -328,10 +340,12 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: complaint?.assignedTo ? "Assignment Updated" : "Complaint Assigned",
+        text1: complaint?.assignedTo
+          ? t("complaints.details.assignmentUpdated")
+          : t("complaints.details.complaintAssigned"),
         text2: complaint?.assignedTo
-          ? "Worker assignment changed successfully"
-          : "Worker has been notified",
+          ? t("complaints.details.workerAssignmentChanged")
+          : t("complaints.details.workerNotified"),
       });
 
       setAssignModalVisible(false);
@@ -340,8 +354,9 @@ export default function ComplaintDetails() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Assignment Failed",
-        text2: e?.response?.data?.message || "Could not assign complaint",
+        text1: t("complaints.details.assignmentFailed"),
+        text2:
+          e?.response?.data?.message || t("complaints.details.couldNotAssign"),
       });
     } finally {
       setAssigning(false);
@@ -363,16 +378,17 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: "Approved",
-        text2: "Complaint marked as resolved",
+        text1: t("complaints.details.approved"),
+        text2: t("complaints.details.markedAsResolved"),
       });
 
       await load(true);
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Approval Failed",
-        text2: e?.response?.data?.message || "Could not approve completion",
+        text1: t("complaints.details.approvalFailed"),
+        text2:
+          e?.response?.data?.message || t("complaints.details.couldNotApprove"),
       });
     } finally {
       setApproving(false);
@@ -384,8 +400,8 @@ export default function ComplaintDetails() {
     if (!reworkReason.trim()) {
       Toast.show({
         type: "error",
-        text1: "Reason Required",
-        text2: "Please provide rework details",
+        text1: t("complaints.details.reasonRequired"),
+        text2: t("complaints.details.provideReworkDetails"),
       });
       return;
     }
@@ -403,8 +419,8 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: "Sent for Rework",
-        text2: "Worker has been notified",
+        text1: t("complaints.details.sentForRework"),
+        text2: t("complaints.details.workerNotified"),
       });
 
       setApprovalModalVisible(false);
@@ -413,8 +429,10 @@ export default function ComplaintDetails() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Request Failed",
-        text2: e?.response?.data?.message || "Could not send for rework",
+        text1: t("complaints.details.requestFailed"),
+        text2:
+          e?.response?.data?.message ||
+          t("complaints.details.couldNotSendRework"),
       });
     } finally {
       setSendingRework(false);
@@ -432,16 +450,17 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: "Cancelled",
-        text2: "Complaint has been cancelled",
+        text1: t("complaints.details.cancelled"),
+        text2: t("complaints.details.complaintCancelled"),
       });
 
       await load(true);
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Cancel Failed",
-        text2: e?.response?.data?.message || "Could not cancel complaint",
+        text1: t("complaints.details.cancelFailed"),
+        text2:
+          e?.response?.data?.message || t("complaints.details.couldNotCancel"),
       });
     } finally {
       setCancelling(false);
@@ -453,8 +472,8 @@ export default function ComplaintDetails() {
     if (!newStatus) {
       Toast.show({
         type: "error",
-        text1: "Status Required",
-        text2: "Please select a status",
+        text1: t("complaints.details.statusRequired"),
+        text2: t("complaints.details.pleaseSelectStatus"),
       });
       return;
     }
@@ -473,8 +492,8 @@ export default function ComplaintDetails() {
 
       Toast.show({
         type: "success",
-        text1: "Status Updated",
-        text2: `Complaint marked as ${newStatus}`,
+        text1: t("complaints.details.statusUpdated"),
+        text2: `${t("complaints.details.markedAs", { status: newStatus })}`,
       });
 
       setStatusModalVisible(false);
@@ -483,8 +502,10 @@ export default function ComplaintDetails() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Update Failed",
-        text2: e?.response?.data?.message || "Could not update status",
+        text1: t("complaints.details.updateFailed"),
+        text2:
+          e?.response?.data?.message ||
+          t("complaints.details.couldNotUpdateStatus"),
       });
     } finally {
       setUpdating(false);
@@ -516,9 +537,13 @@ export default function ComplaintDetails() {
 
   const formatStatusLabel = (status) => {
     const s = String(status || "").toLowerCase();
-    if (s === "needs-rework") return "Rework Required";
-    if (s === "in-progress") return "In Progress";
-    if (s === "pending-approval") return "Pending Approval";
+    if (s === "needs-rework") return t("complaints.status.needsRework");
+    if (s === "in-progress") return t("complaints.status.inProgress");
+    if (s === "pending-approval") return t("complaints.status.pendingApproval");
+    if (s === "assigned") return t("complaints.status.assigned");
+    if (s === "resolved") return t("complaints.status.resolved");
+    if (s === "cancelled") return t("complaints.status.cancelled");
+    if (s === "pending") return t("complaints.status.pending");
     return String(status || "-").replace("-", " ");
   };
 
@@ -528,14 +553,14 @@ export default function ComplaintDetails() {
         className="flex-1"
         style={{ backgroundColor: colors.backgroundPrimary }}
       >
-        <BackButtonHeader title="Complaint Details" />
+        <BackButtonHeader title={t("complaints.details.title")} />
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={colors.primary} />
           <Text
             className="text-sm mt-3"
             style={{ color: colors.textSecondary }}
           >
-            Loading details...
+            {t("complaints.details.loadingDetails")}
           </Text>
         </View>
       </View>
@@ -548,20 +573,20 @@ export default function ComplaintDetails() {
         className="flex-1"
         style={{ backgroundColor: colors.backgroundPrimary }}
       >
-        <BackButtonHeader title="Complaint Details" />
+        <BackButtonHeader title={t("complaints.details.title")} />
         <View className="flex-1 justify-center items-center p-6">
           <AlertCircle size={48} color={colors.textSecondary} />
           <Text
             className="text-lg font-bold mt-4"
             style={{ color: colors.textPrimary }}
           >
-            Complaint Not Found
+            {t("complaints.details.notFound")}
           </Text>
           <Text
             className="text-sm mt-2 text-center"
             style={{ color: colors.textSecondary }}
           >
-            This complaint may have been removed or you don&apos;t have access to it.
+            {t("complaints.details.notFoundMessage")}
           </Text>
         </View>
       </View>
@@ -569,9 +594,12 @@ export default function ComplaintDetails() {
   }
 
   const statusOptions = [
-    { value: "assigned", label: "Assigned" },
-    { value: "in-progress", label: "In Progress" },
-    { value: "pending-approval", label: "Submit for Approval" },
+    { value: "assigned", label: t("complaints.status.assigned") },
+    { value: "in-progress", label: t("complaints.status.inProgress") },
+    {
+      value: "pending-approval",
+      label: t("complaints.status.pendingApproval"),
+    },
   ];
 
   return (
@@ -579,7 +607,7 @@ export default function ComplaintDetails() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Complaint Details" />
+      <BackButtonHeader title={t("complaints.details.title")} />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
@@ -600,7 +628,7 @@ export default function ComplaintDetails() {
               className="text-sm mb-1"
               style={{ color: colors.textSecondary }}
             >
-              Ticket ID
+              {t("complaints.details.ticketId")}
             </Text>
             <Text
               className="text-2xl font-bold"
@@ -615,7 +643,7 @@ export default function ComplaintDetails() {
         <View className="flex-row mb-3">
           <Card style={{ margin: 0, marginRight: 6, flex: 1 }}>
             <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              Status
+              {t("complaints.details.status")}
             </Text>
             <Text
               className="text-lg font-bold mt-1 capitalize"
@@ -626,7 +654,7 @@ export default function ComplaintDetails() {
           </Card>
           <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
             <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              Priority
+              {t("complaints.details.priority")}
             </Text>
             <Text
               className="text-lg font-bold mt-1"
@@ -665,16 +693,17 @@ export default function ComplaintDetails() {
                       }}
                     >
                       {hasUpvoted
-                        ? "You support this"
-                        : "Support this complaint"}
+                        ? t("complaints.details.youSupportThis")
+                        : t("complaints.details.supportThisComplaint")}
                     </Text>
                     <Text
                       className="text-sm mt-0.5"
                       style={{ color: colors.textSecondary }}
                     >
                       {complaint.upvoteCount || 0}{" "}
-                      {(complaint.upvoteCount || 0) === 1 ? "person" : "people"}{" "}
-                      affected
+                      {(complaint.upvoteCount || 0) === 1
+                        ? t("complaints.details.personAffected")
+                        : t("complaints.details.peopleAffected")}
                     </Text>
                   </View>
                 </View>
@@ -695,7 +724,7 @@ export default function ComplaintDetails() {
                 className="text-base font-semibold ml-2"
                 style={{ color: colors.textPrimary }}
               >
-                Community Support
+                {t("complaints.details.communitySupport")}
               </Text>
             </View>
             <Text
@@ -703,8 +732,9 @@ export default function ComplaintDetails() {
               style={{ color: colors.textSecondary }}
             >
               {complaint.upvoteCount || 0}{" "}
-              {(complaint.upvoteCount || 0) === 1 ? "person" : "people"}{" "}
-              affected by this issue
+              {(complaint.upvoteCount || 0) === 1
+                ? t("complaints.details.personAffected")
+                : t("complaints.details.peopleAffected")}
             </Text>
           </Card>
         )}
@@ -718,7 +748,7 @@ export default function ComplaintDetails() {
                 className="text-sm ml-2"
                 style={{ color: colors.textSecondary }}
               >
-                Currently Assigned
+                {t("complaints.details.currentlyAssigned")}
               </Text>
             </View>
             <Text
@@ -727,7 +757,7 @@ export default function ComplaintDetails() {
             >
               {currentAssignedWorker?.fullName ||
                 complaint.assignedWorkerName ||
-                "Assigned Worker"}
+                t("complaints.details.assignedWorker")}
             </Text>
           </Card>
         )}
@@ -763,8 +793,8 @@ export default function ComplaintDetails() {
                     style={{ color: "#FFFFFF" }}
                   >
                     {complaint.assignedTo
-                      ? "Reassign Worker"
-                      : "Assign to Worker"}
+                      ? t("complaints.details.reassignWorker")
+                      : t("complaints.details.assignToWorker")}
                   </Text>
                 </View>
               </Card>
@@ -775,7 +805,10 @@ export default function ComplaintDetails() {
           complaint.status !== "resolved" &&
           complaint.status !== "cancelled" &&
           !complaint.assignedTo && (
-            <PressableBlock onPress={handleCancelComplaint} disabled={cancelling}>
+            <PressableBlock
+              onPress={handleCancelComplaint}
+              disabled={cancelling}
+            >
               <Card
                 style={{
                   margin: 0,
@@ -792,7 +825,7 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      Cancel Complaint
+                      {t("complaints.details.cancelComplaint")}
                     </Text>
                   )}
                 </View>
@@ -824,7 +857,7 @@ export default function ComplaintDetails() {
                         className="text-base font-semibold"
                         style={{ color: "#FFFFFF" }}
                       >
-                        ✓ Approve Completion
+                        {t("complaints.details.approveCompletion")}
                       </Text>
                     </>
                   )}
@@ -845,7 +878,7 @@ export default function ComplaintDetails() {
                     className="text-base font-semibold"
                     style={{ color: "#FFFFFF" }}
                   >
-                    ✗ Request Rework
+                    {t("complaints.details.requestRework")}
                   </Text>
                 </View>
               </PressableBlock>
@@ -870,7 +903,7 @@ export default function ComplaintDetails() {
                   className="text-base font-semibold text-center"
                   style={{ color: "#FFFFFF" }}
                 >
-                  Update Status
+                  {t("complaints.details.updateStatus")}
                 </Text>
               </Card>
             </PressableBlock>
@@ -888,8 +921,11 @@ export default function ComplaintDetails() {
                 Title
               </Text>
             </View>
-            <Text className="text-base font-semibold" style={{ color: colors.textPrimary }}>
-              {complaint.title || "Complaint"}
+            <Text
+              className="text-base font-semibold"
+              style={{ color: colors.textPrimary }}
+            >
+              {complaint.title || t("complaints.complaint")}
             </Text>
           </View>
 
@@ -903,13 +939,13 @@ export default function ComplaintDetails() {
               className="text-sm mb-1"
               style={{ color: colors.textSecondary }}
             >
-              Description
+              {t("complaints.details.complaintDescription")}
             </Text>
             <Text
               className="text-base leading-6"
               style={{ color: colors.textPrimary }}
             >
-              {complaint.description || "No description provided"}
+              {complaint.description || t("complaints.details.noDescription")}
             </Text>
           </View>
         </Card>
@@ -923,7 +959,7 @@ export default function ComplaintDetails() {
                 className="text-sm mb-1"
                 style={{ color: colors.textSecondary }}
               >
-                Department
+                {t("complaints.details.department")}
               </Text>
               <Text
                 className="text-base font-semibold capitalize"
@@ -946,13 +982,13 @@ export default function ComplaintDetails() {
                 className="text-sm mb-1"
                 style={{ color: colors.textSecondary }}
               >
-                Location
+                {t("complaints.details.location")}
               </Text>
               <Text
                 className="text-base font-semibold"
                 style={{ color: colors.textPrimary }}
               >
-                {complaint.locationName || "Not specified"}
+                {complaint.locationName || t("complaints.details.notSpecified")}
               </Text>
               {complaint.coordinates && (
                 <Text
@@ -979,11 +1015,10 @@ export default function ComplaintDetails() {
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Proof Image
                   {Array.isArray(complaint.proofImage) &&
                   complaint.proofImage.length > 1
-                    ? "s"
-                    : ""}
+                    ? t("complaints.details.proofImages")
+                    : t("complaints.details.proofImage")}
                 </Text>
               </View>
               {Array.isArray(complaint.proofImage) ? (
@@ -1017,7 +1052,7 @@ export default function ComplaintDetails() {
                         className="text-xs font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        Tap to view full size
+                        {t("complaints.details.tapToViewFullSize")}
                       </Text>
                     </View>
                   </View>
@@ -1036,7 +1071,7 @@ export default function ComplaintDetails() {
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Completion Photos (After)
+                  {t("complaints.details.completionPhotos")}
                 </Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1064,13 +1099,13 @@ export default function ComplaintDetails() {
               className="text-base font-semibold ml-2"
               style={{ color: colors.textPrimary }}
             >
-              Timeline
+              {t("complaints.details.timeline")}
             </Text>
           </View>
 
           <View className="mb-3">
             <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              Created
+              {t("complaints.details.created")}
             </Text>
             <Text
               className="text-base font-semibold mt-1"
@@ -1087,7 +1122,7 @@ export default function ComplaintDetails() {
 
           <View className="mb-3">
             <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              Last Updated
+              {t("complaints.details.lastUpdated")}
             </Text>
             <Text
               className="text-base font-semibold mt-1"
@@ -1111,23 +1146,22 @@ export default function ComplaintDetails() {
                     className="text-sm"
                     style={{ color: colors.textSecondary }}
                   >
-                    Estimated Completion
+                    {t("complaints.details.estimatedCompletion")}
                   </Text>
                   <Text
                     className="text-base font-semibold mt-1"
                     style={{ color: colors.warning || "#f59e0b" }}
                   >
                     {complaint.estimatedCompletionTime < 24
-                      ? `${complaint.estimatedCompletionTime} hours`
-                      : `${Math.round(complaint.estimatedCompletionTime / 24)} days`}
+                      ? `${complaint.estimatedCompletionTime} ${t("complaints.details.hours")}`
+                      : `${Math.round(complaint.estimatedCompletionTime / 24)} ${t("complaints.details.days")}`}
                   </Text>
                   {userRole === "head" && (
                     <Text
                       className="text-xs mt-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      Why ETA: base time by priority, adjusted by worker history,
-                      similar complaints, and current workload.
+                      {t("complaints.details.etaExplanation")}
                     </Text>
                   )}
                 </View>
@@ -1142,7 +1176,7 @@ export default function ComplaintDetails() {
               className="text-base font-semibold mb-3"
               style={{ color: colors.textPrimary }}
             >
-              Status History
+              {t("complaints.details.statusHistory")}
             </Text>
             {complaint.history.map((item, index) => (
               <View key={index}>
@@ -1190,7 +1224,7 @@ export default function ComplaintDetails() {
                 className="text-base font-semibold mb-3"
                 style={{ color: colors.textPrimary }}
               >
-                Citizen Feedback
+                {t("complaints.details.citizenFeedback")}
               </Text>
 
               <View className="flex-row items-center mb-2">
@@ -1215,7 +1249,7 @@ export default function ComplaintDetails() {
                       className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      Comment:
+                      {t("complaints.details.comment")}
                     </Text>
                   </View>
                   <Text
@@ -1240,13 +1274,13 @@ export default function ComplaintDetails() {
                   className="text-base font-semibold mb-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Rate this resolution
+                  {t("complaints.details.rateResolution")}
                 </Text>
                 <Text
                   className="text-sm text-center mb-4"
                   style={{ color: colors.textSecondary }}
                 >
-                  Help us improve by rating the service quality
+                  {t("complaints.details.helpUsImprove")}
                 </Text>
                 <PressableBlock onPress={() => setFeedbackModalVisible(true)}>
                   <View
@@ -1257,7 +1291,7 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      Submit Feedback
+                      {t("complaints.details.submitFeedback")}
                     </Text>
                   </View>
                 </PressableBlock>
@@ -1274,7 +1308,7 @@ export default function ComplaintDetails() {
                 className="text-base font-semibold ml-2"
                 style={{ color: colors.textPrimary }}
               >
-                Your Feedback
+                {t("complaints.details.yourFeedback")}
               </Text>
             </View>
             <View className="flex-row items-center mt-2">
@@ -1361,13 +1395,13 @@ export default function ComplaintDetails() {
                 className="text-xl font-bold mb-2 text-center"
                 style={{ color: colors.textPrimary }}
               >
-                Rate this Resolution
+                {t("complaints.details.rateThisResolution")}
               </Text>
               <Text
                 className="text-sm mb-6 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                How satisfied are you with the resolution?
+                {t("complaints.details.howSatisfied")}
               </Text>
 
               <View className="flex-row justify-center mb-6">
@@ -1392,12 +1426,12 @@ export default function ComplaintDetails() {
                 className="text-sm mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Additional Comments (Optional)
+                {t("complaints.details.additionalComments")}
               </Text>
               <TextInput
                 value={feedbackComment}
                 onChangeText={setFeedbackComment}
-                placeholder="Share your experience..."
+                placeholder={t("complaints.details.shareYourExperience")}
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={4}
@@ -1425,7 +1459,7 @@ export default function ComplaintDetails() {
                     className="text-base font-semibold"
                     style={{ color: colors.textPrimary }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Text>
                 </Pressable>
 
@@ -1447,7 +1481,7 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      Submit
+                      {t("common.submit")}
                     </Text>
                   )}
                 </Pressable>
@@ -1477,7 +1511,9 @@ export default function ComplaintDetails() {
                 className="text-xl font-bold mb-4 text-center"
                 style={{ color: colors.textPrimary }}
               >
-                {complaint?.assignedTo ? "Change Assignment" : "Assign to Worker"}
+                {complaint?.assignedTo
+                  ? t("complaints.details.changeAssignment")
+                  : t("complaints.details.assignToWorker")}
               </Text>
 
               {/* Worker Search */}
@@ -1494,7 +1530,7 @@ export default function ComplaintDetails() {
                   <TextInput
                     className="flex-1 ml-2 text-sm"
                     style={{ color: colors.textPrimary }}
-                    placeholder="Search workers..."
+                    placeholder={t("complaints.details.searchWorkers")}
                     placeholderTextColor={colors.textSecondary}
                     value={workerSearchQuery}
                     onChangeText={setWorkerSearchQuery}
@@ -1512,45 +1548,45 @@ export default function ComplaintDetails() {
                 showsVerticalScrollIndicator={false}
               >
                 {filteredWorkers.map((worker) => (
-                    <Pressable
-                      key={worker.workerId}
-                      onPress={() => setSelectedWorker(worker.workerId)}
-                      className="mb-2"
+                  <Pressable
+                    key={worker.workerId}
+                    onPress={() => setSelectedWorker(worker.workerId)}
+                    className="mb-2"
+                  >
+                    <Card
+                      style={{
+                        margin: 0,
+                        backgroundColor:
+                          selectedWorker === worker.workerId
+                            ? colors.primary + "20"
+                            : colors.backgroundSecondary,
+                        borderWidth: selectedWorker === worker.workerId ? 2 : 0,
+                        borderColor: colors.primary,
+                      }}
                     >
-                      <Card
-                        style={{
-                          margin: 0,
-                          backgroundColor:
-                            selectedWorker === worker.workerId
-                              ? colors.primary + "20"
-                              : colors.backgroundSecondary,
-                          borderWidth: selectedWorker === worker.workerId ? 2 : 0,
-                          borderColor: colors.primary,
-                        }}
-                      >
-                        <View className="flex-row items-center justify-between">
-                          <Text
-                            className="text-base font-semibold"
-                            style={{
-                              color:
-                                selectedWorker === worker.workerId
-                                  ? colors.primary
-                                  : colors.textPrimary,
-                            }}
-                          >
-                            {worker.fullName}
-                          </Text>
-                          {selectedWorker === worker.workerId && (
-                            <CheckCircle size={22} color={colors.primary} />
-                          )}
-                        </View>
-                      </Card>
-                    </Pressable>
-                  ))}
+                      <View className="flex-row items-center justify-between">
+                        <Text
+                          className="text-base font-semibold"
+                          style={{
+                            color:
+                              selectedWorker === worker.workerId
+                                ? colors.primary
+                                : colors.textPrimary,
+                          }}
+                        >
+                          {worker.fullName}
+                        </Text>
+                        {selectedWorker === worker.workerId && (
+                          <CheckCircle size={22} color={colors.primary} />
+                        )}
+                      </View>
+                    </Card>
+                  </Pressable>
+                ))}
                 {filteredWorkers.length === 0 && (
                   <Card style={{ margin: 0, flex: 0 }}>
                     <Text style={{ color: colors.textSecondary }}>
-                      No workers found.
+                      {t("complaints.details.noWorkersFound")}
                     </Text>
                   </Card>
                 )}
@@ -1570,7 +1606,7 @@ export default function ComplaintDetails() {
                     className="text-base font-semibold"
                     style={{ color: colors.textPrimary }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Text>
                 </Pressable>
 
@@ -1590,7 +1626,9 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      {complaint?.assignedTo ? "Change Assignment" : "Assign"}
+                      {complaint?.assignedTo
+                        ? t("complaints.details.changeAssignment")
+                        : t("complaints.details.assign")}
                     </Text>
                   )}
                 </Pressable>
@@ -1620,7 +1658,7 @@ export default function ComplaintDetails() {
                 className="text-xl font-bold mb-4 text-center"
                 style={{ color: colors.textPrimary }}
               >
-                Update Complaint Status
+                {t("complaints.details.updateComplaintStatus")}
               </Text>
 
               <View className="mb-4">
@@ -1661,12 +1699,12 @@ export default function ComplaintDetails() {
                 className="text-sm mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Notes (Optional)
+                {t("complaints.details.notesOptional")}
               </Text>
               <TextInput
                 value={workerNotes}
                 onChangeText={setWorkerNotes}
-                placeholder="Add notes about the work..."
+                placeholder={t("complaints.details.addWorkNotes")}
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={3}
@@ -1693,7 +1731,7 @@ export default function ComplaintDetails() {
                     className="text-base font-semibold"
                     style={{ color: colors.textPrimary }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Text>
                 </Pressable>
 
@@ -1713,7 +1751,7 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      Update
+                      {t("common.update")}
                     </Text>
                   )}
                 </Pressable>
@@ -1743,19 +1781,19 @@ export default function ComplaintDetails() {
                 className="text-xl font-bold mb-4 text-center"
                 style={{ color: colors.textPrimary }}
               >
-                Request Rework
+                {t("complaints.details.requestReworkTitle")}
               </Text>
 
               <Text
                 className="text-sm mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Reason for rework *
+                {t("complaints.details.reworkReasonRequired")}
               </Text>
               <TextInput
                 value={reworkReason}
                 onChangeText={setReworkReason}
-                placeholder="Explain what needs to be fixed..."
+                placeholder={t("complaints.details.explainWhatNeedsFixing")}
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={4}
@@ -1782,7 +1820,7 @@ export default function ComplaintDetails() {
                     className="text-base font-semibold"
                     style={{ color: colors.textPrimary }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Text>
                 </Pressable>
 
@@ -1802,7 +1840,7 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      Send for Rework
+                      {t("complaints.details.sendForRework")}
                     </Text>
                   )}
                 </Pressable>

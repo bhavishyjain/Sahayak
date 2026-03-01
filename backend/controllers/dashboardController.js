@@ -38,13 +38,44 @@ exports.summary = asyncHandler(async (req, res) => {
   });
 });
 
-exports.heatmap = asyncHandler(async (_req, res) => {
-  const windowStart = new Date();
-  windowStart.setDate(windowStart.getDate() - 60);
+exports.heatmap = asyncHandler(async (req, res) => {
+  // Parse filters from query params
+  const { department, priority, timeframe } = req.query;
 
-  const complaints = await Complaint.find({
+  // Calculate time window based on timeframe filter
+  const windowStart = new Date();
+  switch (timeframe) {
+    case "7days":
+      windowStart.setDate(windowStart.getDate() - 7);
+      break;
+    case "3months":
+      windowStart.setMonth(windowStart.getMonth() - 3);
+      break;
+    case "6months":
+      windowStart.setMonth(windowStart.getMonth() - 6);
+      break;
+    case "30days":
+    default:
+      windowStart.setDate(windowStart.getDate() - 30);
+      break;
+  }
+
+  // Build query filters
+  const query = {
     createdAt: { $gte: windowStart },
-  }).select("locationName coordinates status priority department createdAt");
+  };
+
+  if (department && department !== "all") {
+    query.department = department;
+  }
+
+  if (priority && priority !== "all") {
+    query.priority = priority;
+  }
+
+  const complaints = await Complaint.find(query).select(
+    "locationName coordinates status priority department createdAt",
+  );
 
   const spotsByKey = new Map();
 
@@ -133,12 +164,12 @@ exports.heatmap = asyncHandler(async (_req, res) => {
         lastReportedAt: spot.lastReportedAt,
       };
     })
-    .sort((a, b) => b.intensity - a.intensity)
-    .slice(0, 50);
+    .sort((a, b) => b.intensity - a.intensity);
+  // Removed .slice(0, 50) to show all spots
 
   return sendSuccess(res, {
     updatedAt: new Date().toISOString(),
-    windowDays: 60,
+    windowDays: timeframe || "30days",
     totalSpots: spots.length,
     spots,
   });

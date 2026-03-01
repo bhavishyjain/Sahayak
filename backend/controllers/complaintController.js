@@ -15,6 +15,7 @@ const {
   uploadComplaintImages,
   applyUpvotePolicy,
 } = require("../services/complaintService");
+const { sendComplaintRegistered } = require("../services/emailService");
 
 exports.createComplaint = asyncHandler(async (req, res) => {
   validateCreateComplaint(req.body);
@@ -31,7 +32,9 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     department,
     locationName,
     coordinates,
-    priority: ["Low", "Medium", "High"].includes(priority) ? priority : "Medium",
+    priority: ["Low", "Medium", "High"].includes(priority)
+      ? priority
+      : "Medium",
     proofImage: proofImages,
     status: "pending",
     history: [
@@ -48,6 +51,25 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     body: `Ticket ${complaint.ticketId} has been created.`,
     data: { type: "complaint_created", complaintId: String(complaint._id) },
   });
+
+  // Send email confirmation
+  try {
+    await sendComplaintRegistered(
+      req.user.email,
+      req.user.fullName || req.user.username,
+      {
+        _id: complaint._id,
+        ticketId: complaint.ticketId,
+        title: complaint.refinedText || title,
+        department,
+        priority: complaint.priority,
+        locationName,
+      },
+    );
+  } catch (emailError) {
+    console.error("Failed to send registration email:", emailError);
+    // Continue anyway - don't block complaint creation
+  }
 
   return sendSuccess(
     res,
@@ -119,10 +141,14 @@ exports.upvoteComplaint = asyncHandler(async (req, res) => {
   applyUpvotePolicy(complaint, userId, hasUpvoted);
   await complaint.save();
 
-  return sendSuccess(res, {
-    upvoteCount: complaint.upvoteCount,
-    hasUpvoted: !hasUpvoted,
-  }, hasUpvoted ? "Upvote removed" : "Upvoted successfully");
+  return sendSuccess(
+    res,
+    {
+      upvoteCount: complaint.upvoteCount,
+      hasUpvoted: !hasUpvoted,
+    },
+    hasUpvoted ? "Upvote removed" : "Upvoted successfully",
+  );
 });
 
 exports.submitFeedback = asyncHandler(async (req, res) => {

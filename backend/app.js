@@ -15,6 +15,22 @@ require("./utils/eventPriorityUpdater");
 const { setupSLAEscalationJob } = require("./utils/slaEscalation");
 setupSLAEscalationJob();
 
+// Self-ping cron job to keep Render service alive
+const cron = require("node-cron");
+const axios = require("axios");
+
+if (process.env.SELF_PING_URL) {
+  cron.schedule("*/14 * * * *", async () => {
+    try {
+      await axios.get(process.env.SELF_PING_URL);
+      console.log("✅ Self ping successful");
+    } catch (err) {
+      console.log("❌ Self ping failed:", err.message);
+    }
+  });
+  console.log("🔄 Self-ping cron job started (every 14 minutes)");
+}
+
 const defaultOrigins = [
   "http://localhost:5173",
   "http://localhost:5000",

@@ -28,8 +28,10 @@ import Card from "../../../components/Card";
 import { WORKER_LEADERBOARD_URL } from "../../../url";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
 export default function WorkerLeaderboard() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -46,19 +48,22 @@ export default function WorkerLeaderboard() {
   const [selectedBadge, setSelectedBadge] = useState(null);
 
   const periodOptions = [
-    { value: "weekly", label: "This Week" },
-    { value: "monthly", label: "This Month" },
-    { value: "yearly", label: "This Year" },
+    { value: "weekly", label: t("worker.leaderboard.periods.weekly") },
+    { value: "monthly", label: t("worker.leaderboard.periods.monthly") },
+    { value: "yearly", label: t("worker.leaderboard.periods.yearly") },
   ];
 
   const departmentOptions = [
-    { value: "all", label: "All Departments" },
-    { value: "Road", label: "Road" },
-    { value: "Water", label: "Water" },
-    { value: "Electricity", label: "Electricity" },
-    { value: "Waste", label: "Waste" },
-    { value: "Drainage", label: "Drainage" },
-    { value: "Other", label: "Other" },
+    { value: "all", label: t("worker.leaderboard.departments.all") },
+    { value: "Road", label: t("worker.leaderboard.departments.road") },
+    { value: "Water", label: t("worker.leaderboard.departments.water") },
+    {
+      value: "Electricity",
+      label: t("worker.leaderboard.departments.electricity"),
+    },
+    { value: "Waste", label: t("worker.leaderboard.departments.waste") },
+    { value: "Drainage", label: t("worker.leaderboard.departments.drainage") },
+    { value: "Other", label: t("worker.leaderboard.departments.other") },
   ];
 
   const load = async (isRefresh = false) => {
@@ -79,8 +84,9 @@ export default function WorkerLeaderboard() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not load leaderboard",
+        text1: t("worker.leaderboard.failed"),
+        text2:
+          e?.response?.data?.message || t("worker.leaderboard.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -166,7 +172,7 @@ export default function WorkerLeaderboard() {
                       className="text-xs font-bold"
                       style={{ color: colors.primary }}
                     >
-                      You
+                      {t("worker.leaderboard.you")}
                     </Text>
                   </View>
                 )}
@@ -189,7 +195,7 @@ export default function WorkerLeaderboard() {
               {worker.periodCompleted}
             </Text>
             <Text className="text-xs" style={{ color: colors.textSecondary }}>
-              completed
+              {t("worker.leaderboard.completed")}
             </Text>
           </View>
         </View>
@@ -263,7 +269,10 @@ export default function WorkerLeaderboard() {
         className="flex-1"
         style={{ backgroundColor: colors.backgroundPrimary }}
       >
-        <BackButtonHeader title="Leaderboard" hasBackButton={false} />
+        <BackButtonHeader
+          title={t("worker.leaderboard.title")}
+          hasBackButton={false}
+        />
 
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={colors.primary} />
@@ -271,7 +280,7 @@ export default function WorkerLeaderboard() {
             className="text-sm mt-3"
             style={{ color: colors.textSecondary }}
           >
-            Loading leaderboard...
+            {t("worker.leaderboard.loading")}
           </Text>
         </View>
       </View>
@@ -283,7 +292,10 @@ export default function WorkerLeaderboard() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Leaderboard" hasBackButton={false} />
+      <BackButtonHeader
+        title={t("worker.leaderboard.title")}
+        hasBackButton={false}
+      />
 
       {/* Current User Highlight */}
       {currentUser && (
@@ -300,16 +312,17 @@ export default function WorkerLeaderboard() {
               className="text-sm font-bold mb-2"
               style={{ color: colors.primary }}
             >
-              Your Rank: #{currentUser.rank}
+              {t("worker.leaderboard.yourRank")}: #{currentUser.rank}
             </Text>
             <View className="flex-row items-center justify-between">
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                {currentUser.periodCompleted} completed this{" "}
+                {currentUser.periodCompleted}{" "}
+                {t("worker.leaderboard.completedThis")}{" "}
                 {period === "weekly"
-                  ? "week"
+                  ? t("worker.leaderboard.week")
                   : period === "monthly"
-                    ? "month"
-                    : "year"}
+                    ? t("worker.leaderboard.month")
+                    : t("worker.leaderboard.year")}
               </Text>
               {currentUser.currentStreak > 0 && (
                 <View className="flex-row items-center">
@@ -318,7 +331,8 @@ export default function WorkerLeaderboard() {
                     className="text-sm font-bold ml-1"
                     style={{ color: "#EF4444" }}
                   >
-                    {currentUser.currentStreak} day streak!
+                    {currentUser.currentStreak}{" "}
+                    {t("worker.leaderboard.dayStreak")}!
                   </Text>
                 </View>
               )}
@@ -502,7 +516,7 @@ export default function WorkerLeaderboard() {
                   className="text-lg font-bold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Top Performers
+                  {t("worker.leaderboard.topPerformers")}
                 </Text>
               </View>
               <TouchableOpacity
@@ -528,13 +542,13 @@ export default function WorkerLeaderboard() {
                 className="text-base font-semibold mt-3"
                 style={{ color: colors.textSecondary }}
               >
-                No data available
+                {t("worker.leaderboard.noData")}
               </Text>
               <Text
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                Complete some tasks to appear on the leaderboard!
+                {t("worker.leaderboard.noDataDesc")}
               </Text>
             </View>
           </Card>
@@ -564,7 +578,7 @@ export default function WorkerLeaderboard() {
                 className="text-xl font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                📊 How Metrics Work
+                {t("worker.leaderboard.metricsInfo.title")}
               </Text>
               <TouchableOpacity onPress={() => setShowInfoModal(false)}>
                 <X size={24} color={colors.textSecondary} />
@@ -580,16 +594,14 @@ export default function WorkerLeaderboard() {
                     className="text-base font-bold ml-2"
                     style={{ color: colors.textPrimary }}
                   >
-                    Rating
+                    {t("worker.leaderboard.rating")}
                   </Text>
                 </View>
                 <Text
                   className="text-sm leading-5"
                   style={{ color: colors.textSecondary }}
                 >
-                  Average of all citizen feedback ratings (1-5 stars) on your
-                  resolved complaints. Updated when citizens submit feedback
-                  after resolution.
+                  {t("worker.leaderboard.metricsInfo.rating.desc")}
                 </Text>
               </View>
 
@@ -601,16 +613,14 @@ export default function WorkerLeaderboard() {
                     className="text-base font-bold ml-2"
                     style={{ color: colors.textPrimary }}
                   >
-                    Average Time
+                    {t("worker.leaderboard.avgTime")}
                   </Text>
                 </View>
                 <Text
                   className="text-sm leading-5"
                   style={{ color: colors.textSecondary }}
                 >
-                  Running average of hours taken from assignment to resolution.
-                  Calculated as: (previous avg × completions + new time) ÷
-                  (completions + 1). Updated on every HOD approval.
+                  {t("worker.leaderboard.metricsInfo.avgTime.desc")}
                 </Text>
               </View>
 
@@ -622,16 +632,14 @@ export default function WorkerLeaderboard() {
                     className="text-base font-bold ml-2"
                     style={{ color: colors.textPrimary }}
                   >
-                    Streak
+                    {t("worker.leaderboard.streak")}
                   </Text>
                 </View>
                 <Text
                   className="text-sm leading-5"
                   style={{ color: colors.textSecondary }}
                 >
-                  Consecutive days with at least 1 completion. Counts backwards
-                  from today with a 1-day grace period. Resets if you miss 2+
-                  days. Maintain 7+ days to earn the Consistent Performer badge!
+                  {t("worker.leaderboard.metricsInfo.streak.desc")}
                 </Text>
               </View>
 
@@ -643,16 +651,14 @@ export default function WorkerLeaderboard() {
                     className="text-base font-bold ml-2"
                     style={{ color: colors.textPrimary }}
                   >
-                    Total Completed
+                    {t("worker.leaderboard.metricsInfo.totalCompleted.title")}
                   </Text>
                 </View>
                 <Text
                   className="text-sm leading-5"
                   style={{ color: colors.textSecondary }}
                 >
-                  Lifetime count of all resolved complaints. This never
-                  decreases - it&apos;s your career achievement counter. Incremented
-                  on every HOD approval.
+                  {t("worker.leaderboard.metricsInfo.totalCompleted.desc")}
                 </Text>
               </View>
 
@@ -664,8 +670,7 @@ export default function WorkerLeaderboard() {
                   className="text-xs font-semibold"
                   style={{ color: colors.primary }}
                 >
-                  💡 Tip: All metrics are calculated in real-time when the
-                  leaderboard loads!
+                  {t("worker.leaderboard.metricsInfo.tip")}
                 </Text>
               </View>
             </ScrollView>
@@ -706,7 +711,7 @@ export default function WorkerLeaderboard() {
                     className="text-xs mt-1"
                     style={{ color: colors.textSecondary }}
                   >
-                    Achievement Badge
+                    {t("worker.leaderboard.achievementBadge")}
                   </Text>
                 </View>
               </View>
@@ -744,7 +749,7 @@ export default function WorkerLeaderboard() {
                 className="text-center text-base font-bold"
                 style={{ color: "#fff" }}
               >
-                Got it!
+                {t("worker.leaderboard.gotIt")}
               </Text>
             </TouchableOpacity>
           </View>

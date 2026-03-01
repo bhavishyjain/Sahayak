@@ -1,7 +1,15 @@
 import * as Clarity from "@microsoft/react-native-clarity";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { Globe, LogOut, Moon, Pencil, Sun, Trash2, CheckCircle } from "lucide-react-native";
+import {
+  Globe,
+  LogOut,
+  Moon,
+  Pencil,
+  Sun,
+  Trash2,
+  CheckCircle,
+} from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../../../colors";
@@ -80,7 +88,7 @@ const ProfileHeader = React.memo(({ user, colors, t, loading }) => {
           <PressableBlock
             className="absolute bottom-0 right-0 p-2 rounded-full"
             style={{ backgroundColor: colors.backgroundSecondary }}
-            onPress={() => router.push("/(app)/settings/update-profile")}
+            onPress={() => router.push("/(app)/more/update-profile")}
           >
             <Pencil size={18} color={colors.textPrimary} />
           </PressableBlock>
@@ -101,7 +109,7 @@ const ProfileHeader = React.memo(({ user, colors, t, loading }) => {
 });
 ProfileHeader.displayName = "ProfileHeader";
 
-export default function Setting() {
+export default function More() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const [user, setUser] = useState(null);
@@ -143,9 +151,9 @@ export default function Setting() {
       ? [
           {
             icon: CheckCircle,
-            title: "Resolved Complaints",
-            subtitle: "View resolved complaints",
-            route: "/(app)/settings/hod-resolved",
+            title: "more.menu.resolvedComplaints.title",
+            subtitle: "more.menu.resolvedComplaints.description",
+            route: "/(app)/more/hod-resolved",
           },
         ]
       : []),
@@ -154,32 +162,32 @@ export default function Setting() {
       ? [
           {
             icon: CheckCircle,
-            title: "Completed",
-            subtitle: "View your completed complaints",
-            route: "/(app)/settings/worker-completed",
+            title: "more.menu.completedWork.title",
+            subtitle: "more.menu.completedWork.description",
+            route: "/(app)/more/worker-completed",
           },
         ]
       : []),
     {
       icon: colorScheme === "dark" ? Moon : Sun,
-      title: "more.settings.menu.theme.title",
+      title: "more.menu.theme.title",
       subtitle: () =>
         colorScheme === "dark"
-          ? t("more.settings.menu.theme.subtitle.dark")
-          : t("more.settings.menu.theme.subtitle.light"),
-      route: "/(app)/settings/theme",
+          ? t("more.menu.theme.subtitle.dark")
+          : t("more.menu.theme.subtitle.light"),
+      route: "/(app)/more/theme",
     },
     {
       icon: Globe,
-      title: "more.settings.menu.language.title",
-      subtitle: "more.settings.menu.language.subtitle",
+      title: "more.menu.language.title",
+      subtitle: "more.menu.language.subtitle",
       onPress: () => languagePickerRef.current?.openModal(),
     },
     {
       icon: Trash2,
       iconColor: "red",
-      title: "more.settings.menu.deleteAccount.title",
-      subtitle: "more.settings.menu.deleteAccount.subtitle",
+      title: "more.menu.deleteAccount.title",
+      subtitle: "more.menu.deleteAccount.subtitle",
       onPress: () => setShowDeleteAccountDialog(true),
     },
     {
@@ -202,7 +210,7 @@ export default function Setting() {
   return (
     <>
       <MenuScreenLayout
-        titleKey="more.settings.title"
+        titleKey="more.title"
         analyticsName="SettingsIndex"
         items={SETTINGS_ITEMS}
         headerComponent={ProfileHeaderComponent}
@@ -213,8 +221,8 @@ export default function Setting() {
 
       <DialogBox
         visible={showClarityDialog}
-        title={t("more.settings.menu.tracking.modalTitle")}
-        message={t("more.settings.menu.tracking.modalMessage")}
+        title={t("more.menu.tracking.modalTitle")}
+        message={t("more.menu.tracking.modalMessage")}
         confirmText="Allow"
         cancelText="Don't Allow"
         onConfirm={() => toggleConsent(true)}
@@ -223,8 +231,8 @@ export default function Setting() {
 
       <DialogBox
         visible={showDeleteAccountDialog}
-        title={t("more.settings.menu.deleteAccount.modalTitle")}
-        message={t("more.settings.menu.deleteAccount.modalMessage")}
+        title={t("more.menu.deleteAccount.modalTitle")}
+        message={t("more.menu.deleteAccount.modalMessage")}
         confirmText="OK"
         cancelText="Cancel"
         onConfirm={() => setShowDeleteAccountDialog(false)}

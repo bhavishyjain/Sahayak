@@ -74,6 +74,9 @@ export const HOD_NEEDS_REWORK_URL = (id) =>
 export const HOD_CANCEL_COMPLAINT_URL = (id) =>
   API_BASE + `/hod/cancel-complaint/${id}`;
 export const HOD_BULK_ASSIGN_URL = API_BASE + "/hod/bulk-assign";
+export const HOD_INVITE_WORKER_URL = API_BASE + "/hod/invite-worker";
+export const HOD_REMOVE_WORKER_URL = (workerId) =>
+  API_BASE + `/hod/workers/${workerId}`;
 
 // ============================================================================
 // HEALTH CHECK

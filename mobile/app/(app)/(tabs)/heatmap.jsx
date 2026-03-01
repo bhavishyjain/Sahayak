@@ -20,8 +20,6 @@ import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
 export default function HeatMap() {
-  console.log("🗺️ HeatMap component rendered");
-
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -38,12 +36,9 @@ export default function HeatMap() {
   // Function to fetch user's current location
   const fetchUserLocation = useCallback(async () => {
     try {
-      console.log("📍 Fetching location...");
       const { status } = await Location.requestForegroundPermissionsAsync();
-      console.log("Permission status:", status);
 
       if (status !== "granted") {
-        console.log("Location permission denied");
         return;
       }
 
@@ -53,7 +48,6 @@ export default function HeatMap() {
 
       while (retries > 0 && !location) {
         try {
-          console.log(`Attempting to get location (${4 - retries}/3)...`);
           location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
             timeout: 15000,
@@ -61,7 +55,6 @@ export default function HeatMap() {
           });
 
           if (location) {
-            console.log("✅ Location fetched successfully:", location.coords);
             setUserLocation({
               lat: location.coords.latitude,
               lng: location.coords.longitude,
@@ -70,41 +63,33 @@ export default function HeatMap() {
           }
         } catch (err) {
           retries--;
-          console.log(
-            `Location attempt failed: ${err.message}, retries left: ${retries}`,
-          );
 
           if (retries > 0) {
             // Wait 1 second before retrying
             await new Promise((resolve) => setTimeout(resolve, 1000));
           } else {
             // Try last known position as fallback
-            console.log("Trying last known position...");
             const lastKnown = await Location.getLastKnownPositionAsync({
               maxAge: 300000, // 5 minutes
             });
 
             if (lastKnown) {
-              console.log("✅ Using last known position");
               setUserLocation({
                 lat: lastKnown.coords.latitude,
                 lng: lastKnown.coords.longitude,
               });
-            } else {
-              console.log("⚠️ No location available, using default");
             }
           }
         }
       }
     } catch (error) {
-      console.log("❌ Error in fetchUserLocation:", error.message);
+      // Silent error handling
     }
   }, []);
 
   // Fetch location whenever the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log("🌍 HeatMap screen focused, fetching location...");
       fetchUserLocation();
     }, [fetchUserLocation]),
   );
@@ -156,26 +141,31 @@ export default function HeatMap() {
   } = useQuery({
     queryKey: ["heatmap", filters],
     queryFn: async () => {
-      console.log("🔄 Fetching heatmap data...");
+      const params = new URLSearchParams();
+      if (filters.department !== "all") {
+        params.append("department", filters.department);
+      }
+      if (filters.priority !== "all") {
+        params.append("priority", filters.priority);
+      }
+      if (filters.timeframe) {
+        params.append("timeframe", filters.timeframe);
+      }
+
+      const url = params.toString()
+        ? `${GET_HEATMAP_URL}?${params.toString()}`
+        : GET_HEATMAP_URL;
+
       const response = await apiCall({
         method: "GET",
-        url: GET_HEATMAP_URL,
+        url: url,
       });
-      console.log("✅ Heatmap data received:", response.data);
       return response.data;
     },
     retry: 1,
   });
 
   const spots = heatmapData?.spots || [];
-
-  console.log("📊 Heatmap State:", {
-    isLoading,
-    spotsCount: spots.length,
-    hasData: !!heatmapData,
-    userLocation,
-    firstSpot: spots[0],
-  });
 
   const stats = {
     total: spots.reduce((sum, s) => sum + s.totalComplaints, 0),
@@ -538,11 +528,10 @@ export default function HeatMap() {
       try {
         const message = JSON.parse(event.nativeEvent.data);
         if (message.action === "requestLocation") {
-          console.log("🔄 Location requested from WebView");
           await fetchUserLocation();
         }
       } catch (error) {
-        console.log("Error handling webview message:", error);
+        // Silent error handling
       }
     },
     [fetchUserLocation],
@@ -569,22 +558,6 @@ export default function HeatMap() {
           />
         }
       >
-        {/* Debug Info */}
-        <View className="px-4 pt-4">
-          <View
-            className="p-3 rounded-lg mb-2"
-            style={{ backgroundColor: colors.cardBackground }}
-          >
-            <Text style={{ color: colors.textPrimary, fontSize: 12 }}>
-              🐛 Debug: Loading={isLoading ? "Yes" : "No"} | Spots=
-              {spots.length} | Location=
-              {userLocation
-                ? `${userLocation.lat.toFixed(2)}, ${userLocation.lng.toFixed(2)}`
-                : "None"}
-            </Text>
-          </View>
-        </View>
-
         {/* Filters */}
         <View className="px-4 mb-4">
           <View

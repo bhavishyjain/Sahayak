@@ -24,12 +24,14 @@ import Card from "../../../components/Card";
 import MetricCard from "../../../components/MetricCard";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import getUserAuth from "../../../utils/userAuth";
 import { WORKER_DASHBOARD_URL } from "../../../url";
 import { getPriorityColor } from "../../../utils/colorHelpers";
 
 export default function WorkerDashboard() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -41,10 +43,10 @@ export default function WorkerDashboard() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    if (hour < 21) return "Good Evening";
-    return "Good Night";
+    if (hour < 12) return t("greetings.morning");
+    if (hour < 17) return t("greetings.afternoon");
+    if (hour < 21) return t("greetings.evening");
+    return t("greetings.night");
   };
 
   const load = async (isRefresh = false) => {
@@ -78,8 +80,8 @@ export default function WorkerDashboard() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not load dashboard",
+        text1: t("worker.dashboard.failed"),
+        text2: e?.response?.data?.message || t("worker.dashboard.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -104,7 +106,7 @@ export default function WorkerDashboard() {
       >
         <ActivityIndicator size="large" color={colors.primary} />
         <Text className="text-sm mt-3" style={{ color: colors.textSecondary }}>
-          Loading dashboard...
+          {t("worker.dashboard.loading")}
         </Text>
       </View>
     );
@@ -147,7 +149,7 @@ export default function WorkerDashboard() {
                 className="text-xs font-semibold"
                 style={{ color: colors.primary }}
               >
-                {user?.department || ""} Department
+                {user?.department || ""} {t("worker.dashboard.department")}
               </Text>
             </View>
           </View>
@@ -163,9 +165,9 @@ export default function WorkerDashboard() {
                 Icon={Clock}
                 iconColor={colors.warning || "#F59E0B"}
                 iconBgColor={(colors.warning || "#F59E0B") + "20"}
-                title="Active Tasks"
+                title={t("worker.dashboard.stats.active")}
                 value={dashboardData.activeCount || 0}
-                subtitle="Assigned to you"
+                subtitle={t("worker.dashboard.stats.assigned")}
                 valueColor={colors.warning || "#F59E0B"}
                 style={{ marginRight: 6 }}
               />
@@ -175,9 +177,9 @@ export default function WorkerDashboard() {
                 Icon={CheckCircle}
                 iconColor={colors.success || "#10B981"}
                 iconBgColor={(colors.success || "#10B981") + "20"}
-                title="Completed"
+                title={t("worker.dashboard.stats.completed")}
                 value={dashboardData.completedCount || 0}
-                subtitle="Total resolved"
+                subtitle={t("worker.dashboard.stats.total")}
                 valueColor={colors.success || "#10B981"}
                 style={{ marginLeft: 6 }}
               />
@@ -204,13 +206,13 @@ export default function WorkerDashboard() {
                         className="text-xs font-semibold"
                         style={{ color: colors.textSecondary }}
                       >
-                        Awaiting Approval
+                        {t("worker.dashboard.awaitingApproval")}
                       </Text>
                       <Text
                         className="text-sm mt-1"
                         style={{ color: colors.textSecondary }}
                       >
-                        HOD review pending
+                        {t("worker.dashboard.hodReview")}
                       </Text>
                     </View>
                   </View>
@@ -237,7 +239,7 @@ export default function WorkerDashboard() {
                   className="text-base font-bold ml-3"
                   style={{ color: colors.textPrimary }}
                 >
-                  Performance Overview
+                  {t("worker.dashboard.performanceOverview")}
                 </Text>
               </View>
 
@@ -255,7 +257,7 @@ export default function WorkerDashboard() {
                       className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      Average Rating
+                      {t("worker.dashboard.averageRating")}
                     </Text>
                   </View>
                   <Text
@@ -294,7 +296,7 @@ export default function WorkerDashboard() {
                       className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      This Week
+                      {t("worker.dashboard.thisWeek")}
                     </Text>
                   </View>
                   <Text
@@ -307,7 +309,7 @@ export default function WorkerDashboard() {
                       style={{ color: colors.textSecondary }}
                     >
                       {" "}
-                      completed
+                      {t("worker.dashboard.completed")}
                     </Text>
                   </Text>
                 </View>
@@ -322,7 +324,7 @@ export default function WorkerDashboard() {
                       className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      Completion Rate
+                      {t("worker.dashboard.completionRate")}
                     </Text>
                   </View>
                   <Text
@@ -386,20 +388,22 @@ export default function WorkerDashboard() {
                       style={{ color: colors.primary }}
                     >
                       {dashboardData.completedCount >= 100
-                        ? "Century Club! 🎉"
+                        ? t("worker.dashboard.achievement.centuryClub")
                         : dashboardData.completedCount >= 50
-                          ? "Community Hero! 🌟"
-                          : "Keep Going! 💪"}
+                          ? t("worker.dashboard.achievement.communityHero")
+                          : t("worker.dashboard.achievement.keepGoing")}
                     </Text>
                     <Text
                       className="text-xs mt-1"
                       style={{ color: colors.textSecondary }}
                     >
                       {dashboardData.completedCount >= 100
-                        ? "You've completed 100+ tasks!"
+                        ? t("worker.dashboard.achievement.centuryDesc")
                         : dashboardData.completedCount >= 50
-                          ? "50+ tasks completed - Amazing work!"
-                          : `${50 - dashboardData.completedCount} more to Community Hero`}
+                          ? t("worker.dashboard.achievement.heroDesc")
+                          : t("worker.dashboard.achievement.moreToHero", {
+                              count: 50 - dashboardData.completedCount,
+                            })}
                     </Text>
                   </View>
                 </View>
@@ -412,7 +416,7 @@ export default function WorkerDashboard() {
                 className="text-lg font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Active Assignments
+                {t("worker.dashboard.activeAssignments")}
               </Text>
               {dashboardData.activeComplaints &&
                 dashboardData.activeComplaints.length > 3 && (
@@ -423,7 +427,7 @@ export default function WorkerDashboard() {
                       className="text-sm font-semibold"
                       style={{ color: colors.primary }}
                     >
-                      View All
+                      {t("worker.dashboard.viewAll")}
                     </Text>
                   </PressableBlock>
                 )}
@@ -501,13 +505,13 @@ export default function WorkerDashboard() {
                     className="text-base font-semibold mt-3"
                     style={{ color: colors.textSecondary }}
                   >
-                    No active assignments
+                    {t("worker.dashboard.noActiveAssignments")}
                   </Text>
                   <Text
                     className="text-sm mt-1 text-center"
                     style={{ color: colors.textSecondary }}
                   >
-                    You&apos;re all caught up! New assignments will appear here.
+                    {t("worker.dashboard.allCaughtUp")}
                   </Text>
                 </View>
               </Card>

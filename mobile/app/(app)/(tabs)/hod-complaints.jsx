@@ -40,8 +40,10 @@ import {
 import apiCall from "../../../utils/api";
 import { getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
 export default function HodComplaints() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -76,11 +78,11 @@ export default function HodComplaints() {
   };
 
   const statusChips = [
-    { key: "all", label: "All" },
-    { key: "unassigned", label: "Unassigned" },
-    { key: "assigned", label: "Assigned" },
-    { key: "pending", label: "Pending" },
-    { key: "in-progress", label: "In Progress" },
+    { key: "all", label: t("common.all") },
+    { key: "unassigned", label: t("hod.complaints.unassigned") },
+    { key: "assigned", label: t("status.assigned") },
+    { key: "pending", label: t("status.pending") },
+    { key: "in-progress", label: t("hod.complaints.inProgress") },
   ];
 
   const baseFilteredComplaints = complaints.filter((complaint) => {
@@ -176,8 +178,9 @@ export default function HodComplaints() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not load complaints.",
+        text1: t("toast.error.failed"),
+        text2:
+          e?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
       });
     } finally {
       setLoading(false);
@@ -197,8 +200,8 @@ export default function HodComplaints() {
       console.error("Error loading workers:", e);
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: "Could not load workers",
+        text1: t("toast.error.failed"),
+        text2: t("hod.complaints.couldNotLoadWorkers"),
       });
     }
   };
@@ -238,8 +241,8 @@ export default function HodComplaints() {
     if (!selectedWorker) {
       Toast.show({
         type: "error",
-        text1: "Error",
-        text2: "Please select a worker",
+        text1: t("toast.error.title"),
+        text2: t("hod.complaints.selectWorker"),
       });
       return;
     }
@@ -257,8 +260,10 @@ export default function HodComplaints() {
 
       Toast.show({
         type: "success",
-        text1: "Success",
-        text2: `${selectedComplaints.length} complaints assigned successfully`,
+        text1: t("toast.success.title"),
+        text2: t("hod.complaints.assignedSuccessfully", {
+          count: selectedComplaints.length,
+        }),
       });
 
       setBulkAssignModalVisible(false);
@@ -269,8 +274,8 @@ export default function HodComplaints() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not assign complaints",
+        text1: t("toast.error.failed"),
+        text2: e?.response?.data?.message || t("hod.complaints.couldNotAssign"),
       });
     } finally {
       setBulkAssigning(false);
@@ -284,7 +289,7 @@ export default function HodComplaints() {
     const diffMs = eta - now;
     const diffHours = Math.round(diffMs / (1000 * 60 * 60));
 
-    if (diffHours < 0) return "Overdue";
+    if (diffHours < 0) return t("complaints.overdue");
     if (diffHours < 24) return `${diffHours}h`;
     const diffDays = Math.round(diffHours / 24);
     return `${diffDays}d`;
@@ -465,7 +470,10 @@ export default function HodComplaints() {
         className="flex-1"
         style={{ backgroundColor: colors.backgroundPrimary }}
       >
-        <BackButtonHeader title="Manage Complaints" hasBackButton={false} />
+        <BackButtonHeader
+          title={t("hod.complaints.title")}
+          hasBackButton={false}
+        />
 
         {/* Search Bar */}
         <View className="px-4 pb-4 pt-4">
@@ -486,7 +494,7 @@ export default function HodComplaints() {
             <TextInput
               className="flex-1 ml-3 text-base"
               style={{ color: colors.textPrimary }}
-              placeholder="Search by ticket ID, title or location..."
+              placeholder={t("hod.complaints.searchPlaceholder")}
               placeholderTextColor={colors.textSecondary}
               editable={false}
             />
@@ -499,7 +507,7 @@ export default function HodComplaints() {
             className="text-sm mt-3"
             style={{ color: colors.textSecondary }}
           >
-            Loading complaints...
+            {t("hod.complaints.loadingComplaints")}
           </Text>
         </View>
       </View>
@@ -511,7 +519,7 @@ export default function HodComplaints() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Manage Complaints" hasBackButton={false} />
+      <BackButtonHeader title={t("hod.complaints.title")} hasBackButton={false} />
 
       {/* Search Bar */}
       <View className="px-4 pb-4 pt-4">
@@ -532,7 +540,7 @@ export default function HodComplaints() {
           <TextInput
             className="flex-1 ml-3 text-base"
             style={{ color: colors.textPrimary }}
-            placeholder="Search by ticket ID, title or location..."
+            placeholder={t("hod.complaints.searchPlaceholder")}
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -564,7 +572,7 @@ export default function HodComplaints() {
                 color: selectMode ? colors.primary : colors.textSecondary,
               }}
             >
-              {selectMode ? "Cancel" : "Bulk Select"}
+              {selectMode ? t("common.cancel") : t("hod.complaints.bulkSelect")}
             </Text>
           </TouchableOpacity>
 
@@ -584,7 +592,7 @@ export default function HodComplaints() {
                     className="text-xs font-medium"
                     style={{ color: colors.textSecondary }}
                   >
-                    Select All
+                    {t("hod.complaints.selectAll")}
                   </Text>
                 </TouchableOpacity>
 
@@ -601,7 +609,7 @@ export default function HodComplaints() {
                     className="text-xs font-medium"
                     style={{ color: colors.textSecondary }}
                   >
-                    Clear
+                    {t("common.clear")}
                   </Text>
                 </TouchableOpacity>
 
@@ -621,7 +629,7 @@ export default function HodComplaints() {
                       className="text-xs font-bold ml-1.5"
                       style={{ color: "#fff" }}
                     >
-                      Assign ({selectedComplaints.length})
+                      {t("hod.complaints.assign")} ({selectedComplaints.length})
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -679,7 +687,7 @@ export default function HodComplaints() {
                 className="text-base font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Filters
+                {t("common.filters")}
               </Text>
               <View className="flex-row items-center">
                 {hasActiveFilters() && (
@@ -688,7 +696,7 @@ export default function HodComplaints() {
                       className="text-sm font-semibold mr-3"
                       style={{ color: colors.textSecondary }}
                     >
-                      Clear All
+                      {t("hod.complaints.clearAll")}
                     </Text>
                   </PressableBlock>
                 )}

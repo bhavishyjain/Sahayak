@@ -11,6 +11,8 @@ const {
   cancelComplaint,
   bulkAssignComplaints,
   getWorkerComplaints,
+  inviteWorker,
+  removeWorker,
 } = require("../controllers/hodController");
 
 router.use(attachAuth, requireAuth, authorize("head"));
@@ -19,16 +21,12 @@ router.get("/dashboard", getHodDashboard);
 router.get("/workers", getHodWorkers);
 router.get("/workers/:workerId/complaints", getWorkerComplaints);
 router.post("/assign-complaint", assignComplaintToWorker);
+router.post("/invite-worker", inviteWorker);
+router.delete("/workers/:workerId", removeWorker);
 
 // HOD Approval Workflow
-router.post(
-  "/approve-completion/:complaintId",
-  approveCompletion,
-);
-router.post(
-  "/needs-rework/:complaintId",
-  markNeedsRework,
-);
+router.post("/approve-completion/:complaintId", approveCompletion);
+router.post("/needs-rework/:complaintId", markNeedsRework);
 router.post("/cancel-complaint/:complaintId", cancelComplaint);
 
 // Bulk Operations

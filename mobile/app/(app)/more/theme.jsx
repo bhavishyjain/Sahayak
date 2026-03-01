@@ -11,20 +11,20 @@ const THEME_OPTIONS = [
   {
     id: "system",
     icon: Settings,
-    name: "more.settings.theme.system",
-    desc: "more.settings.theme.systemDesc",
+    name: "more.theme.system",
+    desc: "more.theme.systemDesc",
   },
   {
     id: "light",
     icon: Sun,
-    name: "more.settings.theme.light",
-    desc: "more.settings.theme.lightDesc",
+    name: "more.theme.light",
+    desc: "more.theme.lightDesc",
   },
   {
     id: "dark",
     icon: Moon,
-    name: "more.settings.theme.dark",
-    desc: "more.settings.theme.darkDesc",
+    name: "more.theme.dark",
+    desc: "more.theme.darkDesc",
   },
 ];
 
@@ -41,7 +41,7 @@ export default function ThemeSettings() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
-      <BackButtonHeader title={t("more.settings.theme.title")} />
+      <BackButtonHeader title={t("more.theme.title")} />
 
       <View style={{ padding: 16 }}>
         {/* CURRENT THEME CARD */}
@@ -62,7 +62,7 @@ export default function ThemeSettings() {
               marginBottom: 10,
             }}
           >
-            {t("more.settings.theme.selectTheme")}
+            {t("more.theme.selectTheme")}
           </Text>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -81,7 +81,7 @@ export default function ThemeSettings() {
                 {t(currentTheme?.name)}
               </Text>
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                {t("more.settings.theme.currentlyActive")}
+                {t("more.theme.currentlyActive")}
               </Text>
             </View>
           </View>
@@ -95,7 +95,7 @@ export default function ThemeSettings() {
             marginBottom: 10,
           }}
         >
-          {t("more.settings.theme.selectThemeLabel")}
+          {t("more.theme.selectThemeLabel")}
         </Text>
 
         {/* OPTIONS */}

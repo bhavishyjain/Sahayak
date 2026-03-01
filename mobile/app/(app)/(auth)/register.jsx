@@ -44,8 +44,8 @@ export default function Register() {
     ) {
       Toast.show({
         type: "error",
-        text1: "Missing fields",
-        text2: "Please fill all required fields.",
+        text1: t("toast.registerError.missingFields"),
+        text2: t("toast.registerError.fillAllFields"),
       });
       return;
     }
@@ -73,8 +73,8 @@ export default function Register() {
       if (!authToken) {
         Toast.show({
           type: "error",
-          text1: "Registration failed",
-          text2: responseData?.message || "Token not returned.",
+          text1: t("toast.registerError.title"),
+          text2: responseData?.message || t("toast.registerError.tokenNotReturned"),
         });
         return;
       }
@@ -87,16 +87,16 @@ export default function Register() {
 
       Toast.show({
         type: "success",
-        text1: "Account created",
-        text2: responseData?.message || "Welcome to Sahayak.",
+        text1: t("toast.registerSuccess.title"),
+        text2: responseData?.message || t("toast.registerSuccess.message"),
       });
 
       router.replace("/(app)/(tabs)/home");
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Registration failed",
-        text2: error?.response?.data?.message || error?.message || t("failed"),
+        text1: t("toast.registerError.title"),
+        text2: error?.response?.data?.message || error?.message || t("toast.registerError.failed"),
       });
     } finally {
       setLoading(false);
@@ -134,38 +134,38 @@ export default function Register() {
           className="text-[28px] font-fira-bold mb-4 text-center"
           style={{ color: colors.textPrimary }}
         >
-          Create Account
+          {t("auth.register.title")}
         </Text>
         <Text
           className="text-sm mb-8 text-center px-5"
           style={{ color: colors.textSecondary }}
         >
-          Register with your details to continue.
+          {t("auth.register.subtitle")}
         </Text>
 
         {[
           {
             value: fullName,
             onChangeText: setFullName,
-            placeholder: "Full name",
+            placeholder: t("auth.register.fullNamePlaceholder"),
           },
           {
             value: username,
             onChangeText: setUsername,
-            placeholder: "Username",
+            placeholder: t("auth.register.usernamePlaceholder"),
             autoCapitalize: "none",
           },
           {
             value: email,
             onChangeText: setEmail,
-            placeholder: "Email",
+            placeholder: t("auth.register.emailPlaceholder"),
             keyboardType: "email-address",
             autoCapitalize: "none",
           },
           {
             value: phone,
             onChangeText: setPhone,
-            placeholder: "Phone",
+            placeholder: t("auth.register.phonePlaceholder"),
             keyboardType: "phone-pad",
           },
         ].map((input, index) => (
@@ -212,7 +212,7 @@ export default function Register() {
             mode="flat"
             value={password}
             onChangeText={setPassword}
-            placeholder={t("password") || "Password"}
+            placeholder={t("auth.register.passwordPlaceholder")}
             placeholderTextColor={colors.placeholder}
             secureTextEntry={secure}
             autoCapitalize="none"
@@ -247,7 +247,7 @@ export default function Register() {
                 className="ml-3 text-base font-fira-bold"
                 style={{ color: colors.dark, opacity: 0.5 }}
               >
-                {t("loading") || "Loading"}
+                {t("auth.register.loading")}
               </Text>
             </View>
           ) : (
@@ -255,7 +255,7 @@ export default function Register() {
               className="text-base font-fira-bold"
               style={{ color: colors.dark }}
             >
-              Register
+              {t("auth.register.button")}
             </Text>
           )}
         </PressableBlock>
@@ -277,7 +277,7 @@ export default function Register() {
               color: colors.textSecondary,
             }}
           >
-            Back to Login
+            {t("auth.register.backToLogin")}
           </Text>
         </PressableBlock>
 

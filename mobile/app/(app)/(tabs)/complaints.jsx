@@ -32,9 +32,11 @@ import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { API_BASE } from "../../../url";
 
 export default function Complaints() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -60,17 +62,17 @@ export default function Complaints() {
   const baseUrl = API_BASE;
 
   const DEPARTMENT_OPTIONS = [
-    { label: "Road", value: "Road" },
-    { label: "Water", value: "Water" },
-    { label: "Electricity", value: "Electricity" },
-    { label: "Sanitation", value: "Sanitation" },
-    { label: "Other", value: "other" },
+    { label: t("complaints.departments.road"), value: "Road" },
+    { label: t("complaints.departments.water"), value: "Water" },
+    { label: t("complaints.departments.electricity"), value: "Electricity" },
+    { label: t("complaints.departments.sanitation"), value: "Sanitation" },
+    { label: t("complaints.departments.other"), value: "other" },
   ];
 
   const PRIORITY_OPTIONS = [
-    { label: "Low", value: "Low" },
-    { label: "Medium", value: "Medium" },
-    { label: "High", value: "High" },
+    { label: t("complaints.priority.low"), value: "Low" },
+    { label: t("complaints.priority.medium"), value: "Medium" },
+    { label: t("complaints.priority.high"), value: "High" },
   ];
 
   const load = async (pull = false) => {
@@ -88,8 +90,9 @@ export default function Complaints() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not load complaints.",
+        text1: t("toast.error.failed"),
+        text2:
+          e?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
       });
     } finally {
       setLoading(false);
@@ -126,8 +129,8 @@ export default function Complaints() {
       if (status !== "granted") {
         Toast.show({
           type: "error",
-          text1: "Permission Denied",
-          text2: "Camera roll permission is required",
+          text1: t("toast.error.permissionDenied"),
+          text2: t("toast.error.permissionRequired"),
         });
         return;
       }
@@ -144,8 +147,8 @@ export default function Complaints() {
         if (totalImages > 5) {
           Toast.show({
             type: "error",
-            text1: "Too Many Images",
-            text2: "Maximum 5 images allowed",
+            text1: t("toast.error.tooManyImages"),
+            text2: t("toast.error.maxImagesReached"),
           });
           return;
         }
@@ -154,8 +157,8 @@ export default function Complaints() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Error",
-        text2: "Could not select images",
+        text1: t("toast.error.title"),
+        text2: t("toast.error.imageSelectError"),
       });
     }
   };
@@ -166,8 +169,8 @@ export default function Complaints() {
       if (status !== "granted") {
         Toast.show({
           type: "error",
-          text1: "Permission Denied",
-          text2: "Camera permission is required",
+          text1: t("toast.error.permissionDenied"),
+          text2: t("toast.error.cameraRequired"),
         });
         return;
       }
@@ -175,8 +178,8 @@ export default function Complaints() {
       if (selectedImages.length >= 5) {
         Toast.show({
           type: "error",
-          text1: "Maximum Reached",
-          text2: "You can only upload 5 images",
+          text1: t("toast.error.maximumReached"),
+          text2: t("toast.error.onlyFiveImages"),
         });
         return;
       }
@@ -192,8 +195,8 @@ export default function Complaints() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Error",
-        text2: "Could not take photo",
+        text1: t("toast.error.title"),
+        text2: t("toast.error.photoError"),
       });
     }
   };
@@ -210,8 +213,8 @@ export default function Complaints() {
       if (status !== "granted") {
         Toast.show({
           type: "error",
-          text1: "Permission Denied",
-          text2: "Location permission is required",
+          text1: t("toast.error.permissionDenied"),
+          text2: t("toast.error.locationPermissionRequired"),
         });
         return;
       }
@@ -228,15 +231,15 @@ export default function Complaints() {
 
       Toast.show({
         type: "success",
-        text1: "Location Captured",
+        text1: t("toast.success.locationCaptured"),
         text2: `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`,
       });
     } catch (error) {
       console.error("Location error:", error);
       Toast.show({
         type: "error",
-        text1: "Location Error",
-        text2: "Could not get current location",
+        text1: t("toast.error.locationFailed"),
+        text2: t("toast.error.locationError"),
       });
     } finally {
       setFetchingLocation(false);
@@ -252,8 +255,8 @@ export default function Complaints() {
     ) {
       Toast.show({
         type: "error",
-        text1: "Missing fields",
-        text2: "Please fill required details.",
+        text1: t("toast.error.missingFields"),
+        text2: t("toast.error.fillRequired"),
       });
       return;
     }
@@ -315,8 +318,9 @@ export default function Complaints() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not create complaint.",
+        text1: t("toast.error.failed"),
+        text2:
+          e?.response?.data?.message || t("toast.error.createComplaintFailed"),
       });
     } finally {
       setSaving(false);
@@ -347,7 +351,7 @@ export default function Complaints() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Complaints" hasBackButton={false} />
+      <BackButtonHeader title={t("complaints.title")} hasBackButton={false} />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
@@ -369,7 +373,7 @@ export default function Complaints() {
             className="text-base font-extrabold ml-2"
             style={{ color: colors.dark }}
           >
-            New Complaint
+            {t("complaints.newComplaint")}
           </Text>
         </PressableBlock>
         <Card style={{ margin: 0, flex: 0 }}>
@@ -381,7 +385,7 @@ export default function Complaints() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search by ticket, department, location"
+              placeholder={t("complaints.searchPlaceholder")}
               placeholderTextColor={colors.placeholder}
               className="ml-2 flex-1"
               style={{ color: colors.textPrimary }}
@@ -417,7 +421,7 @@ export default function Complaints() {
           {filtered.length === 0 && !loading ? (
             <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
               <Text style={{ color: colors.textSecondary }}>
-                No complaints found.
+                {t("complaints.noComplaints")}
               </Text>
             </Card>
           ) : (
@@ -439,7 +443,7 @@ export default function Complaints() {
                 const diffMs = eta - now;
                 const diffHours = Math.round(diffMs / (1000 * 60 * 60));
 
-                if (diffHours < 0) return "Overdue";
+                if (diffHours < 0) return t("complaints.overdue");
                 if (diffHours < 24) return `${diffHours}h`;
                 const diffDays = Math.round(diffHours / 24);
                 return `${diffDays}d`;
@@ -454,7 +458,7 @@ export default function Complaints() {
                         className="text-sm"
                         style={{ color: colors.textSecondary }}
                       >
-                        Ticket
+                        {t("complaints.ticket")}
                       </Text>
                       <Text
                         className="text-base font-semibold mt-1"
@@ -468,7 +472,7 @@ export default function Complaints() {
                         className="text-sm"
                         style={{ color: colors.textSecondary }}
                       >
-                        Date
+                        {t("complaints.date")}
                       </Text>
                       <Text
                         className="text-base font-semibold mt-1"
@@ -486,7 +490,7 @@ export default function Complaints() {
                         className="text-sm"
                         style={{ color: colors.textSecondary }}
                       >
-                        Department
+                        {t("complaints.details.department")}
                       </Text>
                       <Text
                         className="text-base font-semibold mt-1 capitalize"
@@ -500,7 +504,7 @@ export default function Complaints() {
                         className="text-sm"
                         style={{ color: colors.textSecondary }}
                       >
-                        Status
+                        {t("complaints.details.status")}
                       </Text>
                       <Text
                         className="text-base font-semibold mt-1 capitalize"
@@ -518,13 +522,13 @@ export default function Complaints() {
                         className="text-sm"
                         style={{ color: colors.textSecondary }}
                       >
-                        Location
+                        {t("complaints.location")}
                       </Text>
                       <Text
                         className="text-base font-semibold mt-1"
                         style={{ color: colors.textPrimary }}
                       >
-                        {c.locationName || "Location not set"}
+                        {c.locationName || t("complaints.locationNotSet")}
                       </Text>
                     </View>
                     <View className="flex-1 ml-2 items-end">
@@ -532,7 +536,7 @@ export default function Complaints() {
                         className="text-sm"
                         style={{ color: colors.textSecondary }}
                       >
-                        Priority
+                        {t("complaints.details.priority")}
                       </Text>
                       <Text
                         className="text-base font-semibold mt-1"
@@ -568,12 +572,13 @@ export default function Complaints() {
                         className="text-base font-bold ml-2"
                         style={{
                           color:
-                            formatETA(c.estimatedCompletionTime) === "Overdue"
+                            formatETA(c.estimatedCompletionTime) ===
+                            t("complaints.overdue")
                               ? "#EF4444"
                               : colors.info || "#3B82F6",
                         }}
                       >
-                        Expected Resolution:{" "}
+                        {t("complaints.expectedResolution")}:{" "}
                         {formatETA(c.estimatedCompletionTime)}
                       </Text>
                     </View>
@@ -585,13 +590,13 @@ export default function Complaints() {
                       className="text-sm"
                       style={{ color: colors.textSecondary }}
                     >
-                      Description
+                      {t("complaints.description")}
                     </Text>
                     <Text
                       className="text-base mt-1"
                       style={{ color: colors.textPrimary }}
                     >
-                      {c.title || "Complaint"}
+                      {c.title || t("complaints.complaint")}
                     </Text>
                   </View>
 
@@ -603,7 +608,7 @@ export default function Complaints() {
                     style={{ backgroundColor: colors.primary }}
                   >
                     <Text className="font-bold" style={{ color: colors.dark }}>
-                      Open
+                      {t("complaints.open")}
                     </Text>
                   </PressableBlock>
                 </Card>
@@ -635,7 +640,7 @@ export default function Complaints() {
                 className="text-lg font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                New Complaint
+                {t("complaints.newComplaint")}
               </Text>
               <PressableBlock
                 onPress={() => setModalVisible(false)}
@@ -659,12 +664,12 @@ export default function Complaints() {
                   className="text-base font-bold mb-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  Title
+                  {t("complaints.form.title")}
                 </Text>
                 <Input
                   value={title}
                   onChangeText={setTitle}
-                  placeholder="Enter title"
+                  placeholder={t("complaints.form.titlePlaceholder")}
                 />
               </View>
 
@@ -673,12 +678,12 @@ export default function Complaints() {
                   className="text-base font-bold mb-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  Description
+                  {t("complaints.form.description")}
                 </Text>
                 <Input
                   value={description}
                   onChangeText={setDescription}
-                  placeholder="Enter description"
+                  placeholder={t("complaints.form.descriptionPlaceholder")}
                   multiline
                 />
               </View>
@@ -688,13 +693,13 @@ export default function Complaints() {
                   className="text-base font-bold mb-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  Department
+                  {t("complaints.form.department")}
                 </Text>
                 <CustomPicker
                   data={DEPARTMENT_OPTIONS}
                   value={department}
                   onChange={(item) => setDepartment(item.value)}
-                  placeholder="Select department"
+                  placeholder={t("complaints.form.departmentPlaceholder")}
                   searchPlaceholder={null}
                   containerStyle={{
                     borderColor: colors.border,
@@ -710,12 +715,12 @@ export default function Complaints() {
                   className="text-base font-bold mb-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  Location
+                  {t("complaints.form.location")}
                 </Text>
                 <Input
                   value={locationName}
                   onChangeText={setLocationName}
-                  placeholder="Enter location name"
+                  placeholder={t("complaints.form.locationPlaceholder")}
                 />
               </View>
 
@@ -724,13 +729,13 @@ export default function Complaints() {
                   className="text-base font-bold mb-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  Priority
+                  {t("complaints.form.priority")}
                 </Text>
                 <CustomPicker
                   data={PRIORITY_OPTIONS}
                   value={priority}
                   onChange={(item) => setPriority(item.value)}
-                  placeholder="Select priority"
+                  placeholder={t("complaints.form.priorityPlaceholder")}
                   searchPlaceholder={null}
                   containerStyle={{
                     borderColor: colors.border,
@@ -747,7 +752,7 @@ export default function Complaints() {
                   className="text-base font-bold mb-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  GPS Coordinates (Optional)
+                  {t("complaints.gpsCoordinates")}
                 </Text>
                 <View className="flex-row">
                   <PressableBlock
@@ -781,7 +786,7 @@ export default function Complaints() {
                         >
                           {coordinates
                             ? `${coordinates.lat.toFixed(4)}, ${coordinates.lng.toFixed(4)}`
-                            : "Capture Location"}
+                            : t("complaints.captureLocation")}
                         </Text>
                       </>
                     )}
@@ -804,7 +809,7 @@ export default function Complaints() {
                   className="text-base font-bold mb-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  Proof Images (Optional, Max 5)
+                  {t("complaints.proofImages")}
                 </Text>
 
                 {/* Selected Images Preview */}
@@ -844,7 +849,7 @@ export default function Complaints() {
                         className="text-sm font-semibold ml-2"
                         style={{ color: colors.textPrimary }}
                       >
-                        Take Photo
+                        {t("complaints.takePhoto")}
                       </Text>
                     </PressableBlock>
 
@@ -861,7 +866,7 @@ export default function Complaints() {
                         className="text-sm font-semibold ml-2"
                         style={{ color: colors.textPrimary }}
                       >
-                        Choose Photos
+                        {t("complaints.choosePhotos")}
                       </Text>
                     </PressableBlock>
                   </View>
@@ -878,7 +883,9 @@ export default function Complaints() {
                   className="text-base font-extrabold"
                   style={{ color: colors.dark }}
                 >
-                  {saving ? "Saving..." : "Submit complaint"}
+                  {saving
+                    ? t("complaints.saving")
+                    : t("complaints.submitComplaint")}
                 </Text>
               </PressableBlock>
             </ScrollView>
@@ -888,11 +895,13 @@ export default function Complaints() {
 
       <DialogBox
         visible={showSuccess}
-        title="Complaint created"
+        title={t("complaints.complaintCreated")}
         message={
-          createdTicket ? `Ticket: ${createdTicket}` : "Saved successfully"
+          createdTicket
+            ? `${t("complaints.ticketLabel")}: ${createdTicket}`
+            : t("complaints.savedSuccessfully")
         }
-        confirmText="OK"
+        confirmText={t("common.ok")}
         onConfirm={() => setShowSuccess(false)}
       />
     </View>

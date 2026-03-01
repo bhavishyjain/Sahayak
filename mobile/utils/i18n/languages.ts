@@ -1,5 +1,5 @@
 import en from "../../assets/lang/english.json";
-import th from "../../assets/lang/thai.json";
+import hn from "../../assets/lang/hindi.json";
 
 export const LANGUAGES = {
   en: {
@@ -7,16 +7,11 @@ export const LANGUAGES = {
     messages: en,
     value: "en",
   },
-  th: {
-    label: "ไทย",
-    messages: th,
-    value: "th",
+  hn: {
+    label: "हिन्दी",
+    messages: hn,
+    value: "hn",
   },
-  // my: {
-  //   label: "မြန်မာ",
-  //   messages: my,
-  //   value: "my",
-  // },
 } as const;
 
 export type LanguageKey = keyof typeof LANGUAGES;

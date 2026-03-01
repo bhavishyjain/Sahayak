@@ -7,6 +7,7 @@ import {
   Clock,
   Calendar,
 } from "lucide-react-native";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -29,6 +30,7 @@ import { getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
 
 export default function HodResolvedComplaints() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -59,9 +61,9 @@ export default function HodResolvedComplaints() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
+        text1: t("hod.resolvedComplaints.failed"),
         text2:
-          e?.response?.data?.message || "Could not load resolved complaints.",
+          e?.response?.data?.message || t("hod.resolvedComplaints.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -222,11 +224,11 @@ export default function HodResolvedComplaints() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Resolved Complaints" hasBackButton={true} />
+      <BackButtonHeader title={t("hod.resolvedComplaints.title")} hasBackButton={true} />
 
       <View className="px-4 pt-4 pb-2">
         <View
-          className="flex-row items-center px-4 py-3.5 rounded-2xl"
+          className="flex-row items-center px-4 py-1 rounded-xl"
           style={{
             backgroundColor: colors.backgroundSecondary,
             borderWidth: 1.5,
@@ -237,7 +239,7 @@ export default function HodResolvedComplaints() {
           <TextInput
             className="flex-1 ml-3 text-base"
             style={{ color: colors.textPrimary }}
-            placeholder="Search resolved complaints..."
+            placeholder={t("hod.resolvedComplaints.searchPlaceholder")}
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -245,7 +247,7 @@ export default function HodResolvedComplaints() {
         </View>
       </View>
 
-      <View className="px-4 pb-2">
+      <View className="px-4 my-3">
         <View className="flex-row" style={{ gap: 8 }}>
           <View className="flex-1">
             <DateTimePickerModal
@@ -253,14 +255,13 @@ export default function HodResolvedComplaints() {
               value={startDate}
               onChange={setStartDate}
               icon={Calendar}
-              placeholder="Start date"
+              placeholder={t("hod.resolvedComplaints.startDate")}
               maxDateToday={true}
               containerStyle={{
                 backgroundColor: colors.backgroundSecondary,
                 borderWidth: 1.5,
                 borderColor: colors.border,
                 marginBottom: 0,
-                borderRadius: 16,
               }}
             />
           </View>
@@ -270,14 +271,13 @@ export default function HodResolvedComplaints() {
               value={endDate}
               onChange={setEndDate}
               icon={Calendar}
-              placeholder="End date"
+              placeholder={t("hod.resolvedComplaints.endDate")}
               maxDateToday={true}
               containerStyle={{
                 backgroundColor: colors.backgroundSecondary,
                 borderWidth: 1.5,
                 borderColor: colors.border,
                 marginBottom: 0,
-                borderRadius: 16,
               }}
             />
           </View>
@@ -305,8 +305,8 @@ export default function HodResolvedComplaints() {
               style={{ color: colors.textSecondary }}
             >
               {searchQuery || startDate || endDate
-                ? "No complaints found"
-                : "No resolved complaints"}
+                ? t("hod.resolvedComplaints.noComplaints")
+                : t("hod.resolvedComplaints.noComplaintsDefault")}
             </Text>
           </View>
         }

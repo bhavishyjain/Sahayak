@@ -24,11 +24,13 @@ import Card from "../../../components/Card";
 import PressableBlock from "../../../components/PressableBlock";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import { WORKER_ASSIGNED_URL } from "../../../url";
 
 export default function WorkerAssigned() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -179,7 +181,7 @@ export default function WorkerAssigned() {
     const diffMs = eta - now;
     const diffHours = Math.round(diffMs / (1000 * 60 * 60));
 
-    if (diffHours < 0) return "Overdue";
+    if (diffHours < 0) return t("worker.assigned.overdue");
     if (diffHours < 24) return `${diffHours}h`;
     const diffDays = Math.round(diffHours / 24);
     return `${diffDays}d`;
@@ -197,7 +199,7 @@ export default function WorkerAssigned() {
             className="text-sm mt-3"
             style={{ color: colors.textSecondary }}
           >
-            Loading assigned complaints...
+            {t("worker.assigned.loading")}
           </Text>
         </View>
       </View>
@@ -209,7 +211,7 @@ export default function WorkerAssigned() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Assigned Complaints" hasBackButton={false} />
+      <BackButtonHeader title={t("worker.assigned.title")} hasBackButton={false} />
 
       <ScrollView
         className="flex-1 px-4"
@@ -242,7 +244,7 @@ export default function WorkerAssigned() {
               <TextInput
                 className="ml-3 flex-1 text-base"
                 style={{ color: colors.textPrimary }}
-                placeholder="Search by ID, title, location..."
+                placeholder={t("worker.assigned.searchPlaceholder")}
                 placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -274,7 +276,7 @@ export default function WorkerAssigned() {
                     className="text-xs"
                     style={{ color: colors.textSecondary }}
                   >
-                    Active Tasks
+                    {t("worker.dashboard.stats.active")}
                   </Text>
                   <Text
                     className="text-2xl font-bold mt-1"
@@ -316,7 +318,7 @@ export default function WorkerAssigned() {
                 className="text-base font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Filters & Sorting
+                {t("worker.assigned.filters.title")}
               </Text>
               {hasActiveFilters() && (
                 <PressableBlock onPress={clearFilters}>
@@ -326,7 +328,7 @@ export default function WorkerAssigned() {
                       className="text-sm font-semibold ml-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      Clear All
+                      {t("worker.assigned.clearFilters")}
                     </Text>
                   </View>
                 </PressableBlock>
@@ -344,7 +346,7 @@ export default function WorkerAssigned() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Sort By Date
+                {t("worker.assigned.sortBy")}
               </Text>
               <View className="flex-row" style={{ gap: 8 }}>
                 <PressableBlock
@@ -382,7 +384,7 @@ export default function WorkerAssigned() {
                             : colors.textPrimary,
                       }}
                     >
-                      Newest First
+                      {t("worker.assigned.newToOld")}
                     </Text>
                   </View>
                 </PressableBlock>
@@ -421,7 +423,7 @@ export default function WorkerAssigned() {
                             : colors.textPrimary,
                       }}
                     >
-                      Oldest First
+                      {t("worker.assigned.oldToNew")}
                     </Text>
                   </View>
                 </PressableBlock>
@@ -434,7 +436,7 @@ export default function WorkerAssigned() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Date Range
+                {t("worker.assigned.filters.dateRange")}
               </Text>
               <View className="flex-row" style={{ gap: 8 }}>
                 <View className="flex-1">
@@ -443,7 +445,7 @@ export default function WorkerAssigned() {
                     value={startDate}
                     onChange={setStartDate}
                     icon={Calendar}
-                    placeholder="Start date"
+                    placeholder={t("worker.assigned.filters.startDate")}
                     maxDateToday={true}
                   />
                 </View>
@@ -453,7 +455,7 @@ export default function WorkerAssigned() {
                     value={endDate}
                     onChange={setEndDate}
                     icon={Calendar}
-                    placeholder="End date"
+                    placeholder={t("worker.assigned.filters.endDate")}
                     maxDateToday={true}
                   />
                 </View>
@@ -466,7 +468,7 @@ export default function WorkerAssigned() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Priority
+                {t("worker.assigned.filters.priority")}
               </Text>
               <View className="flex-row flex-wrap" style={{ gap: 8 }}>
                 {["all", "high", "medium", "low"].map((priority) => (
@@ -511,7 +513,7 @@ export default function WorkerAssigned() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Status
+                {t("worker.assigned.filters.status")}
               </Text>
               <View className="flex-row flex-wrap" style={{ gap: 8 }}>
                 {["all", "assigned", "in-progress", "resolved"].map(
@@ -561,8 +563,10 @@ export default function WorkerAssigned() {
                   className="text-xs text-center"
                   style={{ color: colors.info || "#3B82F6" }}
                 >
-                  Showing {filteredComplaints.length} of {complaints.length}{" "}
-                  tasks
+                  {t("worker.assigned.showingResults", {
+                    filtered: filteredComplaints.length,
+                    total: complaints.length,
+                  })}
                 </Text>
               </View>
             )}
@@ -576,13 +580,13 @@ export default function WorkerAssigned() {
                 className="text-base font-semibold"
                 style={{ color: colors.textSecondary }}
               >
-                No tasks found
+                {t("worker.assigned.noResults")}
               </Text>
               <Text
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                Try adjusting your filters
+                {t("worker.assigned.tryAdjusting")}
               </Text>
             </View>
           </Card>
@@ -593,13 +597,13 @@ export default function WorkerAssigned() {
                 className="text-base font-semibold"
                 style={{ color: colors.textSecondary }}
               >
-                No assigned complaints
+                {t("worker.assigned.noComplaints.title")}
               </Text>
               <Text
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                You don&apos;t have any active complaints assigned to you
+                {t("worker.assigned.noComplaints.message")}
               </Text>
             </View>
           </Card>
@@ -658,7 +662,7 @@ export default function WorkerAssigned() {
                     className="text-xs ml-1 flex-1"
                     style={{ color: colors.textSecondary }}
                   >
-                    {complaint.locationName || "No location"}
+                    {complaint.locationName || t("worker.assigned.noLocation")}
                   </Text>
                 </View>
 
@@ -669,7 +673,9 @@ export default function WorkerAssigned() {
                       className="text-xs ml-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      Assigned {formatDate(complaint.assignedAt)}
+                      {t("worker.assigned.assignedAt", {
+                        date: formatDate(complaint.assignedAt),
+                      })}
                     </Text>
                   </View>
                   <View
@@ -695,7 +701,7 @@ export default function WorkerAssigned() {
                     style={{
                       backgroundColor:
                         formatETA(complaint.estimatedCompletionTime) ===
-                        "Overdue"
+                        t("worker.assigned.overdue")
                           ? "#FEE2E2"
                           : colors.info
                             ? colors.info + "20"
@@ -706,7 +712,7 @@ export default function WorkerAssigned() {
                       size={16}
                       color={
                         formatETA(complaint.estimatedCompletionTime) ===
-                        "Overdue"
+                        t("worker.assigned.overdue")
                           ? "#EF4444"
                           : colors.info || "#3B82F6"
                       }
@@ -716,12 +722,12 @@ export default function WorkerAssigned() {
                       style={{
                         color:
                           formatETA(complaint.estimatedCompletionTime) ===
-                          "Overdue"
+                          t("worker.assigned.overdue")
                             ? "#EF4444"
                             : colors.info || "#3B82F6",
                       }}
                     >
-                      ETA: {formatETA(complaint.estimatedCompletionTime)}
+                      {t("worker.assigned.eta")}: {formatETA(complaint.estimatedCompletionTime)}
                     </Text>
                   </View>
                 )}
