@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import {
   Clock,
   MapPin,
@@ -8,11 +9,14 @@ import {
   AlertCircle,
   Image as ImageIcon,
   ThumbsUp,
+  ThumbsDown,
   Star,
   MessageSquare,
   Users,
   Search,
   X,
+  Camera,
+  Upload,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -36,13 +40,17 @@ import {
   GET_COMPLAINT_BY_ID_URL,
   UPVOTE_COMPLAINT_URL,
   SUBMIT_FEEDBACK_URL,
-  HOD_ASSIGN_COMPLAINT_URL,
+  HOD_ASSIGN_MULTIPLE_WORKERS_URL,
   HOD_WORKERS_URL,
   HOD_APPROVE_COMPLETION_URL,
   HOD_NEEDS_REWORK_URL,
   HOD_CANCEL_COMPLAINT_URL,
   UPDATE_COMPLAINT_STATUS_URL,
   WORKERS_URL,
+  UPLOAD_COMPLETION_PHOTOS_URL,
+  SATISFACTION_VOTE_URL,
+  GET_SATISFACTION_URL,
+  APPLY_AI_SUGGESTION_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
@@ -88,6 +96,13 @@ export default function ComplaintDetails() {
   const [newStatus, setNewStatus] = useState("");
   const [workerNotes, setWorkerNotes] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [photoUploadModalVisible, setPhotoUploadModalVisible] = useState(false);
+  const [selectedPhotos, setSelectedPhotos] = useState([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
+  // Satisfaction voting states
+  const [satisfactionVotes, setSatisfactionVotes] = useState(null);
+  const [votingInProgress, setVotingInProgress] = useState(false);
 
   // Common states
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -120,10 +135,11 @@ export default function ComplaintDetails() {
   }, [normalizedWorkers, workerSearchQuery]);
 
   const currentAssignedWorker = useMemo(() => {
-    if (!complaint?.assignedTo) return null;
-    const assignedId = String(complaint.assignedTo);
+    const primaryWorkerId = complaint?.assignedWorkers?.[0]?.workerId;
+    if (!primaryWorkerId) return null;
+    const assignedId = String(primaryWorkerId);
     return normalizedWorkers.find((w) => w.workerId === assignedId) || null;
-  }, [complaint?.assignedTo, normalizedWorkers]);
+  }, [complaint?.assignedWorkers, normalizedWorkers]);
 
   const load = async (isRefresh = false) => {
     try {
@@ -156,6 +172,11 @@ export default function ComplaintDetails() {
       ) {
         const upvotedByUser = complaintData.upvotes.includes(userIdString);
         setHasUpvoted(upvotedByUser);
+      }
+
+      // Fetch satisfaction votes for resolved complaints
+      if (complaintData?.status === "resolved") {
+        await fetchSatisfactionVotes();
       }
     } catch (e) {
       Toast.show({
@@ -331,19 +352,18 @@ export default function ComplaintDetails() {
 
       await apiCall({
         method: "POST",
-        url: HOD_ASSIGN_COMPLAINT_URL,
+        url: HOD_ASSIGN_MULTIPLE_WORKERS_URL(id),
         data: {
-          complaintId: id,
-          workerId: selectedWorker,
+          workers: [{ workerId: selectedWorker }],
         },
       });
 
       Toast.show({
         type: "success",
-        text1: complaint?.assignedTo
+        text1: complaint?.isAssigned
           ? t("complaints.details.assignmentUpdated")
           : t("complaints.details.complaintAssigned"),
-        text2: complaint?.assignedTo
+        text2: complaint?.isAssigned
           ? t("complaints.details.workerAssignmentChanged")
           : t("complaints.details.workerNotified"),
       });
@@ -467,6 +487,38 @@ export default function ComplaintDetails() {
     }
   };
 
+  // HOD: Apply AI Suggestion
+  const handleApplyAISuggestion = async (applyDepartment, applyPriority) => {
+    try {
+      await apiCall({
+        method: "POST",
+        url: APPLY_AI_SUGGESTION_URL(id),
+        data: { applyDepartment, applyPriority },
+      });
+
+      Toast.show({
+        type: "success",
+        text1:
+          t("complaints.details.aiSuggestionApplied") ||
+          "AI Suggestion Applied",
+        text2:
+          t("complaints.details.complaintUpdated") ||
+          "Complaint has been updated",
+      });
+
+      await load(true);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: t("complaints.details.updateFailed") || "Update Failed",
+        text2:
+          e?.response?.data?.message ||
+          t("complaints.details.couldNotApplyAI") ||
+          "Failed to apply AI suggestion",
+      });
+    }
+  };
+
   // Worker: Update status
   const handleUpdateStatus = async () => {
     if (!newStatus) {
@@ -509,6 +561,194 @@ export default function ComplaintDetails() {
       });
     } finally {
       setUpdating(false);
+    }
+  };
+
+  // Worker: Pick photos from gallery
+  const pickPhotosFromGallery = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        Toast.show({
+          type: "error",
+          text1: t("complaints.permissionRequired") || "Permission Required",
+          text2:
+            t("complaints.galleryPermissionDenied") ||
+            "Please allow access to your gallery",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        aspect: [4, 3],
+      });
+
+      if (!result.canceled && result.assets) {
+        setSelectedPhotos(result.assets);
+        setPhotoUploadModalVisible(false);
+        await uploadCompletionPhotos(result.assets);
+      }
+    } catch (err) {
+      Toast.show({
+        type: "error",
+        text1: t("complaints.pickPhotosFailed") || "Failed to pick photos",
+        text2: err.message,
+      });
+    }
+  };
+
+  // Worker: Take photo with camera
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (status !== "granted") {
+        Toast.show({
+          type: "error",
+          text1: t("complaints.permissionRequired") || "Permission Required",
+          text2:
+            t("complaints.cameraPermissionDenied") ||
+            "Please allow access to your camera",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        aspect: [4, 3],
+      });
+
+      if (!result.canceled && result.assets) {
+        setSelectedPhotos(result.assets);
+        setPhotoUploadModalVisible(false);
+        await uploadCompletionPhotos(result.assets);
+      }
+    } catch (err) {
+      Toast.show({
+        type: "error",
+        text1: t("complaints.takePhotoFailed") || "Failed to take photo",
+        text2: err.message,
+      });
+    }
+  };
+
+  // Worker: Upload completion photos (after photos)
+  const uploadCompletionPhotos = async (photos) => {
+    if (!photos || photos.length === 0) return;
+
+    try {
+      setUploadingPhotos(true);
+
+      const formData = new FormData();
+      photos.forEach((photo, index) => {
+        const fileExtension = photo.uri.split(".").pop();
+        formData.append("completionPhotos", {
+          uri: photo.uri,
+          type: `image/${fileExtension}`,
+          name: `completion_${Date.now()}_${index}.${fileExtension}`,
+        });
+      });
+
+      await apiCall({
+        method: "POST",
+        url: UPLOAD_COMPLETION_PHOTOS_URL(id),
+        data: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      Toast.show({
+        type: "success",
+        text1: t("complaints.uploadSuccess") || "Upload Successful",
+        text2:
+          t("complaints.afterPhotosUploaded") ||
+          "After photos have been uploaded",
+      });
+
+      setSelectedPhotos([]);
+      await load(true);
+    } catch (err) {
+      Toast.show({
+        type: "error",
+        text1: t("complaints.uploadFailed") || "Upload Failed",
+        text2:
+          err?.response?.data?.message ||
+          t("complaints.couldNotUploadPhotos") ||
+          "Failed to upload photos",
+      });
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
+
+  // Fetch satisfaction votes
+  const fetchSatisfactionVotes = async () => {
+    try {
+      const response = await apiCall({
+        method: "GET",
+        url: GET_SATISFACTION_URL(id),
+      });
+
+      if (response?.data?.satisfactionVotes) {
+        setSatisfactionVotes(response.data.satisfactionVotes);
+      }
+    } catch (err) {
+      // Silently fail - votes are not critical, don't show error to user
+      if (__DEV__) {
+        console.log("Failed to fetch satisfaction votes:", err.message);
+      }
+    }
+  };
+
+  // Handle satisfaction vote
+  const handleSatisfactionVote = async (voteType) => {
+    if (votingInProgress) return;
+
+    try {
+      setVotingInProgress(true);
+
+      const response = await apiCall({
+        method: "POST",
+        url: SATISFACTION_VOTE_URL(id),
+        data: { voteType },
+      });
+
+      Toast.show({
+        type: "success",
+        text1: t("complaints.voteRecorded") || "Vote Recorded",
+        text2:
+          voteType === "up"
+            ? t("complaints.thanksForPositiveFeedback") ||
+              "Thanks for your positive feedback!"
+            : t("complaints.feedbackReceived") ||
+              "Your feedback has been received",
+      });
+
+      // Update satisfaction votes from response
+      if (response?.data?.satisfactionVotes) {
+        setSatisfactionVotes(response.data.satisfactionVotes);
+      } else {
+        // Fallback: refresh votes
+        await fetchSatisfactionVotes();
+      }
+    } catch (err) {
+      Toast.show({
+        type: "error",
+        text1: t("complaints.voteFailed") || "Vote Failed",
+        text2:
+          err?.response?.data?.message ||
+          t("complaints.couldNotRecordVote") ||
+          "Failed to record your vote",
+      });
+    } finally {
+      setVotingInProgress(false);
     }
   };
 
@@ -739,8 +979,226 @@ export default function ComplaintDetails() {
           </Card>
         )}
 
+        {/* HOD: AI Suggestion Review */}
+        {userRole === "head" &&
+          complaint.aiSuggestedDepartment &&
+          (complaint.aiSuggestedDepartment !== complaint.department ||
+            complaint.aiAnalysis?.suggestedPriority !== complaint.priority) && (
+            <Card
+              style={{
+                margin: 0,
+                marginBottom: 12,
+                flex: 0,
+                borderWidth: 2,
+                borderColor: colors.purple || "#8B5CF6",
+              }}
+            >
+              <View className="flex-row items-center mb-3">
+                <View
+                  className="w-8 h-8 rounded-full items-center justify-center"
+                  style={{
+                    backgroundColor: colors.purple + "20" || "#8B5CF620",
+                  }}
+                >
+                  <AlertCircle size={16} color={colors.purple || "#8B5CF6"} />
+                </View>
+                <View className="ml-2 flex-1">
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    AI Suggestion Available
+                  </Text>
+                  {complaint.aiConfidence && (
+                    <Text
+                      className="text-xs"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {Math.round(complaint.aiConfidence * 100)}% confident
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Department Suggestion */}
+              {complaint.aiSuggestedDepartment !== complaint.department && (
+                <View className="mb-3">
+                  <View
+                    className="rounded-lg p-3"
+                    style={{ backgroundColor: colors.backgroundSecondary }}
+                  >
+                    <Text
+                      className="text-xs mb-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Department Suggestion
+                    </Text>
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-1">
+                        <Text
+                          className="text-sm"
+                          style={{ color: colors.textSecondary }}
+                        >
+                          Current:{" "}
+                          <Text
+                            className="font-semibold"
+                            style={{ color: colors.textPrimary }}
+                          >
+                            {complaint.department}
+                          </Text>
+                        </Text>
+                        <Text
+                          className="text-sm mt-1"
+                          style={{ color: colors.textSecondary }}
+                        >
+                          AI suggests:{" "}
+                          <Text
+                            className="font-semibold"
+                            style={{ color: colors.success || "#10B981" }}
+                          >
+                            {complaint.aiSuggestedDepartment}
+                          </Text>
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleApplyAISuggestion(true, false)}
+                        className="px-4 py-2 rounded-lg"
+                        style={{ backgroundColor: colors.primary }}
+                      >
+                        <Text className="text-sm font-semibold text-white">
+                          Apply
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Priority Suggestion */}
+              {complaint.aiAnalysis?.suggestedPriority &&
+                complaint.aiAnalysis.suggestedPriority !==
+                  complaint.priority && (
+                  <View className="mb-3">
+                    <View
+                      className="rounded-lg p-3"
+                      style={{ backgroundColor: colors.backgroundSecondary }}
+                    >
+                      <Text
+                        className="text-xs mb-2"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        Priority Suggestion
+                      </Text>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-1">
+                          <Text
+                            className="text-sm"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            Current:{" "}
+                            <Text
+                              className="font-semibold"
+                              style={{ color: colors.textPrimary }}
+                            >
+                              {complaint.priority}
+                            </Text>
+                          </Text>
+                          <Text
+                            className="text-sm mt-1"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            AI suggests:{" "}
+                            <Text
+                              className="font-semibold"
+                              style={{ color: colors.warning || "#F59E0B" }}
+                            >
+                              {complaint.aiAnalysis.suggestedPriority}
+                            </Text>
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleApplyAISuggestion(false, true)}
+                          className="px-4 py-2 rounded-lg"
+                          style={{ backgroundColor: colors.primary }}
+                        >
+                          <Text className="text-sm font-semibold text-white">
+                            Apply
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+              {/* AI Reasoning */}
+              {complaint.aiAnalysis?.reasoning && (
+                <View
+                  className="rounded-lg p-3"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <Text
+                    className="text-xs mb-1"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    AI Reasoning
+                  </Text>
+                  <Text
+                    className="text-sm"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {complaint.aiAnalysis.reasoning}
+                  </Text>
+                </View>
+              )}
+
+              {/* Sentiment & Urgency */}
+              {complaint.aiAnalysis && (
+                <View className="flex-row mt-3 space-x-2">
+                  {complaint.aiAnalysis.sentiment && (
+                    <View
+                      className="flex-1 rounded-lg p-2"
+                      style={{ backgroundColor: colors.backgroundSecondary }}
+                    >
+                      <Text
+                        className="text-xs"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        Sentiment
+                      </Text>
+                      <Text
+                        className="text-sm font-semibold capitalize"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {complaint.aiAnalysis.sentiment}
+                      </Text>
+                    </View>
+                  )}
+                  {complaint.aiAnalysis.urgency && (
+                    <View
+                      className="flex-1 rounded-lg p-2 ml-2"
+                      style={{ backgroundColor: colors.backgroundSecondary }}
+                    >
+                      <Text
+                        className="text-xs"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        Urgency
+                      </Text>
+                      <Text
+                        className="text-sm font-semibold"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {complaint.aiAnalysis.urgency}/10
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Card>
+          )}
+
         {/* HOD: Current Assigned Worker */}
-        {userRole === "head" && complaint.assignedTo && (
+        {userRole === "head" && complaint.isAssigned && (
           <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
             <View className="flex-row items-center mb-1">
               <Users size={18} color={colors.primary} />
@@ -774,7 +1232,9 @@ export default function ComplaintDetails() {
                 setAssignModalVisible(true);
                 setWorkerSearchQuery("");
                 setSelectedWorker(
-                  complaint?.assignedTo ? String(complaint.assignedTo) : null,
+                  complaint?.assignedWorkers?.[0]?.workerId
+                    ? String(complaint.assignedWorkers[0].workerId)
+                    : null,
                 );
               }}
             >
@@ -792,7 +1252,7 @@ export default function ComplaintDetails() {
                     className="text-base font-semibold ml-2"
                     style={{ color: "#FFFFFF" }}
                   >
-                    {complaint.assignedTo
+                    {complaint.isAssigned
                       ? t("complaints.details.reassignWorker")
                       : t("complaints.details.assignToWorker")}
                   </Text>
@@ -804,7 +1264,7 @@ export default function ComplaintDetails() {
         {userRole === "head" &&
           complaint.status !== "resolved" &&
           complaint.status !== "cancelled" &&
-          !complaint.assignedTo && (
+          !complaint.isAssigned && (
             <PressableBlock
               onPress={handleCancelComplaint}
               disabled={cancelling}
@@ -905,6 +1365,32 @@ export default function ComplaintDetails() {
                 >
                   {t("complaints.details.updateStatus")}
                 </Text>
+              </Card>
+            </PressableBlock>
+          )}
+
+        {/* Worker: Upload After Photos Button */}
+        {userRole === "worker" &&
+          complaint.status !== "resolved" &&
+          complaint.status !== "cancelled" && (
+            <PressableBlock onPress={() => setPhotoUploadModalVisible(true)}>
+              <Card
+                style={{
+                  margin: 0,
+                  marginBottom: 12,
+                  flex: 0,
+                  backgroundColor: colors.success || "#10B981",
+                }}
+              >
+                <View className="flex-row items-center justify-center py-1">
+                  <Upload size={20} color="#FFFFFF" />
+                  <Text
+                    className="text-base font-semibold ml-2"
+                    style={{ color: "#FFFFFF" }}
+                  >
+                    {t("complaints.uploadAfterPhotos") || "Upload After Photos"}
+                  </Text>
+                </View>
               </Card>
             </PressableBlock>
           )}
@@ -1090,6 +1576,130 @@ export default function ComplaintDetails() {
               </ScrollView>
             </Card>
           )}
+
+        {/* Satisfaction Voting - Only for resolved complaints */}
+        {complaint.status === "resolved" && satisfactionVotes && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="mb-3">
+              <Text
+                className="text-base font-semibold mb-2"
+                style={{ color: colors.textPrimary }}
+              >
+                {t("complaints.satisfactionVote") ||
+                  "How satisfied are you with the resolution?"}
+              </Text>
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                {t("complaints.satisfactionVoteDesc") ||
+                  "Let us know if you're satisfied with how this complaint was resolved"}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center justify-around mb-4">
+              <Pressable
+                onPress={() => handleSatisfactionVote("up")}
+                disabled={votingInProgress}
+                className="flex-1 mr-2 py-4 rounded-xl items-center"
+                style={{
+                  backgroundColor:
+                    satisfactionVotes.userVote === "up"
+                      ? colors.success || "#10B981"
+                      : colors.backgroundSecondary,
+                  opacity: votingInProgress ? 0.5 : 1,
+                }}
+              >
+                <ThumbsUp
+                  size={28}
+                  color={
+                    satisfactionVotes.userVote === "up"
+                      ? "#FFFFFF"
+                      : colors.textPrimary
+                  }
+                />
+                <Text
+                  className="text-lg font-bold mt-2"
+                  style={{
+                    color:
+                      satisfactionVotes.userVote === "up"
+                        ? "#FFFFFF"
+                        : colors.textPrimary,
+                  }}
+                >
+                  {satisfactionVotes.thumbsUpCount || 0}
+                </Text>
+                <Text
+                  className="text-xs mt-1"
+                  style={{
+                    color:
+                      satisfactionVotes.userVote === "up"
+                        ? "#FFFFFF"
+                        : colors.textSecondary,
+                  }}
+                >
+                  {t("complaints.satisfied") || "Satisfied"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => handleSatisfactionVote("down")}
+                disabled={votingInProgress}
+                className="flex-1 ml-2 py-4 rounded-xl items-center"
+                style={{
+                  backgroundColor:
+                    satisfactionVotes.userVote === "down"
+                      ? colors.error || "#EF4444"
+                      : colors.backgroundSecondary,
+                  opacity: votingInProgress ? 0.5 : 1,
+                }}
+              >
+                <ThumbsDown
+                  size={28}
+                  color={
+                    satisfactionVotes.userVote === "down"
+                      ? "#FFFFFF"
+                      : colors.textPrimary
+                  }
+                />
+                <Text
+                  className="text-lg font-bold mt-2"
+                  style={{
+                    color:
+                      satisfactionVotes.userVote === "down"
+                        ? "#FFFFFF"
+                        : colors.textPrimary,
+                  }}
+                >
+                  {satisfactionVotes.thumbsDownCount || 0}
+                </Text>
+                <Text
+                  className="text-xs mt-1"
+                  style={{
+                    color:
+                      satisfactionVotes.userVote === "down"
+                        ? "#FFFFFF"
+                        : colors.textSecondary,
+                  }}
+                >
+                  {t("complaints.notSatisfied") || "Not Satisfied"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {satisfactionVotes.userVote && (
+              <View
+                className="py-2 px-3 rounded-lg"
+                style={{ backgroundColor: colors.backgroundSecondary }}
+              >
+                <Text
+                  className="text-xs text-center"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("complaints.yourVoteRecorded") ||
+                    "Your vote has been recorded. You can change it anytime."}
+                </Text>
+              </View>
+            )}
+          </Card>
+        )}
 
         {/* Timeline */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -1511,7 +2121,7 @@ export default function ComplaintDetails() {
                 className="text-xl font-bold mb-4 text-center"
                 style={{ color: colors.textPrimary }}
               >
-                {complaint?.assignedTo
+                {complaint?.isAssigned
                   ? t("complaints.details.changeAssignment")
                   : t("complaints.details.assignToWorker")}
               </Text>
@@ -1626,7 +2236,7 @@ export default function ComplaintDetails() {
                       className="text-base font-semibold"
                       style={{ color: "#FFFFFF" }}
                     >
-                      {complaint?.assignedTo
+                      {complaint?.isAssigned
                         ? t("complaints.details.changeAssignment")
                         : t("complaints.details.assign")}
                     </Text>
@@ -1756,6 +2366,108 @@ export default function ComplaintDetails() {
                   )}
                 </Pressable>
               </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Worker: Photo Upload Modal */}
+      {userRole === "worker" && (
+        <Modal
+          visible={photoUploadModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setPhotoUploadModalVisible(false)}
+        >
+          <View
+            className="flex-1 justify-end"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          >
+            <View
+              className="rounded-t-3xl p-6"
+              style={{ backgroundColor: colors.backgroundPrimary }}
+            >
+              <Text
+                className="text-xl font-bold mb-4 text-center"
+                style={{ color: colors.textPrimary }}
+              >
+                {t("complaints.uploadAfterPhotos") || "Upload After Photos"}
+              </Text>
+
+              <Text
+                className="text-sm mb-6 text-center"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("complaints.uploadAfterPhotosDesc") ||
+                  "Upload photos showing the work completed"}
+              </Text>
+
+              <View className="mb-4">
+                <Pressable
+                  onPress={takePhoto}
+                  disabled={uploadingPhotos}
+                  className="flex-row items-center justify-center py-4 rounded-xl mb-3"
+                  style={{
+                    backgroundColor: colors.primary,
+                    opacity: uploadingPhotos ? 0.5 : 1,
+                  }}
+                >
+                  <Camera size={24} color="#FFFFFF" />
+                  <Text
+                    className="text-base font-semibold ml-2"
+                    style={{ color: "#FFFFFF" }}
+                  >
+                    {t("complaints.takePhoto") || "Take Photo"}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={pickPhotosFromGallery}
+                  disabled={uploadingPhotos}
+                  className="flex-row items-center justify-center py-4 rounded-xl"
+                  style={{
+                    backgroundColor: colors.success || "#10B981",
+                    opacity: uploadingPhotos ? 0.5 : 1,
+                  }}
+                >
+                  <ImageIcon size={24} color="#FFFFFF" />
+                  <Text
+                    className="text-base font-semibold ml-2"
+                    style={{ color: "#FFFFFF" }}
+                  >
+                    {t("complaints.chooseFromGallery") || "Choose from Gallery"}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {uploadingPhotos && (
+                <View className="items-center mb-4">
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text
+                    className="text-sm mt-2"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("complaints.uploading") || "Uploading..."}
+                  </Text>
+                </View>
+              )}
+
+              <Pressable
+                onPress={() => setPhotoUploadModalVisible(false)}
+                disabled={uploadingPhotos}
+                className="py-3 rounded-xl items-center"
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  opacity: uploadingPhotos ? 0.5 : 1,
+                }}
+              >
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("common.cancel")}
+                </Text>
+              </Pressable>
             </View>
           </View>
         </Modal>

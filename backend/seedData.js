@@ -653,7 +653,25 @@ function generateComplaint(userId, ticketNum, allUsers) {
     upvoteCount: upvotesArray.length,
     createdAt: createdAt,
     updatedAt: new Date(),
+    proofImage: [], // Will be populated below
   };
+
+  // Add proof images (before photos) - 60% chance
+  if (Math.random() < 0.6) {
+    const photoCount = Math.floor(Math.random() * 3) + 1; // 1-3 photos
+    const sampleProofPhotos = [
+      "https://images.unsplash.com/photo-1549560443-7f6b4b13d6d3?w=800",
+      "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=800",
+      "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800",
+      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+      "https://images.unsplash.com/photo-1581092918484-8313e1f7f53d?w=800",
+    ];
+    for (let j = 0; j < photoCount; j++) {
+      complaint.proofImage.push(
+        sampleProofPhotos[Math.floor(Math.random() * sampleProofPhotos.length)],
+      );
+    }
+  }
 
   // Add history based on status
   complaint.history = [
@@ -664,7 +682,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
     },
   ];
 
-  if (["assigned", "in-progress", "needs-rework", "resolved"].includes(status)) {
+  if (
+    ["assigned", "in-progress", "needs-rework", "resolved"].includes(status)
+  ) {
     const assignedDate = new Date(createdAt);
     assignedDate.setHours(
       assignedDate.getHours() + Math.floor(Math.random() * 24),
@@ -969,6 +989,7 @@ async function seedDatabase() {
     const workers = createdUsers.filter((u) => u.role === "worker");
 
     // Generate 2000 complaints with realistic distribution
+    let multiWorkerCount = 0;
     for (let i = 1; i <= 2000; i++) {
       const randomUser =
         regularUsers[Math.floor(Math.random() * regularUsers.length)];
@@ -986,10 +1007,112 @@ async function seedDatabase() {
         if (deptWorkers.length > 0) {
           const assignedWorker =
             deptWorkers[Math.floor(Math.random() * deptWorkers.length)];
-          complaint.assignedTo = assignedWorker._id;
           complaint.assignedAt = complaint.history.find(
             (h) => h.status === "assigned",
           )?.timestamp;
+
+          // Initialize assignedWorkers array
+          complaint.assignedWorkers = [
+            {
+              workerId: assignedWorker._id,
+              assignedAt: complaint.assignedAt,
+              taskDescription: "Complete the assigned work",
+              status:
+                complaint.status === "resolved"
+                  ? "completed"
+                  : complaint.status === "in-progress"
+                    ? "in-progress"
+                    : "assigned",
+              completedAt:
+                complaint.status === "resolved"
+                  ? complaint.history.find((h) => h.status === "resolved")
+                      ?.timestamp
+                  : null,
+            },
+          ];
+
+          // 15% chance of multi-worker assignment for medium/high priority
+          if (
+            (complaint.priority === "Medium" ||
+              complaint.priority === "High") &&
+            Math.random() < 0.15 &&
+            deptWorkers.length > 1
+          ) {
+            const secondWorker = deptWorkers.find(
+              (w) => w._id.toString() !== assignedWorker._id.toString(),
+            );
+            if (secondWorker) {
+              complaint.assignedWorkers.push({
+                workerId: secondWorker._id,
+                assignedAt: complaint.assignedAt,
+                taskDescription: "Assist with the work",
+                status:
+                  complaint.status === "resolved"
+                    ? "completed"
+                    : complaint.status === "in-progress"
+                      ? "in-progress"
+                      : "assigned",
+                completedAt:
+                  complaint.status === "resolved"
+                    ? complaint.history.find((h) => h.status === "resolved")
+                        ?.timestamp
+                    : null,
+              });
+
+              multiWorkerCount++;
+            }
+          }
+        }
+      }
+
+      // Add completion photos for resolved complaints (80% chance)
+      if (complaint.status === "resolved" && Math.random() < 0.8) {
+        const photoCount = Math.floor(Math.random() * 3) + 1; // 1-3 photos
+        complaint.completionPhotos = [];
+        const samplePhotos = [
+          "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=800",
+          "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=800",
+          "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=800",
+          "https://images.unsplash.com/photo-1486718448742-163732cd1544?w=800",
+          "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=800",
+        ];
+        for (let j = 0; j < photoCount; j++) {
+          complaint.completionPhotos.push(
+            samplePhotos[Math.floor(Math.random() * samplePhotos.length)],
+          );
+        }
+      }
+
+      // Add satisfaction votes for resolved complaints (60% chance)
+      if (complaint.status === "resolved" && Math.random() < 0.6) {
+        complaint.satisfactionVotes = {
+          thumbsUp: [],
+          thumbsDown: [],
+          thumbsUpCount: 0,
+          thumbsDownCount: 0,
+        };
+
+        // Add random votes (more thumbs up than down for realistic data)
+        const voteCount = Math.floor(Math.random() * 15) + 1; // 1-15 votes
+        const availableVoters = regularUsers.filter(
+          (u) => u._id.toString() !== complaint.userId.toString(),
+        );
+
+        for (let v = 0; v < Math.min(voteCount, availableVoters.length); v++) {
+          const voter =
+            availableVoters[Math.floor(Math.random() * availableVoters.length)];
+          const isPositive = Math.random() < 0.75; // 75% positive votes
+
+          if (isPositive) {
+            complaint.satisfactionVotes.thumbsUp.push(voter._id);
+            complaint.satisfactionVotes.thumbsUpCount++;
+          } else {
+            complaint.satisfactionVotes.thumbsDown.push(voter._id);
+            complaint.satisfactionVotes.thumbsDownCount++;
+          }
+
+          // Remove voter from available voters to avoid duplicate votes
+          availableVoters.splice(availableVoters.indexOf(voter), 1);
         }
       }
 
@@ -999,6 +1122,10 @@ async function seedDatabase() {
         console.log(`   Generated ${i}/2000 complaints...`);
       }
     }
+
+    console.log(
+      `   Created ${multiWorkerCount} multi-worker assignments in memory`,
+    );
 
     const createdComplaints = await Complaint.insertMany(complaints);
     console.log(
@@ -1022,14 +1149,26 @@ async function seedDatabase() {
     console.log(
       `   - ${createdComplaints.filter((c) => c.status === "cancelled").length} Cancelled`,
     );
+    console.log(
+      `   - ${createdComplaints.filter((c) => c.assignedWorkers && c.assignedWorkers.length > 1).length} Multi-worker assignments`,
+    );
+    console.log(
+      `   - ${createdComplaints.filter((c) => c.completionPhotos && c.completionPhotos.length > 0).length} With completion photos`,
+    );
+    console.log(
+      `   - ${createdComplaints.filter((c) => c.satisfactionVotes && (c.satisfactionVotes.thumbsUpCount > 0 || c.satisfactionVotes.thumbsDownCount > 0)).length} With satisfaction votes`,
+    );
 
     // Update worker assigned complaints
     console.log("\n🔄 Updating worker assignments...");
     for (const worker of workers) {
-      const assignedComplaints = createdComplaints.filter(
-        (c) =>
-          c.assignedTo && c.assignedTo.toString() === worker._id.toString(),
-      );
+      const assignedComplaints = createdComplaints.filter((c) => {
+        // Check assignedWorkers array
+        const isInAssignedWorkers = c.assignedWorkers?.some(
+          (w) => w.workerId.toString() === worker._id.toString(),
+        );
+        return isInAssignedWorkers;
+      });
 
       worker.assignedComplaints = assignedComplaints
         .filter((c) =>

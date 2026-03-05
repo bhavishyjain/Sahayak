@@ -178,27 +178,48 @@ export default function HeatMap() {
 
   // Filter options
   const departments = [
-    { label: t("all_departments") || "All Departments", value: "all" },
-    { label: t("roads") || "Roads", value: "Road" },
-    { label: t("water") || "Water Supply", value: "Water" },
-    { label: t("electricity") || "Electricity", value: "Electricity" },
-    { label: t("waste") || "Waste Management", value: "Waste" },
-    { label: t("drainage") || "Drainage", value: "Drainage" },
-    { label: t("other") || "Other", value: "Other" },
+    { label: t("heatmap.allDepartments") || "All Departments", value: "all" },
+    { label: t("complaints.departments.road") || "Roads", value: "Road" },
+    {
+      label: t("complaints.departments.water") || "Water Supply",
+      value: "Water",
+    },
+    {
+      label: t("complaints.departments.electricity") || "Electricity",
+      value: "Electricity",
+    },
+    {
+      label: t("complaints.departments.waste") || "Waste Management",
+      value: "Waste",
+    },
+    {
+      label: t("complaints.departments.drainage") || "Drainage",
+      value: "Drainage",
+    },
+    { label: t("complaints.departments.other") || "Other", value: "Other" },
   ];
 
   const priorities = [
-    { label: t("all_priorities") || "All Priorities", value: "all" },
-    { label: t("high") || "High", value: "High" },
-    { label: t("medium") || "Medium", value: "Medium" },
-    { label: t("low") || "Low", value: "Low" },
+    { label: t("heatmap.allPriorities") || "All Priorities", value: "all" },
+    { label: t("complaints.priority.high") || "High", value: "High" },
+    { label: t("complaints.priority.medium") || "Medium", value: "Medium" },
+    { label: t("complaints.priority.low") || "Low", value: "Low" },
   ];
 
   const timeframes = [
-    { label: t("last_7_days") || "Last 7 Days", value: "7days" },
-    { label: t("last_30_days") || "Last 30 Days", value: "30days" },
-    { label: t("last_3_months") || "Last 3 Months", value: "3months" },
-    { label: t("last_6_months") || "Last 6 Months", value: "6months" },
+    { label: t("heatmap.timePeriods.7days") || "Last 7 Days", value: "7days" },
+    {
+      label: t("heatmap.timePeriods.30days") || "Last 30 Days",
+      value: "30days",
+    },
+    {
+      label: t("heatmap.timePeriods.3months") || "Last 3 Months",
+      value: "3months",
+    },
+    {
+      label: t("heatmap.timePeriods.6months") || "Last 6 Months",
+      value: "6months",
+    },
   ];
 
   // Generate Leaflet map HTML
@@ -543,7 +564,7 @@ export default function HeatMap() {
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
       <BackButtonHeader
-        title={t("heatmap") || "Heat Map"}
+        title={t("heatmap.title") || "Heat Map"}
         hasBackButton={false}
       />
       <ScrollView
@@ -568,13 +589,13 @@ export default function HeatMap() {
               style={{ color: colors.textPrimary }}
               className="text-lg font-bold mb-4"
             >
-              {t("filters") || "Filters"}
+              {t("heatmap.filters") || "Filters"}
             </Text>
 
             <View className="flex-row gap-2">
               <View style={{ flex: 1 }}>
                 <CustomPicker
-                  placeholder={t("department") || "Department"}
+                  placeholder={t("heatmap.department") || "Department"}
                   value={filters.department}
                   onChange={(item) => updateFilter("department", item.value)}
                   data={departments}
@@ -584,7 +605,7 @@ export default function HeatMap() {
 
               <View style={{ flex: 1 }}>
                 <CustomPicker
-                  placeholder={t("priority") || "Priority"}
+                  placeholder={t("heatmap.priority") || "Priority"}
                   value={filters.priority}
                   onChange={(item) => updateFilter("priority", item.value)}
                   data={priorities}
@@ -594,7 +615,7 @@ export default function HeatMap() {
 
               <View style={{ flex: 1 }}>
                 <CustomPicker
-                  placeholder={t("time_period") || "Time Period"}
+                  placeholder={t("heatmap.timeframe") || "Time Period"}
                   value={filters.timeframe}
                   onChange={(item) => updateFilter("timeframe", item.value)}
                   data={timeframes}
@@ -628,7 +649,7 @@ export default function HeatMap() {
                   style={{ color: colors.textSecondary, marginTop: 10 }}
                   className="text-sm"
                 >
-                  {t("loading_map") || "Loading map..."}
+                  {t("heatmap.loadingMap") || "Loading map..."}
                 </Text>
               </View>
             ) : (

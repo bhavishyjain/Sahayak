@@ -31,6 +31,12 @@ import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
+import {
+  formatDateShort,
+  formatEtaFromHours,
+  formatPriorityLabel,
+  formatStatusLabel,
+} from "../../../utils/complaintFormatters";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { API_BASE } from "../../../url";
@@ -49,7 +55,7 @@ export default function Complaints() {
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [department, setDepartment] = useState("road");
+  const [department, setDepartment] = useState("Road");
   const [locationName, setLocationName] = useState("");
   const [priority, setPriority] = useState("Medium");
   const [saving, setSaving] = useState(false);
@@ -65,8 +71,8 @@ export default function Complaints() {
     { label: t("complaints.departments.road"), value: "Road" },
     { label: t("complaints.departments.water"), value: "Water" },
     { label: t("complaints.departments.electricity"), value: "Electricity" },
-    { label: t("complaints.departments.sanitation"), value: "Sanitation" },
-    { label: t("complaints.departments.other"), value: "other" },
+    { label: t("complaints.departments.waste"), value: "Waste" },
+    { label: t("complaints.departments.other"), value: "Other" },
   ];
 
   const PRIORITY_OPTIONS = [
@@ -306,7 +312,7 @@ export default function Complaints() {
       // Reset form
       setTitle("");
       setDescription("");
-      setDepartment("road");
+      setDepartment("Road");
       setLocationName("");
       setPriority("Medium");
       setSelectedImages([]);
@@ -410,7 +416,7 @@ export default function Complaints() {
                   className="text-xs font-semibold capitalize"
                   style={{ color: colors.textPrimary }}
                 >
-                  {chip}
+                  {chip === "all" ? t("common.all") : formatStatusLabel(t, chip)}
                 </Text>
               </PressableBlock>
             ))}
@@ -426,28 +432,11 @@ export default function Complaints() {
             </Card>
           ) : (
             filtered.map((c) => {
-              const formatDate = (dateString) => {
-                if (!dateString) return "-";
-                const date = new Date(dateString);
-                return date.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
-              };
-
-              const formatETA = (etaDate) => {
-                if (!etaDate) return null;
-                const eta = new Date(etaDate);
-                const now = new Date();
-                const diffMs = eta - now;
-                const diffHours = Math.round(diffMs / (1000 * 60 * 60));
-
-                if (diffHours < 0) return t("complaints.overdue");
-                if (diffHours < 24) return `${diffHours}h`;
-                const diffDays = Math.round(diffHours / 24);
-                return `${diffDays}d`;
-              };
+              const eta = formatEtaFromHours(
+                c.estimatedCompletionTime,
+                c.assignedAt,
+                t("complaints.overdue"),
+              );
 
               return (
                 <Card key={c.id} style={{ margin: 0, marginTop: 10, flex: 0 }}>
@@ -478,7 +467,7 @@ export default function Complaints() {
                         className="text-base font-semibold mt-1"
                         style={{ color: colors.textPrimary }}
                       >
-                        {formatDate(c.createdAt)}
+                        {formatDateShort(c.createdAt)}
                       </Text>
                     </View>
                   </View>
@@ -510,7 +499,7 @@ export default function Complaints() {
                         className="text-base font-semibold mt-1 capitalize"
                         style={{ color: getStatusColor(c.status, colors) }}
                       >
-                        {c.status || "-"}
+                        {formatStatusLabel(t, c.status)}
                       </Text>
                     </View>
                   </View>
@@ -542,7 +531,7 @@ export default function Complaints() {
                         className="text-base font-semibold mt-1"
                         style={{ color: getPriorityColor(c.priority, colors) }}
                       >
-                        {c.priority || "-"}
+                        {formatPriorityLabel(t, c.priority)}
                       </Text>
                     </View>
                   </View>
@@ -553,7 +542,7 @@ export default function Complaints() {
                       className="mb-3 px-3 py-2.5 rounded-xl flex-row items-center justify-center"
                       style={{
                         backgroundColor:
-                          formatETA(c.estimatedCompletionTime) === "Overdue"
+                          eta === t("complaints.overdue")
                             ? "#FEE2E2"
                             : colors.info
                               ? colors.info + "20"
@@ -563,7 +552,7 @@ export default function Complaints() {
                       <Clock
                         size={18}
                         color={
-                          formatETA(c.estimatedCompletionTime) === "Overdue"
+                          eta === t("complaints.overdue")
                             ? "#EF4444"
                             : colors.info || "#3B82F6"
                         }
@@ -572,14 +561,13 @@ export default function Complaints() {
                         className="text-base font-bold ml-2"
                         style={{
                           color:
-                            formatETA(c.estimatedCompletionTime) ===
-                            t("complaints.overdue")
+                            eta === t("complaints.overdue")
                               ? "#EF4444"
                               : colors.info || "#3B82F6",
                         }}
                       >
                         {t("complaints.expectedResolution")}:{" "}
-                        {formatETA(c.estimatedCompletionTime)}
+                        {eta}
                       </Text>
                     </View>
                   )}

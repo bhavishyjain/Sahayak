@@ -1,12 +1,15 @@
-const bcrypt = require("bcryptjs");
 const express = require("express");
-const Complaint = require("../models/Complaint");
 const User = require("../models/User");
 const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
 const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 const authorize = require("../middlewares/authorize");
+const { createUserAccount } = require("../services/userProvisionService");
+const {
+  getWorkerMetrics,
+  calculateWorkerPerformanceScore,
+} = require("../services/workerMetricsService");
 
 const router = express.Router();
 
@@ -28,42 +31,17 @@ router.get(
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
         if (user.role !== "worker") return user.toObject();
-
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-
-        const [activeCases, completedCases, completedToday, totalAssigned] =
-          await Promise.all([
-            Complaint.countDocuments({
-              assignedTo: user._id,
-              status: { $in: ["assigned", "in-progress"] },
-            }),
-            Complaint.countDocuments({
-              assignedTo: user._id,
-              status: "resolved",
-            }),
-            Complaint.countDocuments({
-              assignedTo: user._id,
-              status: "resolved",
-              updatedAt: { $gte: todayStart },
-            }),
-            Complaint.countDocuments({ assignedTo: user._id }),
-          ]);
-
-        const performanceScore =
-          totalAssigned > 0
-            ? Math.min(Math.round((completedCases / totalAssigned) * 100), 100)
-            : 0;
+        const metrics = await getWorkerMetrics(user._id);
 
         return {
           ...user.toObject(),
           name: user.fullName || user.username,
-          activeCases,
-          completedCases,
-          completedToday,
+          activeCases: metrics.activeComplaints,
+          completedCases: metrics.completedCount,
+          completedToday: metrics.completedToday,
           rating: user.rating || 4.5,
           status: user.isActive ? "active" : "offline",
-          performanceScore,
+          performanceScore: calculateWorkerPerformanceScore(metrics),
         };
       }),
     );
@@ -87,17 +65,27 @@ router.get(
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-    const { username, password, role = "worker", department } = req.body;
-    if (!username || !password) {
-      throw new AppError("username and password are required", 400);
-    }
-
-    const existingUser = await User.findOne({ username });
-    if (existingUser) throw new AppError("User already exists", 400);
-
-    const newUser = await User.create({
+    const {
       username,
-      password: await bcrypt.hash(password, 10),
+      password,
+      fullName,
+      email,
+      phone,
+      role = "worker",
+      department,
+    } = req.body;
+    if (!username || !password || !fullName || !email || !phone) {
+      throw new AppError(
+        "username, password, fullName, email and phone are required",
+        400,
+      );
+    }
+    const newUser = await createUserAccount({
+      username,
+      password,
+      fullName,
+      email,
+      phone,
       role,
       department,
     });

@@ -1,36 +1,40 @@
 const mongoose = require("mongoose");
+const generateTicketId = require("../utils/generateTicketId");
+const complaintAssignmentSchema = require("./complaintSchemas/complaintAssignmentSchema");
+const complaintFeedbackSchema = require("./complaintSchemas/complaintFeedbackSchema");
+const complaintSatisfactionVotesSchema = require("./complaintSchemas/complaintSatisfactionVotesSchema");
+const complaintSlaSchema = require("./complaintSchemas/complaintSlaSchema");
+const complaintHistorySchema = require("./complaintSchemas/complaintHistorySchema");
+const complaintAiAnalysisSchema = require("./complaintSchemas/complaintAiAnalysisSchema");
 
 const complaintSchema = new mongoose.Schema(
   {
-    ticketId: { type: String, required: true, unique: true },
+    ticketId: {
+      type: String,
+      required: true,
+      unique: true,
+      default: generateTicketId,
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: false, // Made optional to support anonymous submissions
-      default: null,
+      required: true,
     },
     rawText: { type: String, required: true },
-    refinedText: { type: String, default: null },
-
-    // additional description field for form submissions (keeping from existing)
-    description: { type: String, default: null },
+    refinedText: { type: String, default: null, alias: "description" },
 
     department: {
       type: String,
       enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
       required: true,
     },
-    aiSuggestedDepartment: {
-      type: String,
-      enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
-      default: null,
-    },
-    aiConfidence: { type: Number, min: 0, max: 1, default: null },
+    // AI Analysis Fields
+    aiAnalysis: { type: complaintAiAnalysisSchema, default: {} },
     coordinates: {
       lat: { type: Number, required: false },
       lng: { type: Number, required: false },
     },
-    locationName: { type: String, default: null },
+    locationName: { type: String, default: null, alias: "location" },
 
     // Contact information for anonymous submissions
     contactInfo: {
@@ -38,9 +42,6 @@ const complaintSchema = new mongoose.Schema(
       phone: { type: String, default: null },
       email: { type: String, default: null },
     },
-
-    // additional location field (keeping from existing)
-    location: { type: String, default: null },
 
     priority: {
       type: String,
@@ -61,21 +62,19 @@ const complaintSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
-    assignedTo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
+    // Multi-worker assignment support
+    assignedWorkers: [complaintAssignmentSchema],
     assignedAt: { type: Date },
     assignedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    resolvedAt: { type: Date, default: null },
     estimatedCompletionTime: { type: Number }, // in hours
     actualCompletionTime: { type: Number }, // in hours
     workerNotes: { type: String },
-    completionPhotos: [{ type: String }], // URLs to completion photos
-    proofImage: [{ type: String }], // Changed to array for multiple photos
+    completionPhotos: [{ type: String }], // URLs to after/completion photos
+    proofImage: [{ type: String }], // Before photos (from citizen)
     note: { type: String },
 
     // Public Voting/Support
@@ -87,48 +86,16 @@ const complaintSchema = new mongoose.Schema(
     ],
     upvoteCount: { type: Number, default: 0 },
 
+    // Satisfaction Voting (for resolved complaints)
+    satisfactionVotes: { type: complaintSatisfactionVotesSchema, default: {} },
+
     // Citizen Feedback & Rating
-    feedback: {
-      rating: { type: Number, min: 1, max: 5, default: null },
-      comment: { type: String, default: null },
-      ratedBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        default: null,
-      },
-      ratedAt: { type: Date, default: null },
-    },
+    feedback: { type: complaintFeedbackSchema, default: {} },
 
     // SLA Tracking
-    sla: {
-      dueDate: { type: Date, default: null },
-      isOverdue: { type: Boolean, default: false },
-      escalated: { type: Boolean, default: false },
-      escalationLevel: { type: Number, default: 0 },
-      escalationHistory: [
-        {
-          level: Number,
-          escalatedAt: Date,
-          escalatedTo: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-          },
-        },
-      ],
-    },
+    sla: { type: complaintSlaSchema, default: {} },
 
-    history: [
-      {
-        status: String,
-        updatedBy: {
-          type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String for anonymous users
-          ref: "User",
-          default: null,
-        },
-        timestamp: { type: Date, default: Date.now },
-        note: String,
-      },
-    ],
+    history: [complaintHistorySchema],
     chatHistory: [{ role: String, content: String }], // stores conversation
   },
   { timestamps: true },
@@ -137,11 +104,7 @@ const complaintSchema = new mongoose.Schema(
 // auto-generate ticketId
 complaintSchema.pre("save", function (next) {
   if (!this.ticketId) {
-    const base = Date.now().toString(36).toUpperCase();
-    this.ticketId = `CMP-${base}-${Math.random()
-      .toString(36)
-      .slice(2, 6)
-      .toUpperCase()}`;
+    this.ticketId = generateTicketId();
   }
 
   // Calculate SLA due date based on priority

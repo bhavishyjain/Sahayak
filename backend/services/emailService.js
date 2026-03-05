@@ -636,8 +636,71 @@ const sendComplaintCompleted = async (
   }
 };
 
+function normalizeAttachmentContent(content) {
+  if (!content) return null;
+  if (Buffer.isBuffer(content)) {
+    return content.toString("base64");
+  }
+  if (typeof content === "string") {
+    return content;
+  }
+  if (content.type === "Buffer" && Array.isArray(content.data)) {
+    return Buffer.from(content.data).toString("base64");
+  }
+  return null;
+}
+
+const sendEmailWithAttachment = async ({
+  to,
+  subject,
+  text,
+  html,
+  attachments = [],
+}) => {
+  if (!to) {
+    throw new Error("Recipient email is required");
+  }
+  if (!subject) {
+    throw new Error("Email subject is required");
+  }
+
+  const normalizedAttachments = attachments
+    .map((attachment) => {
+      const content = normalizeAttachmentContent(attachment?.content);
+      if (!content || !attachment?.filename) {
+        return null;
+      }
+      return {
+        filename: attachment.filename,
+        content,
+        contentType: attachment.contentType || "application/octet-stream",
+      };
+    })
+    .filter(Boolean);
+
+  const { data, error } = await resend.emails.send({
+    from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    text: text || undefined,
+    html: html || undefined,
+    attachments:
+      normalizedAttachments.length > 0 ? normalizedAttachments : undefined,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return {
+    success: true,
+    messageId: data?.id,
+  };
+};
+
 module.exports = {
   sendWorkerInvitation,
   sendComplaintRegistered,
   sendComplaintCompleted,
+  sendEmailWithAttachment,
 };

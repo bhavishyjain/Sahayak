@@ -2,17 +2,24 @@ const User = require("../models/User");
 const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
-const { sendExpoPushNotifications } = require("../services/pushNotificationService");
+const {
+  sendExpoPushNotifications,
+  isValidExpoPushToken,
+} = require("../services/pushNotificationService");
 
 exports.registerPushToken = asyncHandler(async (req, res) => {
   const { pushToken } = req.body;
-  if (!pushToken || typeof pushToken !== "string") {
+  const normalizedToken = String(pushToken || "").trim();
+  if (!normalizedToken) {
     throw new AppError("pushToken is required", 400);
+  }
+  if (!isValidExpoPushToken(normalizedToken)) {
+    throw new AppError("Invalid Expo push token format", 400);
   }
 
   await User.findByIdAndUpdate(
     req.user._id,
-    { $addToSet: { pushTokens: pushToken } },
+    { $addToSet: { pushTokens: normalizedToken } },
     { new: true },
   );
 

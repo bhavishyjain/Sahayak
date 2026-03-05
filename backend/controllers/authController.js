@@ -1,9 +1,12 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const User = require("../models/User");
+const WorkerInvitation = require("../models/WorkerInvitation");
 const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
 const { issueToken, buildUserPayload } = require("../services/authService");
+const { createUserAccount } = require("../services/userProvisionService");
 const {
   validateRegisterBody,
   validateLoginBody,
@@ -12,25 +15,47 @@ const {
 exports.register = asyncHandler(async (req, res) => {
   validateRegisterBody(req.body);
 
-  const { username, password, fullName, email, phone, role } = req.body;
+  const { username, password, fullName, email, phone, inviteToken } = req.body;
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  let invitation = null;
 
-  const existing = await User.findOne({
-    $or: [{ username }, { email }, { phone }],
-  });
+  if (inviteToken) {
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(String(inviteToken))
+      .digest("hex");
+    invitation = await WorkerInvitation.findOne({
+      tokenHash,
+      acceptedAt: null,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
 
-  if (existing) {
-    throw new AppError("User already exists with provided details", 409);
+    if (!invitation) {
+      throw new AppError("Invalid or expired invitation token", 400);
+    }
+    if (invitation.email !== normalizedEmail) {
+      throw new AppError("Invitation token does not match this email", 400);
+    }
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await User.create({
+  const role = invitation ? "worker" : "user";
+  const department = invitation ? invitation.department : "Other";
+  const user = await createUserAccount({
     username,
-    password: hashedPassword,
+    password,
     fullName,
-    email,
+    email: normalizedEmail,
     phone,
-    role: role || "user",
+    role,
+    department,
   });
+
+  if (invitation) {
+    invitation.acceptedAt = new Date();
+    invitation.acceptedBy = user._id;
+    await invitation.save();
+  }
 
   return sendSuccess(
     res,
@@ -44,8 +69,14 @@ exports.login = asyncHandler(async (req, res) => {
   validateLoginBody(req.body);
 
   const { loginId, password } = req.body;
+  const normalizedLoginId = String(loginId || "").trim();
+  const lowerLoginId = normalizedLoginId.toLowerCase();
   const user = await User.findOne({
-    $or: [{ username: loginId }, { email: loginId }, { phone: loginId }],
+    $or: [
+      { username: lowerLoginId },
+      { email: lowerLoginId },
+      { phone: normalizedLoginId },
+    ],
   });
 
   if (!user) {
@@ -82,24 +113,33 @@ exports.updateMe = asyncHandler(async (req, res) => {
     throw new AppError("User not found", 404);
   }
 
-  if (email && email !== user.email) {
-    const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedPhone = String(phone || "").trim();
+
+  if (normalizedEmail && normalizedEmail !== user.email) {
+    const existingEmail = await User.findOne({
+      email: normalizedEmail,
+      _id: { $ne: userId },
+    });
     if (existingEmail) {
       throw new AppError("Email is already in use", 400, {
         email_phone_already_used: true,
       });
     }
-    user.email = email;
+    user.email = normalizedEmail;
   }
 
-  if (phone && phone !== user.phone) {
-    const existingPhone = await User.findOne({ phone, _id: { $ne: userId } });
+  if (normalizedPhone && normalizedPhone !== user.phone) {
+    const existingPhone = await User.findOne({
+      phone: normalizedPhone,
+      _id: { $ne: userId },
+    });
     if (existingPhone) {
       throw new AppError("Phone is already in use", 400, {
         email_phone_already_used: true,
       });
     }
-    user.phone = phone;
+    user.phone = normalizedPhone;
   }
 
   if (typeof fullName === "string" && fullName.trim()) {

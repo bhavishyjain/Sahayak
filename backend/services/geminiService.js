@@ -116,4 +116,168 @@ Now analyze the user input and return JSON only.
   }
 }
 
-module.exports = { analyze };
+// Analyze sentiment and urgency of complaint
+async function analyzeSentiment(description) {
+  if (!genAI) return { sentiment: "unknown", urgency: 5, keywords: [] };
+
+  try {
+    const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
+
+    const prompt = `Analyze the sentiment and urgency of this complaint:
+
+"${description}"
+
+Return ONLY valid JSON with:
+{
+  "sentiment": "calm" | "frustrated" | "angry" | "desperate",
+  "urgency": 1-10 (number),
+  "keywords": ["keyword1", "keyword2"],
+  "affectedCount": estimated number of people affected (number),
+  "suggestedPriority": "Low" | "Medium" | "High"
+}
+
+Consider:
+- Urgent words: urgent, immediate, emergency, dangerous, critical
+- Anger indicators: terrible, awful, unacceptable, disgraceful
+- Impact indicators: entire area, many people, whole street, community
+
+Return only JSON, no explanation.`;
+
+    const response = await model.generateContent(prompt);
+    let text = response.response.text().trim();
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    try {
+      const json = JSON.parse(text);
+      return json;
+    } catch (err) {
+      console.error("Gemini sentiment analysis invalid JSON:", text);
+      return { sentiment: "unknown", urgency: 5, keywords: [], affectedCount: 1 };
+    }
+  } catch (err) {
+    console.error("Gemini sentiment analysis error:", err);
+    return { sentiment: "unknown", urgency: 5, keywords: [], affectedCount: 1 };
+  }
+}
+
+// Smart worker suggestion based on complaint and available workers
+async function suggestWorker(complaint, workers) {
+  if (!workers || workers.length === 0) return null;
+
+  try {
+    // Calculate score for each worker
+    const workerScores = workers.map(worker => {
+      let score = 0;
+
+      // Factor 1: Same department (40 points)
+      if (worker.department === complaint.department) {
+        score += 40;
+      }
+
+      // Factor 2: Workload (30 points - inverse)
+      const activeCount = worker.activeComplaints || 0;
+      const workloadScore = Math.max(0, 30 - (activeCount * 5));
+      score += workloadScore;
+
+      // Factor 3: Performance/Rating (20 points)
+      const rating = worker.avgRating || 3;
+      const performanceScore = (rating / 5) * 20;
+      score += performanceScore;
+
+      // Factor 4: Completion rate (10 points)
+      const totalResolved = worker.totalResolved || 0;
+      const totalAssigned = totalResolved + activeCount;
+      const completionRate = totalAssigned > 0 ? totalResolved / totalAssigned : 0;
+      score += completionRate * 10;
+
+      return {
+        workerId: worker._id,
+        workerName: worker.fullName || worker.username,
+        score: Math.round(score),
+        reason: `${worker.department} specialist, ${activeCount} active, ${rating.toFixed(1)}⭐`
+      };
+    });
+
+    // Sort by score and return top 3
+    const topWorkers = workerScores
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+
+    return topWorkers;
+  } catch (err) {
+    console.error("Worker suggestion error:", err);
+    return null;
+  }
+}
+
+// Enhanced complaint analysis with image description
+async function analyzeComplaintWithImage(description, imageUrl = null) {
+  if (!genAI) return { department: "Other", priority: "Medium", refinedText: description };
+
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: imageUrl ? "gemini-2.0-flash-exp" : GEMINI_PRIMARY_MODEL 
+    });
+
+    let prompt = `Analyze this complaint and categorize it:
+
+Description: "${description}"
+${imageUrl ? `Image URL: ${imageUrl}` : ''}
+
+Return ONLY valid JSON:
+{
+  "department": "Road" | "Water" | "Electricity" | "Waste" | "Drainage" | "Other",
+  "priority": "Low" | "Medium" | "High",
+  "refinedText": "Clear, concise description",
+  "confidence": 0-100 (number),
+  "reasoning": "Brief explanation"
+}
+
+Department Guidelines:
+- Road: potholes, cracks, road damage, traffic signs, zebra crossings
+- Water: leaks, burst pipes, water shortage, contamination, tanker issues
+- Electricity: power outage, streetlight not working, exposed wires, pole damage
+- Waste: garbage not collected, overflowing bins, littering, sanitation
+- Drainage: blocked drains, waterlogging, sewage overflow, manhole issues
+- Other: anything else
+
+Priority Guidelines:
+- High: Safety hazards, affecting many people, urgent situations, dangerous conditions
+- Medium: Causing inconvenience, needs attention soon
+- Low: Minor issues, cosmetic problems, can wait
+
+Return only JSON.`;
+
+    const response = await model.generateContent(prompt);
+    let text = response.response.text().trim();
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    try {
+      const json = JSON.parse(text);
+      return json;
+    } catch (err) {
+      console.error("Gemini image analysis invalid JSON:", text);
+      return { 
+        department: "Other", 
+        priority: "Medium", 
+        refinedText: description,
+        confidence: 50
+      };
+    }
+  } catch (err) {
+    console.error("Gemini image analysis error:", err);
+    return { 
+      department: "Other", 
+      priority: "Medium", 
+      refinedText: description,
+      confidence: 50
+    };
+  }
+}
+
+module.exports = { 
+  analyze, 
+  analyzeSentiment, 
+  suggestWorker,
+  analyzeComplaintWithImage
+};

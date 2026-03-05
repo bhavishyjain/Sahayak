@@ -8,7 +8,6 @@ const {
   updateWorker,
   getAllWorkers,
   getAvailableWorkers,
-  assignComplaint,
   updateWorkerStatus,
   getWorkerDashboard,
   updateComplaintStatus,
@@ -24,7 +23,6 @@ router.post("/create", authorize("admin"), createWorker);
 router.put("/:workerId", authorize("admin"), updateWorker);
 router.get("/", authorize("admin", "head"), getAllWorkers);
 router.get("/available/:department", authorize("admin", "head"), getAvailableWorkers);
-router.post("/assign-complaint", authorize("admin", "head"), assignComplaint);
 
 // Worker routes
 router.get("/dashboard", authorize("worker", "admin"), getWorkerDashboard);

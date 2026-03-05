@@ -1,11 +1,11 @@
 const AppError = require("../core/AppError");
 
 function validateCreateComplaint(body) {
-  const required = ["title", "description", "department", "locationName"];
+  const required = ["title", "description", "locationName"];
   const missing = required.filter((field) => !String(body?.[field] || "").trim());
   if (missing.length > 0) {
     throw new AppError(
-      "title, description, department and locationName are required",
+      "title, description and locationName are required",
       400,
       { missing },
     );

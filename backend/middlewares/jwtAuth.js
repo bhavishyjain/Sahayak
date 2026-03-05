@@ -10,6 +10,7 @@ function normalizeUser(userObj) {
     fullName: userObj.fullName,
     email: userObj.email,
     phone: userObj.phone,
+    department: userObj.department,
     preferredLanguage: userObj.preferredLanguage || "en",
   };
 }
@@ -27,10 +28,10 @@ function attachAuth(req, res, next) {
 
   if (token) {
     try {
-      const payload = jwt.verify(
-        token,
-        process.env.JWT_SECRET || "api_dev_secret"
-      );
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
+      const payload = jwt.verify(token, process.env.JWT_SECRET);
 
       req.user = normalizeUser({
         _id: payload.userId,
@@ -39,6 +40,7 @@ function attachAuth(req, res, next) {
         fullName: payload.fullName,
         email: payload.email,
         phone: payload.phone,
+        department: payload.department,
         preferredLanguage: payload.preferredLanguage || "en",
       });
       req.currentUser = req.user;

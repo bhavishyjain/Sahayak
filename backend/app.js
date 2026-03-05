@@ -5,15 +5,9 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const cors = require("cors");
-const connectDB = require("./config/db");
 const { notFound, errorHandler } = require("./core/errorMiddleware");
 
 const app = express();
-
-connectDB();
-require("./utils/eventPriorityUpdater");
-const { setupSLAEscalationJob } = require("./utils/slaEscalation");
-setupSLAEscalationJob();
 
 // Self-ping cron job to keep Render service alive
 const cron = require("node-cron");

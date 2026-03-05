@@ -1,6 +1,7 @@
 const express = require("express");
 const controller = require("../controllers/complaintController");
 const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
+const authorize = require("../middlewares/authorize");
 const upload = require("../middlewares/multer");
 
 const router = express.Router();
@@ -17,6 +18,35 @@ router.post(
 router.post(
   "/:complaintId([0-9a-fA-F]{24})/feedback",
   controller.submitFeedback,
+);
+
+// AI Review Routes (HOD/Admin only)
+router.get(
+  "/ai-review/pending",
+  authorize("head", "admin"),
+  controller.getComplaintsNeedingReview,
+);
+router.post(
+  "/:complaintId([0-9a-fA-F]{24})/apply-ai-suggestion",
+  authorize("head", "admin"),
+  controller.applyAISuggestion,
+);
+
+// Completion Photos (Worker only)
+router.post(
+  "/:id([0-9a-fA-F]{24})/completion-photos",
+  upload.array("completionPhotos", 10),
+  controller.uploadCompletionPhotos,
+);
+
+// Satisfaction Voting (All authenticated users)
+router.post(
+  "/:id([0-9a-fA-F]{24})/satisfaction-vote",
+  controller.voteSatisfaction,
+);
+router.get(
+  "/:id([0-9a-fA-F]{24})/satisfaction",
+  controller.getSatisfactionVotes,
 );
 
 module.exports = router;

@@ -34,11 +34,18 @@ import PressableBlock from "../../../components/PressableBlock";
 import StatusPill from "../../../components/StatusPill";
 import {
   HOD_DASHBOARD_URL,
-  HOD_BULK_ASSIGN_URL,
+  HOD_ASSIGN_MULTIPLE_WORKERS_URL,
   HOD_WORKERS_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
 import { getPriorityColor } from "../../../utils/colorHelpers";
+import {
+  formatDateShort,
+  formatEtaFromHours,
+  formatPriorityLabel,
+  isComplaintAssigned,
+  normalizeStatus,
+} from "../../../utils/complaintFormatters";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
@@ -67,14 +74,11 @@ export default function HodComplaints() {
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
 
-  const getNormalizedStatus = (status) =>
-    (status || "").toLowerCase().replace(/\s+/g, "-");
-
   const matchesStatusFilter = (complaint, filterKey) => {
     if (filterKey === "all") return true;
-    if (filterKey === "assigned") return Boolean(complaint.assignedTo);
-    if (filterKey === "unassigned") return !complaint.assignedTo;
-    return getNormalizedStatus(complaint.status) === filterKey;
+    if (filterKey === "assigned") return isComplaintAssigned(complaint);
+    if (filterKey === "unassigned") return !isComplaintAssigned(complaint);
+    return normalizeStatus(complaint.status) === filterKey;
   };
 
   const statusChips = [
@@ -86,7 +90,7 @@ export default function HodComplaints() {
   ];
 
   const baseFilteredComplaints = complaints.filter((complaint) => {
-    const normalizedStatus = getNormalizedStatus(complaint.status);
+    const normalizedStatus = normalizeStatus(complaint.status);
     if (normalizedStatus === "resolved" || normalizedStatus === "cancelled") {
       return false;
     }
@@ -228,7 +232,7 @@ export default function HodComplaints() {
 
   const selectAll = () => {
     const unassignedIds = filteredComplaints
-      .filter((c) => !c.assignedTo)
+      .filter((c) => !isComplaintAssigned(c))
       .map((c) => c.id);
     setSelectedComplaints(unassignedIds);
   };
@@ -249,14 +253,17 @@ export default function HodComplaints() {
 
     try {
       setBulkAssigning(true);
-      await apiCall({
-        method: "POST",
-        url: HOD_BULK_ASSIGN_URL,
-        data: {
-          complaintIds: selectedComplaints,
-          workerId: selectedWorker,
-        },
-      });
+      await Promise.all(
+        selectedComplaints.map((complaintId) =>
+          apiCall({
+            method: "POST",
+            url: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
+            data: {
+              workers: [{ workerId: selectedWorker }],
+            },
+          }),
+        ),
+      );
 
       Toast.show({
         type: "success",
@@ -282,27 +289,19 @@ export default function HodComplaints() {
     }
   };
 
-  const formatETA = (etaDate) => {
-    if (!etaDate) return null;
-    const eta = new Date(etaDate);
-    const now = new Date();
-    const diffMs = eta - now;
-    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
-
-    if (diffHours < 0) return t("complaints.overdue");
-    if (diffHours < 24) return `${diffHours}h`;
-    const diffDays = Math.round(diffHours / 24);
-    return `${diffDays}d`;
-  };
-
   const onRefresh = () => {
     load(true);
   };
 
   const renderComplaintItem = ({ item }) => {
     const isSelected = selectedComplaints.includes(item.id);
-    const canSelect = selectMode && !item.assignedTo;
-    const eta = formatETA(item.estimatedCompletionTime);
+    const isAssigned = isComplaintAssigned(item);
+    const canSelect = selectMode && !isAssigned;
+    const eta = formatEtaFromHours(
+      item.estimatedCompletionTime,
+      item.assignedAt,
+      t("hod.complaints.overdue"),
+    );
 
     return (
       <View className="flex-row items-center mb-3">
@@ -369,7 +368,7 @@ export default function HodComplaints() {
               </View>
 
               <View className="flex-row items-center ml-3">
-                {item.assignedTo ? (
+                {isAssigned ? (
                   <>
                     <CheckCircle
                       size={14}
@@ -379,7 +378,7 @@ export default function HodComplaints() {
                       className="text-xs ml-1 font-semibold"
                       style={{ color: colors.success || "#10B981" }}
                     >
-                      Assigned
+                      {t("status.assigned")}
                     </Text>
                   </>
                 ) : (
@@ -392,7 +391,7 @@ export default function HodComplaints() {
                       className="text-xs ml-1 font-semibold"
                       style={{ color: colors.warning || "#F59E0B" }}
                     >
-                      Unassigned
+                      {t("hod.complaints.unassigned")}
                     </Text>
                   </>
                 )}
@@ -414,7 +413,7 @@ export default function HodComplaints() {
                       color: getPriorityColor(item.priority, colors),
                     }}
                   >
-                    {item.priority}
+                    {formatPriorityLabel(t, item.priority)}
                   </Text>
                 </View>
                 <View className="flex-row items-center ml-2">
@@ -428,34 +427,31 @@ export default function HodComplaints() {
                 </View>
                 {eta && (
                   <View className="flex-row items-center ml-2">
-                    <Clock
-                      size={12}
-                      color={
-                        eta === "Overdue" ? "#EF4444" : colors.info || "#3B82F6"
+                      <Clock
+                        size={12}
+                        color={
+                          eta === t("hod.complaints.overdue")
+                            ? "#EF4444"
+                            : colors.info || "#3B82F6"
                       }
                     />
                     <Text
                       className="text-xs ml-1 font-semibold"
                       style={{
                         color:
-                          eta === "Overdue"
+                          eta === t("hod.complaints.overdue")
                             ? "#EF4444"
                             : colors.info || "#3B82F6",
                       }}
                     >
-                      ETA: {eta}
+                      {t("worker.assigned.eta")}: {eta}
                     </Text>
                   </View>
                 )}
               </View>
 
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                {new Date(item.createdAt).toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {formatDateShort(item.createdAt)}
               </Text>
             </View>
           </Card>
@@ -716,7 +712,7 @@ export default function HodComplaints() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Status
+                {t("hod.complaints.filters.status")}
               </Text>
               <View className="flex-row flex-wrap mb-3" style={{ gap: 8 }}>
                 {statusChips.map((chip) => (
@@ -778,7 +774,7 @@ export default function HodComplaints() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Priority
+                {t("hod.complaints.filters.priority")}
               </Text>
               <View className="flex-row flex-wrap mb-3" style={{ gap: 8 }}>
                 {["all", "high", "medium", "low"].map((priority) => (
@@ -808,7 +804,9 @@ export default function HodComplaints() {
                               : colors.textPrimary,
                         }}
                       >
-                        {priority}
+                        {priority === "all"
+                          ? t("common.all")
+                          : formatPriorityLabel(t, priority)}
                       </Text>
                     </View>
                   </PressableBlock>
@@ -819,7 +817,7 @@ export default function HodComplaints() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Sort
+                {t("common.sort")}
               </Text>
               <View className="flex-row mb-3" style={{ gap: 8 }}>
                 <PressableBlock onPress={() => setSortOrder("new-to-old")}>
@@ -845,7 +843,7 @@ export default function HodComplaints() {
                             : colors.textPrimary,
                       }}
                     >
-                      Latest to Old
+                      {t("worker.assigned.newToOld")}
                     </Text>
                   </View>
                 </PressableBlock>
@@ -872,7 +870,7 @@ export default function HodComplaints() {
                             : colors.textPrimary,
                       }}
                     >
-                      Oldest First
+                      {t("worker.assigned.oldToNew")}
                     </Text>
                   </View>
                 </PressableBlock>
@@ -882,7 +880,7 @@ export default function HodComplaints() {
                 className="text-xs font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Date Range
+                {t("hod.complaints.filters.dateRange")}
               </Text>
               <View className="flex-row pb-4" style={{ gap: 8 }}>
                 <View className="flex-1">
@@ -891,7 +889,7 @@ export default function HodComplaints() {
                     value={startDate}
                     onChange={setStartDate}
                     icon={Calendar}
-                    placeholder="Start date"
+                    placeholder={t("hod.complaints.filters.startDate")}
                     maxDateToday={true}
                   />
                 </View>
@@ -901,7 +899,7 @@ export default function HodComplaints() {
                     value={endDate}
                     onChange={setEndDate}
                     icon={Calendar}
-                    placeholder="End date"
+                    placeholder={t("hod.complaints.filters.endDate")}
                     maxDateToday={true}
                   />
                 </View>
@@ -933,15 +931,15 @@ export default function HodComplaints() {
               style={{ color: colors.textSecondary }}
             >
               {searchQuery || hasActiveFilters()
-                ? "No complaints found"
-                : "No complaints in your department"}
+                ? t("hod.complaints.noComplaintsFound")
+                : t("hod.complaints.noDepartmentComplaints")}
             </Text>
             {(searchQuery || hasActiveFilters()) && (
               <Text
                 className="text-sm mt-1 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                Try changing search or filters
+                {t("hod.complaints.tryChangingFilters")}
               </Text>
             )}
           </View>
@@ -971,7 +969,7 @@ export default function HodComplaints() {
                 className="text-xl font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Bulk Assign Complaints
+                {t("hod.complaints.bulkAssignTitle")}
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -991,10 +989,12 @@ export default function HodComplaints() {
                 className="text-sm font-semibold mb-1"
                 style={{ color: colors.primary }}
               >
-                {selectedComplaints.length} Complaints Selected
+                {t("hod.complaints.bulkSelectedCount", {
+                  count: selectedComplaints.length,
+                })}
               </Text>
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                Select a worker to assign all selected complaints
+                {t("hod.complaints.bulkAssignHint")}
               </Text>
             </View>
 
@@ -1012,7 +1012,7 @@ export default function HodComplaints() {
                 <TextInput
                   className="flex-1 ml-2 text-sm"
                   style={{ color: colors.textPrimary }}
-                  placeholder="Search workers..."
+                  placeholder={t("hod.complaints.searchWorkers")}
                   placeholderTextColor={colors.textSecondary}
                   value={workerSearchQuery}
                   onChangeText={setWorkerSearchQuery}
@@ -1037,63 +1037,67 @@ export default function HodComplaints() {
                     className="text-sm mt-3 text-center"
                     style={{ color: colors.textSecondary }}
                   >
-                    No workers available
+                    {t("hod.complaints.noWorkers")}
                   </Text>
                 </View>
               ) : (
                 workers
                   .filter((w) =>
-                    w.fullName
+                    (w.fullName || w.username || "")
                       ?.toLowerCase()
                       .includes(workerSearchQuery.toLowerCase()),
                   )
-                  .map((worker) => (
-                    <TouchableOpacity
-                      key={worker.id}
-                      onPress={() => setSelectedWorker(worker.id)}
-                      className="mb-2"
-                    >
-                      <View
-                        className="p-4 rounded-xl flex-row items-center justify-between"
-                        style={{
-                          backgroundColor:
-                            selectedWorker === worker.id
-                              ? colors.primary + "20"
-                              : colors.backgroundSecondary,
-                          borderWidth: 1.5,
-                          borderColor:
-                            selectedWorker === worker.id
-                              ? colors.primary
-                              : colors.border,
-                        }}
+                  .map((worker) => {
+                    const workerId = String(worker.id || worker._id || "");
+                    if (!workerId) return null;
+                    return (
+                      <TouchableOpacity
+                        key={workerId}
+                        onPress={() => setSelectedWorker(workerId)}
+                        className="mb-2"
                       >
-                        <View className="flex-1">
-                          <Text
-                            className="text-base font-semibold mb-1"
-                            style={{
-                              color:
-                                selectedWorker === worker.id
-                                  ? colors.primary
-                                  : colors.textPrimary,
-                            }}
-                          >
-                            {worker.fullName}
-                          </Text>
-                          <Text
-                            className="text-xs"
-                            style={{ color: colors.textSecondary }}
-                          >
-                            {worker.specializations?.join(", ") ||
-                              "General worker"}
-                          </Text>
-                        </View>
+                        <View
+                          className="p-4 rounded-xl flex-row items-center justify-between"
+                          style={{
+                            backgroundColor:
+                              selectedWorker === workerId
+                                ? colors.primary + "20"
+                                : colors.backgroundSecondary,
+                            borderWidth: 1.5,
+                            borderColor:
+                              selectedWorker === workerId
+                                ? colors.primary
+                                : colors.border,
+                          }}
+                        >
+                          <View className="flex-1">
+                            <Text
+                              className="text-base font-semibold mb-1"
+                              style={{
+                                color:
+                                  selectedWorker === workerId
+                                    ? colors.primary
+                                    : colors.textPrimary,
+                              }}
+                            >
+                              {worker.fullName || worker.username}
+                            </Text>
+                            <Text
+                              className="text-xs"
+                              style={{ color: colors.textSecondary }}
+                            >
+                              {worker.specializations?.join(", ") ||
+                                t("hod.complaints.generalWorker")}
+                            </Text>
+                          </View>
 
-                        {selectedWorker === worker.id && (
-                          <CheckCircle size={24} color={colors.primary} />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  ))
+                          {selectedWorker === workerId && (
+                            <CheckCircle size={24} color={colors.primary} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
               )}
             </ScrollView>
 
@@ -1114,7 +1118,7 @@ export default function HodComplaints() {
                   className="text-center text-base font-semibold"
                   style={{ color: colors.textSecondary }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Text>
               </TouchableOpacity>
 
@@ -1137,7 +1141,7 @@ export default function HodComplaints() {
                     className="text-center text-base font-bold"
                     style={{ color: "#fff" }}
                   >
-                    Assign All
+                    {t("hod.complaints.assignAll")}
                   </Text>
                 )}
               </TouchableOpacity>

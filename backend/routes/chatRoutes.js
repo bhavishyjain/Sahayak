@@ -1,15 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { analyze } = require("../services/geminiService");
 const Complaint = require("../models/Complaint");
 const { attachAuth } = require("../middlewares/jwtAuth");
+const { canAccessComplaint } = require("../policies/complaintPolicy");
+const {
+  hasGeminiClient,
+  runGeminiWithFallback,
+  generateChatResponse,
+} = require("../services/chatAssistantService");
 
-// Configure multer for audio uploads
 const upload = multer({
   storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     if (
       file.mimetype.startsWith("audio/") ||
       file.mimetype === "application/octet-stream"
@@ -24,23 +27,14 @@ const upload = multer({
   },
 });
 
-function getGeminiApiKey() {
-  const raw = process.env.GEMINI_API_KEY;
-  if (!raw) return "";
-  return String(raw).trim().replace(/^['\"]|['\"]$/g, "");
-}
-
 function getOpenAIApiKey() {
   const raw = process.env.OPENAI_API_KEY;
   if (!raw) return "";
-  return String(raw).trim().replace(/^['\"]|['\"]$/g, "");
+  return String(raw)
+    .trim()
+    .replace(/^['\"]|['\"]$/g, "");
 }
 
-const genAI = getGeminiApiKey()
-  ? new GoogleGenerativeAI(getGeminiApiKey())
-  : null;
-
-const CHAT_MODELS = ["gemini-2.5-flash", "gemini-3-flash-preview"];
 router.use(attachAuth);
 
 function wantsRecentComplaints(message = "") {
@@ -61,12 +55,6 @@ function extractTicketId(message = "") {
   return match ? match[0].toUpperCase() : null;
 }
 
-function canAccessComplaint(user, complaint) {
-  if (!user?._id) return false;
-  if (["admin", "head", "worker"].includes(user.role)) return true;
-  return String(complaint.userId) === String(user._id);
-}
-
 function resolveAudioMimeType(mimetype = "", originalname = "") {
   const normalized = String(mimetype || "").toLowerCase();
   const fileName = String(originalname || "").toLowerCase();
@@ -81,35 +69,15 @@ function resolveAudioMimeType(mimetype = "", originalname = "") {
   }
 
   if (normalized === "application/octet-stream") {
-    if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) return "audio/mp4";
+    if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
+      return "audio/mp4";
+    }
     if (fileName.endsWith(".mp4")) return "audio/mp4";
     if (fileName.endsWith(".wav")) return "audio/wav";
     if (fileName.endsWith(".mp3")) return "audio/mpeg";
   }
 
   return normalized || "audio/mp4";
-}
-
-async function generateWithModel(modelName, prompt, inlineAudio = null) {
-  const model = genAI.getGenerativeModel({ model: modelName });
-  const parts = [];
-  if (inlineAudio) parts.push({ inlineData: inlineAudio });
-  parts.push(prompt);
-  const result = await model.generateContent(parts);
-  return result.response.text().trim();
-}
-
-async function runGeminiWithFallback(prompt, inlineAudio = null) {
-  let lastError = null;
-  for (const modelName of CHAT_MODELS) {
-    try {
-      return await generateWithModel(modelName, prompt, inlineAudio);
-    } catch (error) {
-      lastError = error;
-      console.error(`Gemini model ${modelName} failed:`, error?.message || error);
-    }
-  }
-  throw lastError || new Error("No Gemini model available");
 }
 
 async function transcribeWithWhisper(reqFile) {
@@ -121,16 +89,13 @@ async function transcribeWithWhisper(reqFile) {
   const mimeType = resolveAudioMimeType(reqFile.mimetype, reqFile.originalname);
   const fileName = reqFile.originalname || "recording.m4a";
   const form = new FormData();
-  form.append(
-    "file",
-    new Blob([reqFile.buffer], { type: mimeType }),
-    fileName
-  );
+  form.append("file", new Blob([reqFile.buffer], { type: mimeType }), fileName);
   form.append("model", "whisper-1");
   form.append("response_format", "json");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000);
+
   let response;
   try {
     response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -178,8 +143,7 @@ router.post("/message", async (req, res) => {
     if (wantsRecentComplaints(message)) {
       if (!req.user?._id) {
         return res.json({
-          response:
-            "Please login first, then I can show your recent complaints.",
+          response: "Please login first, then I can show your recent complaints.",
           assistant: { intent: "status_list", found: false, complaints: [] },
           timestamp: new Date().toISOString(),
         });
@@ -201,7 +165,7 @@ router.post("/message", async (req, res) => {
       const summary = complaints
         .map(
           (c, i) =>
-            `${i + 1}. ${c.ticketId} - ${c.status} (${c.department}, ${c.priority})`
+            `${i + 1}. ${c.ticketId} - ${c.status} (${c.department}, ${c.priority})`,
         )
         .join("\n");
 
@@ -217,7 +181,10 @@ router.post("/message", async (req, res) => {
     }
 
     const ticketId = extractTicketId(message);
-    if (ticketId && (lowerMessage.includes("status") || lowerMessage.includes("track"))) {
+    if (
+      ticketId &&
+      (lowerMessage.includes("status") || lowerMessage.includes("track"))
+    ) {
       if (!req.user?._id) {
         return res.status(401).json({
           error: "Authentication required to check ticket status",
@@ -233,7 +200,7 @@ router.post("/message", async (req, res) => {
         });
       }
 
-      if (!canAccessComplaint(req.user, complaint)) {
+      if (!(await canAccessComplaint(req.user, complaint))) {
         return res.status(403).json({
           error: "You are not allowed to access this ticket",
         });
@@ -280,13 +247,17 @@ router.post("/speech-to-text", upload.single("audio"), async (req, res) => {
     if (sttProvider === "whisper") {
       transcription = await transcribeWithWhisper(req.file);
     } else {
-      if (!genAI) {
+      if (!hasGeminiClient()) {
         return res.status(500).json({
-          error: "Speech recognition service not available - Gemini API key missing",
+          error:
+            "Speech recognition service not available - Gemini API key missing",
         });
       }
       const base64Audio = req.file.buffer.toString("base64");
-      const mimeType = resolveAudioMimeType(req.file.mimetype, req.file.originalname);
+      const mimeType = resolveAudioMimeType(
+        req.file.mimetype,
+        req.file.originalname,
+      );
       const prompt =
         "Please transcribe this audio file to text. Only return the transcribed text, nothing else.";
       transcription = await runGeminiWithFallback(prompt, {
@@ -308,77 +279,5 @@ router.post("/speech-to-text", upload.single("audio"), async (req, res) => {
     });
   }
 });
-
-async function generateChatResponse(message, conversationHistory = []) {
-  const lowerMessage = String(message || "").toLowerCase();
-
-  if (
-    lowerMessage.includes("complaint") ||
-    lowerMessage.includes("problem") ||
-    lowerMessage.includes("issue") ||
-    lowerMessage.includes("report")
-  ) {
-    try {
-      const analysis = await analyze(message);
-
-      if (analysis.type === "newComplaint") {
-        return `I understand you want to report: "${analysis.refinedText}". This appears to be a ${analysis.department} department issue with ${analysis.priority} priority. Would you like me to help you register this complaint? Please provide your location details if you'd like to proceed.`;
-      }
-
-      if (analysis.type === "statusQuery") {
-        return "I can help you check your complaint status. Please provide your complaint ID, or I can look up your most recent complaint if you're logged in.";
-      }
-    } catch (error) {
-      console.error("Analysis error:", error);
-    }
-  }
-
-  if (genAI) {
-    try {
-      const context =
-        conversationHistory.length > 0
-          ? `Previous conversation:\n${conversationHistory
-              .map((msg) => `${msg.sender}: ${msg.text}`)
-              .join("\n")}\n\n`
-          : "";
-
-      const prompt = `${context}You are a helpful municipal assistant chatbot. The user is interacting with a municipal complaints system.
-
-Respond helpfully to their query: "${message}"
-
-Keep responses concise, friendly, and relevant to municipal services. If they ask about complaints, guide them to register or check status.
-
-Available services:
-- Complaint registration
-- Complaint status tracking
-- Information about municipal services
-- Office hours and contact information
-
-Respond in a conversational tone.`;
-
-      return await runGeminiWithFallback(prompt);
-    } catch (error) {
-      console.error("Gemini chat error:", error);
-    }
-  }
-
-  if (lowerMessage.includes("hello") || lowerMessage.includes("hi") || lowerMessage.includes("hey")) {
-    return "Hello! I'm your municipal assistant. I can help you register complaints, check complaint status, or provide information about our services. How can I assist you today?";
-  }
-
-  if (lowerMessage.includes("help")) {
-    return "I can assist you with:\n• Registering new complaints\n• Checking complaint status\n• Information about municipal services\n• Office hours and contact details\n• Service procedures\n\nWhat would you like to know more about?";
-  }
-
-  if (lowerMessage.includes("office hours") || lowerMessage.includes("timing")) {
-    return "Our office hours are:\nMonday-Friday: 9:00 AM - 6:00 PM\nSaturday: 9:00 AM - 2:00 PM\nNo service on Sundays and public holidays.";
-  }
-
-  if (lowerMessage.includes("contact") || lowerMessage.includes("phone")) {
-    return "You can reach us at:\nPhone: 1800-123-4567\nEmail: complaints@municipality.gov\nAddress: Municipal Corporation Office, 123 Civic Center";
-  }
-
-  return "I understand you need assistance. I can help you register complaints, check status, or provide information about municipal services. Could you please be more specific about what you need help with?";
-}
 
 module.exports = router;

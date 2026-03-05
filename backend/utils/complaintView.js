@@ -43,10 +43,19 @@ function buildComplaintView(complaint, options = {}) {
     return base;
   }
 
+  const assignedWorkers = (complaint.assignedWorkers || []).map((w) => ({
+    workerId: w.workerId?._id || w.workerId,
+    workerName: w.workerId?.fullName || w.workerId?.username || null,
+    taskDescription: w.taskDescription,
+    status: w.status,
+    assignedAt: w.assignedAt,
+    completedAt: w.completedAt,
+    notes: w.notes,
+  }));
+
   return {
     ...base,
-    assignedTo: complaint.assignedTo?._id || complaint.assignedTo || null,
-    assignedWorkerName: complaint.assignedTo?.fullName || null,
+    assignedWorkers,
   };
 }
 

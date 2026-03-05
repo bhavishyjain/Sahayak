@@ -554,7 +554,8 @@ export default function HodDashboard() {
                       className="text-xs mb-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      Total Upvotes
+                      {t("hod.dashboard.engagement.totalUpvotes") ||
+                        "Total Upvotes"}
                     </Text>
                     <Text
                       className="text-2xl font-bold"
@@ -574,7 +575,8 @@ export default function HodDashboard() {
                       className="text-xs mb-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      Avg per Complaint
+                      {t("hod.dashboard.engagement.avgPerComplaint") ||
+                        "Avg per Complaint"}
                     </Text>
                     <Text
                       className="text-2xl font-bold"
@@ -704,7 +706,8 @@ export default function HodDashboard() {
                   className="text-xl font-bold"
                   style={{ color: colors.textPrimary }}
                 >
-                  Performance Calculation
+                  {t("hod.dashboard.performance.calculationTitle") ||
+                    "Performance Calculation"}
                 </Text>
               </View>
               <TouchableOpacity
@@ -724,7 +727,8 @@ export default function HodDashboard() {
                 className="text-sm mb-1"
                 style={{ color: colors.textSecondary }}
               >
-                Current Performance Score
+                {t("hod.dashboard.performance.currentScore") ||
+                  "Current Performance Score"}
               </Text>
               <Text
                 className="text-4xl font-bold"
@@ -749,7 +753,8 @@ export default function HodDashboard() {
                   className="text-sm font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Calculation Formula
+                  {t("hod.dashboard.performance.calculationFormula") ||
+                    "Calculation Formula"}
                 </Text>
               </View>
               <View
@@ -775,7 +780,8 @@ export default function HodDashboard() {
                   className="text-sm font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Performance Components
+                  {t("hod.dashboard.performance.componentsTitle") ||
+                    "Performance Components"}
                 </Text>
               </View>
 
@@ -800,13 +806,15 @@ export default function HodDashboard() {
                         className="text-sm font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        Completion Rate
+                        {t("hod.dashboard.performance.completionRateTitle") ||
+                          "Completion Rate"}
                       </Text>
                       <Text
                         className="text-xs"
                         style={{ color: colors.textSecondary }}
                       >
-                        Weight: 50%
+                        {t("hod.dashboard.performance.weight50") ||
+                          "Weight: 50%"}
                       </Text>
                     </View>
                   </View>
@@ -867,13 +875,15 @@ export default function HodDashboard() {
                         className="text-sm font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        Response Time
+                        {t("hod.dashboard.performance.responseTimeTitle") ||
+                          "Response Time"}
                       </Text>
                       <Text
                         className="text-xs"
                         style={{ color: colors.textSecondary }}
                       >
-                        Weight: 30%
+                        {t("hod.dashboard.performance.weight30") ||
+                          "Weight: 30%"}
                       </Text>
                     </View>
                   </View>
@@ -929,13 +939,15 @@ export default function HodDashboard() {
                         className="text-sm font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        Pending Status
+                        {t("hod.dashboard.performance.pendingStatusTitle") ||
+                          "Pending Status"}
                       </Text>
                       <Text
                         className="text-xs"
                         style={{ color: colors.textSecondary }}
                       >
-                        Weight: 20%
+                        {t("hod.dashboard.performance.weight20") ||
+                          "Weight: 20%"}
                       </Text>
                     </View>
                   </View>
@@ -985,7 +997,7 @@ export default function HodDashboard() {
                 className="text-center font-semibold"
                 style={{ color: "#FFFFFF" }}
               >
-                Got it
+                {t("hod.dashboard.performance.gotIt") || "Got it"}
               </Text>
             </Pressable>
           </Pressable>

@@ -15,7 +15,6 @@ function errorHandler(err, _req, res, _next) {
   return res.status(statusCode).json({
     success: false,
     message: err.message || "Internal server error",
-    ...(err.details || {}),
     details: err.details || undefined,
     stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });

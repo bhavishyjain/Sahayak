@@ -1,5 +1,4 @@
-const cloudinary = require("../config/cloudinary");
-const streamifier = require("streamifier");
+const { uploadFilesToCloudinary } = require("./mediaUploadService");
 
 function parseCoordinates(rawCoordinates) {
   let coordinates = rawCoordinates;
@@ -26,22 +25,8 @@ function parseCoordinates(rawCoordinates) {
 
 async function uploadComplaintImages(files = []) {
   if (!files.length) return [];
-
-  return Promise.all(
-    files.map(
-      (file) =>
-        new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            { folder: "sahayak/complaints", resource_type: "image" },
-            (error, result) => {
-              if (error) return reject(error);
-              return resolve(result.secure_url);
-            },
-          );
-          streamifier.createReadStream(file.buffer).pipe(uploadStream);
-        }),
-    ),
-  );
+  const uploads = await uploadFilesToCloudinary(files, "sahayak/complaints");
+  return uploads.map((upload) => upload.url).filter(Boolean);
 }
 
 function applyUpvotePolicy(complaint, userId, hasUpvoted) {

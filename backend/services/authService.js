@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
 
 function issueToken(user) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET environment variable is not set");
+  }
   return jwt.sign(
     {
       userId: user._id,
@@ -9,9 +12,10 @@ function issueToken(user) {
       fullName: user.fullName,
       email: user.email,
       phone: user.phone,
+      department: user.department,
       preferredLanguage: user.preferredLanguage || "en",
     },
-    process.env.JWT_SECRET || "api_dev_secret",
+    process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
   );
 }

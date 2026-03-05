@@ -65,7 +65,15 @@ export async function updateUserInfo() {
   });
   const userData = res.data.user;
   if (userData) {
-    setUserAuth(userData);
+    // Preserve existing token
+    const currentUser = await getUserAuth();
+    const authToken = currentUser?.auth_token || userData.auth_token;
+    const mergedUser = {
+      ...userData,
+      auth_token: authToken,
+      token: authToken,
+    };
+    await setUserAuth(mergedUser);
   }
   return res;
 }
@@ -75,7 +83,7 @@ export async function updateUserInfoViaApi(partialUpdate) {
     throw new Error("updateUserInfoViaApi requires an object");
   }
 
-  let user = getUserAuth();
+  let user = await getUserAuth();
 
   if (!user) {
     throw new Error("No authenticated user found");
@@ -88,8 +96,14 @@ export async function updateUserInfoViaApi(partialUpdate) {
 
   if (Platform.OS === "web") {
     localStorage.setItem("user", JSON.stringify(updatedUser));
+    if (updatedUser.auth_token) {
+      localStorage.setItem("auth_token", updatedUser.auth_token);
+    }
   } else {
     await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+    if (updatedUser.auth_token) {
+      await AsyncStorage.setItem("auth_token", updatedUser.auth_token);
+    }
   }
 
   return updatedUser;

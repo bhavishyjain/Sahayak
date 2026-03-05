@@ -27,6 +27,14 @@ import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
+import {
+  formatDateShort,
+  formatEtaFromHours,
+  formatPriorityLabel,
+  formatStatusLabel,
+  normalizePriority,
+  normalizeStatus,
+} from "../../../utils/complaintFormatters";
 import { WORKER_ASSIGNED_URL } from "../../../url";
 
 export default function WorkerAssigned() {
@@ -64,9 +72,9 @@ export default function WorkerAssigned() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
+        text1: t("worker.assigned.failed"),
         text2:
-          e?.response?.data?.message || "Could not load assigned complaints",
+          e?.response?.data?.message || t("worker.assigned.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -124,12 +132,16 @@ export default function WorkerAssigned() {
 
     // Priority filter
     if (selectedPriority !== "all") {
-      filtered = filtered.filter((c) => c.priority === selectedPriority);
+      filtered = filtered.filter(
+        (c) => normalizePriority(c.priority) === selectedPriority,
+      );
     }
 
     // Status filter
     if (selectedStatus !== "all") {
-      filtered = filtered.filter((c) => c.status === selectedStatus);
+      filtered = filtered.filter(
+        (c) => normalizeStatus(c.status) === selectedStatus,
+      );
     }
 
     // Sort
@@ -161,30 +173,6 @@ export default function WorkerAssigned() {
       selectedPriority !== "all" ||
       selectedStatus !== "all"
     );
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatETA = (etaDate) => {
-    if (!etaDate) return null;
-    const eta = new Date(etaDate);
-    const now = new Date();
-    const diffMs = eta - now;
-    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
-
-    if (diffHours < 0) return t("worker.assigned.overdue");
-    if (diffHours < 24) return `${diffHours}h`;
-    const diffDays = Math.round(diffHours / 24);
-    return `${diffDays}d`;
   };
 
   if (loading) {
@@ -318,7 +306,7 @@ export default function WorkerAssigned() {
                 className="text-base font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                {t("worker.assigned.filters.title")}
+                {t("common.filters")}
               </Text>
               {hasActiveFilters() && (
                 <PressableBlock onPress={clearFilters}>
@@ -499,7 +487,9 @@ export default function WorkerAssigned() {
                               : colors.textPrimary,
                         }}
                       >
-                        {priority}
+                        {priority === "all"
+                          ? t("common.all")
+                          : formatPriorityLabel(t, priority)}
                       </Text>
                     </View>
                   </PressableBlock>
@@ -545,7 +535,9 @@ export default function WorkerAssigned() {
                                 : colors.textPrimary,
                           }}
                         >
-                          {status.replace("-", " ")}
+                          {status === "all"
+                            ? t("common.all")
+                            : formatStatusLabel(t, status)}
                         </Text>
                       </View>
                     </PressableBlock>
@@ -564,6 +556,7 @@ export default function WorkerAssigned() {
                   style={{ color: colors.info || "#3B82F6" }}
                 >
                   {t("worker.assigned.showingResults", {
+                    count: filteredComplaints.length,
                     filtered: filteredComplaints.length,
                     total: complaints.length,
                   })}
@@ -597,143 +590,148 @@ export default function WorkerAssigned() {
                 className="text-base font-semibold"
                 style={{ color: colors.textSecondary }}
               >
-                {t("worker.assigned.noComplaints.title")}
+                {t("worker.assigned.noComplaints")}
               </Text>
               <Text
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                {t("worker.assigned.noComplaints.message")}
+                {t("worker.dashboard.allCaughtUp")}
               </Text>
             </View>
           </Card>
         ) : (
-          filteredComplaints.map((complaint) => (
-            <PressableBlock
-              key={complaint.id}
-              onPress={() =>
-                router.push(`/complaints/complaint-details?id=${complaint.id}`)
-              }
-            >
-              <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-                <View className="flex-row justify-between items-start mb-2">
-                  <Text
-                    className="text-lg font-bold flex-1"
-                    style={{ color: colors.primary }}
-                  >
-                    #{complaint.ticketId}
-                  </Text>
-                  <View
-                    className="px-2 py-1 rounded"
-                    style={{
-                      backgroundColor:
-                        getStatusColor(complaint.status, colors) + "20",
-                    }}
-                  >
+          filteredComplaints.map((complaint) => {
+            const eta = formatEtaFromHours(
+              complaint.estimatedCompletionTime,
+              complaint.assignedAt,
+              t("worker.assigned.overdue"),
+            );
+
+            return (
+              <PressableBlock
+                key={complaint.id}
+                onPress={() =>
+                  router.push(`/complaints/complaint-details?id=${complaint.id}`)
+                }
+              >
+                <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+                  <View className="flex-row justify-between items-start mb-2">
                     <Text
-                      className="text-xs font-semibold capitalize"
+                      className="text-lg font-bold flex-1"
+                      style={{ color: colors.primary }}
+                    >
+                      #{complaint.ticketId}
+                    </Text>
+                    <View
+                      className="px-2 py-1 rounded"
                       style={{
-                        color: getStatusColor(complaint.status, colors),
+                        backgroundColor:
+                          getStatusColor(complaint.status, colors) + "20",
                       }}
                     >
-                      {complaint.status}
-                    </Text>
+                      <Text
+                        className="text-xs font-semibold capitalize"
+                        style={{
+                          color: getStatusColor(complaint.status, colors),
+                        }}
+                      >
+                        {formatStatusLabel(t, complaint.status)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
-                <Text
-                  className="text-base font-semibold mb-1"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {complaint.title}
-                </Text>
-
-                <Text
-                  className="text-sm mb-3 leading-5"
-                  numberOfLines={2}
-                  style={{ color: colors.textSecondary }}
-                >
-                  {complaint.description}
-                </Text>
-
-                <View className="flex-row items-center mb-2">
-                  <MapPin size={14} color={colors.textSecondary} />
                   <Text
-                    className="text-xs ml-1 flex-1"
+                    className="text-base font-semibold mb-1"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {complaint.title}
+                  </Text>
+
+                  <Text
+                    className="text-sm mb-3 leading-5"
+                    numberOfLines={2}
                     style={{ color: colors.textSecondary }}
                   >
-                    {complaint.locationName || t("worker.assigned.noLocation")}
+                    {complaint.description}
                   </Text>
-                </View>
 
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center">
-                    <Clock size={14} color={colors.textSecondary} />
+                  <View className="flex-row items-center mb-2">
+                    <MapPin size={14} color={colors.textSecondary} />
                     <Text
-                      className="text-xs ml-1"
+                      className="text-xs ml-1 flex-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      {t("worker.assigned.assignedAt", {
-                        date: formatDate(complaint.assignedAt),
-                      })}
+                      {complaint.locationName || t("worker.assigned.noLocation")}
                     </Text>
                   </View>
-                  <View
-                    className="px-2 py-1 rounded"
-                    style={{
-                      backgroundColor:
-                        getPriorityColor(complaint.priority, colors) + "20",
-                    }}
-                  >
-                    <Text
-                      className="text-xs font-semibold"
+
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center">
+                      <Clock size={14} color={colors.textSecondary} />
+                      <Text
+                        className="text-xs ml-1"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("worker.assigned.assignedAt", {
+                          date: formatDateShort(complaint.assignedAt),
+                        })}
+                      </Text>
+                    </View>
+                    <View
+                      className="px-2 py-1 rounded"
                       style={{
-                        color: getPriorityColor(complaint.priority, colors),
+                        backgroundColor:
+                          getPriorityColor(complaint.priority, colors) + "20",
                       }}
                     >
-                      {complaint.priority}
-                    </Text>
+                      <Text
+                        className="text-xs font-semibold"
+                        style={{
+                          color: getPriorityColor(complaint.priority, colors),
+                        }}
+                      >
+                        {formatPriorityLabel(t, complaint.priority)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                {complaint.estimatedCompletionTime && (
-                  <View
-                    className="mt-3 px-3 py-2 rounded-xl flex-row items-center justify-center"
-                    style={{
-                      backgroundColor:
-                        formatETA(complaint.estimatedCompletionTime) ===
-                        t("worker.assigned.overdue")
-                          ? "#FEE2E2"
-                          : colors.info
-                            ? colors.info + "20"
-                            : "#DBEAFE",
-                    }}
-                  >
-                    <Clock
-                      size={16}
-                      color={
-                        formatETA(complaint.estimatedCompletionTime) ===
-                        t("worker.assigned.overdue")
-                          ? "#EF4444"
-                          : colors.info || "#3B82F6"
-                      }
-                    />
-                    <Text
-                      className="text-sm font-bold ml-2"
+                  {eta && (
+                    <View
+                      className="mt-3 px-3 py-2 rounded-xl flex-row items-center justify-center"
                       style={{
-                        color:
-                          formatETA(complaint.estimatedCompletionTime) ===
-                          t("worker.assigned.overdue")
+                        backgroundColor:
+                          eta === t("worker.assigned.overdue")
+                            ? "#FEE2E2"
+                            : colors.info
+                              ? colors.info + "20"
+                              : "#DBEAFE",
+                      }}
+                    >
+                      <Clock
+                        size={16}
+                        color={
+                          eta === t("worker.assigned.overdue")
                             ? "#EF4444"
-                            : colors.info || "#3B82F6",
-                      }}
-                    >
-                      {t("worker.assigned.eta")}: {formatETA(complaint.estimatedCompletionTime)}
-                    </Text>
-                  </View>
-                )}
-              </Card>
-            </PressableBlock>
-          ))
+                            : colors.info || "#3B82F6"
+                        }
+                      />
+                      <Text
+                        className="text-sm font-bold ml-2"
+                        style={{
+                          color:
+                            eta === t("worker.assigned.overdue")
+                              ? "#EF4444"
+                              : colors.info || "#3B82F6",
+                        }}
+                      >
+                        {t("worker.assigned.eta")}: {eta}
+                      </Text>
+                    </View>
+                  )}
+                </Card>
+              </PressableBlock>
+            );
+          })
         )}
       </ScrollView>
     </View>

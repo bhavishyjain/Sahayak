@@ -47,7 +47,10 @@ const getAuthHeaders = async (headers = {}) => {
         "User-Agent": USER_AGENT_STRING,
       };
     }
-    return headers;
+    return {
+      ...headers,
+      "User-Agent": USER_AGENT_STRING,
+    };
   } catch (error) {
     return {
       ...headers,
@@ -102,6 +105,7 @@ const apiCall = async ({
   params = undefined,
   headers = {},
   auth = null,
+  responseType = undefined,
 }) => {
   try {
     const authHeaders = auth
@@ -148,6 +152,7 @@ const apiCall = async ({
       data: payload,
       params,
       headers: authHeaders,
+      responseType,
       timeout: 30000,
       validateStatus: (status) => status < 500,
     };

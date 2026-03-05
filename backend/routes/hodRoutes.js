@@ -5,14 +5,15 @@ const authorize = require("../middlewares/authorize");
 const {
   getHodDashboard,
   getHodWorkers,
-  assignComplaintToWorker,
   approveCompletion,
   markNeedsRework,
   cancelComplaint,
-  bulkAssignComplaints,
   getWorkerComplaints,
   inviteWorker,
   removeWorker,
+  assignMultipleWorkers,
+  updateWorkerTask,
+  getComplaintWorkers,
 } = require("../controllers/hodController");
 
 router.use(attachAuth, requireAuth, authorize("head"));
@@ -20,7 +21,6 @@ router.use(attachAuth, requireAuth, authorize("head"));
 router.get("/dashboard", getHodDashboard);
 router.get("/workers", getHodWorkers);
 router.get("/workers/:workerId/complaints", getWorkerComplaints);
-router.post("/assign-complaint", assignComplaintToWorker);
 router.post("/invite-worker", inviteWorker);
 router.delete("/workers/:workerId", removeWorker);
 
@@ -29,7 +29,9 @@ router.post("/approve-completion/:complaintId", approveCompletion);
 router.post("/needs-rework/:complaintId", markNeedsRework);
 router.post("/cancel-complaint/:complaintId", cancelComplaint);
 
-// Bulk Operations
-router.post("/bulk-assign", bulkAssignComplaints);
+// Multi-Worker Assignment
+router.post("/complaints/:complaintId/assign-workers", assignMultipleWorkers);
+router.put("/complaints/:complaintId/workers/:workerId", updateWorkerTask);
+router.get("/complaints/:complaintId/workers", getComplaintWorkers);
 
 module.exports = router;

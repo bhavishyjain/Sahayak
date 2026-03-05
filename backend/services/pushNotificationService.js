@@ -1,6 +1,14 @@
+function isValidExpoPushToken(token) {
+  const expoTokenPattern = /^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/;
+  return (
+    typeof token === "string" &&
+    expoTokenPattern.test(token.trim())
+  );
+}
+
 async function sendExpoPushNotifications(tokens, payload) {
-  const validTokens = (tokens || []).filter(
-    (token) => typeof token === "string" && token.startsWith("ExponentPushToken[")
+  const validTokens = (tokens || []).filter((token) =>
+    isValidExpoPushToken(token),
   );
 
   if (!validTokens.length) return { sent: 0, tickets: [] };
@@ -41,4 +49,5 @@ async function sendExpoPushNotifications(tokens, payload) {
 
 module.exports = {
   sendExpoPushNotifications,
+  isValidExpoPushToken,
 };

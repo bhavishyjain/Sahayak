@@ -14,5 +14,6 @@ router.use("/chat", require("./chatRoutes"));
 router.use("/workers", require("./workerRoutes"));
 router.use("/hod", require("./hodRoutes"));
 router.use("/users", require("./users"));
+router.use("/reports", require("./reportRoutes"));
 
 module.exports = router;

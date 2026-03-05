@@ -1,4 +1,6 @@
 const Complaint = require("../models/Complaint");
+const User = require("../models/User");
+const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
 const { buildComplaintView } = require("../utils/complaintView");
@@ -41,6 +43,7 @@ exports.summary = asyncHandler(async (req, res) => {
 exports.heatmap = asyncHandler(async (req, res) => {
   // Parse filters from query params
   const { department, priority, timeframe } = req.query;
+  const role = req.user?.role;
 
   // Calculate time window based on timeframe filter
   const windowStart = new Date();
@@ -65,7 +68,13 @@ exports.heatmap = asyncHandler(async (req, res) => {
     createdAt: { $gte: windowStart },
   };
 
-  if (department && department !== "all") {
+  if (role === "head" || role === "worker") {
+    const actor = await User.findById(req.user._id).select("role department");
+    if (!actor || actor.role !== role) {
+      throw new AppError("Forbidden", 403);
+    }
+    query.department = actor.department;
+  } else if (department && department !== "all") {
     query.department = department;
   }
 

@@ -30,6 +30,14 @@ export const UPVOTE_COMPLAINT_URL = (id) =>
   API_BASE + `/complaints/${id}/upvote`;
 export const SUBMIT_FEEDBACK_URL = (id) =>
   API_BASE + `/complaints/${id}/feedback`;
+export const UPLOAD_COMPLETION_PHOTOS_URL = (id) =>
+  API_BASE + `/complaints/${id}/completion-photos`;
+export const SATISFACTION_VOTE_URL = (id) =>
+  API_BASE + `/complaints/${id}/satisfaction-vote`;
+export const GET_SATISFACTION_URL = (id) =>
+  API_BASE + `/complaints/${id}/satisfaction`;
+export const APPLY_AI_SUGGESTION_URL = (id) =>
+  API_BASE + `/complaints/${id}/apply-ai-suggestion`;
 
 // ============================================================================
 // DASHBOARD URLs
@@ -66,17 +74,32 @@ export const HOD_DASHBOARD_URL = API_BASE + "/hod/dashboard";
 export const HOD_WORKERS_URL = API_BASE + "/hod/workers";
 export const HOD_WORKER_COMPLAINTS_URL = (workerId) =>
   API_BASE + `/hod/workers/${workerId}/complaints`;
-export const HOD_ASSIGN_COMPLAINT_URL = API_BASE + "/hod/assign-complaint";
 export const HOD_APPROVE_COMPLETION_URL = (id) =>
   API_BASE + `/hod/approve-completion/${id}`;
 export const HOD_NEEDS_REWORK_URL = (id) =>
   API_BASE + `/hod/needs-rework/${id}`;
 export const HOD_CANCEL_COMPLAINT_URL = (id) =>
   API_BASE + `/hod/cancel-complaint/${id}`;
-export const HOD_BULK_ASSIGN_URL = API_BASE + "/hod/bulk-assign";
 export const HOD_INVITE_WORKER_URL = API_BASE + "/hod/invite-worker";
 export const HOD_REMOVE_WORKER_URL = (workerId) =>
   API_BASE + `/hod/workers/${workerId}`;
+export const HOD_ASSIGN_MULTIPLE_WORKERS_URL = (complaintId) =>
+  API_BASE + `/hod/complaints/${complaintId}/assign-workers`;
+export const HOD_UPDATE_WORKER_TASK_URL = (complaintId, workerId) =>
+  API_BASE + `/hod/complaints/${complaintId}/workers/${workerId}`;
+export const HOD_GET_COMPLAINT_WORKERS_URL = (complaintId) =>
+  API_BASE + `/hod/complaints/${complaintId}/workers`;
+
+// ============================================================================
+// REPORT URLs
+// ============================================================================
+export const REPORT_STATS_URL = API_BASE + "/reports/stats";
+export const REPORT_DOWNLOAD_URL = (format) => API_BASE + `/reports/${format}`;
+
+// ============================================================================
+// LEGACY/OPTIONAL URLs
+// ============================================================================
+export const GET_PRESIGNED_UPLOAD_URL = API_BASE + "/uploads/presigned-url";
 
 // ============================================================================
 // HEALTH CHECK

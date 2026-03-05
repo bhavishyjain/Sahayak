@@ -9,6 +9,7 @@ import {
   Sun,
   Trash2,
   CheckCircle,
+  FileText,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -98,7 +99,7 @@ const ProfileHeader = React.memo(({ user, colors, t, loading }) => {
           className="text-lg font-bold mt-3"
           style={{ color: colors.textPrimary }}
         >
-          {user?.fullName || "Loading..."}
+          {user?.fullName || t("common.loading")}
         </Text>
 
         <Text style={{ color: colors.textSecondary }}>{user?.phone || ""}</Text>
@@ -149,6 +150,12 @@ export default function More() {
   const SETTINGS_ITEMS = [
     ...(user?.role === "head"
       ? [
+          {
+            icon: FileText,
+            title: "more.menu.reports.title",
+            subtitle: "more.menu.reports.description",
+            route: "/(app)/more/hod-reports",
+          },
           {
             icon: CheckCircle,
             title: "more.menu.resolvedComplaints.title",
@@ -223,8 +230,8 @@ export default function More() {
         visible={showClarityDialog}
         title={t("more.menu.tracking.modalTitle")}
         message={t("more.menu.tracking.modalMessage")}
-        confirmText="Allow"
-        cancelText="Don't Allow"
+        confirmText={t("common.allow")}
+        cancelText={t("common.dontAllow")}
         onConfirm={() => toggleConsent(true)}
         onCancel={() => toggleConsent(false)}
       />
@@ -233,8 +240,8 @@ export default function More() {
         visible={showDeleteAccountDialog}
         title={t("more.menu.deleteAccount.modalTitle")}
         message={t("more.menu.deleteAccount.modalMessage")}
-        confirmText="OK"
-        cancelText="Cancel"
+        confirmText={t("common.ok")}
+        cancelText={t("common.cancel")}
         onConfirm={() => setShowDeleteAccountDialog(false)}
         onCancel={() => setShowDeleteAccountDialog(false)}
       />
