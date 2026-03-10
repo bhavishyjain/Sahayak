@@ -24,7 +24,7 @@ import Card from "../../../components/Card";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import PressableBlock from "../../../components/PressableBlock";
 import StatusPill from "../../../components/StatusPill";
-import { HOD_DASHBOARD_URL } from "../../../url";
+import { HOD_OVERVIEW_URL } from "../../../url";
 import apiCall from "../../../utils/api";
 import { getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
@@ -49,7 +49,7 @@ export default function HodResolvedComplaints() {
 
       const res = await apiCall({
         method: "GET",
-        url: HOD_DASHBOARD_URL,
+        url: HOD_OVERVIEW_URL,
       });
 
       const payload = res?.data;
@@ -63,7 +63,8 @@ export default function HodResolvedComplaints() {
         type: "error",
         text1: t("hod.resolvedComplaints.failed"),
         text2:
-          e?.response?.data?.message || t("hod.resolvedComplaints.loadingError"),
+          e?.response?.data?.message ||
+          t("hod.resolvedComplaints.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -224,7 +225,10 @@ export default function HodResolvedComplaints() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title={t("hod.resolvedComplaints.title")} hasBackButton={true} />
+      <BackButtonHeader
+        title={t("hod.resolvedComplaints.title")}
+        hasBackButton={true}
+      />
 
       <View className="px-4 pt-4 pb-2">
         <View

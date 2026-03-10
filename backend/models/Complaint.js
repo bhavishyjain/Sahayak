@@ -6,6 +6,7 @@ const complaintSatisfactionVotesSchema = require("./complaintSchemas/complaintSa
 const complaintSlaSchema = require("./complaintSchemas/complaintSlaSchema");
 const complaintHistorySchema = require("./complaintSchemas/complaintHistorySchema");
 const complaintAiAnalysisSchema = require("./complaintSchemas/complaintAiAnalysisSchema");
+const complaintMessageSchema = require("./complaintSchemas/complaintMessageSchema");
 
 const complaintSchema = new mongoose.Schema(
   {
@@ -97,6 +98,7 @@ const complaintSchema = new mongoose.Schema(
 
     history: [complaintHistorySchema],
     chatHistory: [{ role: String, content: String }], // stores conversation
+    messages: [complaintMessageSchema], // citizen/worker/hod thread
   },
   { timestamps: true },
 );

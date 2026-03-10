@@ -10,6 +10,30 @@ const {
 } = require("../../services/reportSchedulerService");
 const { normalizeString, buildFilters } = require("./helpers");
 
+exports.getSchedules = asyncHandler(async (req, res) => {
+  const schedules = await ReportSchedule.find({
+    userId: req.user._id,
+    isActive: true,
+  }).sort({ createdAt: -1 });
+
+  sendSuccess(res, { schedules }, "Schedules fetched successfully");
+});
+
+exports.cancelSchedule = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const schedule = await ReportSchedule.findOneAndUpdate(
+    { _id: id, userId: req.user._id },
+    { $set: { isActive: false } },
+    { new: true },
+  );
+
+  if (!schedule) {
+    throw new AppError("Schedule not found", 404);
+  }
+
+  sendSuccess(res, { schedule }, "Schedule cancelled successfully");
+});
+
 exports.scheduleEmailReport = asyncHandler(async (req, res) => {
   const { email, frequency, department, format = "pdf" } = req.body;
   const normalizedEmail = normalizeString(email).toLowerCase();

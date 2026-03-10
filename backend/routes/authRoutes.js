@@ -9,5 +9,7 @@ router.post("/login", controller.login);
 router.get("/me", attachAuth, requireAuth, controller.me);
 router.put("/me", attachAuth, requireAuth, controller.updateMe);
 router.post("/update-profile", attachAuth, requireAuth, controller.updateMe); // Alias for mobile app
+router.post("/accept-invite", attachAuth, requireAuth, controller.acceptInvite);
+router.delete("/me", attachAuth, requireAuth, controller.deleteMe);
 
 module.exports = router;

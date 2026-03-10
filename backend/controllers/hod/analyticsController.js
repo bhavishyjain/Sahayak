@@ -7,7 +7,7 @@ const { getHodOrThrow } = require("../../services/accessService");
 const { getWorkerMetricsBulk } = require("../../services/workerMetricsService");
 const { escapeRegex } = require("./helpers");
 
-exports.getHodDashboard = asyncHandler(async (req, res) => {
+exports.getHodOverview = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { department } = hod;
 
@@ -55,6 +55,7 @@ exports.getHodDashboard = asyncHandler(async (req, res) => {
             $sum: { $cond: [{ $eq: ["$priority", "Low"] }, 1, 0] },
           },
           totalUpvotes: { $sum: { $ifNull: ["$upvoteCount", 0] } },
+          avgFeedbackRating: { $avg: "$feedback.rating" },
         },
       },
     ]),
@@ -121,6 +122,9 @@ exports.getHodDashboard = asyncHandler(async (req, res) => {
       activeWorkers: workerStats.totalWorkers || 0,
       totalUpvotes: complaintStats.totalUpvotes || 0,
       avgResponseTime,
+      avgFeedbackRating: complaintStats.avgFeedbackRating
+        ? Math.round(complaintStats.avgFeedbackRating * 10) / 10
+        : null,
       performanceScore,
     },
   });

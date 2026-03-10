@@ -242,3 +242,63 @@ exports.submitFeedback = asyncHandler(async (req, res) => {
     "Feedback submitted successfully",
   );
 });
+
+exports.getNearbyComplaints = asyncHandler(async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  const radius = Math.min(parseFloat(req.query.radius) || 5, 50);
+
+  if (
+    isNaN(lat) ||
+    isNaN(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    throw new AppError("Valid lat and lng query parameters are required", 400);
+  }
+
+  // Bounding box pre-filter (1° lat ≈ 111 km)
+  const latDelta = radius / 111;
+  const lngDelta = radius / (111 * Math.cos((lat * Math.PI) / 180));
+
+  const candidates = await Complaint.find({
+    "coordinates.lat": { $gte: lat - latDelta, $lte: lat + latDelta },
+    "coordinates.lng": { $gte: lng - lngDelta, $lte: lng + lngDelta },
+    status: { $nin: ["resolved", "cancelled"] },
+  })
+    .select(
+      "ticketId refinedText rawText department status priority locationName coordinates upvoteCount createdAt",
+    )
+    .sort({ upvoteCount: -1, createdAt: -1 })
+    .limit(50)
+    .lean();
+
+  const haversine = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.asin(Math.sqrt(a));
+  };
+
+  const nearby = candidates
+    .filter((c) => c.coordinates?.lat != null && c.coordinates?.lng != null)
+    .map((c) => ({
+      ...c,
+      distance:
+        Math.round(
+          haversine(lat, lng, c.coordinates.lat, c.coordinates.lng) * 10,
+        ) / 10,
+    }))
+    .filter((c) => c.distance <= radius)
+    .sort((a, b) => b.upvoteCount - a.upvoteCount || a.distance - b.distance)
+    .slice(0, 20);
+
+  return sendSuccess(res, { complaints: nearby });
+});

@@ -1,0 +1,330 @@
+import { useLocalSearchParams } from "expo-router";
+import { MessageSquare, Send } from "lucide-react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Toast from "react-native-toast-message";
+import { darkColors, lightColors } from "../../../colors";
+import BackButtonHeader from "../../../components/BackButtonHeader";
+import {
+  GET_COMPLAINT_MESSAGES_URL,
+  POST_COMPLAINT_MESSAGE_URL,
+} from "../../../url";
+import apiCall from "../../../utils/api";
+import { useTheme } from "../../../utils/context/theme";
+import getUserAuth from "../../../utils/userAuth";
+
+const ROLE_LABEL = {
+  user: "Citizen",
+  worker: "Worker",
+  head: "HOD",
+  admin: "Admin",
+};
+
+const ROLE_COLOR = (colors) => ({
+  user: colors.primary,
+  worker: colors.success,
+  head: colors.warning,
+  admin: colors.danger,
+});
+
+function MessageBubble({ msg, currentUserId, colors }) {
+  const isOwn = String(msg.senderId) === String(currentUserId);
+  const roleColors = ROLE_COLOR(colors);
+  const roleColor = roleColors[msg.senderRole] || colors.primary;
+
+  const date = new Date(msg.createdAt);
+  const timeStr = date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const dateStr = date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <View
+      className={`mb-3 max-w-[80%] ${isOwn ? "self-end items-end" : "self-start items-start"}`}
+    >
+      {!isOwn && (
+        <View className="flex-row items-center mb-1 ml-1 gap-1">
+          <Text className="text-xs font-semibold" style={{ color: roleColor }}>
+            {msg.senderName}
+          </Text>
+          <View
+            className="px-1.5 py-0.5 rounded-full"
+            style={{ backgroundColor: roleColor + "22" }}
+          >
+            <Text
+              className="text-[10px] font-medium"
+              style={{ color: roleColor }}
+            >
+              {ROLE_LABEL[msg.senderRole] || msg.senderRole}
+            </Text>
+          </View>
+        </View>
+      )}
+      <View
+        className="px-4 py-3 rounded-2xl"
+        style={{
+          backgroundColor: isOwn ? colors.primary : colors.backgroundSecondary,
+          borderBottomRightRadius: isOwn ? 4 : 16,
+          borderBottomLeftRadius: isOwn ? 16 : 4,
+        }}
+      >
+        <Text
+          className="text-sm leading-relaxed"
+          style={{ color: isOwn ? "#fff" : colors.textPrimary }}
+        >
+          {msg.text}
+        </Text>
+      </View>
+      <Text
+        className="text-[10px] mt-1 mx-1"
+        style={{ color: colors.textSecondary }}
+      >
+        {dateStr} · {timeStr}
+      </Text>
+    </View>
+  );
+}
+
+export default function ComplaintChat() {
+  const { id, ticketId } = useLocalSearchParams();
+  const { colorScheme } = useTheme();
+  const colors = colorScheme === "dark" ? darkColors : lightColors;
+
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [text, setText] = useState("");
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const flatListRef = useRef(null);
+
+  const fetchMessages = useCallback(
+    async (pageNum = 1, append = false) => {
+      try {
+        if (pageNum === 1) setLoading(true);
+        else setLoadingMore(true);
+
+        const res = await apiCall({
+          method: "GET",
+          url: `${GET_COMPLAINT_MESSAGES_URL(id)}?page=${pageNum}`,
+        });
+
+        const fetched = res?.data?.messages || [];
+        const total = res?.data?.total || 0;
+        const pageSize = res?.data?.pageSize || 50;
+
+        if (append) {
+          // Prepend older messages (they come in ascending order)
+          setMessages((prev) => [...fetched, ...prev]);
+        } else {
+          setMessages(fetched);
+          setTimeout(
+            () => flatListRef.current?.scrollToEnd({ animated: false }),
+            100,
+          );
+        }
+
+        setHasMore(pageNum * pageSize < total);
+        setPage(pageNum);
+      } catch (e) {
+        Toast.show({
+          type: "error",
+          text1: "Failed to load messages",
+          text2: e?.response?.data?.message || "Please try again",
+        });
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    const init = async () => {
+      const user = await getUserAuth();
+      setCurrentUserId(String(user?.id || user?._id));
+      await fetchMessages(1);
+    };
+    if (id) init();
+  }, [id]);
+
+  const handleSend = async () => {
+    const msg = text.trim();
+    if (!msg || sending) return;
+
+    setText("");
+    setSending(true);
+    try {
+      const res = await apiCall({
+        method: "POST",
+        url: POST_COMPLAINT_MESSAGE_URL(id),
+        data: { text: msg },
+      });
+
+      const newMsg = res?.data?.message;
+      if (newMsg) {
+        setMessages((prev) => [...prev, newMsg]);
+        setTimeout(
+          () => flatListRef.current?.scrollToEnd({ animated: true }),
+          100,
+        );
+      }
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to send",
+        text2: e?.response?.data?.message || "Please try again",
+      });
+      // Restore text so user doesn't lose their message
+      setText(msg);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchMessages(page + 1, true);
+    }
+  };
+
+  const title = ticketId ? `#${ticketId}` : "Discussion";
+
+  return (
+    <KeyboardAvoidingView
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+    >
+      <BackButtonHeader title={`Thread · ${title}`} />
+
+      {loading ? (
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <>
+          {messages.length === 0 ? (
+            <View className="flex-1 justify-center items-center px-8">
+              <MessageSquare
+                size={48}
+                color={colors.border}
+                style={{ marginBottom: 12 }}
+              />
+              <Text
+                className="text-base font-semibold text-center mb-2"
+                style={{ color: colors.textPrimary }}
+              >
+                No messages yet
+              </Text>
+              <Text
+                className="text-sm text-center"
+                style={{ color: colors.textSecondary }}
+              >
+                Start the conversation. Citizens, workers and the department
+                head can all reply here.
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => String(item._id)}
+              renderItem={({ item }) => (
+                <MessageBubble
+                  msg={item}
+                  currentUserId={currentUserId}
+                  colors={colors}
+                />
+              )}
+              contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+              onEndReachedThreshold={0.1}
+              ListHeaderComponent={
+                loadingMore ? (
+                  <View className="py-4 items-center">
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  </View>
+                ) : hasMore ? (
+                  <TouchableOpacity
+                    onPress={handleLoadMore}
+                    className="py-3 items-center mb-2"
+                  >
+                    <Text
+                      className="text-sm font-medium"
+                      style={{ color: colors.primary }}
+                    >
+                      Load older messages
+                    </Text>
+                  </TouchableOpacity>
+                ) : null
+              }
+            />
+          )}
+
+          {/* Input bar */}
+          <View
+            className="flex-row items-end px-4 py-3 gap-3"
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              backgroundColor: colors.backgroundPrimary,
+            }}
+          >
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder="Type a message…"
+              placeholderTextColor={colors.placeholder}
+              multiline
+              maxLength={2000}
+              className="flex-1 rounded-2xl px-4 py-3 text-sm"
+              style={{
+                backgroundColor: colors.backgroundSecondary,
+                color: colors.textPrimary,
+                borderWidth: 1,
+                borderColor: colors.border,
+                maxHeight: 120,
+                textAlignVertical: "top",
+              }}
+              onSubmitEditing={handleSend}
+              blurOnSubmit={false}
+            />
+            <TouchableOpacity
+              onPress={handleSend}
+              disabled={!text.trim() || sending}
+              className="w-11 h-11 rounded-full items-center justify-center"
+              style={{
+                backgroundColor:
+                  text.trim() && !sending ? colors.primary : colors.border,
+              }}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Send size={18} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </KeyboardAvoidingView>
+  );
+}

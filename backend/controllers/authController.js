@@ -104,6 +104,59 @@ exports.me = asyncHandler(async (req, res) => {
   return sendSuccess(res, { user: buildUserPayload(user) });
 });
 
+exports.deleteMe = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+  if (!password) throw new AppError("Password is required to delete your account", 400);
+
+  const user = await User.findById(req.user._id);
+  if (!user) throw new AppError("User not found", 404);
+
+  const isValid = await bcrypt.compare(password, user.password);
+  if (!isValid) throw new AppError("Incorrect password", 401);
+
+  await User.findByIdAndDelete(req.user._id);
+
+  return sendSuccess(res, null, "Account deleted");
+});
+
+exports.acceptInvite = asyncHandler(async (req, res) => {
+  const { inviteToken } = req.body;
+  if (!inviteToken) throw new AppError("inviteToken is required", 400);
+
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(String(inviteToken))
+    .digest("hex");
+
+  const invitation = await WorkerInvitation.findOne({
+    tokenHash,
+    acceptedAt: null,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!invitation) throw new AppError("Invalid or expired invitation", 400);
+  if (invitation.email !== req.user.email) {
+    throw new AppError("This invitation was sent to a different email address", 403);
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { role: "worker", department: invitation.department },
+    { new: true },
+  );
+
+  invitation.acceptedAt = new Date();
+  invitation.acceptedBy = user._id;
+  await invitation.save();
+
+  return sendSuccess(
+    res,
+    { token: issueToken(user), user: buildUserPayload(user) },
+    "You have joined as a worker",
+  );
+});
+
 exports.updateMe = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const { fullName, email, phone, password, preferredLanguage } = req.body;

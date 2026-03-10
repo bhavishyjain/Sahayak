@@ -3,4 +3,5 @@ module.exports = {
   ...require("./complaints/aiReviewController"),
   ...require("./complaints/mediaController"),
   ...require("./complaints/satisfactionController"),
+  ...require("./complaints/messageController"),
 };

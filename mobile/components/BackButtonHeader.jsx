@@ -14,6 +14,7 @@ export default function BackButtonHeader({
   title,
   hasBackButton = true,
   order = null,
+  rightElement = null,
 }) {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -70,7 +71,11 @@ export default function BackButtonHeader({
           {title}
         </Text>
       </View>
-      <View className="w-10" />
+      {rightElement ? (
+        <View className="items-center justify-center">{rightElement}</View>
+      ) : (
+        <View className="w-10" />
+      )}
     </View>
   );
 }

@@ -4,10 +4,13 @@ const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const { buildComplaintView } = require("../../utils/complaintView");
-const { getRequestUserId, getHodOrThrow } = require("../../services/accessService");
+const {
+  getRequestUserId,
+  getHodOrThrow,
+} = require("../../services/accessService");
 const { atStartOfToday, atStartOfWeek } = require("./helpers");
 
-exports.getWorkerDashboard = asyncHandler(async (req, res) => {
+exports.getWorkerOverview = asyncHandler(async (req, res) => {
   const workerId = getRequestUserId(req);
   const assignedComplaints = await Complaint.find({
     "assignedWorkers.workerId": workerId,
@@ -264,5 +267,105 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
       period,
       totalWorkers: leaderboardData.length,
     },
+  });
+});
+
+exports.getWorkerAnalytics = asyncHandler(async (req, res) => {
+  const isPrivileged = req.user.role === "head" || req.user.role === "admin";
+  let workerId;
+
+  if (isPrivileged && req.query.workerId) {
+    workerId = req.query.workerId;
+  } else {
+    workerId = String(req.user._id);
+  }
+
+  const [worker, allComplaints] = await Promise.all([
+    User.findById(workerId)
+      .select("fullName department specializations rating performanceMetrics")
+      .lean(),
+    Complaint.find(
+      { "assignedWorkers.workerId": workerId },
+      { status: 1, priority: 1, resolvedAt: 1, updatedAt: 1, createdAt: 1 },
+    ).lean(),
+  ]);
+
+  if (!worker) throw new AppError("Worker not found", 404);
+
+  const resolved = allComplaints.filter((c) => c.status === "resolved");
+  const total = allComplaints.length;
+  const completionRate =
+    total > 0 ? Math.round((resolved.length / total) * 100) : 0;
+
+  // Weekly trend: last 8 weeks (oldest → newest)
+  const now = new Date();
+  const weeklyTrend = [];
+  for (let i = 7; i >= 0; i--) {
+    const wEnd = new Date(now);
+    wEnd.setDate(now.getDate() - i * 7);
+    wEnd.setHours(23, 59, 59, 999);
+    const wStart = new Date(wEnd);
+    wStart.setDate(wEnd.getDate() - 6);
+    wStart.setHours(0, 0, 0, 0);
+
+    const count = resolved.filter((c) => {
+      const d = new Date(c.resolvedAt || c.updatedAt);
+      return d >= wStart && d <= wEnd;
+    }).length;
+
+    weeklyTrend.push({
+      label: wStart.toLocaleDateString("en-IN", {
+        month: "short",
+        day: "numeric",
+      }),
+      count,
+    });
+  }
+
+  // Priority breakdown (all assigned complaints)
+  const priorityBreakdown = { Low: 0, Medium: 0, High: 0 };
+  allComplaints.forEach((c) => {
+    if (c.priority && priorityBreakdown[c.priority] !== undefined) {
+      priorityBreakdown[c.priority]++;
+    }
+  });
+
+  // Status distribution
+  const STATUS_KEYS = [
+    "pending",
+    "assigned",
+    "in-progress",
+    "pending-approval",
+    "resolved",
+    "needs-rework",
+    "cancelled",
+  ];
+  const statusDistribution = {};
+  STATUS_KEYS.forEach((s) => {
+    statusDistribution[s] = 0;
+  });
+  allComplaints.forEach((c) => {
+    if (c.status in statusDistribution) statusDistribution[c.status]++;
+  });
+
+  return sendSuccess(res, {
+    worker: {
+      fullName: worker.fullName,
+      department: worker.department,
+      specializations: worker.specializations || [],
+      rating: worker.rating || 4.5,
+      performanceMetrics: worker.performanceMetrics || {},
+    },
+    summary: {
+      totalAssigned: total,
+      totalCompleted: resolved.length,
+      completionRate,
+      avgCompletionTime: worker.performanceMetrics?.averageCompletionTime || 0,
+      weekCompleted: worker.performanceMetrics?.currentWeekCompleted || 0,
+      customerRating: worker.performanceMetrics?.customerRating || 4.5,
+    },
+    weeklyTrend,
+    priorityBreakdown,
+    statusDistribution,
   });
 });

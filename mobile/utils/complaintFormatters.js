@@ -1,9 +1,13 @@
 export function normalizeStatus(status) {
-  return String(status || "").toLowerCase().replace(/\s+/g, "-");
+  return String(status || "")
+    .toLowerCase()
+    .replace(/\s+/g, "-");
 }
 
 export function normalizePriority(priority) {
-  return String(priority || "").trim().toLowerCase();
+  return String(priority || "")
+    .trim()
+    .toLowerCase();
 }
 
 export function isComplaintAssigned(complaint) {
@@ -74,4 +78,56 @@ export function formatPriorityLabel(t, priority) {
   const key = PRIORITY_TRANSLATION_KEYS[normalized];
   if (!key) return priority || "-";
   return t(key);
+}
+
+/**
+ * Compute the SLA countdown from a due date string.
+ * Returns null if no due date.
+ * @param {string|Date} dueDateStr
+ * @returns {{ text: string|null, isOverdue: boolean, isCritical: boolean, isUrgent: boolean }|null}
+ */
+export function getSlaCountdown(dueDateStr) {
+  if (!dueDateStr) return null;
+  const due = new Date(dueDateStr);
+  if (Number.isNaN(due.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = due.getTime() - now.getTime();
+
+  if (diffMs <= 0) {
+    return { text: null, isOverdue: true, isCritical: true, isUrgent: false };
+  }
+
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = diffMs / 3600000;
+  const diffDays = diffHours / 24;
+  const isCritical = diffHours < 4;
+  const isUrgent = diffHours < 24;
+
+  if (diffDays >= 1) {
+    const days = Math.floor(diffDays);
+    const hours = Math.floor(diffHours % 24);
+    return {
+      text: hours > 0 ? `${days}d ${hours}h` : `${days}d`,
+      isOverdue: false,
+      isCritical,
+      isUrgent,
+    };
+  }
+  if (diffHours >= 1) {
+    const hours = Math.floor(diffHours);
+    const mins = diffMins % 60;
+    return {
+      text: mins > 0 ? `${hours}h ${mins}m` : `${hours}h`,
+      isOverdue: false,
+      isCritical,
+      isUrgent,
+    };
+  }
+  return {
+    text: `${diffMins}m`,
+    isOverdue: false,
+    isCritical: true,
+    isUrgent: true,
+  };
 }

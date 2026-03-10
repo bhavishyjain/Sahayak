@@ -3,7 +3,7 @@ const router = express.Router();
 const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 const authorize = require("../middlewares/authorize");
 const {
-  getHodDashboard,
+  getHodOverview,
   getHodWorkers,
   approveCompletion,
   markNeedsRework,
@@ -11,6 +11,8 @@ const {
   getWorkerComplaints,
   inviteWorker,
   removeWorker,
+  listInvitations,
+  revokeInvitation,
   assignMultipleWorkers,
   updateWorkerTask,
   getComplaintWorkers,
@@ -18,10 +20,12 @@ const {
 
 router.use(attachAuth, requireAuth, authorize("head"));
 
-router.get("/dashboard", getHodDashboard);
+router.get("/overview", getHodOverview);
 router.get("/workers", getHodWorkers);
 router.get("/workers/:workerId/complaints", getWorkerComplaints);
 router.post("/invite-worker", inviteWorker);
+router.get("/invitations", listInvitations);
+router.delete("/invitations/:invitationId", revokeInvitation);
 router.delete("/workers/:workerId", removeWorker);
 
 // HOD Approval Workflow

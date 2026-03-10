@@ -21,6 +21,7 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import PressableBlock from "../../../components/PressableBlock";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import { useTheme } from "../../../utils/context/theme";
@@ -623,21 +624,24 @@ export default function WorkerAssigned() {
                     >
                       #{complaint.ticketId}
                     </Text>
-                    <View
-                      className="px-2 py-1 rounded"
-                      style={{
-                        backgroundColor:
-                          getStatusColor(complaint.status, colors) + "20",
-                      }}
-                    >
-                      <Text
-                        className="text-xs font-semibold capitalize"
+                    <View style={{ alignItems: "flex-end", gap: 4 }}>
+                      <View
+                        className="px-2 py-1 rounded"
                         style={{
-                          color: getStatusColor(complaint.status, colors),
+                          backgroundColor:
+                            getStatusColor(complaint.status, colors) + "20",
                         }}
                       >
-                        {formatStatusLabel(t, complaint.status)}
-                      </Text>
+                        <Text
+                          className="text-xs font-semibold capitalize"
+                          style={{
+                            color: getStatusColor(complaint.status, colors),
+                          }}
+                        >
+                          {formatStatusLabel(t, complaint.status)}
+                        </Text>
+                      </View>
+                      {complaint.sla && <SlaStatusBadge sla={complaint.sla} />}
                     </View>
                   </View>
 

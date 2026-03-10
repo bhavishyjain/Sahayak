@@ -26,6 +26,7 @@ import { darkColors, lightColors } from "../../../colors";
 import AutoSkeleton from "../../../components/AutoSkeleton";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import CustomPicker from "../../../components/CustomPicker";
 import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
@@ -40,12 +41,24 @@ import {
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { API_BASE } from "../../../url";
+import TEMPLATES from "../../../assets/data/complaint-templates.json";
+import { useNetworkStatus } from "../../../utils/useNetworkStatus";
+import {
+  cacheComplaints,
+  getCachedComplaints,
+} from "../../../utils/complaintsCache";
+import {
+  enqueue,
+  getQueue,
+  dequeue,
+} from "../../../utils/offlineQueue";
 
 export default function Complaints() {
   const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const { isOnline } = useNetworkStatus();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -64,6 +77,7 @@ export default function Complaints() {
   const [selectedImages, setSelectedImages] = useState([]);
   const [coordinates, setCoordinates] = useState(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
+  const [templatePickerVisible, setTemplatePickerVisible] = useState(false);
 
   const baseUrl = API_BASE;
 
@@ -86,20 +100,79 @@ export default function Complaints() {
       if (pull) setRefreshing(true);
       else setLoading(true);
 
+      if (!isOnline) {
+        const cached = await getCachedComplaints(status);
+        if (cached) setComplaints(cached);
+        return;
+      }
+
       const q = status === "all" ? "" : `?status=${encodeURIComponent(status)}`;
       const res = await apiCall({
         method: "GET",
         url: `${baseUrl}/complaints${q}`,
       });
       const payload = res?.data;
-      setComplaints(payload?.complaints || []);
+      const fetched = payload?.complaints || [];
+      setComplaints(fetched);
+      await cacheComplaints(status, fetched);
+
+      // Flush any queued offline submissions now that we're back online
+      const queue = await getQueue();
+      if (queue.length > 0) {
+        for (const entry of queue) {
+          try {
+            const formData = new FormData();
+            formData.append("title", entry.title || "");
+            formData.append("description", entry.description || "");
+            formData.append("department", entry.department || "Other");
+            formData.append("locationName", entry.locationName || "");
+            formData.append("priority", entry.priority || "Medium");
+            if (entry.coordinates) {
+              formData.append("coordinates", JSON.stringify(entry.coordinates));
+            }
+            (entry.images || []).forEach((img) => {
+              const filename = img.uri?.split("/").pop();
+              const match = /\.(\w+)$/.exec(filename || "");
+              const type = match ? `image/${match[1]}` : "image/jpeg";
+              formData.append("images", { uri: img.uri, name: filename, type });
+            });
+            await apiCall({
+              method: "POST",
+              url: `${baseUrl}/complaints`,
+              data: formData,
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+            await dequeue(entry.localId);
+            Toast.show({
+              type: "success",
+              text1: "Queued complaint submitted",
+              text2: `"${entry.title}" was submitted automatically.`,
+            });
+          } catch {
+            // leave in queue for next retry
+          }
+        }
+        // Reload after flushing
+        const res2 = await apiCall({
+          method: "GET",
+          url: `${baseUrl}/complaints${q}`,
+        });
+        const fresh = res2?.data?.complaints || [];
+        setComplaints(fresh);
+        await cacheComplaints(status, fresh);
+      }
     } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.failed"),
-        text2:
-          e?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
-      });
+      const cached = await getCachedComplaints(status);
+      if (cached) {
+        setComplaints(cached);
+      } else {
+        Toast.show({
+          type: "error",
+          text1: t("toast.error.failed"),
+          text2:
+            e?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
+        });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -267,6 +340,34 @@ export default function Complaints() {
       return;
     }
 
+    // Offline: save to queue and show feedback
+    if (!isOnline) {
+      await enqueue({
+        title: title.trim(),
+        description: description.trim(),
+        department: department.trim(),
+        locationName: locationName.trim(),
+        priority,
+        coordinates: coordinates || null,
+        images: selectedImages.map((img) => ({ uri: img.uri })),
+      });
+      Toast.show({
+        type: "info",
+        text1: "Saved offline",
+        text2: "Your complaint will be submitted automatically when you reconnect.",
+      });
+      setTitle("");
+      setDescription("");
+      setDepartment("Road");
+      setLocationName("");
+      setPriority("Medium");
+      setSelectedImages([]);
+      setCoordinates(null);
+      setTemplatePickerVisible(false);
+      setModalVisible(false);
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -317,6 +418,7 @@ export default function Complaints() {
       setPriority("Medium");
       setSelectedImages([]);
       setCoordinates(null);
+      setTemplatePickerVisible(false);
       setModalVisible(false);
 
       // Reload complaints
@@ -416,7 +518,9 @@ export default function Complaints() {
                   className="text-xs font-semibold capitalize"
                   style={{ color: colors.textPrimary }}
                 >
-                  {chip === "all" ? t("common.all") : formatStatusLabel(t, chip)}
+                  {chip === "all"
+                    ? t("common.all")
+                    : formatStatusLabel(t, chip)}
                 </Text>
               </PressableBlock>
             ))}
@@ -471,6 +575,11 @@ export default function Complaints() {
                       </Text>
                     </View>
                   </View>
+
+                  {/* SLA Badge row (shown when SLA data present) */}
+                  {c.sla && (
+                    <SlaStatusBadge sla={c.sla} style={{ marginBottom: 10 }} />
+                  )}
 
                   {/* Second Row: Department and Status */}
                   <View className="flex-row justify-between mb-3">
@@ -566,8 +675,7 @@ export default function Complaints() {
                               : colors.info || "#3B82F6",
                         }}
                       >
-                        {t("complaints.expectedResolution")}:{" "}
-                        {eta}
+                        {t("complaints.expectedResolution")}: {eta}
                       </Text>
                     </View>
                   )}
@@ -587,6 +695,26 @@ export default function Complaints() {
                       {c.title || t("complaints.complaint")}
                     </Text>
                   </View>
+
+                  {/* Tags */}
+                  {c.tags && c.tags.length > 0 && (
+                    <View className="flex-row flex-wrap gap-1 mb-3">
+                      {c.tags.map((tag, i) => (
+                        <View
+                          key={i}
+                          className="px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: colors.primary + "18" }}
+                        >
+                          <Text
+                            className="text-xs font-medium"
+                            style={{ color: colors.primary }}
+                          >
+                            {tag}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
                   <PressableBlock
                     onPress={() =>
@@ -647,6 +775,112 @@ export default function Complaints() {
               contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
               showsVerticalScrollIndicator={false}
             >
+              {/* Quick Template Picker */}
+              <View className="mb-3">
+                <Text
+                  className="text-base font-bold mb-1.5"
+                  style={{ color: colors.textPrimary }}
+                >
+                  Quick Templates
+                </Text>
+                <PressableBlock
+                  onPress={() =>
+                    setTemplatePickerVisible(!templatePickerVisible)
+                  }
+                  className="flex-row items-center justify-between px-3 py-3 rounded-xl border"
+                  style={{
+                    borderColor: templatePickerVisible
+                      ? colors.primary
+                      : colors.border,
+                    backgroundColor: templatePickerVisible
+                      ? colors.primary + "15"
+                      : colors.backgroundSecondary,
+                  }}
+                >
+                  <Text
+                    className="text-sm font-medium"
+                    style={{
+                      color: templatePickerVisible
+                        ? colors.primary
+                        : colors.textSecondary,
+                    }}
+                  >
+                    {templatePickerVisible
+                      ? "▲  Choose a template or fill manually"
+                      : "▼  Use a quick template (optional)"}
+                  </Text>
+                </PressableBlock>
+
+                {templatePickerVisible && (
+                  <View
+                    className="mt-1.5 rounded-xl border overflow-hidden"
+                    style={{ borderColor: colors.border }}
+                  >
+                    {(TEMPLATES[department] || []).map((tpl, idx) => (
+                      <PressableBlock
+                        key={idx}
+                        onPress={() => {
+                          setTitle(tpl.title);
+                          setDescription(tpl.description);
+                          setPriority(tpl.priority);
+                          setTemplatePickerVisible(false);
+                        }}
+                        className="px-4 py-3 border-b"
+                        style={{
+                          borderBottomColor: colors.border,
+                          borderBottomWidth:
+                            idx === (TEMPLATES[department] || []).length - 1
+                              ? 0
+                              : 1,
+                          backgroundColor: colors.backgroundSecondary,
+                        }}
+                      >
+                        <View className="flex-row items-center justify-between">
+                          <Text
+                            className="text-sm font-semibold flex-1 mr-2"
+                            style={{ color: colors.textPrimary }}
+                          >
+                            {tpl.title}
+                          </Text>
+                          <View
+                            className="px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor:
+                                tpl.priority === "High"
+                                  ? colors.danger + "22"
+                                  : tpl.priority === "Medium"
+                                    ? colors.warning + "22"
+                                    : colors.success + "22",
+                            }}
+                          >
+                            <Text
+                              className="text-[10px] font-bold"
+                              style={{
+                                color:
+                                  tpl.priority === "High"
+                                    ? colors.danger
+                                    : tpl.priority === "Medium"
+                                      ? colors.warning
+                                      : colors.success,
+                              }}
+                            >
+                              {tpl.priority}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text
+                          className="text-xs mt-0.5"
+                          numberOfLines={1}
+                          style={{ color: colors.textSecondary }}
+                        >
+                          {tpl.description}
+                        </Text>
+                      </PressableBlock>
+                    ))}
+                  </View>
+                )}
+              </View>
+
               <View className="mb-2.5">
                 <Text
                   className="text-base font-bold mb-1"
@@ -686,7 +920,10 @@ export default function Complaints() {
                 <CustomPicker
                   data={DEPARTMENT_OPTIONS}
                   value={department}
-                  onChange={(item) => setDepartment(item.value)}
+                  onChange={(item) => {
+                    setDepartment(item.value);
+                    setTemplatePickerVisible(false);
+                  }}
                   placeholder={t("complaints.form.departmentPlaceholder")}
                   searchPlaceholder={null}
                   containerStyle={{

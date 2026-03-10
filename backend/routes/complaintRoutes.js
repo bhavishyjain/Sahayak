@@ -10,6 +10,7 @@ router.use(attachAuth, requireAuth);
 
 router.post("/", upload.array("images", 5), controller.createComplaint);
 router.get("/", controller.myComplaints);
+router.get("/nearby", controller.getNearbyComplaints);
 router.get("/:complaintId([0-9a-fA-F]{24})", controller.getComplaintById);
 router.post(
   "/:complaintId([0-9a-fA-F]{24})/upvote",
@@ -48,5 +49,9 @@ router.get(
   "/:id([0-9a-fA-F]{24})/satisfaction",
   controller.getSatisfactionVotes,
 );
+
+// Comment Thread (citizen / worker / HOD / admin)
+router.get("/:id([0-9a-fA-F]{24})/messages", controller.getMessages);
+router.post("/:id([0-9a-fA-F]{24})/messages", controller.postMessage);
 
 module.exports = router;

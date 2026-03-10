@@ -13,32 +13,6 @@ const {
 const { appendCompletionPhotos } = require("../../services/completionPhotoService");
 const { WORKER_STATUS_TRANSITIONS } = require("./helpers");
 
-exports.updateWorkerStatus = asyncHandler(async (req, res) => {
-  const { workerId } = req.params;
-  const { workLocation } = req.body;
-  const requesterId = String(getRequestUserId(req));
-
-  if (req.user.role !== "admin" && requesterId !== String(workerId)) {
-    throw new AppError("You can only update your own status", 403);
-  }
-
-  const updateData = { lastActive: new Date() };
-  if (workLocation) updateData.workLocation = workLocation;
-
-  const worker = await User.findByIdAndUpdate(workerId, updateData, {
-    new: true,
-  }).select("-password");
-
-  if (!worker) throw new AppError("Worker not found", 404);
-  const workerData = worker.toObject();
-  delete workerData.workStatus;
-  return sendSuccess(
-    res,
-    { data: workerData },
-    "Worker status updated successfully",
-  );
-});
-
 exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
   const { status, workerNotes } = req.body;

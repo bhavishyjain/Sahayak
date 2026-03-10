@@ -5,13 +5,18 @@ const WorkerInvitation = require("../../models/WorkerInvitation");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
-const { getHodOrThrow, getWorkerOrThrow } = require("../../services/accessService");
+const {
+  getHodOrThrow,
+  getWorkerOrThrow,
+} = require("../../services/accessService");
 const { sendWorkerInvitation } = require("../../services/emailService");
 
 exports.inviteWorker = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { email } = req.body;
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
 
   if (!normalizedEmail) {
     throw new AppError("Email is required", 400);
@@ -21,9 +26,15 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
   if (existingUser) {
     if (existingUser.role === "worker") {
       if (existingUser.department === hod.department) {
-        throw new AppError("This user is already a worker in your department", 400);
+        throw new AppError(
+          "This user is already a worker in your department",
+          400,
+        );
       }
-      throw new AppError("This user is already a worker in another department", 400);
+      throw new AppError(
+        "This user is already a worker in another department",
+        400,
+      );
     }
     throw new AppError(
       "A user account with this email already exists. Promote the existing user instead of inviting again.",
@@ -113,4 +124,58 @@ exports.removeWorker = asyncHandler(async (req, res) => {
     { user: { id: worker._id, username: worker.username, role: worker.role } },
     `${worker.fullName} has been removed from the worker role`,
   );
+});
+
+exports.listInvitations = asyncHandler(async (req, res) => {
+  const hod = await getHodOrThrow(req);
+
+  const invitations = await WorkerInvitation.find({
+    department: hod.department,
+    invitedBy: hod._id,
+  })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .select("-tokenHash");
+
+  const now = new Date();
+  const formatted = invitations.map((inv) => ({
+    id: inv._id,
+    email: inv.email,
+    department: inv.department,
+    sentAt: inv.createdAt,
+    expiresAt: inv.expiresAt,
+    status: inv.acceptedAt
+      ? "accepted"
+      : inv.revokedAt
+        ? "revoked"
+        : inv.expiresAt < now
+          ? "expired"
+          : "pending",
+    acceptedAt: inv.acceptedAt,
+    revokedAt: inv.revokedAt,
+  }));
+
+  return sendSuccess(res, { invitations: formatted }, "Invitations retrieved");
+});
+
+exports.revokeInvitation = asyncHandler(async (req, res) => {
+  const hod = await getHodOrThrow(req);
+  const { invitationId } = req.params;
+
+  const invitation = await WorkerInvitation.findOne({
+    _id: invitationId,
+    department: hod.department,
+    invitedBy: hod._id,
+    acceptedAt: null,
+    revokedAt: null,
+  });
+
+  if (!invitation) {
+    throw new AppError("Invitation not found or already used/revoked", 404);
+  }
+
+  invitation.revokedAt = new Date();
+  await invitation.save();
+
+  return sendSuccess(res, { id: invitation._id }, "Invitation revoked");
 });

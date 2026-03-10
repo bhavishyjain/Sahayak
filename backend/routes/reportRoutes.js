@@ -54,4 +54,16 @@ router.post(
   reportController.scheduleEmailReport,
 );
 
+router.get(
+  "/schedule",
+  authorize("head", "admin"),
+  reportController.getSchedules,
+);
+
+router.delete(
+  "/schedule/:id",
+  authorize("head", "admin"),
+  reportController.cancelSchedule,
+);
+
 module.exports = router;

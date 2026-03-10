@@ -1,4 +1,4 @@
-﻿{
+{
   "app": {
     "name": "Sahayak",
     "tagline": "Municipal Complaint Management System"
@@ -114,9 +114,9 @@
       "trackComplaint": "Track Complaint",
       "viewAll": "View All"
     },
-    "pendingText": "You have {count} pending complaint{plural}.",
+    "pendingText": "You have %{count} pending complaint%{plural}.",
     "noPending": "No pending complaints right now.",
-    "lastUpdate": "Last complaint was filed {hours}h ago ({ticketId}).",
+    "lastUpdate": "Last complaint was filed %{hours}h ago (%{ticketId}).",
     "noRecent": "No recent complaint updates yet."
   },
   "complaints": {
@@ -209,7 +209,7 @@
       "submitFeedback": "Submit Feedback",
       "upvote": "Upvote",
       "upvoted": "Upvoted",
-      "upvoteCount": "{count} upvote{plural}",
+      "upvoteCount": "%{count} upvote%{plural}",
       "loadingDetails": "Loading details...",
       "notFound": "Complaint Not Found",
       "notFoundMessage": "This complaint may have been removed or you don't have access to it.",
@@ -228,8 +228,8 @@
       "assignToWorker": "Assign to Worker",
       "reassignWorker": "Reassign Worker",
       "cancelComplaint": "Cancel Complaint",
-      "approveCompletion": "✓ Approve Completion",
-      "requestRework": "✗ Request Rework",
+      "approveCompletion": "? Approve Completion",
+      "requestRework": "? Request Rework",
       "updateStatus": "Update Status",
       "complaintTitle": "Title",
       "complaintDescription": "Description",
@@ -245,6 +245,7 @@
       "days": "days",
       "etaExplanation": "Why ETA: base time by priority, adjusted by worker history, similar complaints, and current workload.",
       "statusHistory": "Status History",
+      "complaintTimeline": "Complaint Timeline",
       "citizenFeedback": "Citizen Feedback",
       "comment": "Comment:",
       "rateResolution": "Rate this resolution",
@@ -280,7 +281,7 @@
       "statusRequired": "Status Required",
       "pleaseSelectStatus": "Please select a status",
       "statusUpdated": "Status Updated",
-      "markedAs": "Complaint marked as {status}",
+      "markedAs": "Complaint marked as %{status}",
       "updateFailed": "Update Failed",
       "couldNotUpdateStatus": "Could not update status",
       "searchWorkers": "Search workers...",
@@ -309,7 +310,7 @@
       "chooseFromGallery": "Choose from Gallery",
       "completionPhotosRequired": "Please upload at least one completion photo",
       "photosUploaded": "Completion Photos Uploaded",
-      "photosUploadedSuccess": "{count} photo(s) uploaded successfully",
+      "photosUploadedSuccess": "%{count} photo(s) uploaded successfully",
       "couldNotUploadPhotos": "Could not upload photos",
       "uploading": "Uploading...",
       "uploadSuccess": "Upload Successful",
@@ -344,8 +345,24 @@
       "taskDescriptionPlaceholder": "Describe the task for this worker...",
       "workerTaskStatus": "Worker Task Status",
       "teamProgress": "Team Progress",
-      "workersAssigned": "{count} worker(s) assigned",
-      "allTasksCompleted": "All tasks completed"
+      "workersAssigned": "%{count} worker(s) assigned",
+      "allTasksCompleted": "All tasks completed",
+      "sla": {
+        "title": "SLA Status",
+        "dueDate": "SLA Due Date",
+        "overdue": "OVERDUE",
+        "dueSoon": "Due Soon",
+        "onTime": "On Time",
+        "status": "Status",
+        "timeLeft": "Time Remaining",
+        "escalationLevel": "Escalation Level",
+        "escalationHistory": "Escalation History",
+        "escalatedAt": "Escalated",
+        "noEscalations": "No escalations occurred",
+        "level": "Level",
+        "escalation": "Escalation",
+        "urgent": "Urgent"
+      }
     }
   },
   "heatmap": {
@@ -411,7 +428,7 @@
       "workers": {
         "title": "Workers",
         "active": "Active Workers",
-        "total": "{count} total workers",
+        "total": "%{count} total workers",
         "totalWorkers": "total workers",
         "avgResponse": "Avg Response",
         "withinSLA": "Within SLA"
@@ -470,7 +487,7 @@
       "bulkSelect": "Bulk Select",
       "loadingComplaints": "Loading complaints...",
       "selectWorker": "Please select a worker",
-      "assignedSuccessfully": "{count} complaints assigned successfully",
+      "assignedSuccessfully": "%{count} complaints assigned successfully",
       "couldNotAssign": "Could not assign complaints",
       "couldNotLoadWorkers": "Could not load workers",
       "overdue": "Overdue",
@@ -480,7 +497,7 @@
       "cancel": "Cancel",
       "bulkAssignTitle": "Bulk Assign",
       "bulkAssigning": "Assigning...",
-      "bulkSelectedCount": "{count} complaints selected",
+      "bulkSelectedCount": "%{count} complaints selected",
       "bulkAssignHint": "Select a worker to assign all selected complaints",
       "selectAll": "Select All",
       "deselectAll": "Deselect All",
@@ -522,7 +539,7 @@
       "invalidEmail": "Invalid Email",
       "validEmailAddress": "Please enter a valid email address",
       "invitationSent": "Invitation Sent",
-      "invitationEmailSent": "Invitation email has been sent to {email}",
+      "invitationEmailSent": "Invitation email has been sent to %{email}",
       "couldNotSendInvitation": "Could not send invitation",
 
       "inviteForm": {
@@ -559,12 +576,12 @@
         "removeFromDepartment": "Remove from Department",
         "removeConfirm": "Are you sure you want to remove this worker?",
         "removeModalTitle": "Remove Worker?",
-        "removeModalMessage": "Are you sure you want to remove {name} from your department?",
+        "removeModalMessage": "Are you sure you want to remove %{name} from your department?",
         "removeModalDesc": "They will be converted to a normal user and won't have access to worker features anymore. This action cannot be undone.",
-        "removeWarning": "This worker has {count} active complaint{plural}. You must reassign them before removing.",
+        "removeWarning": "This worker has %{count} active complaint%{plural}. You must reassign them before removing.",
         "cannotRemove": "Cannot remove worker with active complaints",
         "workerRemoved": "Worker Removed",
-        "workerRemovedMessage": "{name} has been converted to a normal user",
+        "workerRemovedMessage": "%{name} has been converted to a normal user",
         "failed": "Failed",
         "couldNotRemove": "Could not remove worker",
         "couldNotLoadDetails": "Could not load worker details",
@@ -608,12 +625,12 @@
       "completionRate": "Completion Rate",
       "completed": "completed",
       "achievement": {
-        "centuryClub": "Century Club! 🎉",
-        "communityHero": "Community Hero! 🌟",
-        "keepGoing": "Keep Going! 💪",
+        "centuryClub": "Century Club! ??",
+        "communityHero": "Community Hero! ??",
+        "keepGoing": "Keep Going! ??",
         "centuryDesc": "You've completed 100+ tasks!",
         "heroDesc": "50+ tasks completed - Amazing work!",
-        "moreToHero": "{count} more to Community Hero"
+        "moreToHero": "%{count} more to Community Hero"
       },
       "activeAssignments": "Active Assignments",
       "viewAll": "View All",
@@ -632,8 +649,8 @@
       "noComplaints": "No assigned complaints",
       "noResults": "No complaints found",
       "tryAdjusting": "Try adjusting your filters",
-      "showingResults": "Showing {count} of {total} complaints",
-      "assignedAt": "Assigned: {date}",
+      "showingResults": "Showing %{count} of %{total} complaints",
+      "assignedAt": "Assigned: %{date}",
       "sortBy": "Sort By",
       "oldToNew": "Oldest First",
       "newToOld": "Newest First",
@@ -692,14 +709,14 @@
       "achievementBadge": "Achievement Badge",
       "gotIt": "Got it!",
       "metricsInfo": {
-        "title": "📊 How Metrics Work",
+        "title": "?? How Metrics Work",
         "rating": {
           "title": "Rating",
           "desc": "Average of all citizen feedback ratings (1-5 stars) on your resolved complaints. Updated when citizens submit feedback after resolution."
         },
         "avgTime": {
           "title": "Average Time",
-          "desc": "Running average of hours taken from assignment to resolution. Calculated as: (previous avg × completions + new time) ÷ (completions + 1). Updated on every HOD approval."
+          "desc": "Running average of hours taken from assignment to resolution. Calculated as: (previous avg � completions + new time) � (completions + 1). Updated on every HOD approval."
         },
         "streak": {
           "title": "Streak",
@@ -709,7 +726,7 @@
           "title": "Total Completed",
           "desc": "Lifetime count of all resolved complaints. This never decreases - it's your career achievement counter. Incremented on every HOD approval."
         },
-        "tip": "💡 Tip: All metrics are calculated in real-time when the leaderboard loads!"
+        "tip": "?? Tip: All metrics are calculated in real-time when the leaderboard loads!"
       },
       "rank": "Rank",
       "worker": "Worker",
@@ -734,7 +751,7 @@
       "startDate": "Start Date",
       "endDate": "End Date",
       "selectDate": "Select date",
-      "showing": "Showing {filtered} of {total} tasks",
+      "showing": "Showing %{filtered} of %{total} tasks",
       "noTasksFound": "No tasks found",
       "tryAdjustingFilters": "Try adjusting your date filters",
       "noComplaints": "No completed complaints",
@@ -894,8 +911,8 @@
     "phone": "Please enter a valid phone number",
     "password": "Password must be at least 6 characters",
     "passwordMatch": "Passwords must match",
-    "minLength": "Must be at least {count} characters",
-    "maxLength": "Must be less than {count} characters",
+    "minLength": "Must be at least %{count} characters",
+    "maxLength": "Must be less than %{count} characters",
     "invalidFormat": "Invalid format",
     "selectOption": "Please select an option"
   },
@@ -911,12 +928,12 @@
   },
   "time": {
     "justNow": "Just now",
-    "minutesAgo": "{count} minute{plural} ago",
-    "hoursAgo": "{count} hour{plural} ago",
-    "daysAgo": "{count} day{plural} ago",
-    "weeksAgo": "{count} week{plural} ago",
-    "monthsAgo": "{count} month{plural} ago",
-    "yearsAgo": "{count} year{plural} ago",
+    "minutesAgo": "%{count} minute%{plural} ago",
+    "hoursAgo": "%{count} hour%{plural} ago",
+    "daysAgo": "%{count} day%{plural} ago",
+    "weeksAgo": "%{count} week%{plural} ago",
+    "monthsAgo": "%{count} month%{plural} ago",
+    "yearsAgo": "%{count} year%{plural} ago",
     "today": "Today",
     "yesterday": "Yesterday",
     "tomorrow": "Tomorrow"
@@ -966,7 +983,7 @@
     "avgResolutionTime": "Avg Resolution Time",
     "filterOptionsSoon": "Filter options coming soon...",
     "reportGenerated": "Report Generated",
-    "reportReady": "{format} report is ready for download",
+    "reportReady": "%{format} report is ready for download",
     "generateFailed": "Failed to generate report",
     "loadStatsFailed": "Failed to load statistics"
   },

@@ -1,0 +1,164 @@
+{
+  "Road": [
+    {
+      "title": "Pothole on road",
+      "description": "There is a large pothole on the road that is causing damage to vehicles and is a safety hazard for commuters.",
+      "priority": "High"
+    },
+    {
+      "title": "Road surface damaged",
+      "description": "The road surface is severely damaged with cracks and uneven patches, making it difficult and dangerous to drive.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Footpath broken",
+      "description": "The footpath tiles are broken and dislodged, posing a tripping hazard to pedestrians.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Road digging not restored",
+      "description": "Road digging work was done for underground utilities but the road surface has not been restored, leaving a dangerous depression.",
+      "priority": "High"
+    },
+    {
+      "title": "Speed breaker missing",
+      "description": "A speed breaker that was previously installed has been damaged or removed, causing vehicles to over-speed in this area.",
+      "priority": "Low"
+    }
+  ],
+  "Water": [
+    {
+      "title": "Water supply not received",
+      "description": "There has been no drinking water supply to this area for multiple days, affecting all residents.",
+      "priority": "High"
+    },
+    {
+      "title": "Water pipe leakage",
+      "description": "A water pipe is leaking on the street, wasting large amounts of water and creating a waterlogged area.",
+      "priority": "High"
+    },
+    {
+      "title": "Contaminated water supply",
+      "description": "The tap water is discolored or has a foul smell, indicating possible contamination. Urgent investigation is needed.",
+      "priority": "High"
+    },
+    {
+      "title": "Low water pressure",
+      "description": "The water pressure in this area is very low, making it impossible to fill tanks or use water adequately.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Water meter damaged",
+      "description": "The water meter installed at this property is damaged or not working correctly.",
+      "priority": "Low"
+    }
+  ],
+  "Electricity": [
+    {
+      "title": "Streetlight not working",
+      "description": "Several streetlights in this area are not functioning, making the street completely dark and unsafe at night.",
+      "priority": "High"
+    },
+    {
+      "title": "Power outage in area",
+      "description": "There is an unplanned power outage affecting multiple buildings in this area for several hours.",
+      "priority": "High"
+    },
+    {
+      "title": "Exposed electrical wire",
+      "description": "There is a dangling or exposed electrical wire near a public area that poses a serious electrocution risk.",
+      "priority": "High"
+    },
+    {
+      "title": "Transformer sparking",
+      "description": "The electrical transformer in this locality is making sparking sounds and showing signs of overheating.",
+      "priority": "High"
+    },
+    {
+      "title": "Electricity pole leaning",
+      "description": "An electricity pole is leaning dangerously and may fall, risking lives and power disruption.",
+      "priority": "Medium"
+    }
+  ],
+  "Waste": [
+    {
+      "title": "Garbage not collected",
+      "description": "Garbage has not been collected from this area for several days, causing a foul smell and unsanitary conditions.",
+      "priority": "High"
+    },
+    {
+      "title": "Overflowing garbage bin",
+      "description": "The public garbage bin is overflowing with waste and attracting stray animals and insects.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Illegal dumping of waste",
+      "description": "People are illegally dumping waste and construction debris on the roadside near this location.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Sweeping not done",
+      "description": "The road cleaning and sweeping has not been done in this area for many days, leaving debris on the streets.",
+      "priority": "Low"
+    },
+    {
+      "title": "Dead animal on road",
+      "description": "A dead animal is lying on the road and needs to be removed urgently to prevent disease and bad odour.",
+      "priority": "High"
+    }
+  ],
+  "Drainage": [
+    {
+      "title": "Blocked drain causing flooding",
+      "description": "A clogged storm drain is causing water to flood the road and nearby buildings during rain.",
+      "priority": "High"
+    },
+    {
+      "title": "Open manhole",
+      "description": "A manhole cover is missing or broken, creating a dangerous open pit on the road.",
+      "priority": "High"
+    },
+    {
+      "title": "Sewage overflow",
+      "description": "Sewage water is overflowing from the drain onto the road, creating extremely unhygienic conditions.",
+      "priority": "High"
+    },
+    {
+      "title": "Drainage not cleaned",
+      "description": "The drainage channel has not been cleaned and is choked with debris, causing stagnant water.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Drain cover broken",
+      "description": "The metal grate/cover over the drain is broken or missing, posing a trip and fall hazard.",
+      "priority": "Medium"
+    }
+  ],
+  "Other": [
+    {
+      "title": "Stray animal menace",
+      "description": "A large number of stray dogs or other animals in this area are causing disturbance and threatening residents.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Illegal construction",
+      "description": "Unauthorized construction activity is happening near this location that may be violating building regulations.",
+      "priority": "Medium"
+    },
+    {
+      "title": "Public property vandalized",
+      "description": "Public property such as a bus shelter, park bench, or sign board has been vandalized or damaged.",
+      "priority": "Low"
+    },
+    {
+      "title": "Tree fallen on road",
+      "description": "A large tree has fallen across the road, blocking traffic and causing a safety hazard.",
+      "priority": "High"
+    },
+    {
+      "title": "Noise pollution complaint",
+      "description": "There is excessive and continuous noise from nearby construction or commercial activity that is disturbing residents.",
+      "priority": "Low"
+    }
+  ]
+}

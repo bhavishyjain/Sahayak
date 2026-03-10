@@ -27,10 +27,10 @@ import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import getUserAuth from "../../../utils/userAuth";
-import { WORKER_DASHBOARD_URL } from "../../../url";
+import { WORKER_OVERVIEW_URL } from "../../../url";
 import { getPriorityColor } from "../../../utils/colorHelpers";
 
-export default function WorkerDashboard() {
+export default function WorkerHome() {
   const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
@@ -56,7 +56,7 @@ export default function WorkerDashboard() {
 
       const res = await apiCall({
         method: "GET",
-        url: WORKER_DASHBOARD_URL,
+        url: WORKER_OVERVIEW_URL,
       });
 
       const backendData = res?.data;

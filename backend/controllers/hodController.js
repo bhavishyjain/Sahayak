@@ -1,5 +1,5 @@
 module.exports = {
-  ...require("./hod/dashboardController"),
+  ...require("./hod/analyticsController"),
   ...require("./hod/assignmentController"),
   ...require("./hod/workflowController"),
   ...require("./hod/invitationController"),

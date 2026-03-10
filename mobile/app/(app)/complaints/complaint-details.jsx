@@ -1,5 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as Notifications from "expo-notifications";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import {
   Clock,
   MapPin,
@@ -13,10 +16,16 @@ import {
   Star,
   MessageSquare,
   Users,
-  Search,
-  X,
   Camera,
   Upload,
+  AlertTriangle,
+  ChevronUp,
+  ShieldAlert,
+  Brain,
+  Tag,
+  Zap,
+  Share2,
+  FileDown,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -24,6 +33,7 @@ import {
   Image,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   View,
   Modal,
@@ -35,18 +45,16 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import ComplaintTimeline from "../../../components/ComplaintTimeline";
 import PressableBlock from "../../../components/PressableBlock";
 import {
   GET_COMPLAINT_BY_ID_URL,
   UPVOTE_COMPLAINT_URL,
   SUBMIT_FEEDBACK_URL,
-  HOD_ASSIGN_MULTIPLE_WORKERS_URL,
-  HOD_WORKERS_URL,
   HOD_APPROVE_COMPLETION_URL,
   HOD_NEEDS_REWORK_URL,
   HOD_CANCEL_COMPLAINT_URL,
   UPDATE_COMPLAINT_STATUS_URL,
-  WORKERS_URL,
   UPLOAD_COMPLETION_PHOTOS_URL,
   SATISFACTION_VOTE_URL,
   GET_SATISFACTION_URL,
@@ -54,9 +62,14 @@ import {
 } from "../../../url";
 import apiCall from "../../../utils/api";
 import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
+import { getSlaCountdown } from "../../../utils/complaintFormatters";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
+import {
+  cacheComplaintDetail,
+  getCachedComplaintDetail,
+} from "../../../utils/complaintsCache";
 
 export default function ComplaintDetails() {
   const { id } = useLocalSearchParams();
@@ -80,11 +93,6 @@ export default function ComplaintDetails() {
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   // HOD-specific states
-  const [assignModalVisible, setAssignModalVisible] = useState(false);
-  const [workers, setWorkers] = useState([]);
-  const [selectedWorker, setSelectedWorker] = useState(null);
-  const [workerSearchQuery, setWorkerSearchQuery] = useState("");
-  const [assigning, setAssigning] = useState(false);
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
   const [reworkReason, setReworkReason] = useState("");
   const [approving, setApproving] = useState(false);
@@ -106,40 +114,22 @@ export default function ComplaintDetails() {
 
   // Common states
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const normalizedWorkers = useMemo(
-    () =>
-      (workers || []).map((w, idx) => {
-        const fallbackId = `worker-${idx}-${w.username || "unknown"}`;
-        return {
-          ...w,
-          workerId: String(w.id || w._id || fallbackId),
-        };
-      }),
-    [workers],
-  );
+  // SLA live countdown — recomputed every 60 s
+  const [slaCountdown, setSlaCountdown] = useState(null);
 
-  const filteredWorkers = useMemo(() => {
-    const q = workerSearchQuery.trim().toLowerCase();
-    if (!q) return normalizedWorkers;
-    return normalizedWorkers.filter((w) => {
-      return (
-        String(w.fullName || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(w.username || "")
-          .toLowerCase()
-          .includes(q)
-      );
-    });
-  }, [normalizedWorkers, workerSearchQuery]);
-
-  const currentAssignedWorker = useMemo(() => {
-    const primaryWorkerId = complaint?.assignedWorkers?.[0]?.workerId;
-    if (!primaryWorkerId) return null;
-    const assignedId = String(primaryWorkerId);
-    return normalizedWorkers.find((w) => w.workerId === assignedId) || null;
-  }, [complaint?.assignedWorkers, normalizedWorkers]);
+  useEffect(() => {
+    if (!complaint?.sla?.dueDate) {
+      setSlaCountdown(null);
+      return;
+    }
+    const update = () =>
+      setSlaCountdown(getSlaCountdown(complaint.sla.dueDate));
+    update();
+    const interval = setInterval(update, 60000);
+    return () => clearInterval(interval);
+  }, [complaint?.sla?.dueDate]);
 
   const load = async (isRefresh = false) => {
     try {
@@ -157,6 +147,8 @@ export default function ComplaintDetails() {
       const payload = res?.data;
       const complaintData = payload?.complaint || null;
       setComplaint(complaintData);
+      // Persist for offline fallback
+      if (complaintData) await cacheComplaintDetail(id, complaintData);
       setUserRole(user?.role);
       setNewStatus(complaintData?.status || "");
 
@@ -179,14 +171,23 @@ export default function ComplaintDetails() {
         await fetchSatisfactionVotes();
       }
     } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("common.failed"),
-        text2:
-          e?.response?.data?.message || t("complaints.details.couldNotLoad"),
-      });
-      if (e?.response?.status === 404) {
-        setTimeout(() => router.back(), 1500);
+      // Try to serve cached version on network failure
+      const cached = await getCachedComplaintDetail(id);
+      if (cached) {
+        setComplaint(cached);
+        const user = await getUserAuth();
+        setUserRole(user?.role);
+        setCurrentUserId(String(user?.id || user?._id));
+      } else {
+        Toast.show({
+          type: "error",
+          text1: t("common.failed"),
+          text2:
+            e?.response?.data?.message || t("complaints.details.couldNotLoad"),
+        });
+        if (e?.response?.status === 404) {
+          setTimeout(() => router.back(), 1500);
+        }
       }
     } finally {
       setLoading(false);
@@ -194,60 +195,24 @@ export default function ComplaintDetails() {
     }
   };
 
-  const loadWorkers = async () => {
-    try {
-      const res = await apiCall({
-        method: "GET",
-        url: HOD_WORKERS_URL,
-      });
-      const payload = res?.data;
-      let workerList = payload?.workers || [];
-
-      // Fallback for cases where HOD endpoint returns partial data unexpectedly.
-      if (workerList.length <= 1) {
-        const fallbackRes = await apiCall({
-          method: "GET",
-          url: WORKERS_URL,
-        });
-        let fallbackList = fallbackRes?.data?.data || [];
-        if (complaint?.department) {
-          const complaintDept = String(complaint.department).toLowerCase();
-          fallbackList = fallbackList.filter(
-            (worker) =>
-              String(worker.department || "").toLowerCase() === complaintDept,
-          );
-        }
-        const merged = [...workerList, ...fallbackList].reduce(
-          (acc, worker) => {
-            const key = String(
-              worker.id || worker._id || worker.username || Math.random(),
-            );
-            if (!acc.some((w) => String(w.id || w._id || w.username) === key)) {
-              acc.push(worker);
-            }
-            return acc;
-          },
-          [],
-        );
-        workerList = merged;
-      }
-
-      setWorkers((prev) => {
-        // Protect against late responses that would shrink an already-loaded list.
-        if (Array.isArray(prev) && prev.length > workerList.length) {
-          return prev;
-        }
-        return workerList;
-      });
-    } catch (e) {
-      console.error("Failed to load workers:", e);
-    }
-  };
-
   useEffect(() => {
     if (id) {
       load(false);
     }
+  }, [id]);
+
+  // Auto-refresh when a push notification arrives that relates to this complaint
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        const data = notification?.request?.content?.data;
+        // Backend sends `complaintId` in the notification payload
+        if (data?.complaintId && String(data.complaintId) === String(id)) {
+          load(true);
+        }
+      },
+    );
+    return () => sub.remove();
   }, [id]);
 
   // Citizen: Handle upvote
@@ -333,53 +298,6 @@ export default function ComplaintDetails() {
       });
     } finally {
       setSubmittingFeedback(false);
-    }
-  };
-
-  // HOD: Assign complaint
-  const handleAssignComplaint = async () => {
-    if (!selectedWorker) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.workerRequired"),
-        text2: t("complaints.details.pleaseSelectWorker"),
-      });
-      return;
-    }
-
-    try {
-      setAssigning(true);
-
-      await apiCall({
-        method: "POST",
-        url: HOD_ASSIGN_MULTIPLE_WORKERS_URL(id),
-        data: {
-          workers: [{ workerId: selectedWorker }],
-        },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: complaint?.isAssigned
-          ? t("complaints.details.assignmentUpdated")
-          : t("complaints.details.complaintAssigned"),
-        text2: complaint?.isAssigned
-          ? t("complaints.details.workerAssignmentChanged")
-          : t("complaints.details.workerNotified"),
-      });
-
-      setAssignModalVisible(false);
-      setSelectedWorker(null);
-      await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.assignmentFailed"),
-        text2:
-          e?.response?.data?.message || t("complaints.details.couldNotAssign"),
-      });
-    } finally {
-      setAssigning(false);
     }
   };
 
@@ -586,6 +504,7 @@ export default function ComplaintDetails() {
         allowsMultipleSelection: true,
         quality: 0.8,
         aspect: [4, 3],
+        selectionLimit: 10,
       });
 
       if (!result.canceled && result.assets) {
@@ -787,6 +706,80 @@ export default function ComplaintDetails() {
     return String(status || "-").replace("-", " ");
   };
 
+  const handleShare = async () => {
+    try {
+      const link = `sahayak://complaints/complaint-details?id=${id}`;
+      await Share.share({
+        message: `📋 Complaint #${complaint.ticketId} — ${complaint.department}\nStatus: ${complaint.status} | Priority: ${complaint.priority}\n\nOpen in Sahayak: ${link}`,
+        url: link,
+      });
+    } catch (_) {
+      Toast.show({ type: "error", text1: "Share failed" });
+    }
+  };
+
+  const escHtml = (s) =>
+    String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}
+  h1{color:#2563EB;font-size:22px;margin-bottom:4px}
+  .sub{color:#6B7280;font-size:13px;margin-bottom:20px}
+  hr{border:none;border-top:1px solid #E5E7EB;margin:16px 0}
+  .label{color:#6B7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-top:12px}
+  .value{font-size:15px;font-weight:bold;margin-top:3px}
+  .normal{font-weight:normal}
+  .row{display:flex;gap:32px}
+  .col{flex:1}
+  .footer{color:#9CA3AF;font-size:10px;margin-top:32px}
+</style></head><body>
+  <h1>Complaint Report</h1>
+  <p class="sub">Ticket #${escHtml(complaint.ticketId)} &bull; Generated ${new Date().toLocaleString()}</p>
+  <hr/>
+  <div class="row">
+    <div class="col"><p class="label">Status</p><p class="value">${escHtml(complaint.status)}</p></div>
+    <div class="col"><p class="label">Priority</p><p class="value">${escHtml(complaint.priority)}</p></div>
+    <div class="col"><p class="label">Department</p><p class="value">${escHtml(complaint.department)}</p></div>
+  </div>
+  <hr/>
+  <p class="label">Location</p>
+  <p class="value normal">${escHtml(complaint.locationName || "Not specified")}</p>
+  <p class="label">Date Submitted</p>
+  <p class="value">${new Date(complaint.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>
+  ${complaint.sla?.dueDate ? `<p class="label">SLA Due Date</p><p class="value">${new Date(complaint.sla.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>` : ""}
+  <hr/>
+  <p class="label">Description</p>
+  <p class="value normal">${escHtml(complaint.refinedText || complaint.rawText || "No description provided")}</p>
+  ${complaint.workerNotes ? `<hr/><p class="label">Worker Notes</p><p class="value normal">${escHtml(complaint.workerNotes)}</p>` : ""}
+  ${complaint.feedback?.rating ? `<hr/><p class="label">Citizen Feedback</p><p class="value">${complaint.feedback.rating} / 5 ★</p>${complaint.feedback.comment ? `<p class="value normal">${escHtml(complaint.feedback.comment)}</p>` : ""}` : ""}
+  <hr/>
+  <p class="footer">Generated by Sahayak &bull; Ticket #${escHtml(complaint.ticketId)}</p>
+</body></html>`;
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/pdf",
+        UTI: "com.adobe.pdf",
+        dialogTitle: `Complaint ${complaint.ticketId}.pdf`,
+      });
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Export failed",
+        text2: e?.message || "Could not generate PDF",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <View
@@ -847,7 +840,32 @@ export default function ComplaintDetails() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title={t("complaints.details.title")} />
+      <BackButtonHeader
+        title={t("complaints.details.title")}
+        rightElement={
+          <View className="flex-row items-center" style={{ gap: 6 }}>
+            <TouchableOpacity
+              onPress={handleShare}
+              className="w-9 h-9 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.backgroundSecondary }}
+            >
+              <Share2 size={16} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleExport}
+              disabled={exporting}
+              className="w-9 h-9 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.backgroundSecondary }}
+            >
+              {exporting ? (
+                <ActivityIndicator size={14} color={colors.primary} />
+              ) : (
+                <FileDown size={16} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
@@ -904,6 +922,201 @@ export default function ComplaintDetails() {
             </Text>
           </Card>
         </View>
+
+        {/* SLA Status Card */}
+        {complaint.sla && complaint.sla.dueDate && (
+          <Card
+            style={{
+              margin: 0,
+              marginBottom: 12,
+              flex: 0,
+              borderWidth: 1.5,
+              borderColor:
+                complaint.sla.isOverdue || slaCountdown?.isOverdue
+                  ? "#EF4444"
+                  : slaCountdown?.isCritical
+                    ? "#EF4444"
+                    : slaCountdown?.isUrgent
+                      ? "#F59E0B"
+                      : colors.border,
+            }}
+          >
+            {/* Header */}
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <ShieldAlert
+                  size={18}
+                  color={
+                    complaint.sla.isOverdue || slaCountdown?.isOverdue
+                      ? "#EF4444"
+                      : slaCountdown?.isCritical
+                        ? "#EF4444"
+                        : slaCountdown?.isUrgent
+                          ? "#F59E0B"
+                          : colors.success || "#10B981"
+                  }
+                />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("complaints.details.sla.title") || "SLA Status"}
+                </Text>
+              </View>
+
+              {/* Escalation level badge */}
+              {(complaint.sla.escalationLevel || 0) > 0 && (
+                <View
+                  className="flex-row items-center px-2 py-1 rounded-lg"
+                  style={{ backgroundColor: "#F9731622" }}
+                >
+                  <ChevronUp size={12} color="#F97316" />
+                  <Text
+                    className="text-xs font-bold ml-1"
+                    style={{ color: "#F97316" }}
+                  >
+                    {t("complaints.details.sla.level") || "Level"}{" "}
+                    {complaint.sla.escalationLevel}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Due Date row */}
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                {t("complaints.details.sla.dueDate") || "SLA Due Date"}
+              </Text>
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: colors.textPrimary }}
+              >
+                {new Date(complaint.sla.dueDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+            </View>
+
+            <View
+              className="h-[1px] mb-2"
+              style={{ backgroundColor: colors.border }}
+            />
+
+            {/* Overdue / Countdown row */}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                {complaint.sla.isOverdue || slaCountdown?.isOverdue
+                  ? t("complaints.details.sla.status") || "Status"
+                  : t("complaints.details.sla.timeLeft") || "Time Remaining"}
+              </Text>
+
+              {complaint.sla.isOverdue || slaCountdown?.isOverdue ? (
+                <View
+                  className="flex-row items-center px-3 py-1 rounded-lg"
+                  style={{ backgroundColor: "#EF444422" }}
+                >
+                  <AlertTriangle size={14} color="#EF4444" />
+                  <Text
+                    className="text-sm font-bold ml-1.5"
+                    style={{ color: "#EF4444" }}
+                  >
+                    {t("complaints.details.sla.overdue") || "OVERDUE"}
+                  </Text>
+                </View>
+              ) : slaCountdown ? (
+                <View
+                  className="flex-row items-center px-3 py-1 rounded-lg"
+                  style={{
+                    backgroundColor: slaCountdown.isCritical
+                      ? "#EF444422"
+                      : slaCountdown.isUrgent
+                        ? "#F59E0B22"
+                        : "#10B98122",
+                  }}
+                >
+                  <Clock
+                    size={14}
+                    color={
+                      slaCountdown.isCritical
+                        ? "#EF4444"
+                        : slaCountdown.isUrgent
+                          ? "#F59E0B"
+                          : "#10B981"
+                    }
+                  />
+                  <Text
+                    className="text-sm font-bold ml-1.5"
+                    style={{
+                      color: slaCountdown.isCritical
+                        ? "#EF4444"
+                        : slaCountdown.isUrgent
+                          ? "#F59E0B"
+                          : "#10B981",
+                    }}
+                  >
+                    {slaCountdown.text}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  className="px-3 py-1 rounded-lg"
+                  style={{ backgroundColor: "#10B98122" }}
+                >
+                  <Text
+                    className="text-sm font-bold"
+                    style={{ color: "#10B981" }}
+                  >
+                    {t("complaints.details.sla.onTime") || "On Time"}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Card>
+        )}
+
+        {/* ETA Card — next to SLA, for assigned/in-progress */}
+        {complaint.estimatedCompletionTime &&
+          (complaint.status === "assigned" ||
+            complaint.status === "in-progress") && (
+            <Card
+              style={{
+                margin: 0,
+                marginBottom: 12,
+                flex: 0,
+                borderWidth: 1.5,
+                borderColor: colors.info ? colors.info + "60" : "#3B82F660",
+              }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <Clock size={18} color={colors.info || "#3B82F6"} />
+                  <Text
+                    className="text-base font-semibold ml-2"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {t("complaints.details.estimatedCompletion") || "ETA"}
+                  </Text>
+                </View>
+                <View
+                  className="px-3 py-1 rounded-lg"
+                  style={{ backgroundColor: (colors.info || "#3B82F6") + "18" }}
+                >
+                  <Text
+                    className="text-sm font-bold"
+                    style={{ color: colors.info || "#3B82F6" }}
+                  >
+                    {complaint.estimatedCompletionTime < 24
+                      ? `${complaint.estimatedCompletionTime}h`
+                      : `${Math.round(complaint.estimatedCompletionTime / 24)}d`}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          )}
 
         {/* Citizen: Upvote Button (Interactive) */}
         {userRole === "user" && (
@@ -1194,49 +1407,134 @@ export default function ComplaintDetails() {
                   )}
                 </View>
               )}
+
+              {/* Keywords */}
+              {complaint.aiAnalysis?.keywords &&
+                complaint.aiAnalysis.keywords.length > 0 && (
+                  <View
+                    className="rounded-lg p-3 mt-3"
+                    style={{ backgroundColor: colors.backgroundSecondary }}
+                  >
+                    <Text
+                      className="text-xs mb-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Keywords
+                    </Text>
+                    <View className="flex-row flex-wrap gap-1">
+                      {complaint.aiAnalysis.keywords.map((kw, i) => (
+                        <View
+                          key={i}
+                          className="px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: "#8B5CF618" }}
+                        >
+                          <Text
+                            className="text-xs font-medium"
+                            style={{ color: "#8B5CF6" }}
+                          >
+                            {kw}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+              {/* Affected Count */}
+              {complaint.aiAnalysis?.affectedCount != null && (
+                <View
+                  className="flex-row items-center mt-3 rounded-lg p-3"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
+                >
+                  <Users size={14} color={colors.textMuted} />
+                  <Text
+                    className="text-xs ml-1.5"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Estimated affected:{" "}
+                    <Text
+                      className="font-semibold"
+                      style={{ color: colors.textPrimary }}
+                    >
+                      ~{complaint.aiAnalysis.affectedCount} people
+                    </Text>
+                  </Text>
+                </View>
+              )}
             </Card>
           )}
 
-        {/* HOD: Current Assigned Worker */}
+        {/* HOD: Current Assigned Workers */}
         {userRole === "head" && complaint.isAssigned && (
           <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <View className="flex-row items-center mb-1">
+            <View className="flex-row items-center mb-2">
               <Users size={18} color={colors.primary} />
               <Text
-                className="text-sm ml-2"
-                style={{ color: colors.textSecondary }}
+                className="text-sm ml-2 font-semibold"
+                style={{ color: colors.textPrimary }}
               >
-                {t("complaints.details.currentlyAssigned")}
+                {complaint.assignedWorkers?.length === 1
+                  ? t("complaints.details.currentlyAssigned")
+                  : `Assigned Workers (${complaint.assignedWorkers?.length ?? 0})`}
               </Text>
             </View>
-            <Text
-              className="text-base font-semibold"
-              style={{ color: colors.textPrimary }}
-            >
-              {currentAssignedWorker?.fullName ||
-                complaint.assignedWorkerName ||
-                t("complaints.details.assignedWorker")}
-            </Text>
+            {(complaint.assignedWorkers ?? []).slice(0, 4).map((w, i) => (
+              <View
+                key={i}
+                className="flex-row items-center justify-between mt-1"
+              >
+                <Text
+                  className="text-sm font-semibold flex-1"
+                  style={{ color: colors.textPrimary }}
+                  numberOfLines={1}
+                >
+                  {w.workerName ?? t("complaints.details.assignedWorker")}
+                </Text>
+                <View
+                  className="ml-2 px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor:
+                      w.status === "completed"
+                        ? "#10B98122"
+                        : w.status === "in-progress"
+                          ? "#F59E0B22"
+                          : w.status === "needs-rework"
+                            ? "#EF444422"
+                            : "#3B82F622",
+                  }}
+                >
+                  <Text
+                    className="text-xs font-semibold capitalize"
+                    style={{
+                      color:
+                        w.status === "completed"
+                          ? "#10B981"
+                          : w.status === "in-progress"
+                            ? "#F59E0B"
+                            : w.status === "needs-rework"
+                              ? "#EF4444"
+                              : "#3B82F6",
+                    }}
+                  >
+                    {(w.status ?? "assigned").replace("-", " ")}
+                  </Text>
+                </View>
+              </View>
+            ))}
           </Card>
         )}
 
-        {/* HOD: Assign Worker Button */}
+        {/* HOD: Manage Workers Button */}
         {userRole === "head" &&
           complaint.status !== "resolved" &&
           complaint.status !== "cancelled" && (
             <PressableBlock
-              onPress={() => {
-                if (!workers.length) {
-                  loadWorkers();
-                }
-                setAssignModalVisible(true);
-                setWorkerSearchQuery("");
-                setSelectedWorker(
-                  complaint?.assignedWorkers?.[0]?.workerId
-                    ? String(complaint.assignedWorkers[0].workerId)
-                    : null,
-                );
-              }}
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/hod/worker-assignment",
+                  params: { complaintId: id },
+                })
+              }
             >
               <Card
                 style={{
@@ -1253,7 +1551,7 @@ export default function ComplaintDetails() {
                     style={{ color: "#FFFFFF" }}
                   >
                     {complaint.isAssigned
-                      ? t("complaints.details.reassignWorker")
+                      ? "Manage Workers"
                       : t("complaints.details.assignToWorker")}
                   </Text>
                 </View>
@@ -1434,6 +1732,41 @@ export default function ComplaintDetails() {
               {complaint.description || t("complaints.details.noDescription")}
             </Text>
           </View>
+
+          {/* Tags */}
+          {complaint.tags && complaint.tags.length > 0 && (
+            <>
+              <View
+                className="h-[1px] mt-3 mb-3"
+                style={{ backgroundColor: colors.border }}
+              />
+              <View className="flex-row items-center mb-2">
+                <Tag size={14} color={colors.textMuted} />
+                <Text
+                  className="text-xs ml-1"
+                  style={{ color: colors.textMuted }}
+                >
+                  Tags
+                </Text>
+              </View>
+              <View className="flex-row flex-wrap gap-1">
+                {complaint.tags.map((tag, i) => (
+                  <View
+                    key={i}
+                    className="px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: colors.primary + "18" }}
+                  >
+                    <Text
+                      className="text-xs font-medium"
+                      style={{ color: colors.primary }}
+                    >
+                      {tag}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
         </Card>
 
         {/* Department and Location */}
@@ -1684,6 +2017,56 @@ export default function ComplaintDetails() {
               </Pressable>
             </View>
 
+            {/* Satisfaction percentage bar */}
+            {(() => {
+              const upCount = satisfactionVotes.thumbsUpCount || 0;
+              const downCount = satisfactionVotes.thumbsDownCount || 0;
+              const total = upCount + downCount;
+              if (total === 0) return null;
+              const upPct = Math.round((upCount / total) * 100);
+              const downPct = 100 - upPct;
+              return (
+                <View className="mb-3">
+                  <View className="flex-row items-center mb-1.5">
+                    <Text
+                      className="text-xs font-bold w-10 text-right"
+                      style={{ color: colors.success || "#10B981" }}
+                    >
+                      {upPct}%
+                    </Text>
+                    <View
+                      className="flex-1 mx-2 rounded-full overflow-hidden"
+                      style={{
+                        height: 8,
+                        backgroundColor: colors.backgroundSecondary,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: `${upPct}%`,
+                          height: 8,
+                          backgroundColor: colors.success || "#10B981",
+                          borderRadius: 4,
+                        }}
+                      />
+                    </View>
+                    <Text
+                      className="text-xs font-bold w-10"
+                      style={{ color: colors.error || "#EF4444" }}
+                    >
+                      {downPct}%
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-xs text-center"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {total} {total === 1 ? "vote" : "votes"} total
+                  </Text>
+                </View>
+              );
+            })()}
+
             {satisfactionVotes.userVote && (
               <View
                 className="py-2 px-3 rounded-lg"
@@ -1779,51 +2162,161 @@ export default function ComplaintDetails() {
             )}
         </Card>
 
-        {/* Status History */}
+        {/* Complaint Timeline */}
         {complaint.history && complaint.history.length > 0 && (
           <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
             <Text
-              className="text-base font-semibold mb-3"
+              className="text-base font-semibold mb-4"
               style={{ color: colors.textPrimary }}
             >
-              {t("complaints.details.statusHistory")}
+              {t("complaints.details.complaintTimeline")}
             </Text>
-            {complaint.history.map((item, index) => (
-              <View key={index}>
-                {index > 0 && (
-                  <View
-                    className="h-[1px] my-3"
-                    style={{ backgroundColor: colors.border }}
-                  />
-                )}
-                <View className="flex-row justify-between items-start">
-                  <View className="flex-1">
-                    <Text
-                      className="text-sm font-semibold capitalize"
-                      style={{ color: colors.textPrimary }}
-                    >
-                      {formatStatusLabel(item.status)}
-                    </Text>
-                    {item.note && (
-                      <Text
-                        className="text-xs mt-1"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {item.note}
-                      </Text>
-                    )}
-                  </View>
+            <ComplaintTimeline history={complaint.history} colors={colors} />
+          </Card>
+        )}
+
+        {/* Escalation History — only shown when escalations occurred */}
+        {complaint.sla?.escalationHistory &&
+          complaint.sla.escalationHistory.length > 0 && (
+            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+              <View className="flex-row items-center mb-3">
+                <ShieldAlert size={18} color="#F97316" />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("complaints.details.sla.escalationHistory") ||
+                    "Escalation History"}
+                </Text>
+                <View
+                  className="ml-2 px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: "#F9731622" }}
+                >
                   <Text
-                    className="text-xs ml-2"
-                    style={{ color: colors.textSecondary }}
+                    className="text-xs font-bold"
+                    style={{ color: "#F97316" }}
                   >
-                    {formatHistoryDate(item.timestamp)}
+                    {complaint.sla.escalationHistory.length}
                   </Text>
                 </View>
               </View>
-            ))}
+
+              {complaint.sla.escalationHistory.map((entry, index) => (
+                <View key={index}>
+                  {index > 0 && (
+                    <View
+                      className="h-[1px] my-2"
+                      style={{ backgroundColor: colors.border }}
+                    />
+                  )}
+                  <View className="flex-row items-start">
+                    <View
+                      className="px-2 py-0.5 rounded-md mr-3 mt-0.5"
+                      style={{ backgroundColor: "#F9731622" }}
+                    >
+                      <Text
+                        className="text-xs font-bold"
+                        style={{ color: "#F97316" }}
+                      >
+                        L{entry.level}
+                      </Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text
+                        className="text-sm font-semibold"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {t("complaints.details.sla.level") || "Level"}{" "}
+                        {entry.level}{" "}
+                        {t("complaints.details.sla.escalation") || "Escalation"}
+                      </Text>
+                      <Text
+                        className="text-xs mt-0.5"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {formatHistoryDate(entry.escalatedAt)}
+                      </Text>
+                      {entry.escalatedTo && (
+                        <Text
+                          className="text-xs mt-0.5"
+                          style={{ color: colors.textMuted }}
+                        >
+                          → {entry.escalatedTo}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </Card>
+          )}
+
+        {/* Discussion Thread - Visible to all parties with access */}
+        {(userRole === "user" ||
+          userRole === "head" ||
+          userRole === "worker" ||
+          userRole === "admin") && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <MessageSquare size={18} color={colors.primary} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  Discussion Thread
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/complaints/complaint-chat",
+                    params: { id, ticketId: complaint.ticketId },
+                  })
+                }
+                className="flex-row items-center px-4 py-2 rounded-xl"
+                style={{ backgroundColor: colors.primary }}
+              >
+                <MessageSquare size={14} color="#fff" />
+                <Text
+                  className="text-sm font-semibold ml-1.5"
+                  style={{ color: "#fff" }}
+                >
+                  Open Chat
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text
+              className="text-xs mt-2"
+              style={{ color: colors.textSecondary }}
+            >
+              Chat with the citizen, worker and department head on this
+              complaint.
+            </Text>
           </Card>
         )}
+
+        {/* Worker Notes - Visible to HOD and Worker */}
+        {(userRole === "head" || userRole === "worker") &&
+          complaint.workerNotes && (
+            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+              <View className="flex-row items-center mb-3">
+                <FileText size={18} color={colors.textSecondary} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  Worker Notes
+                </Text>
+              </View>
+              <Text
+                className="text-sm leading-relaxed"
+                style={{ color: colors.textPrimary }}
+              >
+                {complaint.workerNotes}
+              </Text>
+            </Card>
+          )}
 
         {/* Citizen Feedback - Visible to HOD and Worker */}
         {(userRole === "head" || userRole === "worker") &&
@@ -2101,152 +2594,7 @@ export default function ComplaintDetails() {
         </Modal>
       )}
 
-      {/* HOD: Assign Worker Modal */}
-      {userRole === "head" && (
-        <Modal
-          visible={assignModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setAssignModalVisible(false)}
-        >
-          <View
-            className="flex-1 justify-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-          >
-            <View
-              className="rounded-t-3xl p-6"
-              style={{ backgroundColor: colors.backgroundPrimary }}
-            >
-              <Text
-                className="text-xl font-bold mb-4 text-center"
-                style={{ color: colors.textPrimary }}
-              >
-                {complaint?.isAssigned
-                  ? t("complaints.details.changeAssignment")
-                  : t("complaints.details.assignToWorker")}
-              </Text>
-
-              {/* Worker Search */}
-              <View className="mb-3">
-                <View
-                  className="flex-row items-center px-4 py-3 rounded-xl"
-                  style={{
-                    backgroundColor: colors.backgroundSecondary,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                >
-                  <Search size={18} color={colors.textSecondary} />
-                  <TextInput
-                    className="flex-1 ml-2 text-sm"
-                    style={{ color: colors.textPrimary }}
-                    placeholder={t("complaints.details.searchWorkers")}
-                    placeholderTextColor={colors.textSecondary}
-                    value={workerSearchQuery}
-                    onChangeText={setWorkerSearchQuery}
-                  />
-                  {workerSearchQuery && (
-                    <TouchableOpacity onPress={() => setWorkerSearchQuery("")}>
-                      <X size={18} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              <ScrollView
-                className="max-h-96 mb-4"
-                showsVerticalScrollIndicator={false}
-              >
-                {filteredWorkers.map((worker) => (
-                  <Pressable
-                    key={worker.workerId}
-                    onPress={() => setSelectedWorker(worker.workerId)}
-                    className="mb-2"
-                  >
-                    <Card
-                      style={{
-                        margin: 0,
-                        backgroundColor:
-                          selectedWorker === worker.workerId
-                            ? colors.primary + "20"
-                            : colors.backgroundSecondary,
-                        borderWidth: selectedWorker === worker.workerId ? 2 : 0,
-                        borderColor: colors.primary,
-                      }}
-                    >
-                      <View className="flex-row items-center justify-between">
-                        <Text
-                          className="text-base font-semibold"
-                          style={{
-                            color:
-                              selectedWorker === worker.workerId
-                                ? colors.primary
-                                : colors.textPrimary,
-                          }}
-                        >
-                          {worker.fullName}
-                        </Text>
-                        {selectedWorker === worker.workerId && (
-                          <CheckCircle size={22} color={colors.primary} />
-                        )}
-                      </View>
-                    </Card>
-                  </Pressable>
-                ))}
-                {filteredWorkers.length === 0 && (
-                  <Card style={{ margin: 0, flex: 0 }}>
-                    <Text style={{ color: colors.textSecondary }}>
-                      {t("complaints.details.noWorkersFound")}
-                    </Text>
-                  </Card>
-                )}
-              </ScrollView>
-
-              <View className="flex-row">
-                <Pressable
-                  onPress={() => {
-                    setAssignModalVisible(false);
-                    setSelectedWorker(null);
-                    setWorkerSearchQuery("");
-                  }}
-                  className="flex-1 mr-2 py-3 rounded-xl items-center"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
-                >
-                  <Text
-                    className="text-base font-semibold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {t("common.cancel")}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={handleAssignComplaint}
-                  disabled={assigning}
-                  className="flex-1 ml-2 py-3 rounded-xl items-center"
-                  style={{
-                    backgroundColor: colors.primary,
-                    opacity: assigning ? 0.5 : 1,
-                  }}
-                >
-                  {assigning ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text
-                      className="text-base font-semibold"
-                      style={{ color: "#FFFFFF" }}
-                    >
-                      {complaint?.isAssigned
-                        ? t("complaints.details.changeAssignment")
-                        : t("complaints.details.assign")}
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
+      {/* HOD: Assign Worker → navigate to dedicated page */}
 
       {/* Worker: Status Update Modal */}
       {userRole === "worker" && (

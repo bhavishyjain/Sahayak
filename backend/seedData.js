@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 require("dotenv").config();
 const User = require("./models/User");
 const Complaint = require("./models/Complaint");
+const WorkerInvitation = require("./models/WorkerInvitation");
 
 // Indore areas with accurate coordinates - Expanded list for better coverage
 const indoreAreas = [
@@ -88,6 +89,108 @@ function getLocationForArea(areaName) {
 function getRandomLocation() {
   const area = indoreAreas[Math.floor(Math.random() * indoreAreas.length)];
   return getLocationForArea(area.name);
+}
+
+// Department-specific task descriptions for assigned workers
+const taskDescriptionsByDept = {
+  Road: [
+    "Inspect pothole depth and mark area for patching",
+    "Fill and compact damaged road surface using bitumen mix",
+    "Install warning signs and barricades around excavation",
+    "Survey 200m stretch and document all damage points",
+    "Remove debris and clear road surface before repair",
+    "Apply cold-mix patching compound to potholes",
+    "Restore road markings and reflectors post-repair",
+    "Coordinate traffic diversion during repair work",
+  ],
+  Water: [
+    "Locate and mark leaking pipe section on municipal map",
+    "Shut off supply valve and replace burst pipe segment",
+    "Clear blocked water main and restore pressure",
+    "Test water quality at source and distribution point",
+    "Inspect overhead tank and clean sediment buildup",
+    "Repair damaged water meter and check for tampering",
+    "Restore water supply connection to affected households",
+    "Log flow readings before and after repair",
+  ],
+  Electricity: [
+    "Inspect faulty transformer and check load readings",
+    "Replace damaged street light fitting and ballast",
+    "Restore tripped circuit breaker at distribution box",
+    "Check underground cable for fault and mark location",
+    "Repair broken electric pole and re-tension overhead wire",
+    "Test voltage stability at affected feeder point",
+    "Install new fuse and restore power supply",
+    "Coordinate with MPEB control room for load shedding schedule",
+  ],
+  Waste: [
+    "Collect overflowing waste and transport to processing centre",
+    "Clean and disinfect garbage collection point",
+    "Replace damaged bins and install new ones at marked spots",
+    "Sweep and clear debris from 500m road stretch",
+    "Remove illegal dumping and take photographic evidence",
+    "Coordinate with vehicle crew for extra pickup rounds",
+    "Apply lime and disinfectant to cleared area",
+    "Log weight and type of waste collected for records",
+  ],
+  Drainage: [
+    "Desilting of blocked storm drain using suction vehicle",
+    "Clear 50m stretch of clogged drainage channel",
+    "Repair cracked drain cover and replace broken grate",
+    "Inspect drainage outlet near road and remove blockage",
+    "Map drainage network in affected area for future reference",
+    "Pump out waterlogged area and restore flow",
+    "Apply sealant to leaking drain joint",
+    "Coordinate with Nagar Nigam for desilting machine deployment",
+  ],
+  Other: [
+    "Assess complaint on-site and document findings",
+    "Coordinate with relevant department for resolution",
+    "Complete assigned remediation task as per HOD instructions",
+    "Take before and after photographs for record",
+    "Submit completion report to department office",
+  ],
+};
+
+// Worker progress notes for in-progress / completed tasks
+const workerNotesByStatus = {
+  "in-progress": [
+    "Work started. Material arranged, team on site.",
+    "50% complete. Facing minor delays due to heavy traffic diversion.",
+    "Inspection done. Waiting for equipment to arrive.",
+    "Materials procured. Repair work underway.",
+    "Partially resolved. Remaining section requires specialist tools.",
+    "Coordinating with contractor for heavy machinery deployment.",
+  ],
+  completed: [
+    "Work completed successfully. Site cleaned.",
+    "Repair done and tested. Surface restored to original condition.",
+    "Issue resolved. Photographs uploaded for record.",
+    "Task finished. Follow-up inspection scheduled in 7 days.",
+    "All residents notified. Service restored.",
+    "Completed ahead of schedule. Quality check passed.",
+  ],
+  "needs-rework": [
+    "Materials used were insufficient. Requires second round of patching.",
+    "HOD noted surface not leveled properly. Re-doing.",
+    "Initial repair washed away due to rain. Resuming with waterproof mix.",
+  ],
+};
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getTaskDescription(dept) {
+  const arr = taskDescriptionsByDept[dept] || taskDescriptionsByDept.Other;
+  return pickRandom(arr);
+}
+
+function getWorkerNotes(taskStatus) {
+  const arr = workerNotesByStatus[taskStatus];
+  if (!arr) return null;
+  // ~70% chance of having notes
+  return Math.random() < 0.7 ? pickRandom(arr) : null;
 }
 
 // Sample complaint titles and descriptions by department
@@ -656,6 +759,122 @@ function generateComplaint(userId, ticketNum, allUsers) {
     proofImage: [], // Will be populated below
   };
 
+  // ── AI Analysis ──────────────────────────────────────────────────────
+  const AI_DEPT_KEYWORDS = {
+    Road: ["pothole", "road damage", "crack", "tarring", "speed bump"],
+    Water: [
+      "water leakage",
+      "pipe burst",
+      "shortage",
+      "contaminated water",
+      "tanker",
+    ],
+    Electricity: [
+      "power outage",
+      "streetlight",
+      "exposed wire",
+      "pole damage",
+      "transformer",
+    ],
+    Waste: [
+      "garbage",
+      "overflowing bin",
+      "littering",
+      "sanitation",
+      "waste collection",
+    ],
+    Drainage: [
+      "blocked drain",
+      "waterlogging",
+      "sewage overflow",
+      "manhole",
+      "flooding",
+    ],
+    Other: ["noise", "encroachment", "stray animals", "tree fall", "vandalism"],
+  };
+  const AI_REASONING = {
+    Road: "Road infrastructure complaint with clear indicators of physical damage needing civic attention.",
+    Water:
+      "Water supply issue identified from description keywords indicating supply chain or pipeline problem.",
+    Electricity:
+      "Electrical infrastructure concern requiring immediate assessment for safety.",
+    Waste:
+      "Waste management issue detected — affects public health and sanitation standards.",
+    Drainage:
+      "Drainage/sewage concern with potential flooding or public health risk.",
+    Other:
+      "General civic complaint routed to the appropriate municipal department.",
+  };
+
+  // Sentiment correlates with priority
+  const aiSentiment =
+    priority === "High"
+      ? Math.random() < 0.55
+        ? "angry"
+        : "frustrated"
+      : priority === "Medium"
+        ? Math.random() < 0.6
+          ? "frustrated"
+          : "calm"
+        : Math.random() < 0.7
+          ? "calm"
+          : "frustrated";
+
+  const aiUrgency =
+    priority === "High"
+      ? 7 + Math.floor(Math.random() * 3) // 7-9
+      : priority === "Medium"
+        ? 4 + Math.floor(Math.random() * 3) // 4-6
+        : 1 + Math.floor(Math.random() * 3); // 1-3
+
+  const allKw = AI_DEPT_KEYWORDS[department] || AI_DEPT_KEYWORDS.Other;
+  const shuffledKw = [...allKw].sort(() => Math.random() - 0.5);
+  const aiKeywords = shuffledKw.slice(0, 2 + Math.floor(Math.random() * 2));
+
+  const aiAffectedCount =
+    priority === "High"
+      ? 20 + Math.floor(Math.random() * 80)
+      : priority === "Medium"
+        ? 5 + Math.floor(Math.random() * 20)
+        : 1 + Math.floor(Math.random() * 5);
+
+  // ~30% chance AI disagrees on priority
+  const priorityOptions = ["Low", "Medium", "High"];
+  const aiSuggestedPriority =
+    Math.random() < 0.3
+      ? priorityOptions[
+          (priorityOptions.indexOf(priority) +
+            1 +
+            Math.floor(Math.random() * 2)) %
+            3
+        ]
+      : priority;
+
+  complaint.aiAnalysis = {
+    sentiment: aiSentiment,
+    urgency: aiUrgency,
+    keywords: aiKeywords,
+    affectedCount: aiAffectedCount,
+    suggestedPriority: aiSuggestedPriority,
+    reasoning: AI_REASONING[department] || AI_REASONING.Other,
+  };
+
+  // ~20% chance AI suggests a different department (creates review candidates)
+  if (Math.random() < 0.2) {
+    const altDepts = [
+      "Road",
+      "Water",
+      "Electricity",
+      "Waste",
+      "Drainage",
+      "Other",
+    ].filter((d) => d !== department);
+    complaint.aiSuggestedDepartment =
+      altDepts[Math.floor(Math.random() * altDepts.length)];
+    complaint.aiConfidence = 0.7 + Math.random() * 0.2; // 70-90% when dept differs
+  }
+  // ─────────────────────────────────────────────────────────────────────
+
   // Add proof images (before photos) - 60% chance
   if (Math.random() < 0.6) {
     const photoCount = Math.floor(Math.random() * 3) + 1; // 1-3 photos
@@ -677,8 +896,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
   complaint.history = [
     {
       status: "pending",
+      updatedBy: userId,
       timestamp: createdAt,
-      note: "Complaint registered",
+      note: "Complaint registered by citizen",
     },
   ];
 
@@ -691,8 +911,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
     );
     complaint.history.push({
       status: "assigned",
+      updatedBy: null, // patched in main loop with actual HOD/worker id
       timestamp: assignedDate,
-      note: "Assigned to worker",
+      note: "Assigned to worker by Head of Department",
     });
   }
 
@@ -705,8 +926,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
     );
     complaint.history.push({
       status: "in-progress",
+      updatedBy: null, // patched in main loop with worker id
       timestamp: inProgressDate,
-      note: "Work started",
+      note: "Worker started working on the issue",
     });
   }
 
@@ -719,8 +941,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
     );
     complaint.history.push({
       status: "pending-approval",
+      updatedBy: null, // worker submitted
       timestamp: approvalDate,
-      note: "Submitted for approval",
+      note: "Worker submitted work for HOD approval",
     });
 
     const reworkDate = new Date(approvalDate);
@@ -729,8 +952,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
     );
     complaint.history.push({
       status: "needs-rework",
+      updatedBy: null, // HOD rejected
       timestamp: reworkDate,
-      note: "Marked as needs rework by HOD",
+      note: "Head of Depatment reviewed and sent back for rework",
     });
   }
 
@@ -743,8 +967,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
     );
     complaint.history.push({
       status: "resolved",
+      updatedBy: null, // HOD approved
       timestamp: resolvedDate,
-      note: "Issue resolved",
+      note: "HOD approved completion — issue resolved",
     });
 
     // Add feedback for resolved complaints (70% chance)
@@ -786,10 +1011,34 @@ function generateComplaint(userId, ticketNum, allUsers) {
     );
     complaint.history.push({
       status: "cancelled",
+      updatedBy: null,
       timestamp: cancelledDate,
       note: "Complaint cancelled by HOD before assignment",
     });
   }
+
+  // ── SLA ──────────────────────────────────────────────────────────────
+  // SLA window: High = 24 h, Medium = 72 h, Low = 168 h (7 days)
+  const slaHours = priority === "High" ? 24 : priority === "Medium" ? 72 : 168;
+  const slaDeadline = new Date(createdAt);
+  slaDeadline.setHours(slaDeadline.getHours() + slaHours);
+
+  const now = new Date();
+  const isTerminal = status === "resolved" || status === "cancelled";
+  const isOverdue = !isTerminal && slaDeadline < now;
+  // escalate overdue active complaints (not all at once — ~70% actually escalated)
+  const shouldEscalate = isOverdue && Math.random() < 0.7;
+  const escalationLevel = shouldEscalate ? (Math.random() < 0.3 ? 2 : 1) : 0;
+
+  complaint.sla = {
+    dueDate: slaDeadline,
+    isOverdue: isOverdue,
+    escalated: shouldEscalate,
+    escalationLevel: escalationLevel,
+    // escalationHistory is patched in main loop (needs HOD id)
+    escalationHistory: [],
+  };
+  // ─────────────────────────────────────────────────────────────────────
 
   return complaint;
 }
@@ -805,6 +1054,7 @@ async function seedDatabase() {
     console.log("\n🗑️  Clearing existing data...");
     await User.deleteMany({});
     await Complaint.deleteMany({});
+    await WorkerInvitation.deleteMany({});
     console.log("✅ Existing data cleared");
 
     // Create users
@@ -987,6 +1237,7 @@ async function seedDatabase() {
     const complaints = [];
     const regularUsers = createdUsers.filter((u) => u.role === "user");
     const workers = createdUsers.filter((u) => u.role === "worker");
+    const hods = createdUsers.filter((u) => u.role === "head");
 
     // Generate 2000 complaints with realistic distribution
     let multiWorkerCount = 0;
@@ -1011,23 +1262,47 @@ async function seedDatabase() {
             (h) => h.status === "assigned",
           )?.timestamp;
 
+          // Pick a HOD for this department to patch history updatedBy
+          const deptHod = hods.find(
+            (h) => h.department === complaint.department,
+          );
+
+          // Patch updatedBy in history entries
+          complaint.history.forEach((h) => {
+            if (
+              h.status === "assigned" ||
+              h.status === "needs-rework" ||
+              h.status === "resolved" ||
+              h.status === "cancelled"
+            ) {
+              if (deptHod) h.updatedBy = deptHod._id;
+            } else if (
+              h.status === "in-progress" ||
+              h.status === "pending-approval"
+            ) {
+              h.updatedBy = assignedWorker._id;
+            }
+          });
+
           // Initialize assignedWorkers array
+          const primaryTaskStatus =
+            complaint.status === "resolved"
+              ? "completed"
+              : complaint.status === "in-progress"
+                ? "in-progress"
+                : "assigned";
           complaint.assignedWorkers = [
             {
               workerId: assignedWorker._id,
               assignedAt: complaint.assignedAt,
-              taskDescription: "Complete the assigned work",
-              status:
-                complaint.status === "resolved"
-                  ? "completed"
-                  : complaint.status === "in-progress"
-                    ? "in-progress"
-                    : "assigned",
+              taskDescription: getTaskDescription(complaint.department),
+              status: primaryTaskStatus,
               completedAt:
                 complaint.status === "resolved"
                   ? complaint.history.find((h) => h.status === "resolved")
                       ?.timestamp
                   : null,
+              notes: getWorkerNotes(primaryTaskStatus),
             },
           ];
 
@@ -1042,25 +1317,61 @@ async function seedDatabase() {
               (w) => w._id.toString() !== assignedWorker._id.toString(),
             );
             if (secondWorker) {
+              const secondTaskStatus =
+                complaint.status === "resolved"
+                  ? "completed"
+                  : complaint.status === "in-progress"
+                    ? "in-progress"
+                    : "assigned";
               complaint.assignedWorkers.push({
                 workerId: secondWorker._id,
                 assignedAt: complaint.assignedAt,
-                taskDescription: "Assist with the work",
-                status:
-                  complaint.status === "resolved"
-                    ? "completed"
-                    : complaint.status === "in-progress"
-                      ? "in-progress"
-                      : "assigned",
+                taskDescription: getTaskDescription(complaint.department),
+                status: secondTaskStatus,
                 completedAt:
                   complaint.status === "resolved"
                     ? complaint.history.find((h) => h.status === "resolved")
                         ?.timestamp
                     : null,
+                notes: getWorkerNotes(secondTaskStatus),
               });
 
               multiWorkerCount++;
             }
+          }
+        }
+      }
+
+      // Patch updatedBy for cancelled complaints (no worker, just HOD)
+      if (complaint.status === "cancelled") {
+        const deptHod = hods.find((h) => h.department === complaint.department);
+        if (deptHod) {
+          const cancelledEntry = complaint.history.find(
+            (h) => h.status === "cancelled",
+          );
+          if (cancelledEntry) cancelledEntry.updatedBy = deptHod._id;
+        }
+      }
+
+      // Patch SLA escalationHistory with real HOD id
+      if (complaint.sla && complaint.sla.escalationLevel > 0) {
+        const deptHod = hods.find((h) => h.department === complaint.department);
+        if (deptHod) {
+          const slaDeadline = complaint.sla.dueDate;
+          complaint.sla.escalationHistory = [];
+          for (let lvl = 1; lvl <= complaint.sla.escalationLevel; lvl++) {
+            const escalatedAt = new Date(slaDeadline);
+            // Each escalation step happens a few hours after the previous
+            escalatedAt.setHours(
+              escalatedAt.getHours() +
+                (lvl - 1) * 12 +
+                Math.floor(Math.random() * 6),
+            );
+            complaint.sla.escalationHistory.push({
+              level: lvl,
+              escalatedAt,
+              escalatedTo: deptHod._id,
+            });
           }
         }
       }
@@ -1183,6 +1494,91 @@ async function seedDatabase() {
       await worker.save();
     }
     console.log("✅ Worker assignments updated");
+
+    // ── Seed Worker Invitations ────────────────────────────────────────
+    console.log("\n📧 Seeding worker invitations...");
+    const crypto = require("crypto");
+    const now = new Date();
+
+    const invitationTemplates = [
+      // pending
+      { offsetDays: 5, status: "pending", emailPrefix: "priya.sharma" },
+      { offsetDays: 3, status: "pending", emailPrefix: "rahul.verma" },
+      { offsetDays: 6, status: "pending", emailPrefix: "amit.joshi" },
+      { offsetDays: 2, status: "pending", emailPrefix: "neha.gupta" },
+      { offsetDays: 7, status: "pending", emailPrefix: "suresh.patel" },
+      // accepted
+      { offsetDays: -3, status: "accepted", emailPrefix: "kavita.singh" },
+      { offsetDays: -5, status: "accepted", emailPrefix: "manish.tiwari" },
+      { offsetDays: -2, status: "accepted", emailPrefix: "pooja.mishra" },
+      // expired
+      { offsetDays: -8, status: "expired", emailPrefix: "dinesh.yadav" },
+      { offsetDays: -9, status: "expired", emailPrefix: "sunita.pandey" },
+      // revoked
+      { offsetDays: 4, status: "revoked", emailPrefix: "vikas.rawat" },
+      { offsetDays: 3, status: "revoked", emailPrefix: "anita.chauhan" },
+    ];
+
+    const invitations = [];
+    for (const hod of hods) {
+      const hodIdx = hods.indexOf(hod);
+      const slice = invitationTemplates.filter(
+        (_, i) => i % hods.length === hodIdx,
+      );
+      for (const tpl of slice) {
+        const sentAt = new Date(now);
+        sentAt.setDate(
+          sentAt.getDate() -
+            (tpl.status === "pending" ? 1 : Math.abs(tpl.offsetDays) + 1),
+        );
+
+        const expiresAt = new Date(sentAt);
+        expiresAt.setDate(expiresAt.getDate() + 7);
+        if (tpl.status === "expired") {
+          expiresAt.setDate(sentAt.getDate() - 1); // already past
+        }
+
+        const inv = {
+          email: `${tpl.emailPrefix}.${hod.department.toLowerCase()}@gmail.com`,
+          department: hod.department,
+          invitedBy: hod._id,
+          tokenHash: crypto
+            .createHash("sha256")
+            .update(`${hod._id}-${tpl.emailPrefix}-${hodIdx}-${Math.random()}`)
+            .digest("hex"),
+          expiresAt,
+          createdAt: sentAt,
+          updatedAt: sentAt,
+          acceptedAt: null,
+          revokedAt: null,
+        };
+
+        if (tpl.status === "accepted") {
+          const acceptedAt = new Date(sentAt);
+          acceptedAt.setDate(acceptedAt.getDate() + 2);
+          inv.acceptedAt = acceptedAt;
+        } else if (tpl.status === "revoked") {
+          const revokedAt = new Date(now);
+          revokedAt.setDate(revokedAt.getDate() - 1);
+          inv.revokedAt = revokedAt;
+        }
+
+        invitations.push(inv);
+      }
+    }
+
+    await WorkerInvitation.insertMany(invitations);
+    const pendingCount = invitations.filter(
+      (i) => !i.acceptedAt && !i.revokedAt && i.expiresAt > now,
+    ).length;
+    const acceptedCount = invitations.filter((i) => i.acceptedAt).length;
+    const revokedCount = invitations.filter((i) => i.revokedAt).length;
+    const expiredCount = invitations.filter(
+      (i) => !i.acceptedAt && !i.revokedAt && i.expiresAt <= now,
+    ).length;
+    console.log(
+      `✅ Created ${invitations.length} worker invitations (${pendingCount} pending, ${acceptedCount} accepted, ${revokedCount} revoked, ${expiredCount} expired)`,
+    );
 
     console.log("\n🎉 Database seeded successfully!");
     console.log("\n📝 Sample Login Credentials:");

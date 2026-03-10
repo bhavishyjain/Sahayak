@@ -26,7 +26,7 @@ const sendWorkerInvitation = async (
 ) => {
   try {
     // Generate invitation link
-    const inviteLink = `${process.env.APP_URL || "http://localhost:3000"}/register?token=${inviteToken}&role=worker&department=${department}`;
+    const inviteLink = `sahayak://accept-invite?token=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(email)}&department=${encodeURIComponent(department)}`;
 
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
@@ -163,7 +163,7 @@ const sendWorkerInvitation = async (
               </div>
 
               <div style="text-align: center;">
-                <a href="${inviteLink}" class="button">Accept Invitation & Register</a>
+                <a href="${inviteLink}" class="button">Open Sahayak App & Accept</a>
               </div>
 
               <div class="warning">
@@ -171,7 +171,7 @@ const sendWorkerInvitation = async (
               </div>
 
               <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
-                If the button doesn't work, copy and paste this link into your browser:
+                If the button doesn't work, open the Sahayak app and tap "I have an invite" on the login screen, then paste this link:
               </p>
               <div class="link-box">
                 <a href="${inviteLink}">${inviteLink}</a>

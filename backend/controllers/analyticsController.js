@@ -15,7 +15,12 @@ function severityFromIntensity(intensity) {
 exports.summary = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
-  const [total, pending, inProgress, resolved, recentComplaints] =
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+  sixMonthsAgo.setHours(0, 0, 0, 0);
+
+  const [total, pending, inProgress, resolved, recentComplaints, resolvedComplaints, departmentStats, monthlyData] =
     await Promise.all([
       Complaint.countDocuments({ userId }),
       Complaint.countDocuments({ userId, status: "pending" }),
@@ -27,7 +32,49 @@ exports.summary = asyncHandler(async (req, res) => {
         .select(
           "ticketId rawText refinedText department priority status locationName createdAt",
         ),
+      Complaint.find({ userId, status: "resolved", resolvedAt: { $ne: null } })
+        .select("createdAt resolvedAt")
+        .lean(),
+      Complaint.aggregate([
+        { $match: { userId } },
+        { $group: { _id: "$department", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 1 },
+      ]),
+      Complaint.aggregate([
+        { $match: { userId, createdAt: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
     ]);
+
+  let avgResolutionTime = null;
+  if (resolvedComplaints.length > 0) {
+    const totalHours = resolvedComplaints.reduce((sum, c) => {
+      const hrs = (new Date(c.resolvedAt) - new Date(c.createdAt)) / (1000 * 60 * 60);
+      return sum + (Number.isFinite(hrs) && hrs >= 0 ? hrs : 0);
+    }, 0);
+    avgResolutionTime = Math.round(totalHours / resolvedComplaints.length);
+  }
+
+  const mostActiveDepartment = departmentStats[0]?._id || null;
+
+  const monthlyTrend = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const found = monthlyData.find(
+      (m) => m._id.year === year && m._id.month === month,
+    );
+    monthlyTrend.push({ year, month, count: found?.count || 0 });
+  }
 
   return sendSuccess(res, {
     stats: {
@@ -36,6 +83,9 @@ exports.summary = asyncHandler(async (req, res) => {
       inProgress,
       resolved,
     },
+    avgResolutionTime,
+    mostActiveDepartment,
+    monthlyTrend,
     recent: recentComplaints.map((item) => buildComplaintView(item)),
   });
 });

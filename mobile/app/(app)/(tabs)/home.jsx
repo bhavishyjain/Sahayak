@@ -1,3 +1,4 @@
+import React from "react";
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
@@ -13,15 +14,22 @@ import {
   TrendingUp,
   Bell,
   ChevronRight,
+  BarChart2,
+  Timer,
+  Building2,
+  ThumbsUp,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Pressable,
   RefreshControl,
   ScrollView,
   Text,
   View,
   Dimensions,
 } from "react-native";
+import Svg, { Rect, Text as SvgText } from "react-native-svg";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import PressableBlock from "../../../components/PressableBlock";
@@ -34,7 +42,13 @@ import {
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
-import { API_BASE } from "../../../url";
+import * as Location from "expo-location";
+import {
+  GET_ANALYTICS_SUMMARY_URL,
+  GET_HEATMAP_URL,
+  GET_NEARBY_COMPLAINTS_URL,
+  UPVOTE_COMPLAINT_URL,
+} from "../../../url";
 
 const { width } = Dimensions.get("window");
 
@@ -48,12 +62,15 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState({
     stats: { total: 0, pending: 0, inProgress: 0, resolved: 0 },
+    avgResolutionTime: null,
+    mostActiveDepartment: null,
+    monthlyTrend: [],
     recent: [],
   });
   const [spots, setSpots] = useState([]);
   const [user, setUser] = useState(null);
-
-  const baseUrl = API_BASE;
+  const [nearbyComplaints, setNearbyComplaints] = useState([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -69,8 +86,8 @@ export default function Home() {
       else setLoading(true);
 
       const [summaryRes, heatmapRes] = await Promise.all([
-        apiCall({ method: "GET", url: `${baseUrl}/dashboard/summary` }),
-        apiCall({ method: "GET", url: `${baseUrl}/dashboard/heatmap` }),
+        apiCall({ method: "GET", url: GET_ANALYTICS_SUMMARY_URL }),
+        apiCall({ method: "GET", url: GET_HEATMAP_URL }),
       ]);
 
       const summaryPayload = summaryRes?.data;
@@ -90,8 +107,48 @@ export default function Home() {
     }
   };
 
+  const loadNearby = async () => {
+    try {
+      setNearbyLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const res = await apiCall({
+        method: "GET",
+        url: `${GET_NEARBY_COMPLAINTS_URL}?lat=${loc.coords.latitude}&lng=${loc.coords.longitude}&radius=5`,
+      });
+      setNearbyComplaints(res?.data?.complaints || []);
+    } catch (_) {
+      // fail silently — nearby is optional
+    } finally {
+      setNearbyLoading(false);
+    }
+  };
+
+  const handleNearbyUpvote = async (complaintId) => {
+    try {
+      const res = await apiCall({
+        method: "POST",
+        url: UPVOTE_COMPLAINT_URL(complaintId),
+      });
+      const { upvoteCount } = res?.data || {};
+      setNearbyComplaints((prev) =>
+        prev.map((c) =>
+          c._id === complaintId
+            ? { ...c, upvoteCount: upvoteCount ?? c.upvoteCount }
+            : c,
+        ),
+      );
+    } catch (_) {
+      Toast.show({ type: "error", text1: "Failed to upvote" });
+    }
+  };
+
   useEffect(() => {
     loadData(false);
+    loadNearby();
 
     // Load user data
     getUserAuth()
@@ -312,6 +369,133 @@ export default function Home() {
         </View>
       </View>
 
+      {/* My Stats — analytics card */}
+      {(summary?.avgResolutionTime != null ||
+        summary?.mostActiveDepartment ||
+        (summary?.monthlyTrend || []).length > 0) && (() => {
+        const trend = summary.monthlyTrend || [];
+        const maxCount = Math.max(...trend.map((m) => m.count), 1);
+        const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const barW = 18;
+        const barGap = 6;
+        const chartH = 48;
+        const chartW = trend.length * (barW + barGap) - barGap;
+
+        const avgLabel = (() => {
+          const h = summary.avgResolutionTime;
+          if (h == null) return "N/A";
+          if (h < 24) return `${h}h`;
+          return `${Math.floor(h / 24)}d ${h % 24}h`;
+        })();
+
+        return (
+          <View
+            className="rounded-3xl p-5 mb-6"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <View className="flex-row items-center mb-4">
+              <BarChart2 size={18} color={colors.primary} />
+              <Text
+                className="text-lg font-extrabold ml-2"
+                style={{ color: colors.textPrimary }}
+              >
+                My Stats
+              </Text>
+            </View>
+
+            {/* Avg resolution + most active dept */}
+            <View className="flex-row mb-4" style={{ gap: 8 }}>
+              {summary.avgResolutionTime != null && (
+                <View
+                  className="flex-1 rounded-2xl p-3"
+                  style={{ backgroundColor: (colors.info || "#3B82F6") + "15" }}
+                >
+                  <Timer size={16} color={colors.info || "#3B82F6"} />
+                  <Text
+                    className="text-base font-extrabold mt-1"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {avgLabel}
+                  </Text>
+                  <Text
+                    className="text-[11px] mt-0.5"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Avg resolution
+                  </Text>
+                </View>
+              )}
+              {summary.mostActiveDepartment && (
+                <View
+                  className="flex-1 rounded-2xl p-3"
+                  style={{ backgroundColor: (colors.warning || "#F59E0B") + "15" }}
+                >
+                  <Building2 size={16} color={colors.warning || "#F59E0B"} />
+                  <Text
+                    className="text-base font-extrabold mt-1"
+                    style={{ color: colors.textPrimary }}
+                    numberOfLines={1}
+                  >
+                    {summary.mostActiveDepartment}
+                  </Text>
+                  <Text
+                    className="text-[11px] mt-0.5"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Most active dept
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Monthly sparkline */}
+            {trend.length > 0 && (
+              <>
+                <Text
+                  className="text-xs font-semibold mb-2"
+                  style={{ color: colors.textSecondary }}
+                >
+                  Monthly complaints (last 6 months)
+                </Text>
+                <Svg width={chartW} height={chartH + 16}>
+                  {trend.map((m, i) => {
+                    const barH = maxCount > 0 ? Math.max(3, (m.count / maxCount) * chartH) : 3;
+                    const x = i * (barW + barGap);
+                    const y = chartH - barH;
+                    return (
+                      <React.Fragment key={i}>
+                        <Rect
+                          x={x}
+                          y={y}
+                          width={barW}
+                          height={barH}
+                          rx={4}
+                          fill={m.count > 0 ? colors.primary : colors.border}
+                          opacity={m.count > 0 ? 1 : 0.4}
+                        />
+                        <SvgText
+                          x={x + barW / 2}
+                          y={chartH + 13}
+                          fontSize={9}
+                          textAnchor="middle"
+                          fill={colors.textSecondary}
+                        >
+                          {MONTH_LABELS[m.month - 1]}
+                        </SvgText>
+                      </React.Fragment>
+                    );
+                  })}
+                </Svg>
+              </>
+            )}
+          </View>
+        );
+      })()}
+
       {/* Quick Actions - Horizontal Pills */}
       <View className="flex-row mb-6">
         {actions.map((action) => (
@@ -447,6 +631,109 @@ export default function Home() {
           )}
         </View>
       </View>
+
+      {/* Nearby Complaints Section */}
+      {(nearbyLoading || nearbyComplaints.length > 0) && (
+        <View className="mb-6">
+          <View className="flex-row items-center mb-3">
+            <MapPin size={20} color={colors.primary} style={{ marginRight: 8 }} />
+            <Text
+              className="text-xl font-extrabold"
+              style={{ color: colors.textPrimary }}
+            >
+              Nearby Open Issues
+            </Text>
+          </View>
+          <View
+            className="rounded-2xl px-4 py-2"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            {nearbyLoading ? (
+              <View className="py-6 items-center">
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : (
+              nearbyComplaints.slice(0, 5).map((item, index) => (
+                <View
+                  key={item._id}
+                  className="flex-row items-center py-3"
+                  style={{
+                    borderBottomWidth:
+                      index < Math.min(nearbyComplaints.length, 5) - 1 ? 1 : 0,
+                    borderBottomColor: colors.border,
+                  }}
+                >
+                  <Pressable
+                    onPress={() =>
+                      router.push(
+                        `/complaints/complaint-details?id=${item._id}`,
+                      )
+                    }
+                    className="flex-1"
+                  >
+                    <View className="flex-row items-center mb-1">
+                      <Text
+                        className="text-xs font-bold mr-2"
+                        style={{ color: colors.primary }}
+                      >
+                        #{item.ticketId}
+                      </Text>
+                      <View
+                        className="px-2 py-0.5 rounded-md mr-2"
+                        style={{
+                          backgroundColor: `${getPriorityColor(item.priority, colors)}20`,
+                        }}
+                      >
+                        <Text
+                          className="text-[10px] font-bold"
+                          style={{ color: getPriorityColor(item.priority, colors) }}
+                        >
+                          {item.priority}
+                        </Text>
+                      </View>
+                      <Text
+                        className="text-[10px]"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {item.distance} km away
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-sm font-semibold mb-1"
+                      style={{ color: colors.textPrimary }}
+                      numberOfLines={1}
+                    >
+                      {item.refinedText || item.rawText || "Complaint"}
+                    </Text>
+                    <Text
+                      className="text-xs"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {item.department} • {item.locationName || "Nearby"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleNearbyUpvote(item._id)}
+                    className="ml-3 items-center px-2 py-1"
+                  >
+                    <ThumbsUp size={16} color={colors.primary} />
+                    <Text
+                      className="text-xs font-bold mt-0.5"
+                      style={{ color: colors.primary }}
+                    >
+                      {item.upvoteCount || 0}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Hotspots Section */}
       <View className="mb-4">

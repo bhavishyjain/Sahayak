@@ -8,12 +8,12 @@ const {
   updateWorker,
   getAllWorkers,
   getAvailableWorkers,
-  updateWorkerStatus,
-  getWorkerDashboard,
+  getWorkerOverview,
   updateComplaintStatus,
   getAssignedComplaints,
   getCompletedComplaints,
   getLeaderboard,
+  getWorkerAnalytics,
 } = require("../controllers/workerController");
 
 router.use(attachAuth, requireAuth);
@@ -25,11 +25,11 @@ router.get("/", authorize("admin", "head"), getAllWorkers);
 router.get("/available/:department", authorize("admin", "head"), getAvailableWorkers);
 
 // Worker routes
-router.get("/dashboard", authorize("worker", "admin"), getWorkerDashboard);
+router.get("/overview", authorize("worker", "admin"), getWorkerOverview);
 router.get("/assigned-complaints", authorize("worker", "admin"), getAssignedComplaints);
 router.get("/completed-complaints", authorize("worker", "admin"), getCompletedComplaints);
 router.get("/leaderboard", authorize("worker", "admin", "head"), getLeaderboard);
-router.put("/status/:workerId", authorize("worker", "admin"), updateWorkerStatus);
+router.get("/analytics", authorize("worker", "admin", "head"), getWorkerAnalytics);
 router.put(
   "/complaint/:complaintId/status",
   authorize("worker", "admin"),

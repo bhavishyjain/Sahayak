@@ -2,6 +2,8 @@ import * as Clarity from "@microsoft/react-native-clarity";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import {
+  BarChart2,
+  Bell,
   Globe,
   LogOut,
   Moon,
@@ -10,6 +12,7 @@ import {
   Trash2,
   CheckCircle,
   FileText,
+  UserPlus,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -21,7 +24,9 @@ import MenuScreenLayout from "../../../components/MenuScreenLayout";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import getUserAuth from "../../../utils/userAuth";
+import getUserAuth, { clearUserAuth } from "../../../utils/userAuth";
+import apiCall from "../../../utils/api";
+import { DELETE_ACCOUNT_URL } from "../../../url";
 
 // HELPER FUNCTIONS
 
@@ -117,6 +122,8 @@ export default function More() {
   const [isLoading, setIsLoading] = useState(true);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const languagePickerRef = useRef(null);
   const [showClarityDialog, setShowClarityDialog] = useState(false);
@@ -162,6 +169,12 @@ export default function More() {
             subtitle: "more.menu.resolvedComplaints.description",
             route: "/(app)/more/hod-resolved",
           },
+          {
+            icon: UserPlus,
+            title: "Manage Invitations",
+            subtitle: "Invite workers and track invitation status",
+            route: "/(app)/more/hod-manage-invitations",
+          },
         ]
       : []),
     // Worker-only: Completed Complaints
@@ -173,8 +186,20 @@ export default function More() {
             subtitle: "more.menu.completedWork.description",
             route: "/(app)/more/worker-completed",
           },
+          {
+            icon: BarChart2,
+            title: "My Analytics",
+            subtitle: "Performance graphs & trends",
+            route: "/(app)/more/worker-analytics",
+          },
         ]
       : []),
+    {
+      icon: Bell,
+      title: "Notifications",
+      subtitle: "History & preferences",
+      route: "/(app)/more/notifications",
+    },
     {
       icon: colorScheme === "dark" ? Moon : Sun,
       title: "more.menu.theme.title",
@@ -240,10 +265,46 @@ export default function More() {
         visible={showDeleteAccountDialog}
         title={t("more.menu.deleteAccount.modalTitle")}
         message={t("more.menu.deleteAccount.modalMessage")}
-        confirmText={t("common.ok")}
+        confirmText="Delete Account"
         cancelText={t("common.cancel")}
-        onConfirm={() => setShowDeleteAccountDialog(false)}
-        onCancel={() => setShowDeleteAccountDialog(false)}
+        loading={deletingAccount}
+        showInput
+        inputPlaceholder="Enter your password to confirm"
+        inputValue={deletePassword}
+        onInputChange={setDeletePassword}
+        onConfirm={async () => {
+          if (!deletePassword.trim()) {
+            Toast.show({
+              type: "error",
+              text1: "Enter your password to confirm",
+            });
+            return;
+          }
+          setDeletingAccount(true);
+          try {
+            await apiCall({
+              method: "DELETE",
+              url: DELETE_ACCOUNT_URL,
+              data: { password: deletePassword },
+            });
+            setShowDeleteAccountDialog(false);
+            await clearUserAuth();
+            router.replace("/(app)/(auth)/login");
+          } catch (err) {
+            const msg =
+              err?.response?.data?.message ||
+              err?.message ||
+              "Failed to delete account";
+            Toast.show({ type: "error", text1: "Error", text2: msg });
+          } finally {
+            setDeletingAccount(false);
+            setDeletePassword("");
+          }
+        }}
+        onCancel={() => {
+          setShowDeleteAccountDialog(false);
+          setDeletePassword("");
+        }}
       />
 
       {/* Logout Confirmation Dialog */}

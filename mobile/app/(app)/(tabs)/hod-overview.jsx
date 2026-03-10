@@ -14,6 +14,9 @@ import {
   Target,
   CheckCircle,
   Timer,
+  Brain,
+  ChevronRight,
+  Star,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -33,13 +36,15 @@ import MetricCard from "../../../components/MetricCard";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
-import { HOD_DASHBOARD_URL } from "../../../url";
+import { HOD_OVERVIEW_URL } from "../../../url";
+import { useRouter } from "expo-router";
 
-export default function HodDashboard() {
+export default function HodOverview() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
@@ -52,7 +57,7 @@ export default function HodDashboard() {
 
       const res = await apiCall({
         method: "GET",
-        url: HOD_DASHBOARD_URL,
+        url: HOD_OVERVIEW_URL,
       });
 
       const payload = res?.data;
@@ -657,8 +662,107 @@ export default function HodDashboard() {
                   </Text>
                 </Card>
               </TouchableOpacity>
+
+              {/* Citizen Feedback Rating */}
+              {stats.avgFeedbackRating && (
+                <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center">
+                      <View
+                        className="w-10 h-10 rounded-full items-center justify-center"
+                        style={{ backgroundColor: (colors.warning || "#F59E0B") + "20" }}
+                      >
+                        <Star size={20} color={colors.warning || "#F59E0B"} fill={colors.warning || "#F59E0B"} />
+                      </View>
+                      <Text
+                        className="text-base font-semibold ml-3"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        Citizen Satisfaction
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Text
+                        className="text-2xl font-bold mr-1"
+                        style={{ color: colors.warning || "#F59E0B" }}
+                      >
+                        {stats.avgFeedbackRating}
+                      </Text>
+                      <Text
+                        className="text-sm"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        / 5
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="flex-row mt-3">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        size={18}
+                        color={colors.warning || "#F59E0B"}
+                        fill={
+                          s <= Math.round(stats.avgFeedbackRating)
+                            ? colors.warning || "#F59E0B"
+                            : "transparent"
+                        }
+                        style={{ marginRight: 4 }}
+                      />
+                    ))}
+                    <Text
+                      className="text-xs ml-2 self-center"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      avg. from citizen ratings
+                    </Text>
+                  </View>
+                </Card>
+              )}
             </>
           )}
+
+          {/* AI Review Queue Entry */}
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/hod/ai-review")}
+            activeOpacity={0.7}
+          >
+            <Card
+              style={{
+                margin: 0,
+                marginBottom: 16,
+                flex: 0,
+                borderWidth: 1.5,
+                borderColor: "#8B5CF6",
+              }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center flex-1">
+                  <View
+                    className="w-10 h-10 rounded-full items-center justify-center"
+                    style={{ backgroundColor: "#8B5CF620" }}
+                  >
+                    <Brain size={20} color="#8B5CF6" />
+                  </View>
+                  <View className="ml-3 flex-1">
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: colors.textPrimary }}
+                    >
+                      AI Review Queue
+                    </Text>
+                    <Text
+                      className="text-xs mt-0.5"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Complaints where AI suggests different dept or priority
+                    </Text>
+                  </View>
+                </View>
+                <ChevronRight size={18} color="#8B5CF6" />
+              </View>
+            </Card>
+          </TouchableOpacity>
 
           {!stats && (
             <Card style={{ margin: 0, marginTop: 20 }}>

@@ -14,6 +14,7 @@ import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { setUserAuth } from "../../../utils/userAuth";
 import { API_BASE } from "../../../url";
+import { registerPushToken } from "../../../utils/pushToken";
 
 export default function Login() {
   const { colorScheme } = useTheme();
@@ -38,9 +39,9 @@ export default function Login() {
         const user = JSON.parse(userData);
         const redirectPath =
           user.role === "head"
-            ? "/(app)/(tabs)/hod-dashboard"
+            ? "/(app)/(tabs)/hod-overview"
             : user.role === "worker"
-              ? "/(app)/(tabs)/worker-dashboard"
+              ? "/(app)/(tabs)/worker-home"
               : "/(app)/(tabs)/home";
         router.replace(redirectPath);
       }
@@ -93,6 +94,9 @@ export default function Login() {
 
         await setUserAuth(userToStore);
 
+        // Register device for push notifications (non-blocking)
+        registerPushToken();
+
         Toast.show({
           type: "success",
           text1: t("toast.loginSuccess.title") || "Success",
@@ -102,9 +106,9 @@ export default function Login() {
         // Redirect based on user role
         const redirectPath =
           userData.role === "head"
-            ? "/(app)/(tabs)/hod-dashboard"
+            ? "/(app)/(tabs)/hod-overview"
             : userData.role === "worker"
-              ? "/(app)/(tabs)/worker-dashboard"
+              ? "/(app)/(tabs)/worker-home"
               : "/(app)/(tabs)/home";
         router.replace(redirectPath);
       } else {

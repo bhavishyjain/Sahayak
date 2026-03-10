@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sahayak",
     "slug": "sahayak-mobile",
-    "version": "5.0.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo-ios.png",
     "scheme": "sahayak",

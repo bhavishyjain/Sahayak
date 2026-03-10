@@ -31,9 +31,10 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import PressableBlock from "../../../components/PressableBlock";
+import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import StatusPill from "../../../components/StatusPill";
 import {
-  HOD_DASHBOARD_URL,
+  HOD_OVERVIEW_URL,
   HOD_ASSIGN_MULTIPLE_WORKERS_URL,
   HOD_WORKERS_URL,
 } from "../../../url";
@@ -173,7 +174,7 @@ export default function HodComplaints() {
 
       const res = await apiCall({
         method: "GET",
-        url: HOD_DASHBOARD_URL,
+        url: HOD_OVERVIEW_URL,
       });
 
       const payload = res?.data;
@@ -337,7 +338,10 @@ export default function HodComplaints() {
               >
                 #{item.ticketId}
               </Text>
-              <StatusPill status={item.status} />
+              <View style={{ alignItems: "flex-end", gap: 4 }}>
+                <StatusPill status={item.status} />
+                {item.sla && <SlaStatusBadge sla={item.sla} />}
+              </View>
             </View>
 
             <Text
@@ -427,12 +431,12 @@ export default function HodComplaints() {
                 </View>
                 {eta && (
                   <View className="flex-row items-center ml-2">
-                      <Clock
-                        size={12}
-                        color={
-                          eta === t("hod.complaints.overdue")
-                            ? "#EF4444"
-                            : colors.info || "#3B82F6"
+                    <Clock
+                      size={12}
+                      color={
+                        eta === t("hod.complaints.overdue")
+                          ? "#EF4444"
+                          : colors.info || "#3B82F6"
                       }
                     />
                     <Text
@@ -515,7 +519,10 @@ export default function HodComplaints() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title={t("hod.complaints.title")} hasBackButton={false} />
+      <BackButtonHeader
+        title={t("hod.complaints.title")}
+        hasBackButton={false}
+      />
 
       {/* Search Bar */}
       <View className="px-4 pb-4 pt-4">

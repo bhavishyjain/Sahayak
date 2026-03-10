@@ -13,6 +13,7 @@ import {
   UserMinus,
   AlertTriangle,
   X,
+  BarChart2,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -315,6 +316,24 @@ export default function WorkerDetails() {
             </View>
           </Card>
         </View>
+
+        {/* Analytics Button */}
+        <TouchableOpacity
+          className="flex-row items-center justify-center rounded-2xl py-3 mb-4"
+          style={{ backgroundColor: colors.primary + "18", borderWidth: 1, borderColor: colors.primary + "44" }}
+          activeOpacity={0.7}
+          onPress={() =>
+            router.push(`/(app)/more/worker-analytics?workerId=${id}`)
+          }
+        >
+          <BarChart2 size={18} color={colors.primary} />
+          <Text
+            className="text-sm font-semibold ml-2"
+            style={{ color: colors.primary }}
+          >
+            View Performance Analytics
+          </Text>
+        </TouchableOpacity>
 
         {/* Current Assignments */}
         <PressableBlock

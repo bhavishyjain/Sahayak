@@ -1,5 +1,5 @@
 module.exports = {
   ...require("./worker/assignmentController"),
-  ...require("./worker/dashboardController"),
+  ...require("./worker/analyticsController"),
   ...require("./worker/statusController"),
 };

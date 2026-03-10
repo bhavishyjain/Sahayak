@@ -49,7 +49,6 @@ const userSchema = new mongoose.Schema({
     lng: { type: Number },
     address: { type: String },
   },
-  specializations: [{ type: String }],
   rating: { type: Number, default: 4.5, min: 0, max: 5 },
   performanceMetrics: {
     totalCompleted: { type: Number, default: 0 },
@@ -58,6 +57,12 @@ const userSchema = new mongoose.Schema({
     customerRating: { type: Number, default: 4.5 },
   },
   pushTokens: [{ type: String }],
+  notificationPreferences: {
+    complaintsUpdates: { type: Boolean, default: true },
+    assignments: { type: Boolean, default: true },
+    escalations: { type: Boolean, default: true },
+    systemAlerts: { type: Boolean, default: true },
+  },
   preferredLanguage: {
     type: String,
     enum: ["en", "hi", "mr", "gu", "ta", "te", "bn", "kn", "ml", "pa", "ur"],

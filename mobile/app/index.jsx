@@ -17,9 +17,9 @@ export default function Index() {
         // Redirect based on user role
         const redirectPath =
           user.role === "head"
-            ? "/(app)/(tabs)/hod-dashboard"
+            ? "/(app)/(tabs)/hod-overview"
             : user.role === "worker"
-              ? "/(app)/(tabs)/worker-dashboard"
+              ? "/(app)/(tabs)/worker-home"
               : "/(app)/(tabs)/home";
         router.replace(redirectPath);
       } else {

@@ -105,7 +105,7 @@ export default function TabsLayout() {
     return (
       <Tabs screenOptions={commonScreenOptions}>
         <Tabs.Screen
-          name="worker-dashboard"
+          name="worker-home"
           options={{
             title: "Dashboard",
             tabBarIcon: ({ color }) => (
@@ -159,7 +159,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="home" options={{ href: null }} />
         <Tabs.Screen name="complaints" options={{ href: null }} />
         <Tabs.Screen name="assistant" options={{ href: null }} />
-        <Tabs.Screen name="hod-dashboard" options={{ href: null }} />
+        <Tabs.Screen name="hod-overview" options={{ href: null }} />
         <Tabs.Screen name="hod-workers" options={{ href: null }} />
         <Tabs.Screen name="hod-complaints" options={{ href: null }} />
       </Tabs>
@@ -170,7 +170,7 @@ export default function TabsLayout() {
     return (
       <Tabs screenOptions={commonScreenOptions}>
         <Tabs.Screen
-          name="hod-dashboard"
+          name="hod-overview"
           options={{
             title: "Dashboard",
             tabBarIcon: ({ color }) => (
@@ -220,7 +220,7 @@ export default function TabsLayout() {
 
         {/* Hide unused tabs */}
         <Tabs.Screen name="home" options={{ href: null }} />
-        <Tabs.Screen name="worker-dashboard" options={{ href: null }} />
+        <Tabs.Screen name="worker-home" options={{ href: null }} />
         <Tabs.Screen name="complaints" options={{ href: null }} />
         <Tabs.Screen name="assistant" options={{ href: null }} />
         <Tabs.Screen name="worker-assigned" options={{ href: null }} />
@@ -282,7 +282,7 @@ export default function TabsLayout() {
       {/* Hide worker tabs for citizens */}
       <Tabs.Screen name="worker-assigned" options={{ href: null }} />
       <Tabs.Screen name="worker-leaderboard" options={{ href: null }} />
-      <Tabs.Screen name="hod-dashboard" options={{ href: null }} />
+      <Tabs.Screen name="hod-overview" options={{ href: null }} />
     </Tabs>
   );
 }
