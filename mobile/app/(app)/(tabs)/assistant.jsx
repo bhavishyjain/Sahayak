@@ -44,7 +44,7 @@ export default function Assistant() {
         url: `${baseUrl}/chat/message`,
         data: {
           message: msg,
-          conversationHistory: nextMessages.map((m) => ({
+          conversationHistory: nextMessages.slice(-10).map((m) => ({
             role: m.role,
             text: m.text,
           })),

@@ -20,7 +20,7 @@ exports.applyAISuggestion = asyncHandler(async (req, res) => {
   await assertCanManageComplaintByDepartment(req.user, complaint);
 
   if (
-    !complaint.aiSuggestedDepartment &&
+    !complaint.aiAnalysis?.department &&
     !complaint.aiAnalysis?.suggestedPriority
   ) {
     throw new AppError("No AI suggestions available for this complaint", 400);
@@ -28,9 +28,9 @@ exports.applyAISuggestion = asyncHandler(async (req, res) => {
 
   const changes = [];
 
-  if (applyDepartment && complaint.aiSuggestedDepartment) {
+  if (applyDepartment && complaint.aiAnalysis?.department) {
     const oldDept = complaint.department;
-    complaint.department = complaint.aiSuggestedDepartment;
+    complaint.department = complaint.aiAnalysis.department;
     changes.push(`Department: ${oldDept} -> ${complaint.department}`);
   }
 
@@ -64,13 +64,13 @@ exports.getComplaintsNeedingReview = asyncHandler(async (req, res) => {
   const { department } = req.query;
   const mismatchFilter = {
     $or: [
-      { $expr: { $ne: ["$department", "$aiSuggestedDepartment"] } },
+      { $expr: { $ne: ["$department", "$aiAnalysis.department"] } },
       { $expr: { $ne: ["$priority", "$aiAnalysis.suggestedPriority"] } },
     ],
   };
   const filter = {
     status: { $in: ["pending", "assigned"] },
-    aiConfidence: { $gte: 0.7 },
+    "aiAnalysis.confidence": { $gte: 0.7 },
     $and: [mismatchFilter],
   };
   const normalizedRequestedDepartment = String(department || "").trim();
@@ -91,7 +91,7 @@ exports.getComplaintsNeedingReview = asyncHandler(async (req, res) => {
     filter.$and.push({
       $or: [
         { department: head.department },
-        { aiSuggestedDepartment: head.department },
+        { "aiAnalysis.department": head.department },
       ],
     });
   } else if (
@@ -101,22 +101,22 @@ exports.getComplaintsNeedingReview = asyncHandler(async (req, res) => {
     filter.$and.push({
       $or: [
         { department: normalizedRequestedDepartment },
-        { aiSuggestedDepartment: normalizedRequestedDepartment },
+        { "aiAnalysis.department": normalizedRequestedDepartment },
       ],
     });
   }
 
   const complaints = await Complaint.find(filter)
     .populate("userId", "fullName username")
-    .sort({ aiConfidence: -1, createdAt: -1 })
+    .sort({ "aiAnalysis.confidence": -1, createdAt: -1 })
     .limit(50);
 
   const formatted = complaints.map((c) => ({
     ...buildComplaintView(c),
     aiSuggestion: {
-      department: c.aiSuggestedDepartment,
+      department: c.aiAnalysis?.department,
       priority: c.aiAnalysis?.suggestedPriority,
-      confidence: Math.round(c.aiConfidence * 100),
+      confidence: Math.round((c.aiAnalysis?.confidence ?? 0) * 100),
       reasoning: c.aiAnalysis?.reasoning,
       sentiment: c.aiAnalysis?.sentiment,
       urgency: c.aiAnalysis?.urgency,

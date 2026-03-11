@@ -26,16 +26,20 @@ async function sendExpoPushNotifications(tokens, payload) {
     return { sent: 0, tickets: [], error: "fetch unavailable on runtime" };
   }
 
-  const response = await fetch("https://exp.host/--/api/v2/push/send", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(messages),
-  });
-
-  const result = await response.json().catch(() => ({}));
+  let response, result;
+  try {
+    response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(messages),
+    });
+    result = await response.json().catch(() => ({}));
+  } catch (fetchErr) {
+    return { sent: 0, tickets: [], error: fetchErr.message };
+  }
 
   if (!response.ok) {
     return { sent: 0, tickets: [], error: result?.errors?.[0]?.message || "Push send failed" };

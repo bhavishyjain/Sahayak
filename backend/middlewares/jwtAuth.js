@@ -1,17 +1,18 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 const AppError = require("../core/AppError");
 
-function normalizeUser(userObj) {
+function normalizeUser(userDoc) {
   return {
-    _id: userObj.id || userObj._id,
-    id: userObj.id || userObj._id,
-    role: userObj.role,
-    username: userObj.username,
-    fullName: userObj.fullName,
-    email: userObj.email,
-    phone: userObj.phone,
-    department: userObj.department,
-    preferredLanguage: userObj.preferredLanguage || "en",
+    _id: userDoc._id,
+    id: userDoc._id,
+    role: userDoc.role,
+    username: userDoc.username,
+    fullName: userDoc.fullName,
+    email: userDoc.email,
+    phone: userDoc.phone,
+    department: userDoc.department,
+    preferredLanguage: userDoc.preferredLanguage || "en",
   };
 }
 
@@ -23,39 +24,38 @@ function resolveToken(req) {
   return null;
 }
 
-function attachAuth(req, res, next) {
-  const token = resolveToken(req);
+async function attachAuth(req, res, next) {
+  try {
+    const token = resolveToken(req);
+    if (!token) return next();
 
-  if (token) {
-    try {
-      if (!process.env.JWT_SECRET) {
-        throw new Error("JWT_SECRET environment variable is not set");
-      }
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
+    if (!process.env.JWT_SECRET) {
+      return next(new AppError("JWT_SECRET environment variable is not set", 500));
+    }
 
-      req.user = normalizeUser({
-        _id: payload.userId,
-        username: payload.username,
-        role: payload.role,
-        fullName: payload.fullName,
-        email: payload.email,
-        phone: payload.phone,
-        department: payload.department,
-        preferredLanguage: payload.preferredLanguage || "en",
-      });
-      req.currentUser = req.user;
-      return next();
-    } catch (_error) {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+
+    // DB fetch on every request: validates the token against current user state
+    // (handles account deletion, deactivation, and forced token revocation)
+    const user = await User.findById(payload.userId).select("-password");
+    if (!user || !user.isActive) {
       return next(new AppError("Invalid or expired token", 401));
     }
-  }
 
-  if (req.session?.user) {
-    req.user = normalizeUser(req.session.user);
+    // Reject tokens issued before tokenValidFrom (password reset, forced logout, etc.)
+    if (user.tokenValidFrom && payload.iat * 1000 < user.tokenValidFrom.getTime()) {
+      return next(new AppError("Token has been revoked", 401));
+    }
+
+    req.user = normalizeUser(user);
     req.currentUser = req.user;
+    return next();
+  } catch (err) {
+    if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
+      return next(new AppError("Invalid or expired token", 401));
+    }
+    return next(err);
   }
-
-  return next();
 }
 
 function requireAuth(req, res, next) {

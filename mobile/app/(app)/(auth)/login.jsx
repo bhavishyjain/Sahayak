@@ -1,5 +1,4 @@
 import * as Clarity from "@microsoft/react-native-clarity";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Keyboard, Text, View } from "react-native";
@@ -13,7 +12,7 @@ import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { setUserAuth } from "../../../utils/userAuth";
-import { API_BASE } from "../../../url";
+import { API_BASE, LOGIN_URL } from "../../../url";
 import { registerPushToken } from "../../../utils/pushToken";
 
 export default function Login() {
@@ -28,25 +27,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const userData = await AsyncStorage.getItem("user");
-      if (
-        userData !== null &&
-        userData !== undefined &&
-        userData !== "undefined" &&
-        JSON.parse(userData)?.auth_token
-      ) {
-        const user = JSON.parse(userData);
-        const redirectPath =
-          user.role === "head"
-            ? "/(app)/(tabs)/hod-overview"
-            : user.role === "worker"
-              ? "/(app)/(tabs)/worker-home"
-              : "/(app)/(tabs)/home";
-        router.replace(redirectPath);
-      }
-    };
-    checkAuth();
     Clarity.setCurrentScreenName("Login");
   }, []);
 
@@ -72,10 +52,9 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const baseUrl = API_BASE;
       const response = await apiCall({
         method: "POST",
-        url: `${baseUrl}/auth/login`,
+        url: LOGIN_URL,
         data: {
           loginId: email.trim(),
           password: password,
@@ -90,6 +69,7 @@ export default function Login() {
           ...userData,
           auth_token: authToken,
           token: authToken,
+          refresh_token: responseData?.refreshToken || null,
         };
 
         await setUserAuth(userToStore);
@@ -152,7 +132,7 @@ export default function Login() {
             style={{
               width: 120,
               height: 40,
-              filter: colorScheme === "dark" ? "none" : "invert(1)",
+              tintColor: colors.textPrimary,
             }}
             resizeMode="contain"
           />

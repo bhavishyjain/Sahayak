@@ -1,4 +1,5 @@
 import { Dimensions, Platform, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import PressableBlock from "./PressableBlock";
 

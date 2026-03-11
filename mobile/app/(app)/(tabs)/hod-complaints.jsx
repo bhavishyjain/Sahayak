@@ -3,15 +3,13 @@ import {
   AlertCircle,
   MapPin,
   CheckCircle,
-  Search,
   ThumbsUp,
   Clock,
   CheckSquare,
   Square,
   Users,
   X,
-  Filter,
-  Calendar,
+  Search,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -29,7 +27,8 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
-import DateTimePickerModal from "../../../components/DateTimePickerModal";
+import SearchBar from "../../../components/SearchBar";
+import FilterPanel from "../../../components/FilterPanel";
 import PressableBlock from "../../../components/PressableBlock";
 import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import StatusPill from "../../../components/StatusPill";
@@ -61,7 +60,6 @@ export default function HodComplaints() {
   const [complaints, setComplaints] = useState([]);
   const [stats, setStats] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("new-to-old");
@@ -81,14 +79,6 @@ export default function HodComplaints() {
     if (filterKey === "unassigned") return !isComplaintAssigned(complaint);
     return normalizeStatus(complaint.status) === filterKey;
   };
-
-  const statusChips = [
-    { key: "all", label: t("common.all") },
-    { key: "unassigned", label: t("hod.complaints.unassigned") },
-    { key: "assigned", label: t("status.assigned") },
-    { key: "pending", label: t("status.pending") },
-    { key: "in-progress", label: t("hod.complaints.inProgress") },
-  ];
 
   const baseFilteredComplaints = complaints.filter((complaint) => {
     const normalizedStatus = normalizeStatus(complaint.status);
@@ -130,16 +120,6 @@ export default function HodComplaints() {
       matchesQuery && matchesPriority && matchesStartDate && matchesEndDate
     );
   });
-
-  const statusCounts = statusChips.reduce((acc, chip) => {
-    acc[chip.key] =
-      chip.key === "all"
-        ? baseFilteredComplaints.length
-        : baseFilteredComplaints.filter((complaint) =>
-            matchesStatusFilter(complaint, chip.key),
-          ).length;
-    return acc;
-  }, {});
 
   const filteredComplaints = baseFilteredComplaints.filter((complaint) =>
     matchesStatusFilter(complaint, statusFilter),
@@ -526,29 +506,11 @@ export default function HodComplaints() {
 
       {/* Search Bar */}
       <View className="px-4 pb-4 pt-4">
-        <View
-          className="flex-row items-center px-4 py-1 rounded-2xl"
-          style={{
-            backgroundColor: colors.backgroundSecondary,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 4,
-            elevation: 2,
-          }}
-        >
-          <Search size={20} color={colors.textSecondary} />
-          <TextInput
-            className="flex-1 ml-3 text-base"
-            style={{ color: colors.textPrimary }}
-            placeholder={t("hod.complaints.searchPlaceholder")}
-            placeholderTextColor={colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t("hod.complaints.searchPlaceholder")}
+        />
       </View>
 
       {/* Bulk Select Controls */}
@@ -579,7 +541,7 @@ export default function HodComplaints() {
             </Text>
           </TouchableOpacity>
 
-          <View className="flex-row items-center">
+          <View className="flex-row items-center" style={{ gap: 1 }}>
             {selectMode && (
               <>
                 <TouchableOpacity
@@ -639,282 +601,25 @@ export default function HodComplaints() {
               </>
             )}
 
-            <PressableBlock onPress={() => setShowFilters((prev) => !prev)}>
-              <View
-                className="w-10 h-10 rounded-full items-center justify-center"
-                style={{
-                  backgroundColor:
-                    showFilters || hasActiveFilters()
-                      ? colors.primary + "20"
-                      : colors.backgroundSecondary,
-                  borderWidth: 1.5,
-                  borderColor:
-                    showFilters || hasActiveFilters()
-                      ? colors.primary
-                      : colors.border,
-                }}
-              >
-                <Filter
-                  size={18}
-                  color={
-                    showFilters || hasActiveFilters()
-                      ? colors.primary
-                      : colors.textSecondary
-                  }
-                />
-              </View>
-            </PressableBlock>
+            <FilterPanel
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              priorityFilter={priorityFilter}
+              setPriorityFilter={setPriorityFilter}
+              sortOrder={sortOrder}
+              setSortOrder={setSortOrder}
+              startDate={startDate}
+              endDate={endDate}
+              setStartDate={setStartDate}
+              setEndDate={setEndDate}
+              hasActiveFilters={hasActiveFilters()}
+              onClearFilters={clearFilters}
+              t={t}
+              formatPriorityLabel={formatPriorityLabel}
+            />
           </View>
         </View>
       </View>
-
-      <Modal
-        visible={showFilters}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowFilters(false)}
-      >
-        <View
-          className="flex-1 justify-end"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        >
-          <View
-            className="rounded-t-3xl p-6"
-            style={{
-              backgroundColor: colors.backgroundPrimary,
-              maxHeight: "80%",
-            }}
-          >
-            <View className="flex-row items-center justify-between mb-3">
-              <Text
-                className="text-base font-bold"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("common.filters")}
-              </Text>
-              <View className="flex-row items-center">
-                {hasActiveFilters() && (
-                  <PressableBlock onPress={clearFilters}>
-                    <Text
-                      className="text-sm font-semibold mr-3"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("hod.complaints.clearAll")}
-                    </Text>
-                  </PressableBlock>
-                )}
-                <PressableBlock onPress={() => setShowFilters(false)}>
-                  <X size={20} color={colors.textSecondary} />
-                </PressableBlock>
-              </View>
-            </View>
-
-            <View
-              className="h-[1px] mb-3"
-              style={{ backgroundColor: colors.border }}
-            />
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("hod.complaints.filters.status")}
-              </Text>
-              <View className="flex-row flex-wrap mb-3" style={{ gap: 8 }}>
-                {statusChips.map((chip) => (
-                  <PressableBlock
-                    key={chip.key}
-                    onPress={() => setStatusFilter(chip.key)}
-                  >
-                    <View
-                      className="px-3 py-2 rounded-xl border flex-row items-center"
-                      style={{
-                        borderColor:
-                          statusFilter === chip.key
-                            ? colors.primary
-                            : colors.border,
-                        backgroundColor:
-                          statusFilter === chip.key
-                            ? `${colors.primary}22`
-                            : colors.backgroundPrimary,
-                      }}
-                    >
-                      <Text
-                        className="text-xs font-semibold mr-2"
-                        style={{
-                          color:
-                            statusFilter === chip.key
-                              ? colors.primary
-                              : colors.textPrimary,
-                        }}
-                      >
-                        {chip.label}
-                      </Text>
-                      <View
-                        className="px-1.5 py-[1px] rounded-md"
-                        style={{
-                          backgroundColor:
-                            statusFilter === chip.key
-                              ? colors.primary + "30"
-                              : colors.backgroundSecondary,
-                        }}
-                      >
-                        <Text
-                          className="text-[10px] font-bold"
-                          style={{
-                            color:
-                              statusFilter === chip.key
-                                ? colors.primary
-                                : colors.textSecondary,
-                          }}
-                        >
-                          {statusCounts[chip.key] || 0}
-                        </Text>
-                      </View>
-                    </View>
-                  </PressableBlock>
-                ))}
-              </View>
-
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("hod.complaints.filters.priority")}
-              </Text>
-              <View className="flex-row flex-wrap mb-3" style={{ gap: 8 }}>
-                {["all", "high", "medium", "low"].map((priority) => (
-                  <PressableBlock
-                    key={priority}
-                    onPress={() => setPriorityFilter(priority)}
-                  >
-                    <View
-                      className="px-3 py-2 rounded-xl border"
-                      style={{
-                        borderColor:
-                          priorityFilter === priority
-                            ? colors.primary
-                            : colors.border,
-                        backgroundColor:
-                          priorityFilter === priority
-                            ? `${colors.primary}22`
-                            : colors.backgroundPrimary,
-                      }}
-                    >
-                      <Text
-                        className="text-xs font-semibold capitalize"
-                        style={{
-                          color:
-                            priorityFilter === priority
-                              ? colors.primary
-                              : colors.textPrimary,
-                        }}
-                      >
-                        {priority === "all"
-                          ? t("common.all")
-                          : formatPriorityLabel(t, priority)}
-                      </Text>
-                    </View>
-                  </PressableBlock>
-                ))}
-              </View>
-
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("common.sort")}
-              </Text>
-              <View className="flex-row mb-3" style={{ gap: 8 }}>
-                <PressableBlock onPress={() => setSortOrder("new-to-old")}>
-                  <View
-                    className="px-3 py-2 rounded-xl border"
-                    style={{
-                      borderColor:
-                        sortOrder === "new-to-old"
-                          ? colors.primary
-                          : colors.border,
-                      backgroundColor:
-                        sortOrder === "new-to-old"
-                          ? `${colors.primary}22`
-                          : colors.backgroundPrimary,
-                    }}
-                  >
-                    <Text
-                      className="text-xs font-semibold"
-                      style={{
-                        color:
-                          sortOrder === "new-to-old"
-                            ? colors.primary
-                            : colors.textPrimary,
-                      }}
-                    >
-                      {t("worker.assigned.newToOld")}
-                    </Text>
-                  </View>
-                </PressableBlock>
-                <PressableBlock onPress={() => setSortOrder("old-to-new")}>
-                  <View
-                    className="px-3 py-2 rounded-xl border"
-                    style={{
-                      borderColor:
-                        sortOrder === "old-to-new"
-                          ? colors.primary
-                          : colors.border,
-                      backgroundColor:
-                        sortOrder === "old-to-new"
-                          ? `${colors.primary}22`
-                          : colors.backgroundPrimary,
-                    }}
-                  >
-                    <Text
-                      className="text-xs font-semibold"
-                      style={{
-                        color:
-                          sortOrder === "old-to-new"
-                            ? colors.primary
-                            : colors.textPrimary,
-                      }}
-                    >
-                      {t("worker.assigned.oldToNew")}
-                    </Text>
-                  </View>
-                </PressableBlock>
-              </View>
-
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("hod.complaints.filters.dateRange")}
-              </Text>
-              <View className="flex-row pb-4" style={{ gap: 8 }}>
-                <View className="flex-1">
-                  <DateTimePickerModal
-                    mode="date"
-                    value={startDate}
-                    onChange={setStartDate}
-                    icon={Calendar}
-                    placeholder={t("hod.complaints.filters.startDate")}
-                    maxDateToday={true}
-                  />
-                </View>
-                <View className="flex-1">
-                  <DateTimePickerModal
-                    mode="date"
-                    value={endDate}
-                    onChange={setEndDate}
-                    icon={Calendar}
-                    placeholder={t("hod.complaints.filters.endDate")}
-                    maxDateToday={true}
-                  />
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       <FlatList
         data={sortedComplaints}
@@ -1007,29 +712,11 @@ export default function HodComplaints() {
 
             {/* Worker Search */}
             <View className="mb-3">
-              <View
-                className="flex-row items-center px-4 py-3 rounded-xl"
-                style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Search size={18} color={colors.textSecondary} />
-                <TextInput
-                  className="flex-1 ml-2 text-sm"
-                  style={{ color: colors.textPrimary }}
-                  placeholder={t("hod.complaints.searchWorkers")}
-                  placeholderTextColor={colors.textSecondary}
-                  value={workerSearchQuery}
-                  onChangeText={setWorkerSearchQuery}
-                />
-                {workerSearchQuery && (
-                  <TouchableOpacity onPress={() => setWorkerSearchQuery("")}>
-                    <X size={18} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-              </View>
+              <SearchBar
+                value={workerSearchQuery}
+                onChangeText={setWorkerSearchQuery}
+                placeholder={t("hod.complaints.searchWorkers")}
+              />
             </View>
 
             {/* Worker List */}

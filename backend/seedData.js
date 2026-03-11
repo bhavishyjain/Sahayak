@@ -746,8 +746,6 @@ function generateComplaint(userId, ticketNum, allUsers) {
     refinedText: description,
     description: description,
     department: department,
-    aiSuggestedDepartment: department,
-    aiConfidence: 0.85 + Math.random() * 0.15,
     coordinates: { lat: locationData.lat, lng: locationData.lng },
     locationName: `${locationData.name}, Indore`,
     priority: priority,
@@ -857,6 +855,8 @@ function generateComplaint(userId, ticketNum, allUsers) {
     affectedCount: aiAffectedCount,
     suggestedPriority: aiSuggestedPriority,
     reasoning: AI_REASONING[department] || AI_REASONING.Other,
+    department: department,
+    confidence: 0.85 + Math.random() * 0.15,
   };
 
   // ~20% chance AI suggests a different department (creates review candidates)
@@ -869,9 +869,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
       "Drainage",
       "Other",
     ].filter((d) => d !== department);
-    complaint.aiSuggestedDepartment =
+    complaint.aiAnalysis.department =
       altDepts[Math.floor(Math.random() * altDepts.length)];
-    complaint.aiConfidence = 0.7 + Math.random() * 0.2; // 70-90% when dept differs
+    complaint.aiAnalysis.confidence = 0.7 + Math.random() * 0.2; // 70-90% when dept differs
   }
   // ─────────────────────────────────────────────────────────────────────
 

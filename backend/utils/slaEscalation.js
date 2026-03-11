@@ -10,11 +10,18 @@ const cron = require("node-cron");
 async function checkAndEscalateOverdueComplaints() {
   try {
     const now = new Date();
+    // Re-escalate every 24 h so persistent overdue complaints keep escalating
+    const reEscalateAfter = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const MAX_ESCALATION_LEVEL = 3; // stop escalating beyond level 3
 
     const candidates = await Complaint.find({
       "sla.dueDate": { $lt: now },
       status: { $nin: ["resolved", "cancelled", "needs-rework"] },
-      "sla.escalated": false,
+      "sla.escalationLevel": { $lt: MAX_ESCALATION_LEVEL },
+      $or: [
+        { "sla.lastEscalatedAt": null },
+        { "sla.lastEscalatedAt": { $lt: reEscalateAfter } },
+      ],
     }).select("_id");
 
     console.log(
@@ -29,12 +36,17 @@ async function checkAndEscalateOverdueComplaints() {
           _id: candidate._id,
           "sla.dueDate": { $lt: now },
           status: { $nin: ["resolved", "cancelled", "needs-rework"] },
-          "sla.escalated": false,
+          "sla.escalationLevel": { $lt: MAX_ESCALATION_LEVEL },
+          $or: [
+            { "sla.lastEscalatedAt": null },
+            { "sla.lastEscalatedAt": { $lt: reEscalateAfter } },
+          ],
         },
         {
           $set: {
             "sla.isOverdue": true,
             "sla.escalated": true,
+            "sla.lastEscalatedAt": now,
           },
           $inc: { "sla.escalationLevel": 1 },
         },
@@ -45,6 +57,7 @@ async function checkAndEscalateOverdueComplaints() {
         continue;
       }
 
+      try {
       if (complaint.priority === "Low") {
         complaint.priority = "Medium";
       } else if (complaint.priority === "Medium") {
@@ -95,6 +108,12 @@ async function checkAndEscalateOverdueComplaints() {
 
       await complaint.save();
       processed += 1;
+      } catch (iterErr) {
+        console.error(
+          `[sla-escalation] Failed to process complaint ${candidate._id}:`,
+          iterErr.message,
+        );
+      }
     }
 
     return {
@@ -134,6 +153,23 @@ function setupSLAEscalationJob() {
       console.log("Initial SLA escalation result:", result);
     });
   }
+
+  // Reset currentWeekCompleted for all workers every Monday at midnight
+  cron.schedule(
+    "0 0 * * 1",
+    async () => {
+      try {
+        await User.updateMany(
+          { role: "worker" },
+          { $set: { "performanceMetrics.currentWeekCompleted": 0 } },
+        );
+        console.log("[metrics-reset] Worker currentWeekCompleted reset");
+      } catch (err) {
+        console.error("[metrics-reset] Weekly reset failed:", err.message);
+      }
+    },
+    { timezone: process.env.EVENT_TIMEZONE || "Asia/Kolkata" },
+  );
 
   console.log("SLA escalation cron job started (hourly at minute 5)");
 }

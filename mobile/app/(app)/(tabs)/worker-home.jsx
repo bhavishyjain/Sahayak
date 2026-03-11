@@ -264,7 +264,7 @@ export default function WorkerHome() {
                     className="text-2xl font-bold"
                     style={{ color: colors.textPrimary }}
                   >
-                    {user?.rating ? user.rating.toFixed(1) : "4.5"}
+                    {user?.rating != null ? user.rating.toFixed(1) : "—"}
                     <Text
                       className="text-sm font-normal"
                       style={{ color: colors.textSecondary }}
@@ -280,7 +280,7 @@ export default function WorkerHome() {
                   <View
                     className="h-full rounded-full"
                     style={{
-                      width: `${((user?.rating || 4.5) / 5) * 100}%`,
+                      width: `${((user?.rating || 0) / 5) * 100}%`,
                       backgroundColor: "#EAB308",
                     }}
                   />

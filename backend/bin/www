@@ -38,7 +38,7 @@ bootstrapAndListen();
 async function bootstrapAndListen() {
   try {
     await connectDB();
-    require("../utils/eventPriorityUpdater");
+    require("../utils/eventPriorityUpdater").start();
     setupSLAEscalationJob();
     await initializeReportSchedulers();
     server.listen(port);

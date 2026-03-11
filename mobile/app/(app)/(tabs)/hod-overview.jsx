@@ -1,6 +1,4 @@
 import {
-  TrendingUp,
-  TrendingDown,
   BarChart3,
   PieChart,
   Users,
@@ -8,13 +6,11 @@ import {
   AlertTriangle,
   Award,
   ThumbsUp,
-  Info,
   X,
   Calculator,
-  Target,
   CheckCircle,
   Timer,
-  Brain,
+  Target,
   ChevronRight,
   Star,
 } from "lucide-react-native";
@@ -31,20 +27,16 @@ import {
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
-import Card from "../../../components/Card";
-import MetricCard from "../../../components/MetricCard";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import { HOD_OVERVIEW_URL } from "../../../url";
-import { useRouter } from "expo-router";
 
 export default function HodOverview() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
@@ -54,14 +46,8 @@ export default function HodOverview() {
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: HOD_OVERVIEW_URL,
-      });
-
-      const payload = res?.data;
-      setStats(payload?.stats || null);
+      const res = await apiCall({ method: "GET", url: HOD_OVERVIEW_URL });
+      setStats(res?.data?.stats || null);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -78,12 +64,112 @@ export default function HodOverview() {
     load(false);
   }, []);
 
+  // Derived values
+  const completionRate =
+    stats?.total > 0
+      ? Math.round(((stats.resolved + stats.cancelled) / stats.total) * 100)
+      : 0;
+  const activeWorkRate =
+    stats?.total > 0
+      ? Math.round(((stats.assigned + stats.inProgress) / stats.total) * 100)
+      : 0;
+  const pendingRate =
+    stats?.total > 0 ? Math.round((stats.pending / stats.total) * 100) : 0;
+  const responseScore = stats?.avgResponseTime
+    ? Math.max(0, Math.round(100 - stats.avgResponseTime * 2))
+    : 50;
+  const pendingScore =
+    stats?.total > 0
+      ? Math.round(100 - (stats.pending / stats.total) * 30) || 100
+      : 100;
+  const perfColor =
+    (stats?.performanceScore || 0) >= 80
+      ? colors.success || "#10B981"
+      : (stats?.performanceScore || 0) >= 60
+        ? colors.warning || "#F59E0B"
+        : "#EF4444";
+
+  const statusRows = stats
+    ? [
+        {
+          label: t("hod.dashboard.complaints.pending"),
+          value: stats.pending || 0,
+          color: colors.warning || "#F59E0B",
+        },
+        {
+          label: t("hod.dashboard.complaints.assigned"),
+          value: stats.assigned || 0,
+          color: colors.info || "#3B82F6",
+        },
+        {
+          label: t("hod.dashboard.complaints.inProgress"),
+          value: stats.inProgress || 0,
+          color: colors.purple || "#8B5CF6",
+        },
+        ...(stats.pendingApproval > 0
+          ? [
+              {
+                label:
+                  t("hod.dashboard.awaitingApproval") || "Awaiting Approval",
+                value: stats.pendingApproval,
+                color: "#F97316",
+              },
+            ]
+          : []),
+        {
+          label: t("hod.dashboard.complaints.resolved"),
+          value: stats.resolved || 0,
+          color: colors.success || "#10B981",
+        },
+        {
+          label: t("hod.dashboard.complaints.cancelled"),
+          value: stats.cancelled || 0,
+          color: colors.textSecondary,
+        },
+      ]
+    : [];
+
+  const priorityRows = [
+    {
+      label: t("complaints.priority.high"),
+      value: stats?.highPriority || 0,
+      color: "#EF4444",
+    },
+    {
+      label: t("complaints.priority.medium"),
+      value: stats?.mediumPriority || 0,
+      color: colors.warning || "#F59E0B",
+    },
+    {
+      label: t("complaints.priority.low"),
+      value: stats?.lowPriority || 0,
+      color: colors.success || "#10B981",
+    },
+  ];
+
+  const SectionLabel = ({ label }) => (
+    <Text
+      className="text-xs font-semibold tracking-widest uppercase mb-2 mt-1"
+      style={{ color: colors.textSecondary }}
+    >
+      {label}
+    </Text>
+  );
+
+  const Divider = () => (
+    <View
+      className="h-[1px] ml-14"
+      style={{ backgroundColor: colors.border }}
+    />
+  );
+
   return (
     <View
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <View className="px-4 pt-12 pb-4">
+      {/* Header */}
+      <View className="px-4 pt-4 pb-3">
         <Text
           className="text-2xl font-bold"
           style={{ color: colors.textPrimary }}
@@ -91,7 +177,7 @@ export default function HodOverview() {
           {t("hod.dashboard.analyticsTitle")}
         </Text>
         <Text className="text-sm mt-1" style={{ color: colors.textSecondary }}>
-          {stats?.department || t("hod.dashboard.department")}{" "}
+          {stats?.department || t("hod.dashboard.department")} Department{" "}
           {t("hod.dashboard.performanceOverview")}
         </Text>
       </View>
@@ -99,12 +185,6 @@ export default function HodOverview() {
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text
-            className="text-sm mt-3"
-            style={{ color: colors.textSecondary }}
-          >
-            {t("hod.dashboard.loadingAnalytics")}
-          </Text>
         </View>
       ) : (
         <ScrollView
@@ -120,24 +200,35 @@ export default function HodOverview() {
           }
           contentContainerStyle={{ paddingBottom: 120 }}
         >
-          {/* Main Statistics Grid */}
-          {stats && (
+          {stats ? (
             <>
-              {/* Total Complaints Card */}
-              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                <View className="flex-row items-center justify-between mb-4">
+              {/* ─── COMPLAINTS ──────────────────────────── */}
+              <SectionLabel
+                label={t("hod.dashboard.complaints.total") || "Complaints"}
+              />
+              <View
+                className="rounded-2xl mb-5 overflow-hidden"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.backgroundSecondary,
+                }}
+              >
+                {/* Total header */}
+                <View className="flex-row items-center justify-between px-4 py-3">
                   <View className="flex-row items-center">
                     <View
-                      className="w-10 h-10 rounded-full items-center justify-center"
-                      style={{ backgroundColor: colors.primary + "20" }}
+                      className="w-10 h-10 rounded-xl items-center justify-center"
+                      style={{ backgroundColor: colors.primary + "18" }}
                     >
                       <BarChart3 size={20} color={colors.primary} />
                     </View>
                     <Text
-                      className="text-sm font-semibold ml-3"
+                      className="text-sm font-medium ml-3"
                       style={{ color: colors.textSecondary }}
                     >
-                      {t("hod.dashboard.complaints.total")}
+                      {t("hod.dashboard.complaints.total") ||
+                        "Total Complaints"}
                     </Text>
                   </View>
                   <Text
@@ -148,273 +239,148 @@ export default function HodOverview() {
                   </Text>
                 </View>
 
+                {/* Pending / Assigned / In-Progress grid */}
                 <View
-                  className="h-[1px] mb-4"
+                  className="h-[1px]"
                   style={{ backgroundColor: colors.border }}
                 />
-
-                <View className="mb-3">
-                  <View className="flex-row justify-between">
-                    <View className="flex-1 items-center">
-                      <Text
-                        className="text-xs mb-1"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.complaints.pending")}
-                      </Text>
-                      <Text
-                        className="text-xl font-bold"
-                        style={{ color: colors.warning || "#F59E0B" }}
-                      >
-                        {stats.pending || 0}
-                      </Text>
-                    </View>
-
+                <View className="flex-row py-4">
+                  {[
+                    {
+                      label: t("hod.dashboard.complaints.pending"),
+                      value: stats.pending || 0,
+                      color: colors.warning || "#F59E0B",
+                    },
+                    {
+                      label: t("hod.dashboard.complaints.assigned"),
+                      value: stats.assigned || 0,
+                      color: colors.info || "#3B82F6",
+                    },
+                    {
+                      label: t("hod.dashboard.complaints.inProgress"),
+                      value: stats.inProgress || 0,
+                      color: colors.purple || "#8B5CF6",
+                    },
+                  ].map((col, i, arr) => (
                     <View
-                      className="w-[1px]"
-                      style={{ backgroundColor: colors.border }}
-                    />
-
-                    <View className="flex-1 items-center">
+                      key={i}
+                      className="flex-1 items-center"
+                      style={
+                        i < arr.length - 1
+                          ? {
+                              borderRightWidth: 1,
+                              borderRightColor: colors.border,
+                            }
+                          : {}
+                      }
+                    >
                       <Text
-                        className="text-xs mb-1"
+                        className="text-2xl font-bold"
+                        style={{ color: col.color }}
+                      >
+                        {col.value}
+                      </Text>
+                      <Text
+                        className="text-xs mt-1 text-center px-2"
                         style={{ color: colors.textSecondary }}
                       >
-                        {t("hod.dashboard.complaints.assigned")}
-                      </Text>
-                      <Text
-                        className="text-xl font-bold"
-                        style={{ color: colors.info || "#3B82F6" }}
-                      >
-                        {stats.assigned || 0}
+                        {col.label}
                       </Text>
                     </View>
-
-                    <View
-                      className="w-[1px]"
-                      style={{ backgroundColor: colors.border }}
-                    />
-
-                    <View className="flex-1 items-center">
-                      <Text
-                        className="text-xs mb-1"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.complaints.inProgress")}
-                      </Text>
-                      <Text
-                        className="text-xl font-bold"
-                        style={{ color: colors.purple || "#8B5CF6" }}
-                      >
-                        {stats.inProgress || 0}
-                      </Text>
-                    </View>
-                  </View>
+                  ))}
                 </View>
 
-                {/* Pending Approval Row */}
+                {/* Pending Approval (if any) */}
                 {stats.pendingApproval > 0 && (
                   <>
                     <View
-                      className="h-[1px] mb-3"
+                      className="h-[1px] ml-14"
                       style={{ backgroundColor: colors.border }}
                     />
-                    <View className="flex-row items-center justify-between px-2">
-                      <View className="flex-row items-center">
-                        <AlertTriangle
-                          size={18}
-                          color={colors.purple || "#8B5CF6"}
+                    <View className="flex-row items-center py-3 px-4">
+                      <View className="w-10 h-10 items-center justify-center">
+                        <View
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: "#F97316" }}
                         />
-                        <Text
-                          className="text-xs ml-2"
-                          style={{ color: colors.textSecondary }}
-                        >
-                          {t("hod.dashboard.awaitingApproval") ||
-                            "Awaiting Approval"}
-                        </Text>
                       </View>
                       <Text
-                        className="text-xl font-bold"
-                        style={{ color: colors.purple || "#8B5CF6" }}
+                        className="flex-1 text-sm ml-3"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("hod.dashboard.awaitingApproval") ||
+                          "Awaiting Approval"}
+                      </Text>
+                      <Text
+                        className="text-base font-semibold"
+                        style={{ color: "#F97316" }}
                       >
                         {stats.pendingApproval}
                       </Text>
                     </View>
                   </>
                 )}
-              </Card>
 
-              {/* Completion Stats */}
-              <View className="flex-row mb-4">
-                <MetricCard
-                  colors={colors}
-                  Icon={TrendingUp}
-                  iconColor={colors.success || "#10B981"}
-                  iconBgColor={(colors.success || "#10B981") + "20"}
-                  title={t("hod.dashboard.complaints.resolved")}
-                  value={stats.resolved || 0}
-                  subtitle={
-                    stats.total > 0
-                      ? `${Math.round((stats.resolved / stats.total) * 100)}% ${t("hod.dashboard.completion") || "completion"}`
-                      : `0% ${t("hod.dashboard.completion") || "completion"}`
-                  }
-                  valueColor={colors.success || "#10B981"}
-                  style={{ marginRight: 6 }}
-                />
-
-                <MetricCard
-                  colors={colors}
-                  Icon={TrendingDown}
-                  iconColor={colors.textSecondary}
-                  iconBgColor={colors.backgroundSecondary}
-                  title={t("hod.dashboard.complaints.cancelled")}
-                  value={stats.cancelled || 0}
-                  subtitle={t("hod.dashboard.complaints.cancelledCases")}
-                  style={{ marginLeft: 6 }}
-                />
-              </View>
-
-              {/* Department Efficiency */}
-              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                <View className="flex-row items-center mb-3">
-                  <View
-                    className="w-10 h-10 rounded-full items-center justify-center"
-                    style={{
-                      backgroundColor: colors.info + "20" || "#3B82F620",
-                    }}
-                  >
-                    <PieChart size={20} color={colors.info || "#3B82F6"} />
-                  </View>
-                  <Text
-                    className="text-base font-semibold ml-3"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {t("hod.dashboard.departmentEfficiency") ||
-                      "Department Efficiency"}
-                  </Text>
-                </View>
-
+                {/* Resolved / Cancelled */}
                 <View
-                  className="h-[1px] mb-3"
+                  className="h-[1px]"
                   style={{ backgroundColor: colors.border }}
                 />
-
-                <View className="space-y-3">
-                  {/* Completion Rate */}
-                  <View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.performance.completionRate")}
-                      </Text>
-                      <Text
-                        className="text-sm font-bold"
-                        style={{ color: colors.primary }}
-                      >
-                        {stats.total > 0
-                          ? `${Math.round(((stats.resolved + stats.cancelled) / stats.total) * 100)}%`
-                          : "0%"}
-                      </Text>
-                    </View>
-                    <View
-                      className="h-2 rounded-full overflow-hidden"
-                      style={{ backgroundColor: colors.backgroundSecondary }}
+                <View className="flex-row py-4">
+                  <View
+                    className="flex-1 items-center"
+                    style={{
+                      borderRightWidth: 1,
+                      borderRightColor: colors.border,
+                    }}
+                  >
+                    <Text
+                      className="text-2xl font-bold"
+                      style={{ color: colors.success || "#10B981" }}
                     >
-                      <View
-                        className="h-full rounded-full"
-                        style={{
-                          width:
-                            stats.total > 0
-                              ? `${Math.round(((stats.resolved + stats.cancelled) / stats.total) * 100)}%`
-                              : "0%",
-                          backgroundColor: colors.success || "#10B981",
-                        }}
-                      />
-                    </View>
+                      {stats.resolved || 0}
+                    </Text>
+                    <Text
+                      className="text-xs mt-1"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {t("hod.dashboard.complaints.resolved")}
+                    </Text>
                   </View>
-
-                  {/* Active Work Rate */}
-                  <View className="mt-3">
-                    <View className="flex-row justify-between mb-2">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.activeWorkRate") ||
-                          "Active Work Rate"}
-                      </Text>
-                      <Text
-                        className="text-sm font-bold"
-                        style={{ color: colors.info || "#3B82F6" }}
-                      >
-                        {stats.total > 0
-                          ? `${Math.round(((stats.assigned + stats.inProgress) / stats.total) * 100)}%`
-                          : "0%"}
-                      </Text>
-                    </View>
-                    <View
-                      className="h-2 rounded-full overflow-hidden"
-                      style={{ backgroundColor: colors.backgroundSecondary }}
+                  <View className="flex-1 items-center">
+                    <Text
+                      className="text-2xl font-bold"
+                      style={{ color: colors.textSecondary }}
                     >
-                      <View
-                        className="h-full rounded-full"
-                        style={{
-                          width:
-                            stats.total > 0
-                              ? `${Math.round(((stats.assigned + stats.inProgress) / stats.total) * 100)}%`
-                              : "0%",
-                          backgroundColor: colors.info || "#3B82F6",
-                        }}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Pending Rate */}
-                  <View className="mt-3">
-                    <View className="flex-row justify-between mb-2">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.performance.pendingRate")}
-                      </Text>
-                      <Text
-                        className="text-sm font-bold"
-                        style={{ color: colors.warning || "#F59E0B" }}
-                      >
-                        {stats.total > 0
-                          ? `${Math.round((stats.pending / stats.total) * 100)}%`
-                          : "0%"}
-                      </Text>
-                    </View>
-                    <View
-                      className="h-2 rounded-full overflow-hidden"
-                      style={{ backgroundColor: colors.backgroundSecondary }}
+                      {stats.cancelled || 0}
+                    </Text>
+                    <Text
+                      className="text-xs mt-1"
+                      style={{ color: colors.textSecondary }}
                     >
-                      <View
-                        className="h-full rounded-full"
-                        style={{
-                          width:
-                            stats.total > 0
-                              ? `${Math.round((stats.pending / stats.total) * 100)}%`
-                              : "0%",
-                          backgroundColor: colors.warning || "#F59E0B",
-                        }}
-                      />
-                    </View>
+                      {t("hod.dashboard.complaints.cancelled")}
+                    </Text>
                   </View>
                 </View>
-              </Card>
+              </View>
 
-              {/* Priority Distribution */}
-              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                <View className="flex-row items-center mb-3">
+              {/* ─── PRIORITY ────────────────────────────── */}
+              <SectionLabel
+                label={t("hod.dashboard.priorityDistribution") || "Priority"}
+              />
+              <View
+                className="rounded-2xl mb-5 overflow-hidden"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.backgroundSecondary,
+                }}
+              >
+                <View className="flex-row items-center py-3 px-4">
                   <View
-                    className="w-10 h-10 rounded-full items-center justify-center"
+                    className="w-10 h-10 rounded-xl items-center justify-center"
                     style={{
-                      backgroundColor: colors.warning + "20" || "#F59E0B20",
+                      backgroundColor: (colors.warning || "#F59E0B") + "18",
                     }}
                   >
                     <AlertTriangle
@@ -423,391 +389,448 @@ export default function HodOverview() {
                     />
                   </View>
                   <Text
-                    className="text-base font-semibold ml-3"
+                    className="flex-1 text-sm font-medium ml-3"
                     style={{ color: colors.textPrimary }}
                   >
-                    {t("hod.dashboard.priorityDistribution")}
+                    {t("hod.dashboard.priorityDistribution") ||
+                      "Priority Distribution"}
                   </Text>
                 </View>
 
                 <View
-                  className="h-[1px] mb-3"
+                  className="h-[1px]"
                   style={{ backgroundColor: colors.border }}
                 />
-
-                <View className="flex-row justify-between">
-                  <View className="flex-1 items-center">
-                    <View
-                      className="w-12 h-12 rounded-full items-center justify-center mb-2"
-                      style={{ backgroundColor: "#EF444420" }}
-                    >
-                      <Text
-                        className="text-lg font-bold"
-                        style={{ color: "#EF4444" }}
-                      >
-                        {stats.highPriority || 0}
-                      </Text>
-                    </View>
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("complaints.priority.high")}
-                    </Text>
-                  </View>
-
-                  <View className="flex-1 items-center">
-                    <View
-                      className="w-12 h-12 rounded-full items-center justify-center mb-2"
-                      style={{
-                        backgroundColor: colors.warning + "20" || "#F59E0B20",
-                      }}
-                    >
-                      <Text
-                        className="text-lg font-bold"
-                        style={{ color: colors.warning || "#F59E0B" }}
-                      >
-                        {stats.mediumPriority || 0}
-                      </Text>
-                    </View>
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("complaints.priority.medium")}
-                    </Text>
-                  </View>
-
-                  <View className="flex-1 items-center">
-                    <View
-                      className="w-12 h-12 rounded-full items-center justify-center mb-2"
-                      style={{
-                        backgroundColor: colors.success + "20" || "#10B98120",
-                      }}
-                    >
-                      <Text
-                        className="text-lg font-bold"
-                        style={{ color: colors.success || "#10B981" }}
-                      >
-                        {stats.lowPriority || 0}
-                      </Text>
-                    </View>
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("complaints.priority.low")}
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-
-              {/* Worker Performance & Response Time */}
-              <View className="flex-row mb-4">
-                <MetricCard
-                  colors={colors}
-                  Icon={Users}
-                  iconColor={colors.info || "#3B82F6"}
-                  iconBgColor={(colors.info || "#3B82F6") + "20"}
-                  title={t("hod.dashboard.workers.active")}
-                  value={stats.activeWorkers || 0}
-                  subtitle={`${stats.totalWorkers || 0} ${t("hod.dashboard.workers.totalWorkers") || "total workers"}`}
-                  style={{ marginRight: 6 }}
-                />
-
-                <MetricCard
-                  colors={colors}
-                  Icon={Clock}
-                  iconColor={colors.purple || "#8B5CF6"}
-                  iconBgColor={(colors.purple || "#8B5CF6") + "20"}
-                  title={t("hod.dashboard.workers.avgResponse")}
-                  value={stats.avgResponseTime || "N/A"}
-                  subtitle={
-                    stats.avgResponseTime
-                      ? t("hod.dashboard.hoursToAssign") || "hours to assign"
-                      : t("hod.dashboard.noData") || "No data"
-                  }
-                  style={{ marginLeft: 6 }}
-                />
-              </View>
-
-              {/* Public Engagement */}
-              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                <View className="flex-row items-center mb-3">
-                  <View
-                    className="w-10 h-10 rounded-full items-center justify-center"
-                    style={{ backgroundColor: colors.primary + "20" }}
-                  >
-                    <ThumbsUp size={20} color={colors.primary} />
-                  </View>
-                  <Text
-                    className="text-base font-semibold ml-3"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {t("hod.dashboard.publicEngagement") || "Public Engagement"}
-                  </Text>
-                </View>
-
-                <View
-                  className="h-[1px] mb-3"
-                  style={{ backgroundColor: colors.border }}
-                />
-
-                <View className="flex-row justify-between">
-                  <View className="flex-1">
-                    <Text
-                      className="text-xs mb-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("hod.dashboard.engagement.totalUpvotes") ||
-                        "Total Upvotes"}
-                    </Text>
-                    <Text
-                      className="text-2xl font-bold"
-                      style={{ color: colors.primary }}
-                    >
-                      {stats.totalUpvotes || 0}
-                    </Text>
-                  </View>
-
-                  <View
-                    className="w-[1px] mx-4"
-                    style={{ backgroundColor: colors.border }}
-                  />
-
-                  <View className="flex-1">
-                    <Text
-                      className="text-xs mb-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("hod.dashboard.engagement.avgPerComplaint") ||
-                        "Avg per Complaint"}
-                    </Text>
-                    <Text
-                      className="text-2xl font-bold"
-                      style={{ color: colors.textPrimary }}
-                    >
-                      {stats.total > 0
-                        ? Math.round((stats.totalUpvotes || 0) / stats.total)
-                        : 0}
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-
-              {/* Performance Score */}
-              <TouchableOpacity
-                onPress={() => setShowPerformanceModal(true)}
-                activeOpacity={0.7}
-              >
-                <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                  <View className="flex-row items-center justify-between mb-3">
-                    <View className="flex-row items-center">
+                <View className="flex-row justify-between px-4 py-4">
+                  {[
+                    {
+                      label: t("complaints.priority.high"),
+                      value: stats.highPriority || 0,
+                      color: "#EF4444",
+                    },
+                    {
+                      label: t("complaints.priority.medium"),
+                      value: stats.mediumPriority || 0,
+                      color: colors.warning || "#F59E0B",
+                    },
+                    {
+                      label: t("complaints.priority.low"),
+                      value: stats.lowPriority || 0,
+                      color: colors.success || "#10B981",
+                    },
+                  ].map((p, i) => (
+                    <View key={i} className="flex-1 items-center">
                       <View
-                        className="w-10 h-10 rounded-full items-center justify-center"
-                        style={{
-                          backgroundColor: colors.success + "20" || "#10B98120",
-                        }}
+                        className="w-14 h-14 rounded-full items-center justify-center mb-2"
+                        style={{ backgroundColor: p.color + "20" }}
                       >
-                        <Award size={20} color={colors.success || "#10B981"} />
+                        <Text
+                          className="text-xl font-bold"
+                          style={{ color: p.color }}
+                        >
+                          {p.value}
+                        </Text>
                       </View>
                       <Text
-                        className="text-base font-semibold ml-3"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {t("hod.dashboard.performance.overallPerformance")}
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center">
-                      <Text
-                        className="text-2xl font-bold mr-2"
-                        style={{
-                          color:
-                            stats.performanceScore >= 80
-                              ? colors.success || "#10B981"
-                              : stats.performanceScore >= 60
-                                ? colors.warning || "#F59E0B"
-                                : "#EF4444",
-                        }}
-                      >
-                        {stats.performanceScore || 0}%
-                      </Text>
-                      <Info size={18} color={colors.textSecondary} />
-                    </View>
-                  </View>
-
-                  <View
-                    className="h-3 rounded-full overflow-hidden"
-                    style={{ backgroundColor: colors.backgroundSecondary }}
-                  >
-                    <View
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${stats.performanceScore || 0}%`,
-                        backgroundColor:
-                          stats.performanceScore >= 80
-                            ? colors.success || "#10B981"
-                            : stats.performanceScore >= 60
-                              ? colors.warning || "#F59E0B"
-                              : "#EF4444",
-                      }}
-                    />
-                  </View>
-
-                  <Text
-                    className="text-xs mt-2 text-center"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("hod.dashboard.performance.tapToSeeDetails")}
-                  </Text>
-                </Card>
-              </TouchableOpacity>
-
-              {/* Citizen Feedback Rating */}
-              {stats.avgFeedbackRating && (
-                <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center">
-                      <View
-                        className="w-10 h-10 rounded-full items-center justify-center"
-                        style={{ backgroundColor: (colors.warning || "#F59E0B") + "20" }}
-                      >
-                        <Star size={20} color={colors.warning || "#F59E0B"} fill={colors.warning || "#F59E0B"} />
-                      </View>
-                      <Text
-                        className="text-base font-semibold ml-3"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        Citizen Satisfaction
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center">
-                      <Text
-                        className="text-2xl font-bold mr-1"
-                        style={{ color: colors.warning || "#F59E0B" }}
-                      >
-                        {stats.avgFeedbackRating}
-                      </Text>
-                      <Text
-                        className="text-sm"
+                        className="text-xs"
                         style={{ color: colors.textSecondary }}
                       >
-                        / 5
+                        {p.label}
                       </Text>
                     </View>
-                  </View>
-                  <View className="flex-row mt-3">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star
-                        key={s}
-                        size={18}
-                        color={colors.warning || "#F59E0B"}
-                        fill={
-                          s <= Math.round(stats.avgFeedbackRating)
-                            ? colors.warning || "#F59E0B"
-                            : "transparent"
-                        }
-                        style={{ marginRight: 4 }}
-                      />
-                    ))}
-                    <Text
-                      className="text-xs ml-2 self-center"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      avg. from citizen ratings
-                    </Text>
-                  </View>
-                </Card>
-              )}
-            </>
-          )}
+                  ))}
+                </View>
+              </View>
 
-          {/* AI Review Queue Entry */}
-          <TouchableOpacity
-            onPress={() => router.push("/(app)/hod/ai-review")}
-            activeOpacity={0.7}
-          >
-            <Card
-              style={{
-                margin: 0,
-                marginBottom: 16,
-                flex: 0,
-                borderWidth: 1.5,
-                borderColor: "#8B5CF6",
-              }}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center flex-1">
+              {/* ─── EFFICIENCY ──────────────────────────── */}
+              <SectionLabel
+                label={t("hod.dashboard.departmentEfficiency") || "Efficiency"}
+              />
+              <View
+                className="rounded-2xl mb-5 overflow-hidden"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.backgroundSecondary,
+                }}
+              >
+                <View className="flex-row items-center py-3 px-4">
                   <View
-                    className="w-10 h-10 rounded-full items-center justify-center"
-                    style={{ backgroundColor: "#8B5CF620" }}
+                    className="w-10 h-10 rounded-xl items-center justify-center"
+                    style={{
+                      backgroundColor: (colors.info || "#3B82F6") + "18",
+                    }}
                   >
-                    <Brain size={20} color="#8B5CF6" />
+                    <PieChart size={20} color={colors.info || "#3B82F6"} />
                   </View>
-                  <View className="ml-3 flex-1">
+                  <Text
+                    className="flex-1 text-sm font-medium ml-3"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {t("hod.dashboard.departmentEfficiency") ||
+                      "Department Efficiency"}
+                  </Text>
+                </View>
+
+                {[
+                  {
+                    label:
+                      t("hod.dashboard.performance.completionRate") ||
+                      "Completion Rate",
+                    value: completionRate,
+                    color: colors.success || "#10B981",
+                  },
+                  {
+                    label:
+                      t("hod.dashboard.activeWorkRate") || "Active Work Rate",
+                    value: activeWorkRate,
+                    color: colors.info || "#3B82F6",
+                  },
+                  {
+                    label:
+                      t("hod.dashboard.performance.pendingRate") ||
+                      "Pending Rate",
+                    value: pendingRate,
+                    color: colors.warning || "#F59E0B",
+                  },
+                ].map((metric, i) => (
+                  <View key={i}>
+                    <Divider />
+                    <View className="flex-row items-center px-4 py-3">
+                      <View className="w-10 h-10 items-center justify-center">
+                        <View
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: metric.color }}
+                        />
+                      </View>
+                      <View className="flex-1 ml-3">
+                        <View className="flex-row justify-between mb-1.5">
+                          <Text
+                            className="text-sm"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            {metric.label}
+                          </Text>
+                          <Text
+                            className="text-sm font-bold"
+                            style={{ color: metric.color }}
+                          >
+                            {metric.value}%
+                          </Text>
+                        </View>
+                        <View
+                          className="h-1.5 rounded-full overflow-hidden"
+                          style={{ backgroundColor: colors.border }}
+                        >
+                          <View
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${metric.value}%`,
+                              backgroundColor: metric.color,
+                            }}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* ─── TEAM & ENGAGEMENT ───────────────────── */}
+              <SectionLabel
+                label={
+                  t("hod.dashboard.workers.teamenagment") || "Team & Engagement"
+                }
+              />
+              <View
+                className="rounded-2xl mb-5 overflow-hidden"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.backgroundSecondary,
+                }}
+              >
+                {/* Active Workers */}
+                <View className="flex-row items-center py-3 px-4">
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center"
+                    style={{
+                      backgroundColor: (colors.info || "#3B82F6") + "18",
+                    }}
+                  >
+                    <Users size={20} color={colors.info || "#3B82F6"} />
+                  </View>
+                  <View className="flex-1 ml-3">
                     <Text
-                      className="text-sm font-semibold"
+                      className="text-sm font-medium"
                       style={{ color: colors.textPrimary }}
                     >
-                      AI Review Queue
+                      {t("hod.dashboard.workers.active")}
                     </Text>
                     <Text
                       className="text-xs mt-0.5"
                       style={{ color: colors.textSecondary }}
                     >
-                      Complaints where AI suggests different dept or priority
+                      {stats.totalWorkers || 0}
+                      {t("hod.dashboard.workers.totalWorkers")}
                     </Text>
                   </View>
+                  <Text
+                    className="text-xl font-bold"
+                    style={{ color: colors.info || "#3B82F6" }}
+                  >
+                    {stats.activeWorkers || 0}
+                  </Text>
                 </View>
-                <ChevronRight size={18} color="#8B5CF6" />
-              </View>
-            </Card>
-          </TouchableOpacity>
 
-          {!stats && (
-            <Card style={{ margin: 0, marginTop: 20 }}>
-              <View className="items-center py-8">
-                <Text
-                  className="text-base font-semibold"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t("hod.dashboard.noAnalyticsData")}
-                </Text>
+                {/* Avg Response Time */}
+                <Divider />
+                <View className="flex-row items-center py-3 px-4">
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center"
+                    style={{
+                      backgroundColor: (colors.purple || "#8B5CF6") + "18",
+                    }}
+                  >
+                    <Clock size={20} color={colors.purple || "#8B5CF6"} />
+                  </View>
+                  <View className="flex-1 ml-3">
+                    <Text
+                      className="text-sm font-medium"
+                      style={{ color: colors.textPrimary }}
+                    >
+                      {t("hod.dashboard.workers.avgResponse") ||
+                        "Avg Response Time"}
+                    </Text>
+                    <Text
+                      className="text-xs mt-0.5"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {stats.avgResponseTime
+                        ? t("hod.dashboard.hoursToAssign") || "hours to assign"
+                        : t("hod.dashboard.noData") || "No data yet"}
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-xl font-bold"
+                    style={{ color: colors.purple || "#8B5CF6" }}
+                  >
+                    {stats.avgResponseTime || "—"}
+                  </Text>
+                </View>
+
+                {/* Total Upvotes */}
+                <Divider />
+                <View className="flex-row items-center py-3 px-4">
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center"
+                    style={{ backgroundColor: colors.primary + "18" }}
+                  >
+                    <ThumbsUp size={20} color={colors.primary} />
+                  </View>
+                  <View className="flex-1 ml-3">
+                    <Text
+                      className="text-sm font-medium"
+                      style={{ color: colors.textPrimary }}
+                    >
+                      {t("hod.dashboard.engagement.totalUpvotes") ||
+                        "Total Upvotes"}
+                    </Text>
+                    <Text
+                      className="text-xs mt-0.5"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {stats.total > 0
+                        ? `${Math.round((stats.totalUpvotes || 0) / stats.total)} ${t("hod.dashboard.engagement.avgPerComplaint") || "avg per complaint"}`
+                        : t("hod.dashboard.noData") || "No data"}
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-xl font-bold"
+                    style={{ color: colors.primary }}
+                  >
+                    {stats.totalUpvotes || 0}
+                  </Text>
+                </View>
+
+                {/* Citizen Satisfaction (if available) */}
+                {stats.avgFeedbackRating && (
+                  <>
+                    <Divider />
+                    <View className="flex-row items-center py-3 px-4">
+                      <View
+                        className="w-10 h-10 rounded-xl items-center justify-center"
+                        style={{
+                          backgroundColor: (colors.warning || "#F59E0B") + "18",
+                        }}
+                      >
+                        <Star
+                          size={20}
+                          color={colors.warning || "#F59E0B"}
+                          fill={colors.warning || "#F59E0B"}
+                        />
+                      </View>
+                      <View className="flex-1 ml-3">
+                        <Text
+                          className="text-sm font-medium"
+                          style={{ color: colors.textPrimary }}
+                        >
+                          Citizen Satisfaction
+                        </Text>
+                        <View className="flex-row items-center mt-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              size={11}
+                              color={colors.warning || "#F59E0B"}
+                              fill={
+                                s <= Math.round(stats.avgFeedbackRating)
+                                  ? colors.warning || "#F59E0B"
+                                  : "transparent"
+                              }
+                              style={{ marginRight: 2 }}
+                            />
+                          ))}
+                        </View>
+                      </View>
+                      <Text
+                        className="text-xl font-bold"
+                        style={{ color: colors.warning || "#F59E0B" }}
+                      >
+                        {stats.avgFeedbackRating}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
-            </Card>
+
+              {/* ─── PERFORMANCE SCORE ───────────────────── */}
+              <SectionLabel
+                label={
+                  t("hod.dashboard.performance.overallPerformance") ||
+                  "Performance"
+                }
+              />
+              <TouchableOpacity
+                onPress={() => setShowPerformanceModal(true)}
+                activeOpacity={0.7}
+                className="rounded-2xl mb-8"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.backgroundSecondary,
+                }}
+              >
+                <View className="flex-row items-center py-3 px-4">
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center"
+                    style={{
+                      backgroundColor: (colors.success || "#10B981") + "18",
+                    }}
+                  >
+                    <Award size={20} color={colors.success || "#10B981"} />
+                  </View>
+                  <View className="flex-1 ml-3">
+                    <Text
+                      className="text-sm font-medium"
+                      style={{ color: colors.textPrimary }}
+                    >
+                      {t("hod.dashboard.performance.overallPerformance") ||
+                        "Overall Performance"}
+                    </Text>
+                    <Text
+                      className="text-xs mt-0.5"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {t("hod.dashboard.performance.tapToSeeDetails") ||
+                        "Tap to see breakdown"}
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-2xl font-bold mr-2"
+                    style={{ color: perfColor }}
+                  >
+                    {stats.performanceScore || 0}%
+                  </Text>
+                  <ChevronRight size={18} color={colors.textSecondary} />
+                </View>
+                <View
+                  className="h-[1px] ml-14"
+                  style={{ backgroundColor: colors.border }}
+                />
+                <View className="px-4 py-3">
+                  <View
+                    className="h-2 rounded-full overflow-hidden"
+                    style={{ backgroundColor: colors.border }}
+                  >
+                    <View
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${stats.performanceScore || 0}%`,
+                        backgroundColor: perfColor,
+                      }}
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View
+              className="rounded-2xl mt-4 py-12 items-center justify-center"
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.backgroundSecondary,
+              }}
+            >
+              <BarChart3 size={32} color={colors.textSecondary} />
+              <Text
+                className="text-sm mt-3 font-medium"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("hod.dashboard.noAnalyticsData") ||
+                  "No analytics data available"}
+              </Text>
+            </View>
           )}
         </ScrollView>
       )}
 
-      {/* Performance Calculation Modal */}
+      {/* ─── PERFORMANCE MODAL ───────────────────── */}
       <Modal
         visible={showPerformanceModal}
-        transparent={true}
-        animationType="fade"
+        transparent
+        animationType="slide"
         onRequestClose={() => setShowPerformanceModal(false)}
       >
         <Pressable
-          className="flex-1 bg-black/50 justify-center items-center px-4"
+          className="flex-1 bg-black/60 justify-end"
           onPress={() => setShowPerformanceModal(false)}
         >
           <Pressable
-            className="w-full max-w-md rounded-2xl p-6"
+            className="w-full rounded-t-3xl"
             style={{ backgroundColor: colors.backgroundPrimary }}
             onPress={(e) => e.stopPropagation()}
           >
+            {/* Drag handle */}
+            <View className="items-center pt-3 pb-1">
+              <View
+                className="w-10 h-1 rounded-full"
+                style={{ backgroundColor: colors.border }}
+              />
+            </View>
+
             {/* Header */}
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="flex-row items-center">
+            <View className="flex-row items-center justify-between px-5 pt-3 pb-4">
+              <View className="flex-row items-center gap-3">
                 <View
-                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                  style={{
-                    backgroundColor: colors.success + "20" || "#10B98120",
-                  }}
+                  className="w-10 h-10 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: perfColor + "20" }}
                 >
-                  <Award size={20} color={colors.success || "#10B981"} />
+                  <Award size={20} color={perfColor} />
                 </View>
                 <Text
-                  className="text-xl font-bold"
+                  className="text-lg font-bold"
                   style={{ color: colors.textPrimary }}
                 >
                   {t("hod.dashboard.performance.calculationTitle") ||
@@ -816,294 +839,248 @@ export default function HodOverview() {
               </View>
               <TouchableOpacity
                 onPress={() => setShowPerformanceModal(false)}
-                className="p-1"
+                className="w-8 h-8 rounded-full items-center justify-center"
+                style={{ backgroundColor: colors.backgroundSecondary }}
               >
-                <X size={24} color={colors.textSecondary} />
+                <X size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            {/* Current Score */}
-            <View
-              className="rounded-xl p-4 mb-4"
-              style={{ backgroundColor: colors.backgroundSecondary }}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 32 }}
             >
-              <Text
-                className="text-sm mb-1"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("hod.dashboard.performance.currentScore") ||
-                  "Current Performance Score"}
-              </Text>
-              <Text
-                className="text-4xl font-bold"
-                style={{
-                  color:
-                    (stats?.performanceScore || 0) >= 80
-                      ? colors.success || "#10B981"
-                      : (stats?.performanceScore || 0) >= 60
-                        ? colors.warning || "#F59E0B"
-                        : "#EF4444",
-                }}
-              >
-                {stats?.performanceScore || 0}%
-              </Text>
-            </View>
-
-            {/* Formula */}
-            <View className="mb-4">
-              <View className="flex-row items-center mb-2">
-                <Calculator size={16} color={colors.primary} />
-                <Text
-                  className="text-sm font-semibold ml-2"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {t("hod.dashboard.performance.calculationFormula") ||
-                    "Calculation Formula"}
-                </Text>
-              </View>
-              <View
-                className="rounded-lg p-3"
-                style={{ backgroundColor: colors.backgroundSecondary }}
-              >
-                <Text
-                  className="text-xs font-mono leading-5"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Score = (Completion × 50%) +{"\n"}
-                  (Response × 30%) +{"\n"}
-                  ((100 - Pending) × 20%)
-                </Text>
-              </View>
-            </View>
-
-            {/* Components Breakdown */}
-            <View className="mb-2">
-              <View className="flex-row items-center mb-3">
-                <Target size={16} color={colors.primary} />
-                <Text
-                  className="text-sm font-semibold ml-2"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {t("hod.dashboard.performance.componentsTitle") ||
-                    "Performance Components"}
-                </Text>
-              </View>
-
-              {/* Completion Rate */}
-              <View
-                className="mb-3 rounded-lg p-3"
-                style={{ backgroundColor: colors.backgroundSecondary }}
-              >
-                <View className="flex-row items-center justify-between mb-2">
-                  <View className="flex-row items-center flex-1">
-                    <View
-                      className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: colors.success + "20" }}
-                    >
-                      <CheckCircle
-                        size={16}
-                        color={colors.success || "#10B981"}
-                      />
-                    </View>
-                    <View className="ml-2 flex-1">
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {t("hod.dashboard.performance.completionRateTitle") ||
-                          "Completion Rate"}
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.performance.weight50") ||
-                          "Weight: 50%"}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text
-                    className="text-xl font-bold"
-                    style={{ color: colors.success || "#10B981" }}
-                  >
-                    {stats
-                      ? Math.round(
-                          ((stats.resolved + stats.cancelled) / stats.total) *
-                            100,
-                        ) || 0
-                      : 0}
-                    %
-                  </Text>
-                </View>
+              {/* Score Banner */}
+              <View className="mx-5 mb-4 rounded-2xl overflow-hidden">
                 <View
-                  className="h-2 rounded-full mb-2"
-                  style={{ backgroundColor: colors.backgroundPrimary }}
+                  className="px-5 py-4"
+                  style={{ backgroundColor: perfColor + "18" }}
                 >
+                  <Text
+                    className="text-xs font-semibold uppercase tracking-widest mb-1"
+                    style={{ color: perfColor }}
+                  >
+                    {t("hod.dashboard.performance.currentScore") ||
+                      "Current Performance Score"}
+                  </Text>
+                  <View className="flex-row items-end gap-2">
+                    <Text
+                      className="text-5xl font-bold"
+                      style={{ color: perfColor }}
+                    >
+                      {stats?.performanceScore || 0}
+                    </Text>
+                    <Text
+                      className="text-2xl font-bold mb-1"
+                      style={{ color: perfColor + "80" }}
+                    >
+                      %
+                    </Text>
+                  </View>
+                  {/* Overall bar */}
                   <View
-                    className="h-full rounded-full"
-                    style={{
-                      width: stats
-                        ? `${Math.round(((stats.resolved + stats.cancelled) / stats.total) * 100) || 0}%`
-                        : "0%",
-                      backgroundColor: colors.success || "#10B981",
-                    }}
-                  />
-                </View>
-                <Text
-                  className="text-xs"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {stats
-                    ? `${stats.resolved + stats.cancelled} completed out of ${stats.total} total complaints`
-                    : "Loading..."}
-                </Text>
-              </View>
-
-              {/* Response Score */}
-              <View
-                className="mb-3 rounded-lg p-3"
-                style={{ backgroundColor: colors.backgroundSecondary }}
-              >
-                <View className="flex-row items-center justify-between mb-2">
-                  <View className="flex-row items-center flex-1">
+                    className="h-2 rounded-full mt-3 overflow-hidden"
+                    style={{ backgroundColor: perfColor + "30" }}
+                  >
                     <View
-                      className="w-8 h-8 rounded-full items-center justify-center"
+                      className="h-full rounded-full"
                       style={{
-                        backgroundColor: colors.warning + "20" || "#F59E0B20",
+                        width: `${stats?.performanceScore || 0}%`,
+                        backgroundColor: perfColor,
                       }}
-                    >
-                      <Timer size={16} color={colors.warning || "#F59E0B"} />
-                    </View>
-                    <View className="ml-2 flex-1">
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {t("hod.dashboard.performance.responseTimeTitle") ||
-                          "Response Time"}
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.performance.weight30") ||
-                          "Weight: 30%"}
-                      </Text>
-                    </View>
+                    />
                   </View>
+                </View>
+              </View>
+
+              {/* Formula */}
+              <View className="mx-5 mb-4">
+                <View className="flex-row items-center mb-2">
+                  <Calculator size={14} color={colors.textSecondary} />
                   <Text
-                    className="text-xl font-bold"
-                    style={{ color: colors.warning || "#F59E0B" }}
+                    className="text-xs font-semibold uppercase tracking-widest ml-2"
+                    style={{ color: colors.textSecondary }}
                   >
-                    {stats?.avgResponseTime
-                      ? Math.max(0, Math.round(100 - stats.avgResponseTime * 2))
-                      : 50}
-                    %
+                    {t("hod.dashboard.performance.calculationFormula") ||
+                      "Calculation Formula"}
                   </Text>
                 </View>
                 <View
-                  className="h-2 rounded-full mb-2"
-                  style={{ backgroundColor: colors.backgroundPrimary }}
+                  className="rounded-xl px-4 py-3"
+                  style={{ backgroundColor: colors.backgroundSecondary }}
                 >
-                  <View
-                    className="h-full rounded-full"
-                    style={{
-                      width: stats?.avgResponseTime
-                        ? `${Math.max(0, Math.round(100 - stats.avgResponseTime * 2))}%`
-                        : "50%",
-                      backgroundColor: colors.warning || "#F59E0B",
-                    }}
-                  />
-                </View>
-                <Text
-                  className="text-xs"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {stats?.avgResponseTime
-                    ? `Average ${stats.avgResponseTime} hours to assign complaints`
-                    : "No data available yet"}
-                </Text>
-              </View>
-
-              {/* Pending Penalty */}
-              <View
-                className="mb-3 rounded-lg p-3"
-                style={{ backgroundColor: colors.backgroundSecondary }}
-              >
-                <View className="flex-row items-center justify-between mb-2">
-                  <View className="flex-row items-center flex-1">
-                    <View
-                      className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: "#EF444420" }}
-                    >
-                      <AlertTriangle size={16} color="#EF4444" />
-                    </View>
-                    <View className="ml-2 flex-1">
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {t("hod.dashboard.performance.pendingStatusTitle") ||
-                          "Pending Status"}
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("hod.dashboard.performance.weight20") ||
-                          "Weight: 20%"}
-                      </Text>
-                    </View>
-                  </View>
                   <Text
-                    className="text-xl font-bold"
-                    style={{ color: "#EF4444" }}
+                    className="text-xs font-mono leading-5"
+                    style={{ color: colors.textSecondary }}
                   >
-                    {stats
-                      ? Math.round(100 - (stats.pending / stats.total) * 30) ||
-                        100
-                      : 100}
-                    %
+                    {
+                      "Score = (Completion × 50%) +\n        (Response × 30%) +\n        ((100 - Pending) × 20%)"
+                    }
                   </Text>
                 </View>
-                <View
-                  className="h-2 rounded-full mb-2"
-                  style={{ backgroundColor: colors.backgroundPrimary }}
-                >
-                  <View
-                    className="h-full rounded-full"
-                    style={{
-                      width: stats
-                        ? `${Math.round(100 - (stats.pending / stats.total) * 30) || 100}%`
-                        : "100%",
-                      backgroundColor: "#EF4444",
-                    }}
-                  />
-                </View>
-                <Text
-                  className="text-xs"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {stats
-                    ? `${stats.pending} pending complaints (${Math.round((stats.pending / stats.total) * 100)}% of total)`
-                    : "Loading..."}
-                </Text>
               </View>
-            </View>
 
-            {/* Close Button */}
-            <Pressable
-              className="rounded-xl py-3 mt-2"
-              style={{ backgroundColor: colors.primary }}
-              onPress={() => setShowPerformanceModal(false)}
-            >
-              <Text
-                className="text-center font-semibold"
-                style={{ color: "#FFFFFF" }}
-              >
-                {t("hod.dashboard.performance.gotIt") || "Got it"}
-              </Text>
-            </Pressable>
+              {/* Components */}
+              <View className="mx-5 mb-4">
+                <View className="flex-row items-center mb-2">
+                  <Target size={14} color={colors.textSecondary} />
+                  <Text
+                    className="text-xs font-semibold uppercase tracking-widest ml-2"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("hod.dashboard.performance.componentsTitle") ||
+                      "Performance Components"}
+                  </Text>
+                </View>
+
+                <View
+                  className="rounded-2xl overflow-hidden"
+                  style={{
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.backgroundSecondary,
+                  }}
+                >
+                  {[
+                    {
+                      Icon: CheckCircle,
+                      color: colors.success || "#10B981",
+                      title:
+                        t("hod.dashboard.performance.completionRateTitle") ||
+                        "Completion Rate",
+                      weight:
+                        t("hod.dashboard.performance.weight50") ||
+                        "Weight: 50%",
+                      value: stats
+                        ? Math.round(
+                            ((stats.resolved + stats.cancelled) / stats.total) *
+                              100,
+                          ) || 0
+                        : 0,
+                      barWidth:
+                        stats?.total > 0
+                          ? `${Math.round(((stats.resolved + stats.cancelled) / stats.total) * 100) || 0}%`
+                          : "0%",
+                      note: stats
+                        ? `${stats.resolved + stats.cancelled} completed out of ${stats.total} total`
+                        : "Loading...",
+                    },
+                    {
+                      Icon: Timer,
+                      color: colors.warning || "#F59E0B",
+                      title:
+                        t("hod.dashboard.performance.responseTimeTitle") ||
+                        "Response Time",
+                      weight:
+                        t("hod.dashboard.performance.weight30") ||
+                        "Weight: 30%",
+                      value: responseScore,
+                      barWidth: `${responseScore}%`,
+                      note: stats?.avgResponseTime
+                        ? `Average ${stats.avgResponseTime} hours to assign complaints`
+                        : "No data available yet",
+                    },
+                    {
+                      Icon: AlertTriangle,
+                      color: "#EF4444",
+                      title:
+                        t("hod.dashboard.performance.pendingStatusTitle") ||
+                        "Pending Status",
+                      weight:
+                        t("hod.dashboard.performance.weight20") ||
+                        "Weight: 20%",
+                      value: pendingScore,
+                      barWidth: `${pendingScore}%`,
+                      note: stats
+                        ? `${stats.pending} pending complaints (${Math.round((stats.pending / stats.total) * 100)}% of total)`
+                        : "Loading...",
+                    },
+                  ].map(
+                    (
+                      { Icon, color, title, weight, value, barWidth, note },
+                      i,
+                      arr,
+                    ) => (
+                      <View key={i}>
+                        {i > 0 && (
+                          <View
+                            className="h-[1px] ml-14"
+                            style={{ backgroundColor: colors.border }}
+                          />
+                        )}
+                        <View className="px-4 pt-3 pb-4">
+                          {/* Row: icon + title + value */}
+                          <View className="flex-row items-center mb-3">
+                            <View
+                              className="w-9 h-9 rounded-xl items-center justify-center"
+                              style={{ backgroundColor: color + "20" }}
+                            >
+                              <Icon size={17} color={color} />
+                            </View>
+                            <View className="flex-1 ml-3">
+                              <Text
+                                className="text-sm font-semibold"
+                                style={{ color: colors.textPrimary }}
+                              >
+                                {title}
+                              </Text>
+                              <Text
+                                className="text-xs mt-0.5"
+                                style={{ color: colors.textSecondary }}
+                              >
+                                {weight}
+                              </Text>
+                            </View>
+                            <Text
+                              className="text-2xl font-bold"
+                              style={{ color }}
+                            >
+                              {value}%
+                            </Text>
+                          </View>
+                          {/* Progress bar */}
+                          <View
+                            className="h-2 rounded-full overflow-hidden"
+                            style={{ backgroundColor: color + "20" }}
+                          >
+                            <View
+                              className="h-full rounded-full"
+                              style={{
+                                width: barWidth,
+                                backgroundColor: color,
+                              }}
+                            />
+                          </View>
+                          {/* Note */}
+                          <Text
+                            className="text-xs mt-2"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            {note}
+                          </Text>
+                        </View>
+                      </View>
+                    ),
+                  )}
+                </View>
+              </View>
+
+              {/* Close Button */}
+              <View className="mx-5">
+                <Pressable
+                  className="rounded-2xl py-4"
+                  style={{ backgroundColor: colors.primary }}
+                  onPress={() => setShowPerformanceModal(false)}
+                >
+                  <Text
+                    className="text-center font-semibold text-base"
+                    style={{ color: "#FFFFFF" }}
+                  >
+                    {t("hod.dashboard.performance.gotIt") || "Got it"}
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>

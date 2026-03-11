@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Keyboard, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { TextInput as PaperTextInput } from "react-native-paper";
-import { API_BASE } from "../../../url";
+import { REGISTER_URL } from "../../../url";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import LanguagePicker from "../../../components/LanguagePicker";
@@ -52,11 +52,10 @@ export default function Register() {
 
     try {
       setLoading(true);
-      const baseUrl = API_BASE;
 
       const response = await apiCall({
         method: "POST",
-        url: `${baseUrl}/auth/register`,
+        url: REGISTER_URL,
         data: {
           fullName: fullName.trim(),
           username: username.trim(),
@@ -74,7 +73,8 @@ export default function Register() {
         Toast.show({
           type: "error",
           text1: t("toast.registerError.title"),
-          text2: responseData?.message || t("toast.registerError.tokenNotReturned"),
+          text2:
+            responseData?.message || t("toast.registerError.tokenNotReturned"),
         });
         return;
       }
@@ -96,7 +96,10 @@ export default function Register() {
       Toast.show({
         type: "error",
         text1: t("toast.registerError.title"),
-        text2: error?.response?.data?.message || error?.message || t("toast.registerError.failed"),
+        text2:
+          error?.response?.data?.message ||
+          error?.message ||
+          t("toast.registerError.failed"),
       });
     } finally {
       setLoading(false);

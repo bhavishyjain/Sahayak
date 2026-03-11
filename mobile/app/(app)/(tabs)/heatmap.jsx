@@ -18,12 +18,14 @@ import { GET_HEATMAP_URL } from "../../../url";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import { useNetworkStatus } from "../../../utils/useNetworkStatus";
 
 export default function HeatMap() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const webViewRef = useRef(null);
+  const { isOnline } = useNetworkStatus();
 
   const [filters, setFilters] = useState({
     department: "all",
@@ -431,6 +433,25 @@ export default function HeatMap() {
           </div>
         </div>
         <script>
+          function getSeverityColor(severity) {
+            switch (severity) {
+              case 'very-high': return '#DC2626';
+              case 'high':     return '#F59E0B';
+              case 'medium':   return '#10B981';
+              case 'low':      return '#3B82F6';
+              default:         return '#6B7280';
+            }
+          }
+          function getSeverityLabel(severity) {
+            switch (severity) {
+              case 'very-high': return 'Critical';
+              case 'high':      return 'High';
+              case 'medium':    return 'Medium';
+              case 'low':       return 'Low';
+              default:          return 'Normal';
+            }
+          }
+
           const map = L.map('map').setView([${mapCenter[0]}, ${mapCenter[1]}], 12);
           
           L.tileLayer('https://maps.dkpg.xyz/get-map-tile.php?x={x}&y={y}&z={z}&lyrs=h', {
@@ -650,6 +671,32 @@ export default function HeatMap() {
                   className="text-sm"
                 >
                   {t("heatmap.loadingMap") || "Loading map..."}
+                </Text>
+              </View>
+            ) : !isOnline ? (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  padding: 24,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: "600",
+                    marginBottom: 8,
+                  }}
+                >
+                  {t("common.noInternet") || "No Internet Connection"}
+                </Text>
+                <Text
+                  style={{ color: colors.textSecondary, textAlign: "center" }}
+                >
+                  {t("heatmap.offlineMessage") ||
+                    "The map requires an internet connection to load."}
                 </Text>
               </View>
             ) : (

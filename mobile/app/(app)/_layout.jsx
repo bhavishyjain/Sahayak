@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { Platform, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { darkColors, lightColors } from "../../colors";
@@ -13,12 +13,9 @@ export default function RootLayout() {
   // Get current theme colors
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  // Configure safe area edges - consistent for all tab pages to prevent shifting
-  const getEdges = () => {
-    // Always apply bottom edge on Android for navigation bar
-    // Don't apply top edge as status bar height is handled in individual pages
-    return Platform.OS === "ios" ? ["top"] : ["bottom"];
-  };
+  // Apply safe area on all edges so the offline banner and all child
+  // screens are correctly positioned below the status bar / notch.
+  const getEdges = () => ["top", "bottom"];
 
   return (
     <>

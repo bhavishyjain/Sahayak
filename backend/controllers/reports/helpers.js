@@ -1,5 +1,6 @@
 const User = require("../../models/User");
 const AppError = require("../../core/AppError");
+const { normalizeStatus, getResolvedAt } = require("../../utils/normalize");
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -61,27 +62,9 @@ async function buildFilters(req, source = "query") {
   return filters;
 }
 
-function normalizeStatus(status) {
-  const normalized = String(status || "").trim().toLowerCase();
-  if (normalized === "in progress") return "in-progress";
-  if (normalized === "canceled") return "cancelled";
-  return normalized;
-}
-
-function getResolvedAt(complaint) {
-  if (complaint?.resolvedAt) return new Date(complaint.resolvedAt);
-  const resolvedEvent = (complaint?.history || [])
-    .filter((event) => normalizeStatus(event?.status) === "resolved")
-    .sort(
-      (a, b) =>
-        new Date(b?.timestamp || 0).getTime() -
-        new Date(a?.timestamp || 0).getTime(),
-    )[0];
-  return resolvedEvent?.timestamp ? new Date(resolvedEvent.timestamp) : null;
-}
-
 module.exports = {
   normalizeString,
   buildFilters,
   getResolvedAt,
+  normalizeStatus,
 };

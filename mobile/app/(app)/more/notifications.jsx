@@ -21,7 +21,6 @@ import {
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
-import Card from "../../../components/Card";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
@@ -32,21 +31,15 @@ import {
   NOTIFICATION_PREFERENCES_URL,
 } from "../../../url";
 
-// ─── Type config ──────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
-  "complaint-update": {
-    label: "Complaint Update",
-    Icon: FileText,
-    color: "#3B82F6",
-  },
-  assignment: { label: "Assignment", Icon: UserCheck, color: "#8B5CF6" },
-  escalation: { label: "Escalation", Icon: TriangleAlert, color: "#EF4444" },
-  system: { label: "System", Icon: Wrench, color: "#6B7280" },
-  test: { label: "Test", Icon: Bell, color: "#10B981" },
-  other: { label: "Notification", Icon: Bell, color: "#F59E0B" },
+  "complaint-update": { Icon: FileText, color: "#3B82F6" },
+  assignment: { Icon: UserCheck, color: "#8B5CF6" },
+  escalation: { Icon: TriangleAlert, color: "#EF4444" },
+  system: { Icon: Wrench, color: "#6B7280" },
+  test: { Icon: Bell, color: "#10B981" },
+  other: { Icon: Bell, color: "#F59E0B" },
 };
 
-// ─── Preference rows ──────────────────────────────────────────────────────────
 const PREF_ROWS = [
   {
     key: "complaintsUpdates",
@@ -90,7 +83,6 @@ function formatRelativeTime(dateStr) {
   });
 }
 
-// ─── Notification item ────────────────────────────────────────────────────────
 function NotificationItem({ item, colors, onRead }) {
   const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.other;
   const { Icon } = cfg;
@@ -98,109 +90,58 @@ function NotificationItem({ item, colors, onRead }) {
 
   return (
     <TouchableOpacity
-      activeOpacity={0.75}
+      activeOpacity={0.7}
       onPress={() => isUnread && onRead(item._id)}
     >
-      <Card
+      <View
+        className="flex-row items-start px-4 py-3.5"
         style={{
-          margin: 0,
-          marginBottom: 8,
-          flex: 0,
-          borderLeftWidth: 3,
-          borderLeftColor: isUnread ? cfg.color : "transparent",
-          opacity: isUnread ? 1 : 0.7,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          backgroundColor: isUnread ? cfg.color + "08" : "transparent",
         }}
       >
-        <View className="flex-row items-start">
-          <View
-            className="w-9 h-9 rounded-full items-center justify-center mr-3 mt-0.5"
-            style={{ backgroundColor: cfg.color + "22" }}
-          >
-            <Icon size={16} color={cfg.color} />
-          </View>
-          <View className="flex-1">
-            <View className="flex-row items-center justify-between mb-0.5">
-              <Text
-                className="text-sm font-semibold flex-1 mr-2"
-                style={{ color: colors.textPrimary }}
-                numberOfLines={1}
-              >
-                {item.title}
-              </Text>
-              <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                {formatRelativeTime(item.createdAt)}
-              </Text>
-            </View>
-            <Text
-              className="text-sm leading-5"
-              style={{ color: colors.textSecondary }}
-              numberOfLines={3}
-            >
-              {item.body}
-            </Text>
-            {isUnread && (
-              <View
-                className="mt-1.5 self-start px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: cfg.color + "22" }}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ color: cfg.color }}
-                >
-                  Tap to mark read
-                </Text>
-              </View>
-            )}
-          </View>
+        <View
+          className="w-8 h-8 rounded-full items-center justify-center mr-3 mt-0.5"
+          style={{ backgroundColor: cfg.color + "20" }}
+        >
+          <Icon size={15} color={cfg.color} />
         </View>
-      </Card>
+        <View className="flex-1">
+          <View className="flex-row items-start justify-between mb-0.5">
+            <Text
+              className="text-sm font-semibold flex-1 mr-3"
+              style={{ color: colors.textPrimary }}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
+            <Text className="text-xs" style={{ color: colors.textSecondary }}>
+              {formatRelativeTime(item.createdAt)}
+            </Text>
+          </View>
+          <Text
+            className="text-xs leading-5"
+            style={{ color: colors.textSecondary }}
+            numberOfLines={3}
+          >
+            {item.body}
+          </Text>
+        </View>
+        {isUnread && (
+          <View
+            className="w-2 h-2 rounded-full ml-2 mt-1.5"
+            style={{ backgroundColor: cfg.color }}
+          />
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
 
-// ─── Preference toggle row ────────────────────────────────────────────────────
-function PrefRow({ row, value, colors, onChange }) {
-  const { Icon } = row;
-  return (
-    <View
-      className="flex-row items-center py-3 border-b"
-      style={{ borderColor: colors.border ?? "#E5E7EB22" }}
-    >
-      <View
-        className="w-9 h-9 rounded-full items-center justify-center mr-3"
-        style={{ backgroundColor: row.color + "22" }}
-      >
-        <Icon size={17} color={row.color} />
-      </View>
-      <View className="flex-1 mr-3">
-        <Text
-          className="text-sm font-semibold"
-          style={{ color: colors.textPrimary }}
-        >
-          {row.label}
-        </Text>
-        <Text
-          className="text-xs mt-0.5"
-          style={{ color: colors.textSecondary }}
-        >
-          {row.sub}
-        </Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: "#6B7280", true: row.color }}
-        thumbColor="#FFFFFF"
-      />
-    </View>
-  );
-}
-
-// ─── Main screen ──────────────────────────────────────────────────────────────
 export default function NotificationsScreen() {
   const { colorScheme } = useTheme();
   const { t } = useTranslation();
-
   const colors = useMemo(
     () => (colorScheme === "dark" ? darkColors : lightColors),
     [colorScheme],
@@ -212,16 +153,14 @@ export default function NotificationsScreen() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-
   const [preferences, setPreferences] = useState({
     complaintsUpdates: true,
     assignments: true,
     escalations: true,
     systemAlerts: true,
   });
-  const [savingPref, setSavingPref] = useState(null); // key being saved
+  const [savingPref, setSavingPref] = useState(null);
 
-  // ── Data loaders ──────────────────────────────────────────────────────────
   const loadHistory = useCallback(async (page = 1, append = false) => {
     if (page === 1) {
       append ? setRefreshing(true) : setLoadingHistory(true);
@@ -243,7 +182,7 @@ export default function NotificationsScreen() {
         setPagination(res.data.pagination ?? null);
       }
     } catch {
-      // silently fail — history is not critical
+      /* silently fail */
     } finally {
       setLoadingHistory(false);
       setRefreshing(false);
@@ -261,7 +200,7 @@ export default function NotificationsScreen() {
         setPreferences((prev) => ({ ...prev, ...res.data.preferences }));
       }
     } catch {
-      // silently fail
+      /* silently fail */
     }
   }, []);
 
@@ -272,7 +211,6 @@ export default function NotificationsScreen() {
     }, [loadHistory, loadPreferences]),
   );
 
-  // ── Mark read ─────────────────────────────────────────────────────────────
   const handleMarkRead = useCallback(async (id) => {
     try {
       await apiCall({ method: "PUT", url: NOTIFICATION_MARK_READ_URL(id) });
@@ -303,7 +241,6 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  // ── Toggle preference ─────────────────────────────────────────────────────
   const handleToggle = useCallback(async (key, value) => {
     setPreferences((prev) => ({ ...prev, [key]: value }));
     setSavingPref(key);
@@ -317,7 +254,6 @@ export default function NotificationsScreen() {
         setPreferences((prev) => ({ ...prev, ...res.data.preferences }));
       }
     } catch {
-      // revert on failure
       setPreferences((prev) => ({ ...prev, [key]: !value }));
       Toast.show({ type: "error", text1: "Failed to save preference" });
     } finally {
@@ -325,55 +261,87 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  // ── Pagination ────────────────────────────────────────────────────────────
   const handleLoadMore = useCallback(() => {
     if (!loadingMore && pagination && pagination.page < pagination.totalPages) {
       loadHistory(pagination.page + 1, true);
     }
   }, [loadingMore, pagination, loadHistory]);
 
-  // ── List header (preferences + history header) ────────────────────────────
   const ListHeader = useMemo(
     () => (
       <View>
-        {/* Preferences section */}
-        <Card style={{ marginBottom: 16 }}>
-          <Text
-            className="text-base font-bold mb-1"
-            style={{ color: colors.textPrimary }}
-          >
-            Notification Preferences
-          </Text>
-          <Text
-            className="text-xs mb-3"
-            style={{ color: colors.textSecondary }}
-          >
-            Choose which notifications you want to receive
-          </Text>
-          {PREF_ROWS.map((row) => (
-            <PrefRow
-              key={row.key}
-              row={row}
-              value={preferences[row.key] ?? true}
-              colors={colors}
-              onChange={(val) => handleToggle(row.key, val)}
-            />
+        {/* Preferences */}
+        <Text
+          className="text-xs font-semibold uppercase mb-3"
+          style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
+        >
+          Preferences
+        </Text>
+        <View
+          className="rounded-2xl overflow-hidden mb-6"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          {PREF_ROWS.map(({ key, label, sub, Icon, color }, idx) => (
+            <View key={key}>
+              <View className="flex-row items-center px-4 py-3.5">
+                <View
+                  className="w-8 h-8 rounded-lg items-center justify-center mr-3"
+                  style={{ backgroundColor: color + "20" }}
+                >
+                  <Icon size={16} color={color} />
+                </View>
+                <View className="flex-1 mr-3">
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {label}
+                  </Text>
+                  <Text
+                    className="text-xs mt-0.5"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {sub}
+                  </Text>
+                </View>
+                {savingPref === key ? (
+                  <ActivityIndicator size="small" color={color} />
+                ) : (
+                  <Switch
+                    value={preferences[key] ?? true}
+                    onValueChange={(val) => handleToggle(key, val)}
+                    trackColor={{ false: colors.border, true: color }}
+                    thumbColor="#FFFFFF"
+                  />
+                )}
+              </View>
+              {idx < PREF_ROWS.length - 1 && (
+                <View
+                  className="h-[1px] ml-14"
+                  style={{ backgroundColor: colors.border }}
+                />
+              )}
+            </View>
           ))}
-        </Card>
+        </View>
 
         {/* History header */}
-        <View className="flex-row items-center justify-between mb-2 px-1">
+        <View className="flex-row items-center justify-between mb-3">
           <View className="flex-row items-center">
             <Text
-              className="text-base font-bold"
-              style={{ color: colors.textPrimary }}
+              className="text-xs font-semibold uppercase"
+              style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
             >
-              Notification History
+              History
             </Text>
             {unreadCount > 0 && (
               <View
                 className="ml-2 px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: "#EF444422" }}
+                style={{ backgroundColor: "#EF444420" }}
               >
                 <Text
                   className="text-xs font-semibold"
@@ -388,88 +356,127 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               className="flex-row items-center"
               onPress={handleMarkAllRead}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <CheckCheck
-                size={14}
-                color="#3B82F6"
-                style={{ marginRight: 4 }}
-              />
+              <CheckCheck size={13} color={colors.primary} />
               <Text
-                className="text-xs font-medium"
-                style={{ color: "#3B82F6" }}
+                className="text-xs font-medium ml-1"
+                style={{ color: colors.primary }}
               >
                 Mark all read
               </Text>
             </TouchableOpacity>
           )}
         </View>
+
+        {/* History container top border */}
+        {notifications.length > 0 && (
+          <View
+            className="rounded-t-2xl overflow-hidden"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderBottomWidth: 0,
+            }}
+          />
+        )}
       </View>
     ),
-    [colors, preferences, unreadCount, handleToggle, handleMarkAllRead],
-  );
-
-  const ListEmpty = useMemo(
-    () =>
-      loadingHistory ? (
-        <ActivityIndicator
-          size="small"
-          color={colors.textSecondary}
-          style={{ marginTop: 24 }}
-        />
-      ) : (
-        <View className="items-center py-10">
-          <BellOff size={36} color={colors.textSecondary} />
-          <Text
-            className="mt-3 text-sm"
-            style={{ color: colors.textSecondary }}
-          >
-            No notifications yet
-          </Text>
-        </View>
-      ),
-    [loadingHistory, colors],
+    [
+      colors,
+      preferences,
+      unreadCount,
+      savingPref,
+      notifications.length,
+      handleToggle,
+      handleMarkAllRead,
+    ],
   );
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
+    >
       <BackButtonHeader title="Notifications" />
 
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <NotificationItem
-            item={item}
-            colors={colors}
-            onRead={handleMarkRead}
-          />
-        )}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={ListEmpty}
-        ListFooterComponent={
-          loadingMore ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.textSecondary}
-              style={{ marginVertical: 12 }}
+      {loadingHistory ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => (
+            <NotificationItem
+              item={item}
+              colors={colors}
+              onRead={handleMarkRead}
             />
-          ) : null
-        }
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.3}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              loadHistory(1, true);
-              loadPreferences();
-            }}
-            tintColor={colors.textSecondary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+          )}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={
+            <View
+              className="rounded-2xl items-center py-12"
+              style={{
+                backgroundColor: colors.backgroundSecondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <BellOff size={32} color={colors.textSecondary} />
+              <Text
+                className="text-sm mt-3"
+                style={{ color: colors.textSecondary }}
+              >
+                No notifications yet
+              </Text>
+            </View>
+          }
+          ListFooterComponent={
+            notifications.length > 0 ? (
+              <View
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderTopWidth: 0,
+                  borderBottomLeftRadius: 16,
+                  borderBottomRightRadius: 16,
+                  height: 8,
+                  marginBottom: 16,
+                }}
+              />
+            ) : null
+          }
+          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                loadHistory(1, true);
+                loadPreferences();
+              }}
+              tintColor={colors.textSecondary}
+              colors={[colors.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={null}
+        />
+      )}
+
+      {loadingMore && (
+        <ActivityIndicator
+          size="small"
+          color={colors.textSecondary}
+          style={{ position: "absolute", bottom: 24, alignSelf: "center" }}
+        />
+      )}
     </View>
   );
 }

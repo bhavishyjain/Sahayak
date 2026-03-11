@@ -6,6 +6,7 @@ const { buildComplaintView } = require("../../utils/complaintView");
 const { getHodOrThrow } = require("../../services/accessService");
 const { getWorkerMetricsBulk } = require("../../services/workerMetricsService");
 const { escapeRegex } = require("./helpers");
+const { calculateAvgResponseTimeHours } = require("../../utils/normalize");
 
 exports.getHodOverview = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
@@ -83,16 +84,7 @@ exports.getHodOverview = asyncHandler(async (req, res) => {
     createdAt: { $exists: true },
   }).select("createdAt assignedAt");
 
-  let avgResponseTime = null;
-  if (assignedComplaints.length > 0) {
-    const totalResponseTime = assignedComplaints.reduce((sum, c) => {
-      return (
-        sum +
-        (new Date(c.assignedAt) - new Date(c.createdAt)) / (1000 * 60 * 60)
-      );
-    }, 0);
-    avgResponseTime = Math.round(totalResponseTime / assignedComplaints.length);
-  }
+  const avgResponseTime = calculateAvgResponseTimeHours(assignedComplaints);
 
   const completionRate =
     total > 0 ? Math.round(((resolved + cancelled) / total) * 100) : 0;
@@ -159,4 +151,40 @@ exports.getHodWorkers = asyncHandler(async (req, res) => {
   });
 
   return sendSuccess(res, { workers: workersWithMetrics });
+});
+
+exports.getHodWorkerById = asyncHandler(async (req, res) => {
+  const hod = await getHodOrThrow(req);
+  const departmentRegex = new RegExp(`^${escapeRegex(hod.department)}$`, "i");
+  const { workerId } = req.params;
+
+  const worker = await User.findOne({
+    _id: workerId,
+    role: "worker",
+    department: departmentRegex,
+  }).select("-password");
+
+  if (!worker) {
+    throw new (require("../../core/AppError"))("Worker not found", 404);
+  }
+
+  const metricsByWorkerId = await getWorkerMetricsBulk([worker._id]);
+  const metrics = metricsByWorkerId[String(worker._id)] || {
+    activeComplaints: 0,
+    completedCount: 0,
+  };
+
+  return sendSuccess(res, {
+    worker: {
+      id: worker._id,
+      username: worker.username,
+      fullName: worker.fullName,
+      email: worker.email,
+      phone: worker.phone,
+      department: worker.department,
+      rating: worker.rating,
+      activeComplaints: metrics.activeComplaints,
+      completedCount: metrics.completedCount,
+    },
+  });
 });

@@ -1,8 +1,11 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import apiCall from "./api";
 import getUserAuth from "./userAuth";
 import { NOTIFICATION_REGISTER_TOKEN_URL } from "../url";
+
+const PUSH_TOKEN_CACHE_KEY = "registered_push_token";
 
 /**
  * Requests notification permissions, retrieves the Expo push token,
@@ -33,11 +36,17 @@ export async function registerPushToken() {
     const pushToken = tokenData?.data;
     if (!pushToken) return;
 
+    // Skip registration if the token hasn't changed since last successful call
+    const cachedToken = await AsyncStorage.getItem(PUSH_TOKEN_CACHE_KEY);
+    if (cachedToken === pushToken) return;
+
     await apiCall({
       method: "POST",
       url: NOTIFICATION_REGISTER_TOKEN_URL,
       data: { pushToken },
     });
+
+    await AsyncStorage.setItem(PUSH_TOKEN_CACHE_KEY, pushToken);
   } catch (error) {
     // Non-critical — log but don't surface to user
     console.warn("Push token registration failed:", error?.message);

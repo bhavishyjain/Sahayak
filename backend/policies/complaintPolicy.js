@@ -1,9 +1,6 @@
 const User = require("../models/User");
 const AppError = require("../core/AppError");
-
-function normalizeDepartment(value) {
-  return String(value || "").trim().toLowerCase();
-}
+const { normalizeDepartment } = require("../utils/normalize");
 
 function isWorkerAssignedToComplaint(complaint, workerId) {
   const targetId = String(workerId || "");

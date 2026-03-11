@@ -3,10 +3,7 @@ import {
   Download,
   FileSpreadsheet,
   FileBarChart,
-  Filter,
-  BarChart3,
   RotateCcw,
-  TrendingUp,
   Calendar,
   Clock,
   Mail,
@@ -16,6 +13,7 @@ import {
   Trash2,
   X,
   ChevronRight,
+  BarChart3,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -33,10 +31,11 @@ import { darkColors, lightColors } from "../../../colors";
 import Card from "../../../components/Card";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
-import { formatStatusLabel } from "../../../utils/complaintFormatters";
+import FilterPanel from "../../../components/FilterPanel";
+
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { useDownloadReport, useReportStats } from "../../../utils/hooks/useReports";
+import { useDownloadReport } from "../../../utils/hooks/useReports";
 import getUserAuth from "../../../utils/userAuth";
 import apiCall from "../../../utils/api";
 import {
@@ -45,16 +44,6 @@ import {
   REPORT_CANCEL_SCHEDULE_URL,
   REPORT_EMAIL_URL,
 } from "../../../url";
-
-const STATUS_OPTIONS = [
-  "pending",
-  "assigned",
-  "in-progress",
-  "pending-approval",
-  "needs-rework",
-  "resolved",
-  "cancelled",
-];
 
 function normalizeFilters(filters) {
   const normalized = {};
@@ -85,12 +74,10 @@ export default function HODReports() {
       const dept = user?.department || "";
       setHodDepartment(dept);
       setAppliedFilters((prev) => ({ ...prev, department: dept }));
-      setDraftFilters((prev) => ({ ...prev, department: dept }));
     });
   }, []);
 
   // Filter states
-  const [showFilterModal, setShowFilterModal] = useState(false);
   const [downloadingFormat, setDownloadingFormat] = useState(null);
   const [appliedFilters, setAppliedFilters] = useState({
     department: "",
@@ -98,7 +85,6 @@ export default function HODReports() {
     startDate: "",
     endDate: "",
   });
-  const [draftFilters, setDraftFilters] = useState(appliedFilters);
 
   // Schedule states
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -122,7 +108,6 @@ export default function HODReports() {
   );
 
   const { download } = useDownloadReport();
-  const { data: statsRaw, isLoading: statsLoading } = useReportStats(normalizedFilters);
 
   const loadSchedules = async () => {
     try {
@@ -147,25 +132,6 @@ export default function HODReports() {
       appliedFilters.endDate,
     );
   }, [appliedFilters]);
-
-  const applyFilters = () => {
-    setAppliedFilters(draftFilters);
-    setShowFilterModal(false);
-  };
-
-  const resetDraftFilters = () => {
-    setDraftFilters({
-      department: hodDepartment,
-      status: "all",
-      startDate: "",
-      endDate: "",
-    });
-  };
-
-  const syncAndCloseFilters = () => {
-    setDraftFilters(appliedFilters);
-    setShowFilterModal(false);
-  };
 
   const downloadReport = async (format) => {
     try {
@@ -321,151 +287,32 @@ export default function HODReports() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <View className="px-4 pt-4">
-          {/* Stats Cards */}
-          {statsLoading && (
-            <View
-              className="rounded-2xl p-4 items-center justify-center mb-4"
-              style={{ backgroundColor: colors.backgroundSecondary, height: 96 }}
-            >
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          )}
-          {!statsLoading && statsRaw && (() => {
-            const total = statsRaw.total || 0;
-            const byStatus = statsRaw.byStatus || {};
-            const byPriority = statsRaw.byPriority || {};
-            const avgHours = statsRaw.avgResolutionTime || 0;
-            const activeCount = [
-              "pending",
-              "assigned",
-              "in-progress",
-              "pending-approval",
-              "needs-rework",
-            ].reduce((sum, s) => sum + (byStatus[s] || 0), 0);
-            const resolvedCount = byStatus["resolved"] || 0;
-            const avgLabel =
-              avgHours === 0
-                ? "N/A"
-                : avgHours < 24
-                ? `${avgHours}h`
-                : `${Math.floor(avgHours / 24)}d ${avgHours % 24}h`;
-
-            const Tile = ({ label, value, color, bg }) => (
-              <View
-                className="flex-1 rounded-xl p-3 items-center"
-                style={{ backgroundColor: bg }}
-              >
-                <Text
-                  className="text-xl font-bold"
-                  style={{ color }}
-                >
-                  {value}
-                </Text>
-                <Text
-                  className="text-xs mt-0.5"
-                  style={{ color }}
-                >
-                  {label}
-                </Text>
-              </View>
-            );
-
-            return (
-              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                <View className="flex-row items-center mb-4">
-                  <View
-                    className="w-10 h-10 rounded-xl items-center justify-center"
-                    style={{ backgroundColor: colors.primary + "20" }}
-                  >
-                    <BarChart3 size={20} color={colors.primary} />
-                  </View>
-                  <Text
-                    className="text-base font-bold ml-3 flex-1"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    Complaint Statistics
-                  </Text>
-                  {hasActiveFilters && (
-                    <View
-                      className="px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: colors.primary + "20" }}
-                    >
-                      <Text
-                        className="text-xs font-semibold"
-                        style={{ color: colors.primary }}
-                      >
-                        Filtered
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Totals row */}
-                <View className="flex-row mb-3" style={{ gap: 8 }}>
-                  <Tile
-                    label="Total"
-                    value={total}
-                    color={colors.primary}
-                    bg={colors.primary + "18"}
-                  />
-                  <Tile
-                    label="Active"
-                    value={activeCount}
-                    color={colors.warning || "#F59E0B"}
-                    bg={(colors.warning || "#F59E0B") + "18"}
-                  />
-                  <Tile
-                    label="Resolved"
-                    value={resolvedCount}
-                    color={colors.success || "#10B981"}
-                    bg={(colors.success || "#10B981") + "18"}
-                  />
-                </View>
-
-                {/* Priority row */}
-                <View className="flex-row mb-3" style={{ gap: 8 }}>
-                  <Tile
-                    label="High"
-                    value={byPriority["High"] || 0}
-                    color="#EF4444"
-                    bg="#EF444418"
-                  />
-                  <Tile
-                    label="Medium"
-                    value={byPriority["Medium"] || 0}
-                    color="#F59E0B"
-                    bg="#F59E0B18"
-                  />
-                  <Tile
-                    label="Low"
-                    value={byPriority["Low"] || 0}
-                    color="#10B981"
-                    bg="#10B98118"
-                  />
-                </View>
-
-                {/* Avg resolution time */}
-                <View
-                  className="flex-row items-center rounded-xl px-3 py-2.5"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
-                >
-                  <TrendingUp size={15} color={colors.textSecondary} />
-                  <Text
-                    className="text-sm ml-2 flex-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    Avg resolution time
-                  </Text>
-                  <Text
-                    className="text-sm font-bold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {avgLabel}
-                  </Text>
-                </View>
-              </Card>
-            );
-          })()}
+          {/* Filter Panel */}
+          <FilterPanel
+            variant="bar"
+            statusFilter={appliedFilters.status}
+            setStatusFilter={(val) =>
+              setAppliedFilters((prev) => ({ ...prev, status: val }))
+            }
+            startDate={appliedFilters.startDate}
+            endDate={appliedFilters.endDate}
+            setStartDate={(val) =>
+              setAppliedFilters((prev) => ({ ...prev, startDate: val }))
+            }
+            setEndDate={(val) =>
+              setAppliedFilters((prev) => ({ ...prev, endDate: val }))
+            }
+            hasActiveFilters={hasActiveFilters}
+            summary={[
+              appliedFilters.status !== "all" && appliedFilters.status,
+              appliedFilters.startDate && `From: ${appliedFilters.startDate}`,
+              appliedFilters.endDate && `To: ${appliedFilters.endDate}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            t={t}
+            style={{ marginBottom: 16 }}
+          />
 
           {/* Tab Navigator */}
           <View
@@ -511,624 +358,315 @@ export default function HODReports() {
             </TouchableOpacity>
           </View>
 
-          {/* Filter Badge */}
-          <TouchableOpacity
-            onPress={() => setShowFilterModal(true)}
-            className="rounded-2xl p-4 flex-row items-center justify-between mb-4"
-            style={{
-              backgroundColor: hasActiveFilters
-                ? colors.primary + "20"
-                : colors.backgroundSecondary,
-              borderWidth: 1,
-              borderColor: hasActiveFilters ? colors.primary : colors.border,
-            }}
-          >
-            <View className="flex-row items-center flex-1">
-              <Filter
-                size={20}
-                color={hasActiveFilters ? colors.primary : colors.textSecondary}
-              />
-              <View className="ml-3 flex-1">
-                <Text
-                  className="text-sm font-semibold"
-                  style={{
-                    color: hasActiveFilters
-                      ? colors.primary
-                      : colors.textPrimary,
-                  }}
-                >
-                  {hasActiveFilters ? "Filters Applied" : "Add Filters"}
-                </Text>
-                {hasActiveFilters && (
-                  <Text
-                    className="text-xs"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {[
-                      appliedFilters.status !== "all" && appliedFilters.status,
-                      appliedFilters.startDate &&
-                        `From: ${appliedFilters.startDate}`,
-                      appliedFilters.endDate && `To: ${appliedFilters.endDate}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
-                )}
-              </View>
-            </View>
-            <ChevronRight
-              size={18}
-              color={hasActiveFilters ? colors.primary : colors.textSecondary}
-            />
-          </TouchableOpacity>
-
           {/* Export Tab Content */}
           {activeTab === "export" && (
             <>
-              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                <View className="flex-row items-center mb-4">
-                  <View
-                    className="w-12 h-12 rounded-2xl items-center justify-center"
-                    style={{ backgroundColor: colors.primary + "20" }}
-                  >
-                    <Download size={24} color={colors.primary} />
-                  </View>
-                  <View className="ml-3">
-                    <Text
-                      className="text-lg font-bold"
-                      style={{ color: colors.textPrimary }}
-                    >
-                      Download Reports
-                    </Text>
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Export in your preferred format
-                    </Text>
-                  </View>
-                </View>
-
+              {/* Download Reports */}
+              <View className="mb-4">
+                <Text
+                  className="text-xs font-semibold uppercase mb-3"
+                  style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
+                >
+                  Download
+                </Text>
                 <View
-                  className="h-[1px] mb-4"
-                  style={{ backgroundColor: colors.border }}
-                />
-
-                {/* Export Options */}
-                <View className="space-y-3">
-                  {/* PDF */}
-                  <TouchableOpacity
-                    onPress={() => downloadReport("pdf")}
-                    disabled={Boolean(downloadingFormat)}
-                    activeOpacity={0.7}
-                    className="rounded-xl p-4 flex-row items-center"
-                    style={{
-                      backgroundColor: colors.backgroundSecondary,
-                      borderWidth: 2,
-                      borderColor:
-                        downloadingFormat === "pdf"
-                          ? colors.primary
-                          : "transparent",
-                    }}
-                  >
-                    <View
-                      className="w-12 h-12 rounded-xl items-center justify-center"
-                      style={{ backgroundColor: "#EF444420" }}
-                    >
-                      <FileText size={24} color="#EF4444" />
-                    </View>
-                    <View className="ml-4 flex-1">
-                      <Text
-                        className="text-base font-bold mb-1"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        PDF Report
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        Professional document format
-                      </Text>
-                    </View>
-                    {downloadingFormat === "pdf" ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Download size={20} color={colors.textSecondary} />
-                    )}
-                  </TouchableOpacity>
-
-                  {/* Excel */}
-                  <TouchableOpacity
-                    onPress={() => downloadReport("excel")}
-                    disabled={Boolean(downloadingFormat)}
-                    activeOpacity={0.7}
-                    className="rounded-xl p-4 flex-row items-center"
-                    style={{
-                      backgroundColor: colors.backgroundSecondary,
-                      borderWidth: 2,
-                      borderColor:
-                        downloadingFormat === "excel"
-                          ? colors.primary
-                          : "transparent",
-                    }}
-                  >
-                    <View
-                      className="w-12 h-12 rounded-xl items-center justify-center"
-                      style={{ backgroundColor: colors.success + "20" }}
-                    >
-                      <FileSpreadsheet
-                        size={24}
-                        color={colors.success || "#10B981"}
-                      />
-                    </View>
-                    <View className="ml-4 flex-1">
-                      <Text
-                        className="text-base font-bold mb-1"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        Excel Spreadsheet
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        Detailed data with charts
-                      </Text>
-                    </View>
-                    {downloadingFormat === "excel" ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Download size={20} color={colors.textSecondary} />
-                    )}
-                  </TouchableOpacity>
-
-                  {/* CSV */}
-                  <TouchableOpacity
-                    onPress={() => downloadReport("csv")}
-                    disabled={Boolean(downloadingFormat)}
-                    activeOpacity={0.7}
-                    className="rounded-xl p-4 flex-row items-center"
-                    style={{
-                      backgroundColor: colors.backgroundSecondary,
-                      borderWidth: 2,
-                      borderColor:
-                        downloadingFormat === "csv"
-                          ? colors.primary
-                          : "transparent",
-                    }}
-                  >
-                    <View
-                      className="w-12 h-12 rounded-xl items-center justify-center"
-                      style={{ backgroundColor: colors.info + "20" }}
-                    >
-                      <FileBarChart
-                        size={24}
-                        color={colors.info || "#3B82F6"}
-                      />
-                    </View>
-                    <View className="ml-4 flex-1">
-                      <Text
-                        className="text-base font-bold mb-1"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        CSV Data
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        Raw data for analysis
-                      </Text>
-                    </View>
-                    {downloadingFormat === "csv" ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Download size={20} color={colors.textSecondary} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </Card>
-
-              {/* Email Report Section */}
-              <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-                <View className="flex-row items-center mb-4">
-                  <View
-                    className="w-12 h-12 rounded-2xl items-center justify-center"
-                    style={{
-                      backgroundColor: colors.purple + "20" || "#8B5CF620",
-                    }}
-                  >
-                    <Mail size={24} color={colors.purple || "#8B5CF6"} />
-                  </View>
-                  <View className="ml-3 flex-1">
-                    <Text
-                      className="text-lg font-bold"
-                      style={{ color: colors.textPrimary }}
-                    >
-                      Email Report
-                    </Text>
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Send report to any email
-                    </Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  onPress={() => setShowEmailModal(true)}
-                  className="rounded-xl p-4 flex-row items-center justify-between"
+                  className="rounded-2xl overflow-hidden"
                   style={{
-                    backgroundColor: colors.purple + "15" || "#8B5CF615",
+                    backgroundColor: colors.backgroundSecondary,
                     borderWidth: 1,
-                    borderColor: colors.purple + "40" || "#8B5CF640",
+                    borderColor: colors.border,
                   }}
                 >
-                  <View className="flex-row items-center">
-                    <Send size={20} color={colors.purple || "#8B5CF6"} />
+                  {[
+                    {
+                      format: "pdf",
+                      label: "PDF Report",
+                      desc: "Professional document format",
+                      icon: FileText,
+                      color: "#EF4444",
+                    },
+                    {
+                      format: "excel",
+                      label: "Excel Spreadsheet",
+                      desc: "Detailed data with charts",
+                      icon: FileSpreadsheet,
+                      color: colors.success || "#10B981",
+                    },
+                    {
+                      format: "csv",
+                      label: "CSV Data",
+                      desc: "Raw data for analysis",
+                      icon: FileBarChart,
+                      color: colors.info || "#3B82F6",
+                    },
+                  ].map(
+                    ({ format, label, desc, icon: Icon, color }, idx, arr) => (
+                      <View key={format}>
+                        <TouchableOpacity
+                          onPress={() => downloadReport(format)}
+                          disabled={Boolean(downloadingFormat)}
+                          activeOpacity={0.6}
+                          className="flex-row items-center px-4 py-3.5"
+                        >
+                          <View
+                            className="w-8 h-8 rounded-lg items-center justify-center mr-3"
+                            style={{ backgroundColor: color + "20" }}
+                          >
+                            <Icon size={17} color={color} />
+                          </View>
+                          <View className="flex-1">
+                            <Text
+                              className="text-sm font-semibold"
+                              style={{ color: colors.textPrimary }}
+                            >
+                              {label}
+                            </Text>
+                            <Text
+                              className="text-xs mt-0.5"
+                              style={{ color: colors.textSecondary }}
+                            >
+                              {desc}
+                            </Text>
+                          </View>
+                          {downloadingFormat === format ? (
+                            <ActivityIndicator
+                              size="small"
+                              color={colors.primary}
+                            />
+                          ) : (
+                            <Download size={17} color={colors.textSecondary} />
+                          )}
+                        </TouchableOpacity>
+                        {idx < arr.length - 1 && (
+                          <View
+                            className="h-[1px] ml-14"
+                            style={{ backgroundColor: colors.border }}
+                          />
+                        )}
+                      </View>
+                    ),
+                  )}
+                </View>
+              </View>
+
+              {/* Email Report */}
+              <View className="mb-4">
+                <Text
+                  className="text-xs font-semibold uppercase mb-3"
+                  style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
+                >
+                  Email
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowEmailModal(true)}
+                  activeOpacity={0.6}
+                  className="rounded-2xl flex-row items-center px-4 py-3.5"
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <View
+                    className="w-8 h-8 rounded-lg items-center justify-center mr-3"
+                    style={{
+                      backgroundColor: (colors.purple || "#8B5CF6") + "20",
+                    }}
+                  >
+                    <Mail size={17} color={colors.purple || "#8B5CF6"} />
+                  </View>
+                  <View className="flex-1">
                     <Text
-                      className="text-sm font-semibold ml-2"
-                      style={{ color: colors.purple || "#8B5CF6" }}
+                      className="text-sm font-semibold"
+                      style={{ color: colors.textPrimary }}
                     >
                       Send via Email
                     </Text>
+                    <Text
+                      className="text-xs mt-0.5"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Send report to any email address
+                    </Text>
                   </View>
-                  <ChevronRight size={18} color={colors.purple || "#8B5CF6"} />
+                  <ChevronRight size={17} color={colors.textSecondary} />
                 </TouchableOpacity>
-              </Card>
+              </View>
             </>
           )}
 
           {/* Schedule Tab Content */}
           {activeTab === "schedule" && (
-            <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-              <View className="flex-row items-center mb-4">
-                <View
-                  className="w-12 h-12 rounded-2xl items-center justify-center"
-                  style={{ backgroundColor: colors.success + "20" }}
-                >
-                  <Calendar size={24} color={colors.success || "#10B981"} />
-                </View>
-                <View className="ml-3 flex-1">
+            <>
+              <View className="mb-4">
+                <View className="flex-row items-center mb-3">
                   <Text
-                    className="text-lg font-bold"
-                    style={{ color: colors.textPrimary }}
+                    className="text-xs font-semibold uppercase flex-1"
+                    style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
                   >
                     Automated Reports
                   </Text>
-                  <Text
-                    className="text-xs"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    Get reports delivered to your inbox
-                  </Text>
+                  {loadingSchedules && (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  )}
                 </View>
-                {loadingSchedules && (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                )}
-              </View>
 
-              <View
-                className="h-[1px] mb-4"
-                style={{ backgroundColor: colors.border }}
-              />
-
-              {/* Schedule Options */}
-              <View className="space-y-3">
-                {[
-                  {
-                    freq: "daily",
-                    label: "Daily Reports",
-                    desc: "Receive reports every day at 9:00 AM",
-                    icon: <Clock size={20} color={colors.primary} />,
-                    activeColor: colors.primary,
-                    activeBg: colors.primary + "20",
-                  },
-                  {
-                    freq: "weekly",
-                    label: "Weekly Reports",
-                    desc: "Receive reports every Monday at 9:00 AM",
-                    icon: (
-                      <Calendar size={20} color={colors.info || "#3B82F6"} />
-                    ),
-                    activeColor: colors.info || "#3B82F6",
-                    activeBg: (colors.info || "#3B82F6") + "20",
-                  },
-                  {
-                    freq: "monthly",
-                    label: "Monthly Reports",
-                    desc: "Receive reports on the 1st of every month",
-                    icon: (
-                      <BarChart3
-                        size={20}
-                        color={colors.success || "#10B981"}
-                      />
-                    ),
-                    activeColor: colors.success || "#10B981",
-                    activeBg: (colors.success || "#10B981") + "20",
-                  },
-                ].map(({ freq, label, desc, icon, activeColor, activeBg }) => {
-                  const existing = activeSchedules.find(
-                    (s) => s.frequency === freq && s.isActive,
-                  );
-                  return (
-                    <View
-                      key={freq}
-                      className="rounded-xl p-4"
-                      style={{
-                        backgroundColor: existing
-                          ? activeBg
-                          : colors.backgroundSecondary,
-                        borderWidth: existing ? 1.5 : 0,
-                        borderColor: existing ? activeColor : "transparent",
-                      }}
-                    >
-                      <View className="flex-row items-center mb-2">
-                        {existing ? (
-                          <CheckCircle size={20} color={activeColor} />
-                        ) : (
-                          icon
-                        )}
-                        <Text
-                          className="text-base font-bold ml-2 flex-1"
-                          style={{
-                            color: existing ? activeColor : colors.textPrimary,
-                          }}
-                        >
-                          {label}
-                        </Text>
-                      </View>
-
-                      {existing ? (
-                        <>
-                          <Text
-                            className="text-xs mb-1"
-                            style={{ color: colors.textSecondary }}
-                          >
-                            Sending to{" "}
-                            <Text
-                              className="font-semibold"
-                              style={{ color: colors.textPrimary }}
+                <View
+                  className="rounded-2xl overflow-hidden"
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  {[
+                    {
+                      freq: "daily",
+                      label: "Daily",
+                      desc: "Every day at 9:00 AM",
+                      icon: Clock,
+                      color: colors.primary,
+                    },
+                    {
+                      freq: "weekly",
+                      label: "Weekly",
+                      desc: "Every Monday at 9:00 AM",
+                      icon: Calendar,
+                      color: colors.info || "#3B82F6",
+                    },
+                    {
+                      freq: "monthly",
+                      label: "Monthly",
+                      desc: "1st of every month",
+                      icon: BarChart3,
+                      color: colors.success || "#10B981",
+                    },
+                  ].map(
+                    ({ freq, label, desc, icon: Icon, color }, idx, arr) => {
+                      const existing = activeSchedules.find(
+                        (s) => s.frequency === freq && s.isActive,
+                      );
+                      return (
+                        <View key={freq}>
+                          <View className="flex-row items-center px-4 py-3.5">
+                            <View
+                              className="w-8 h-8 rounded-lg items-center justify-center mr-3"
+                              style={{
+                                backgroundColor: existing
+                                  ? color + "25"
+                                  : color + "18",
+                              }}
                             >
-                              {existing.email}
-                            </Text>
-                            {" · "}
-                            <Text className="uppercase">{existing.format}</Text>
-                          </Text>
-                          <TouchableOpacity
-                            onPress={() => handleCancelSchedule(existing._id)}
-                            disabled={cancellingId === existing._id}
-                            className="rounded-lg py-2.5 flex-row items-center justify-center mt-2"
-                            style={{
-                              backgroundColor: "#EF444415",
-                              borderWidth: 1,
-                              borderColor: "#EF4444",
-                            }}
-                          >
-                            {cancellingId === existing._id ? (
-                              <ActivityIndicator size="small" color="#EF4444" />
-                            ) : (
-                              <>
-                                <Trash2 size={14} color="#EF4444" />
+                              {existing ? (
+                                <CheckCircle size={17} color={color} />
+                              ) : (
+                                <Icon size={17} color={color} />
+                              )}
+                            </View>
+                            <View className="flex-1">
+                              <Text
+                                className="text-sm font-semibold"
+                                style={{
+                                  color: existing ? color : colors.textPrimary,
+                                }}
+                              >
+                                {label} Reports
+                              </Text>
+                              {existing ? (
                                 <Text
-                                  className="text-sm font-semibold ml-1.5"
-                                  style={{ color: "#EF4444" }}
+                                  className="text-xs mt-0.5"
+                                  style={{ color: colors.textSecondary }}
                                 >
-                                  Cancel Schedule
+                                  {existing.email} ·{" "}
+                                  {existing.format.toUpperCase()}
                                 </Text>
-                              </>
+                              ) : (
+                                <Text
+                                  className="text-xs mt-0.5"
+                                  style={{ color: colors.textSecondary }}
+                                >
+                                  {desc}
+                                </Text>
+                              )}
+                            </View>
+                            {existing ? (
+                              <TouchableOpacity
+                                onPress={() =>
+                                  handleCancelSchedule(existing._id)
+                                }
+                                disabled={cancellingId === existing._id}
+                                hitSlop={{
+                                  top: 8,
+                                  bottom: 8,
+                                  left: 8,
+                                  right: 8,
+                                }}
+                              >
+                                {cancellingId === existing._id ? (
+                                  <ActivityIndicator
+                                    size="small"
+                                    color="#EF4444"
+                                  />
+                                ) : (
+                                  <Trash2 size={16} color="#EF4444" />
+                                )}
+                              </TouchableOpacity>
+                            ) : (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setScheduleFrequency(freq);
+                                  setShowScheduleModal(true);
+                                }}
+                                className="px-3 py-1.5 rounded-lg"
+                                style={{ backgroundColor: color + "18" }}
+                              >
+                                <Text
+                                  className="text-xs font-semibold"
+                                  style={{ color }}
+                                >
+                                  Set up
+                                </Text>
+                              </TouchableOpacity>
                             )}
-                          </TouchableOpacity>
-                        </>
-                      ) : (
-                        <>
-                          <Text
-                            className="text-xs mb-3"
-                            style={{ color: colors.textSecondary }}
-                          >
-                            {desc}
-                          </Text>
-                          <TouchableOpacity
-                            onPress={() => {
-                              setScheduleFrequency(freq);
-                              setShowScheduleModal(true);
-                            }}
-                            className="rounded-lg py-2.5 items-center"
-                            style={{
-                              backgroundColor: activeBg,
-                              borderWidth: 1,
-                              borderColor: activeColor,
-                            }}
-                          >
-                            <Text
-                              className="text-sm font-semibold"
-                              style={{ color: activeColor }}
-                            >
-                              Set Up {label.split(" ")[0]} Report
-                            </Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </View>
-                  );
-                })}
+                          </View>
+                          {idx < arr.length - 1 && (
+                            <View
+                              className="h-[1px] ml-14"
+                              style={{ backgroundColor: colors.border }}
+                            />
+                          )}
+                        </View>
+                      );
+                    },
+                  )}
+                </View>
               </View>
 
               <View
-                className="rounded-xl p-4 mt-4"
-                style={{
-                  backgroundColor: colors.info + "10",
-                  borderLeftWidth: 4,
-                  borderLeftColor: colors.info || "#3B82F6",
-                }}
-              >
-                <View className="flex-row items-start">
-                  <AlertCircle
-                    size={18}
-                    color={colors.info || "#3B82F6"}
-                    className="mt-0.5"
-                  />
-                  <View className="ml-2 flex-1">
-                    <Text
-                      className="text-xs font-semibold mb-1"
-                      style={{ color: colors.info || "#3B82F6" }}
-                    >
-                      About Scheduled Reports
-                    </Text>
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Reports will be generated automatically and sent to your
-                      email. You can manage or cancel schedules anytime.
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </Card>
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Filter Modal */}
-      <Modal
-        visible={showFilterModal}
-        transparent
-        animationType="slide"
-        onRequestClose={syncAndCloseFilters}
-      >
-        <Pressable
-          className="flex-1 bg-black/50 justify-end"
-          onPress={syncAndCloseFilters}
-        >
-          <Pressable
-            className="rounded-t-3xl p-6"
-            style={{ backgroundColor: colors.backgroundPrimary }}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text
-                className="text-lg font-bold"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("reports.filters")}
-              </Text>
-              <TouchableOpacity onPress={syncAndCloseFilters}>
-                <X size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <Text
-              className="text-xs mb-2"
-              style={{ color: colors.textSecondary }}
-            >
-              {t("reports.filterStatus")}
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mb-4"
-            >
-              <View className="flex-row">
-                {["all", ...STATUS_OPTIONS].map((status) => {
-                  const selected = draftFilters.status === status;
-                  return (
-                    <TouchableOpacity
-                      key={status}
-                      onPress={() =>
-                        setDraftFilters((prev) => ({ ...prev, status }))
-                      }
-                      className="px-3 py-2 rounded-xl mr-2"
-                      style={{
-                        backgroundColor: selected
-                          ? colors.primary + "20"
-                          : colors.backgroundSecondary,
-                        borderWidth: 1,
-                        borderColor: selected ? colors.primary : colors.border,
-                      }}
-                    >
-                      <Text
-                        className="text-xs font-semibold capitalize"
-                        style={{
-                          color: selected ? colors.primary : colors.textPrimary,
-                        }}
-                      >
-                        {status === "all"
-                          ? t("common.all")
-                          : formatStatusLabel(t, status)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            <Text
-              className="text-xs mb-2"
-              style={{ color: colors.textSecondary }}
-            >
-              {t("reports.filterDateRange")}
-            </Text>
-            <View className="flex-row mb-5" style={{ gap: 8 }}>
-              <View className="flex-1">
-                <DateTimePickerModal
-                  mode="date"
-                  value={draftFilters.startDate}
-                  onChange={(value) =>
-                    setDraftFilters((prev) => ({ ...prev, startDate: value }))
-                  }
-                  placeholder={t("reports.filterStartDate")}
-                  maxDateToday
-                />
-              </View>
-              <View className="flex-1">
-                <DateTimePickerModal
-                  mode="date"
-                  value={draftFilters.endDate}
-                  onChange={(value) =>
-                    setDraftFilters((prev) => ({ ...prev, endDate: value }))
-                  }
-                  placeholder={t("reports.filterEndDate")}
-                  maxDateToday
-                />
-              </View>
-            </View>
-
-            <View className="flex-row" style={{ gap: 10 }}>
-              <TouchableOpacity
-                onPress={resetDraftFilters}
-                className="flex-1 py-3 rounded-xl flex-row items-center justify-center"
+                className="flex-row items-start rounded-2xl px-4 py-3"
                 style={{
                   backgroundColor: colors.backgroundSecondary,
                   borderWidth: 1,
                   borderColor: colors.border,
                 }}
               >
-                <RotateCcw size={15} color={colors.textSecondary} />
+                <AlertCircle
+                  size={15}
+                  color={colors.textSecondary}
+                  style={{ marginTop: 1 }}
+                />
                 <Text
-                  className="text-sm font-semibold ml-2"
+                  className="text-xs ml-2.5 flex-1 leading-5"
                   style={{ color: colors.textSecondary }}
                 >
-                  {t("reports.resetFilters")}
+                  Reports are generated automatically and sent to your email.
+                  You can cancel schedules anytime.
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={applyFilters}
-                className="flex-1 py-3 rounded-xl items-center justify-center"
-                style={{ backgroundColor: colors.primary }}
-              >
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: "#FFFFFF" }}
-                >
-                  {t("reports.applyFilters")}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Schedule Modal */}
       <Modal

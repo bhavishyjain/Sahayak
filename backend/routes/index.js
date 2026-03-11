@@ -11,5 +11,6 @@ router.use("/workers", require("./workerRoutes"));
 router.use("/hod", require("./hodRoutes"));
 router.use("/users", require("./users"));
 router.use("/reports", require("./reportRoutes"));
+router.use("/festival-events", require("./festivalEventRoutes"));
 
 module.exports = router;

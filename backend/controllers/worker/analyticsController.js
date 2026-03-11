@@ -121,133 +121,116 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
   } else if (requestedDepartment && requestedDepartment !== "all") {
     query.department = requestedDepartment;
   }
+
   const workers = await User.find(query).select(
     "fullName username department performanceMetrics rating",
   );
 
-  const leaderboardData = await Promise.all(
-    workers.map(async (worker) => {
-      const periodCompleted = await Complaint.countDocuments({
-        "assignedWorkers.workerId": worker._id,
-        status: "resolved",
-        updatedAt: { $gte: startDate },
-      });
+  if (workers.length === 0) {
+    return sendSuccess(res, {
+      data: { leaderboard: [], currentUser: null, period, totalWorkers: 0 },
+    });
+  }
 
-      const last30Days = new Date();
-      last30Days.setDate(last30Days.getDate() - 30);
-      const recentCompletions = await Complaint.find({
-        "assignedWorkers.workerId": worker._id,
+  const workerIds = workers.map((w) => w._id);
+  const last30Days = new Date();
+  last30Days.setDate(last30Days.getDate() - 30);
+
+  // Single aggregation replaces N×2 countDocuments+find calls
+  const aggResults = await Complaint.aggregate([
+    {
+      $match: {
         status: "resolved",
         updatedAt: { $gte: last30Days },
-      })
-        .select("updatedAt")
-        .sort({ updatedAt: -1 });
+        "assignedWorkers.workerId": { $in: workerIds },
+      },
+    },
+    { $unwind: "$assignedWorkers" },
+    { $match: { "assignedWorkers.workerId": { $in: workerIds } } },
+    {
+      $group: {
+        _id: "$assignedWorkers.workerId",
+        periodCompleted: {
+          $sum: { $cond: [{ $gte: ["$updatedAt", startDate] }, 1, 0] },
+        },
+        completionDates: {
+          $addToSet: {
+            $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" },
+          },
+        },
+      },
+    },
+  ]);
 
-      let currentStreak = 0;
-      if (recentCompletions.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        let checkDate = new Date(today);
-        const completionDates = new Set(
-          recentCompletions.map((c) => {
-            const d = new Date(c.updatedAt);
-            d.setHours(0, 0, 0, 0);
-            return d.getTime();
-          }),
-        );
-
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        if (
-          completionDates.has(today.getTime()) ||
-          completionDates.has(yesterday.getTime())
-        ) {
-          if (!completionDates.has(today.getTime())) {
-            checkDate = yesterday;
-          }
-          while (completionDates.has(checkDate.getTime())) {
-            currentStreak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-          }
-        }
-      }
-
-      const metrics = worker.performanceMetrics || {};
-      const totalCompleted = metrics.totalCompleted || 0;
-      const avgTime = metrics.averageCompletionTime || 0;
-      const rating = worker.rating || 0;
-      const badges = [];
-
-      if (totalCompleted >= 10 && avgTime > 0 && avgTime <= 24) {
-        badges.push({
-          id: "speed-demon",
-          name: "Speed Demon",
-          description: "Completes tasks in under 24 hours on average",
-          icon: "⚡",
-          color: "#F59E0B",
-        });
-      }
-      if (totalCompleted >= 10 && rating >= 4.5) {
-        badges.push({
-          id: "quality-master",
-          name: "Quality Master",
-          description: "Maintains 4.5+ star rating",
-          icon: "⭐",
-          color: "#EAB308",
-        });
-      }
-      if (totalCompleted >= 50) {
-        badges.push({
-          id: "community-hero",
-          name: "Community Hero",
-          description: "Resolved 50+ complaints",
-          icon: "🏆",
-          color: "#10B981",
-        });
-      }
-      if (totalCompleted >= 100) {
-        badges.push({
-          id: "century-club",
-          name: "Century Club",
-          description: "Resolved 100+ complaints",
-          icon: "💯",
-          color: "#8B5CF6",
-        });
-      }
-      if (currentStreak >= 7) {
-        badges.push({
-          id: "consistent-performer",
-          name: "Consistent Performer",
-          description: "7+ day streak",
-          icon: "🔥",
-          color: "#EF4444",
-        });
-      }
-      if (periodCompleted >= 20 && period === "monthly") {
-        badges.push({
-          id: "rising-star",
-          name: "Rising Star",
-          description: "20+ completions this month",
-          icon: "🌟",
-          color: "#06B6D4",
-        });
-      }
-
-      return {
-        id: worker._id,
-        fullName: worker.fullName,
-        username: worker.username,
-        department: worker.department,
-        totalCompleted,
-        periodCompleted,
-        averageCompletionTime: avgTime,
-        rating,
-        currentStreak,
-        badges,
-        isCurrentUser: String(worker._id) === String(currentWorkerId),
-      };
-    }),
+  // Index by workerId string for O(1) lookup
+  const aggMap = new Map(
+    aggResults.map((r) => [String(r._id), r]),
   );
+
+  const leaderboardData = workers.map((worker) => {
+    const agg = aggMap.get(String(worker._id)) || {
+      periodCompleted: 0,
+      completionDates: [],
+    };
+
+    // Streak computed from pre-fetched completionDates (no extra DB call)
+    let currentStreak = 0;
+    if (agg.completionDates.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const completionSet = new Set(agg.completionDates);
+
+      const fmt = (d) =>
+        d.toISOString().slice(0, 10);
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      let checkDate = completionSet.has(fmt(today))
+        ? new Date(today)
+        : completionSet.has(fmt(yesterday))
+        ? new Date(yesterday)
+        : null;
+
+      while (checkDate && completionSet.has(fmt(checkDate))) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+    }
+
+    const metrics = worker.performanceMetrics || {};
+    const totalCompleted = metrics.totalCompleted || 0;
+    const avgTime = metrics.averageCompletionTime || 0;
+    const rating = worker.rating || 0;
+    const badges = [];
+
+    if (totalCompleted >= 10 && avgTime > 0 && avgTime <= 24)
+      badges.push({ id: "speed-demon", name: "Speed Demon", description: "Completes tasks in under 24 hours on average", icon: "⚡", color: "#F59E0B" });
+    if (totalCompleted >= 10 && rating >= 4.5)
+      badges.push({ id: "quality-master", name: "Quality Master", description: "Maintains 4.5+ star rating", icon: "⭐", color: "#EAB308" });
+    if (totalCompleted >= 50)
+      badges.push({ id: "community-hero", name: "Community Hero", description: "Resolved 50+ complaints", icon: "🏆", color: "#10B981" });
+    if (totalCompleted >= 100)
+      badges.push({ id: "century-club", name: "Century Club", description: "Resolved 100+ complaints", icon: "💯", color: "#8B5CF6" });
+    if (currentStreak >= 7)
+      badges.push({ id: "consistent-performer", name: "Consistent Performer", description: "7+ day streak", icon: "🔥", color: "#EF4444" });
+    if (agg.periodCompleted >= 20 && period === "monthly")
+      badges.push({ id: "rising-star", name: "Rising Star", description: "20+ completions this month", icon: "🌟", color: "#06B6D4" });
+
+    return {
+      id: worker._id,
+      fullName: worker.fullName,
+      username: worker.username,
+      department: worker.department,
+      totalCompleted,
+      periodCompleted: agg.periodCompleted,
+      averageCompletionTime: avgTime,
+      rating,
+      currentStreak,
+      badges,
+      isCurrentUser: String(worker._id) === String(currentWorkerId),
+    };
+  });
 
   leaderboardData.sort((a, b) => {
     if (b.periodCompleted !== a.periodCompleted) {

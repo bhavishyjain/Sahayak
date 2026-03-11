@@ -198,7 +198,7 @@ export default function Home() {
       label: t("home.actions.newComplaint"),
       icon: FilePlus2,
       color: colors.primary,
-      onPress: () => router.push("/(tabs)/complaints"),
+      onPress: () => router.push("/(app)/(tabs)/complaints"),
     },
     {
       key: "heatmap",
@@ -528,7 +528,7 @@ export default function Home() {
             {t("home.recentComplaints")}
           </Text>
           <PressableBlock
-            onPress={() => router.push("/(tabs)/complaints")}
+            onPress={() => router.push("/(app)/(tabs)/complaints")}
             className="flex-row items-center"
           >
             <Text

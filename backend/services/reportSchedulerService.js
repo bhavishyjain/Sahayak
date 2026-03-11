@@ -43,7 +43,13 @@ async function generateReportBuffer(format, filters, userId) {
   }
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 async function sendScheduledReport(schedule) {
+  if (!schedule.email || !EMAIL_RE.test(schedule.email)) {
+    throw new Error(`Invalid recipient email: "${schedule.email}"`);
+  }
+
   const { buffer, filename, contentType } = await generateReportBuffer(
     schedule.format,
     schedule.filters || {},

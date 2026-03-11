@@ -46,20 +46,14 @@ export async function syncRemoteTranslations(): Promise<boolean> {
       return false; // no update needed
     }
 
-    // Download all language JSON
-    const [en, th, my] = await Promise.all([
-      fetchJson<TranslationJson>(`${BASE_URL}/english.json`),
-      fetchJson<TranslationJson>(`${BASE_URL}/thai.json`),
-      fetchJson<TranslationJson>(`${BASE_URL}/burmese.json`),
-    ]);
+    // Download english translations only
+    const en = await fetchJson<TranslationJson>(`${BASE_URL}/english.json`);
 
     // Validate
     if (!isValidTranslationObject(en)) throw new Error("Invalid english.json");
-    if (!isValidTranslationObject(th)) throw new Error("Invalid thai.json");
-    if (!isValidTranslationObject(my)) throw new Error("Invalid burmese.json");
 
     // Save cache
-    const payload = { en, th, my };
+    const payload = { en };
     await AsyncStorage.setItem(REMOTE_I18N_CACHE_KEY, JSON.stringify(payload));
     await AsyncStorage.setItem(
       REMOTE_I18N_VERSION_KEY,

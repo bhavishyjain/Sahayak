@@ -36,7 +36,7 @@ import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import {
-  HOD_WORKERS_URL,
+  HOD_WORKER_DETAIL_URL,
   HOD_WORKER_COMPLAINTS_URL,
   HOD_REMOVE_WORKER_URL,
 } from "../../../url";
@@ -64,12 +64,12 @@ export default function WorkerDetails() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      // Fetch worker details and their complaints
+      // Fetch worker details and their complaints in parallel
       const [workerRes, activeComplaintsRes, completedComplaintsRes] =
         await Promise.all([
           apiCall({
             method: "GET",
-            url: HOD_WORKERS_URL,
+            url: HOD_WORKER_DETAIL_URL(id),
           }),
           apiCall({
             method: "GET",
@@ -83,13 +83,9 @@ export default function WorkerDetails() {
           }),
         ]);
 
-      // Find specific worker
-      const workersPayload = workerRes?.data;
       const activePayload = activeComplaintsRes?.data;
       const completedPayload = completedComplaintsRes?.data;
-      const workers = workersPayload?.workers || [];
-      const workerData = workers.find((w) => w.id === id || w._id === id);
-      setWorker(workerData || null);
+      setWorker(workerRes?.data?.worker || null);
 
       // Set complaints from dedicated endpoints
       setActiveComplaints(activePayload?.complaints || []);

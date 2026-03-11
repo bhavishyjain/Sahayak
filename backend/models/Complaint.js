@@ -99,6 +99,10 @@ const complaintSchema = new mongoose.Schema(
     history: [complaintHistorySchema],
     chatHistory: [{ role: String, content: String }], // stores conversation
     messages: [complaintMessageSchema], // citizen/worker/hod thread
+
+    // Soft-delete (admin only)
+    deleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -110,7 +114,8 @@ complaintSchema.pre("save", function (next) {
   }
 
   // Calculate SLA due date based on priority
-  if (this.isNew && !this.sla.dueDate) {
+  if (this.isNew && (!this.sla || !this.sla.dueDate)) {
+    if (!this.sla) this.sla = {};
     const now = new Date();
     let hoursToAdd = 72; // Default: 3 days for Medium
 
@@ -125,7 +130,7 @@ complaintSchema.pre("save", function (next) {
 
   // Check if overdue
   if (
-    this.sla.dueDate &&
+    this.sla && this.sla.dueDate &&
     this.status !== "resolved" &&
     this.status !== "cancelled" &&
     this.status !== "needs-rework"
@@ -133,6 +138,23 @@ complaintSchema.pre("save", function (next) {
     this.sla.isOverdue = new Date() > this.sla.dueDate;
   }
 
+  next();
+});
+
+// Automatically exclude soft-deleted complaints from all find queries unless
+// the caller explicitly opts in with .setOptions({ withDeleted: true })
+complaintSchema.pre(/^find/, function (next) {
+  if (!this.getOptions().withDeleted) {
+    this.where({ deleted: { $ne: true } });
+  }
+  next();
+});
+
+// Same for aggregate pipelines
+complaintSchema.pre("aggregate", function (next) {
+  if (!this.options?.withDeleted) {
+    this.pipeline().unshift({ $match: { deleted: { $ne: true } } });
+  }
   next();
 });
 

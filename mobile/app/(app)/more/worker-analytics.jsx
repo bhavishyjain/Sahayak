@@ -265,7 +265,7 @@ export default function WorkerAnalytics() {
 
   if (loading) {
     return (
-      <View className="flex-1" style={{ backgroundColor: colors.background }}>
+      <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
         <BackButtonHeader title={title} />
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={colors.primary} />
@@ -275,7 +275,7 @@ export default function WorkerAnalytics() {
   }
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background }}>
+    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
       <BackButtonHeader title={title} />
 
       <ScrollView

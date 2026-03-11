@@ -3,10 +3,16 @@ const User = require("../models/User");
 function calculateCompletionHours(complaint) {
   const now = Date.now();
   const startedAt = complaint.assignedAt || complaint.createdAt;
-  let completionHours = (now - new Date(startedAt).getTime()) / (1000 * 60 * 60);
+  let completionHours =
+    (now - new Date(startedAt).getTime()) / (1000 * 60 * 60);
 
-  if (!Number.isFinite(completionHours) || completionHours < 0 || completionHours > 8760) {
-    completionHours = (now - new Date(complaint.createdAt).getTime()) / (1000 * 60 * 60);
+  if (
+    !Number.isFinite(completionHours) ||
+    completionHours < 0 ||
+    completionHours > 8760
+  ) {
+    completionHours =
+      (now - new Date(complaint.createdAt).getTime()) / (1000 * 60 * 60);
   }
 
   if (!Number.isFinite(completionHours) || completionHours < 0) {
@@ -16,10 +22,12 @@ function calculateCompletionHours(complaint) {
   return completionHours;
 }
 
-async function updateWorkerCompletionStats(workerId, complaintId, completionHours) {
+async function updateWorkerCompletionStats(
+  workerId,
+  complaintId,
+  completionHours,
+) {
   await User.findByIdAndUpdate(workerId, {
-    $pull: { assignedComplaints: complaintId },
-    $push: { completedComplaints: complaintId },
     $inc: {
       "performanceMetrics.totalCompleted": 1,
       "performanceMetrics.currentWeekCompleted": 1,

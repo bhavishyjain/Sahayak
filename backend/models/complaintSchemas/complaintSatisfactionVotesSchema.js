@@ -14,10 +14,16 @@ const complaintSatisfactionVotesSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
-    thumbsUpCount: { type: Number, default: 0 },
-    thumbsDownCount: { type: Number, default: 0 },
   },
-  { _id: false },
+  { _id: false, toJSON: { virtuals: true }, toObject: { virtuals: true } },
 );
+
+complaintSatisfactionVotesSchema.virtual("thumbsUpCount").get(function () {
+  return this.thumbsUp ? this.thumbsUp.length : 0;
+});
+
+complaintSatisfactionVotesSchema.virtual("thumbsDownCount").get(function () {
+  return this.thumbsDown ? this.thumbsDown.length : 0;
+});
 
 module.exports = complaintSatisfactionVotesSchema;

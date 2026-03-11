@@ -30,20 +30,28 @@ const userSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true },
   isActive: { type: Boolean, default: true },
   lastActive: { type: Date, default: Date.now },
+  // Tokens issued before this time are rejected (used for forced logout / password reset)
+  tokenValidFrom: { type: Date, default: Date.now },
+
+  // Email verification
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationTokenHash: { type: String, default: null },
+  emailVerificationExpires: { type: Date, default: null },
+
+  // Password reset
+  passwordResetTokenHash: { type: String, default: null },
+  passwordResetExpires: { type: Date, default: null },
+
+  // Hashed refresh tokens — one entry per active device/session (capped at 10)
+  refreshTokens: [
+    {
+      tokenHash: { type: String, required: true },
+      expiresAt: { type: Date, required: true },
+      _id: false,
+    },
+  ],
 
   // Worker-specific fields
-  assignedComplaints: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Complaint",
-    },
-  ],
-  completedComplaints: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Complaint",
-    },
-  ],
   workLocation: {
     lat: { type: Number },
     lng: { type: Number },

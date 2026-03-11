@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import {
   BarChart2,
   Bell,
+  Brain,
   Globe,
   LogOut,
   Moon,
@@ -174,6 +175,12 @@ export default function More() {
             title: "Manage Invitations",
             subtitle: "Invite workers and track invitation status",
             route: "/(app)/more/hod-manage-invitations",
+          },
+          {
+            icon: Brain,
+            title: "AI Review Queue",
+            subtitle: "Review and apply AI-suggested classifications",
+            route: "/(app)/hod/ai-review",
           },
         ]
       : []),

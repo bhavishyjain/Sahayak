@@ -1,6 +1,5 @@
 import { useRouter } from "expo-router";
 import {
-  Search,
   Plus,
   Clock,
   MapPin,
@@ -26,6 +25,7 @@ import { darkColors, lightColors } from "../../../colors";
 import AutoSkeleton from "../../../components/AutoSkeleton";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import SearchBar from "../../../components/SearchBar";
 import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import CustomPicker from "../../../components/CustomPicker";
 import DialogBox from "../../../components/DialogBox";
@@ -485,23 +485,14 @@ export default function Complaints() {
           </Text>
         </PressableBlock>
         <Card style={{ margin: 0, flex: 0 }}>
-          <View
-            className="flex-row items-center rounded-xl border px-3 py-2.5"
-            style={{ borderColor: colors.border }}
-          >
-            <Search size={16} color={colors.textSecondary} />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder={t("complaints.searchPlaceholder")}
-              placeholderTextColor={colors.placeholder}
-              className="ml-2 flex-1"
-              style={{ color: colors.textPrimary }}
-            />
-          </View>
+          <SearchBar
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t("complaints.searchPlaceholder")}
+          />
 
-          <View className="flex-row mt-3">
-            {["all", "pending", "in-progress", "resolved"].map((chip) => (
+          <View className="flex-row flex-wrap mt-3 gap-y-2">
+            {["all", "pending", "assigned", "in-progress", "pending-approval", "needs-rework", "resolved", "cancelled"].map((chip) => (
               <PressableBlock
                 key={chip}
                 onPress={() => setStatus(chip)}

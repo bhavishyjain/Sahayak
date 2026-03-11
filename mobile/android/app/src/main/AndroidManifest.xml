@@ -51,10 +51,8 @@
       </intent-filter>
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
-        <data android:scheme="dkpg"/>
-        <data android:scheme="expresto-app"/>
-        <data android:scheme="https" android:host="sahayak.local"/>
-        <data android:scheme="exp+sahayak-mobile"/>
+        <data android:scheme="sahayak"/>
+        <data android:scheme="https" android:host="sahayak.app"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
       </intent-filter>

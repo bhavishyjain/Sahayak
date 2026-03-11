@@ -52,6 +52,7 @@ export function formatDateShort(dateString, locale = "en-US") {
 }
 
 const STATUS_TRANSLATION_KEYS = {
+  unassigned: "hod.complaints.unassigned",
   pending: "status.pending",
   assigned: "status.assigned",
   "in-progress": "status.inProgress",
@@ -60,6 +61,8 @@ const STATUS_TRANSLATION_KEYS = {
   resolved: "status.resolved",
   cancelled: "status.cancelled",
 };
+
+export const ALL_STATUS_OPTIONS = Object.keys(STATUS_TRANSLATION_KEYS);
 
 export function formatStatusLabel(t, status) {
   const key = STATUS_TRANSLATION_KEYS[normalizeStatus(status)];

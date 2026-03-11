@@ -1,57 +1,43 @@
 const express = require("express");
-const controller = require("../controllers/complaintController");
 const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 const authorize = require("../middlewares/authorize");
 const upload = require("../middlewares/multer");
+const { createComplaint, myComplaints, getNearbyComplaints, getComplaintById, upvoteComplaint, submitFeedback, getComplaintsNeedingReview, applyAISuggestion } = require("../controllers/complaints/createReadController");
+const { uploadCompletionPhotos } = require("../controllers/complaints/mediaController");
+const { voteSatisfaction, getSatisfactionVotes } = require("../controllers/complaints/satisfactionController");
+const { getMessages, postMessage } = require("../controllers/complaints/messageController");
+const { listDeletedComplaints, softDeleteComplaint, restoreComplaint, hardDeleteComplaint } = require("../controllers/admin/complaintController");
 
 const router = express.Router();
 
 router.use(attachAuth, requireAuth);
 
-router.post("/", upload.array("images", 5), controller.createComplaint);
-router.get("/", controller.myComplaints);
-router.get("/nearby", controller.getNearbyComplaints);
-router.get("/:complaintId([0-9a-fA-F]{24})", controller.getComplaintById);
-router.post(
-  "/:complaintId([0-9a-fA-F]{24})/upvote",
-  controller.upvoteComplaint,
-);
-router.post(
-  "/:complaintId([0-9a-fA-F]{24})/feedback",
-  controller.submitFeedback,
-);
+router.post("/", upload.array("images", 5), createComplaint);
+router.get("/", myComplaints);
+router.get("/nearby", getNearbyComplaints);
+router.get("/:complaintId([0-9a-fA-F]{24})", getComplaintById);
+router.post("/:complaintId([0-9a-fA-F]{24})/upvote", upvoteComplaint);
+router.post("/:complaintId([0-9a-fA-F]{24})/feedback", submitFeedback);
 
 // AI Review Routes (HOD/Admin only)
-router.get(
-  "/ai-review/pending",
-  authorize("head", "admin"),
-  controller.getComplaintsNeedingReview,
-);
-router.post(
-  "/:complaintId([0-9a-fA-F]{24})/apply-ai-suggestion",
-  authorize("head", "admin"),
-  controller.applyAISuggestion,
-);
+router.get("/ai-review/pending", authorize("head", "admin"), getComplaintsNeedingReview);
+router.post("/:complaintId([0-9a-fA-F]{24})/apply-ai-suggestion", authorize("head", "admin"), applyAISuggestion);
 
 // Completion Photos (Worker only)
-router.post(
-  "/:id([0-9a-fA-F]{24})/completion-photos",
-  upload.array("completionPhotos", 10),
-  controller.uploadCompletionPhotos,
-);
+router.post("/:id([0-9a-fA-F]{24})/completion-photos", upload.array("completionPhotos", 10), uploadCompletionPhotos);
 
 // Satisfaction Voting (All authenticated users)
-router.post(
-  "/:id([0-9a-fA-F]{24})/satisfaction-vote",
-  controller.voteSatisfaction,
-);
-router.get(
-  "/:id([0-9a-fA-F]{24})/satisfaction",
-  controller.getSatisfactionVotes,
-);
+router.post("/:id([0-9a-fA-F]{24})/satisfaction-vote", voteSatisfaction);
+router.get("/:id([0-9a-fA-F]{24})/satisfaction", getSatisfactionVotes);
 
 // Comment Thread (citizen / worker / HOD / admin)
-router.get("/:id([0-9a-fA-F]{24})/messages", controller.getMessages);
-router.post("/:id([0-9a-fA-F]{24})/messages", controller.postMessage);
+router.get("/:id([0-9a-fA-F]{24})/messages", getMessages);
+router.post("/:id([0-9a-fA-F]{24})/messages", postMessage);
+
+// Admin soft-delete management
+router.get("/deleted", authorize("admin"), listDeletedComplaints);
+router.delete("/:complaintId([0-9a-fA-F]{24})", authorize("admin"), softDeleteComplaint);
+router.post("/:complaintId([0-9a-fA-F]{24})/restore", authorize("admin"), restoreComplaint);
+router.delete("/:complaintId([0-9a-fA-F]{24})/purge", authorize("admin"), hardDeleteComplaint);
 
 module.exports = router;

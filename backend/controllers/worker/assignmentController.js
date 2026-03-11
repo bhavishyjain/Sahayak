@@ -8,11 +8,8 @@ const {
 } = require("../../services/accessService");
 const { createUserAccount } = require("../../services/userProvisionService");
 const { getWorkerMetricsBulk } = require("../../services/workerMetricsService");
-const { requireRole } = require("./helpers");
 
 exports.createWorker = asyncHandler(async (req, res) => {
-  requireRole(req, ["admin"], "Only admins can create workers");
-
   const {
     username,
     password,
@@ -52,7 +49,6 @@ exports.createWorker = asyncHandler(async (req, res) => {
 });
 
 exports.updateWorker = asyncHandler(async (req, res) => {
-  requireRole(req, ["admin"], "Only admins can update workers");
   const { workerId } = req.params;
   const { fullName, email, phone, department, specializations } = req.body;
   const worker = await getWorkerOrThrow(workerId);
@@ -85,9 +81,7 @@ exports.getAllWorkers = asyncHandler(async (req, res) => {
   }
 
   const workers = await User.find(filter)
-    .select("-password")
-    .populate("assignedComplaints", "ticketId status priority createdAt")
-    .populate("completedComplaints", "ticketId status completedAt");
+    .select("-password");
 
   const metricsByWorkerId = await getWorkerMetricsBulk(
     workers.map((worker) => worker._id),

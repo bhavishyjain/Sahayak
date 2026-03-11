@@ -38,8 +38,10 @@ exports.createComplaint = asyncHandler(async (req, res) => {
       proofImages && proofImages.length > 0 ? proofImages[0] : null;
     const aiResult = await analyzeComplaintWithImage(description, imageUrl);
 
+    const VALID_DEPARTMENTS = ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"];
     if (aiResult && !aiResult.error) {
-      aiSuggestedDepartment = aiResult.department || department;
+      const rawDept = aiResult.department;
+      aiSuggestedDepartment = VALID_DEPARTMENTS.includes(rawDept) ? rawDept : (department || "Other");
       aiSuggestedPriority = aiResult.suggestedPriority || priority;
       aiConfidence = (aiResult.confidence || 50) / 100;
     }
@@ -53,6 +55,8 @@ exports.createComplaint = asyncHandler(async (req, res) => {
         affectedCount: sentimentResult.affectedCount || 1,
         suggestedPriority: sentimentResult.suggestedPriority || priority,
         reasoning: aiResult?.reasoning || null,
+        department: aiSuggestedDepartment || null,
+        confidence: aiConfidence,
       };
 
       if (sentimentResult.suggestedPriority === "High" && priority !== "High") {
@@ -80,13 +84,13 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     finalPriority = aiSuggestedPriority || "Medium";
   }
 
-  const complaint = await Complaint.create({
+  let complaint;
+  try {
+  complaint = await Complaint.create({
     userId: req.user._id,
     rawText: `${title}: ${description}`,
     refinedText: description,
     department: finalDepartment,
-    aiSuggestedDepartment,
-    aiConfidence,
     aiAnalysis,
     locationName,
     coordinates,
@@ -103,6 +107,10 @@ exports.createComplaint = asyncHandler(async (req, res) => {
       },
     ],
   });
+  } catch (err) {
+    if (err.code === 11000) throw new AppError("Ticket ID conflict, please try again", 500);
+    throw err;
+  }
 
   await notifyUser(req.user._id, {
     title: "Complaint Received",

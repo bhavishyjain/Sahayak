@@ -6,6 +6,7 @@ const complaintSlaSchema = new mongoose.Schema(
     isOverdue: { type: Boolean, default: false },
     escalated: { type: Boolean, default: false },
     escalationLevel: { type: Number, default: 0 },
+    lastEscalatedAt: { type: Date, default: null },
     escalationHistory: [
       {
         level: Number,

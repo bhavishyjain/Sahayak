@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Complaint = require("../models/Complaint");
 const User = require("../models/User");
 const AppError = require("../core/AppError");
+const { notifyUser } = require("../controllers/notificationController");
 
 function normalizeEstimatedTime(estimatedCompletionTime) {
   if (estimatedCompletionTime === undefined || estimatedCompletionTime === null) {
@@ -155,20 +156,6 @@ async function assignComplaintToWorkers(options) {
 
       await complaintDoc.save({ session });
 
-      if (removedWorkerIds.length > 0) {
-        await User.updateMany(
-          { _id: { $in: removedWorkerIds } },
-          { $pull: { assignedComplaints: complaintDoc._id } },
-          { session },
-        );
-      }
-
-      await User.updateMany(
-        { _id: { $in: orderedWorkerIds } },
-        { $addToSet: { assignedComplaints: complaintDoc._id } },
-        { session },
-      );
-
       updatedComplaint = complaintDoc;
     });
   } catch (error) {
@@ -229,16 +216,6 @@ async function assignComplaintToWorkers(options) {
       });
       await complaintDoc.save();
 
-      if (removedWorkerIds.length > 0) {
-        await User.updateMany(
-          { _id: { $in: removedWorkerIds } },
-          { $pull: { assignedComplaints: complaintDoc._id } },
-        );
-      }
-      await User.updateMany(
-        { _id: { $in: orderedWorkerIds } },
-        { $addToSet: { assignedComplaints: complaintDoc._id } },
-      );
       updatedComplaint = complaintDoc;
     } catch (fallbackError) {
       await Complaint.replaceOne({ _id: complaintDoc._id }, previousState);
@@ -246,6 +223,28 @@ async function assignComplaintToWorkers(options) {
     }
   } finally {
     await session.endSession();
+  }
+
+  // Fire-and-forget notifications after transaction commits
+  if (updatedComplaint) {
+    const ticketId = updatedComplaint.ticketId;
+    const complaintId = String(updatedComplaint._id);
+
+    orderedWorkerIds.forEach((workerId) => {
+      notifyUser(workerId, {
+        title: "New Task Assigned",
+        body: `You have been assigned complaint #${ticketId}`,
+        data: { type: "assignment", complaintId, ticketId },
+      });
+    });
+
+    if (updatedComplaint.userId) {
+      notifyUser(updatedComplaint.userId, {
+        title: "Complaint Assigned",
+        body: `Your complaint #${ticketId} has been assigned to a worker`,
+        data: { type: "complaint-update", complaintId, ticketId },
+      });
+    }
   }
 
   return updatedComplaint;

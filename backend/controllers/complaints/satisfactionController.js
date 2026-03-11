@@ -29,8 +29,6 @@ exports.voteSatisfaction = asyncHandler(async (req, res) => {
     complaint.satisfactionVotes = {
       thumbsUp: [],
       thumbsDown: [],
-      thumbsUpCount: 0,
-      thumbsDownCount: 0,
     };
   }
 
@@ -73,11 +71,6 @@ exports.voteSatisfaction = asyncHandler(async (req, res) => {
       complaint.satisfactionVotes.thumbsDown.push(userId);
     }
   }
-
-  complaint.satisfactionVotes.thumbsUpCount =
-    complaint.satisfactionVotes.thumbsUp.length;
-  complaint.satisfactionVotes.thumbsDownCount =
-    complaint.satisfactionVotes.thumbsDown.length;
 
   await complaint.save();
 

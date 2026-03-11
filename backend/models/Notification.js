@@ -16,6 +16,7 @@ const notificationSchema = new mongoose.Schema(
         "complaint-update",
         "assignment",
         "escalation",
+        "complaint_escalated",
         "system",
         "test",
         "other",

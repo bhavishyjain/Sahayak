@@ -1,20 +1,20 @@
 [
   {
     "name": "Holi",
-    "startDate": "2025-03-25",
-    "endDate": "2025-03-25",
+    "startDate": "2026-03-13",
+    "endDate": "2026-03-14",
     "highPriorityLocations": ["Rajwada", "Indore Main Market"]
   },
   {
-    "name": "Diwali",
-    "startDate": "2025-11-01",
-    "endDate": "2025-11-02",
-    "highPriorityLocations": ["Rajwada", "Indore Temple Area"]
+    "name": "Independence Day",
+    "startDate": "2026-08-15",
+    "endDate": "2026-08-15",
+    "highPriorityLocations": ["India Gate Area", "Central Park"]
   },
   {
-    "name": "Independence Day",
-    "startDate": "2025-08-15",
-    "endDate": "2025-08-15",
-    "highPriorityLocations": ["India Gate Area", "Central Park"]
+    "name": "Diwali",
+    "startDate": "2026-10-19",
+    "endDate": "2026-10-21",
+    "highPriorityLocations": ["Rajwada", "Indore Temple Area"]
   }
 ]

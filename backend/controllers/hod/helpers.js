@@ -1,8 +1,5 @@
 const Complaint = require("../../models/Complaint");
-
-function escapeRegex(value = "") {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+const { escapeRegex } = require("../../utils/normalize");
 
 async function calculateETA(complaint, worker) {
   try {

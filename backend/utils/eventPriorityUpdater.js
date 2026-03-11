@@ -1,6 +1,15 @@
 const cron = require("node-cron");
-const events = require("./festivalEvents.json");
 const Complaint = require("../models/Complaint");
+const FestivalEvent = require("../models/FestivalEvent");
+const { escapeRegex } = require("./normalize");
+
+// JSON file used as seed / fallback only — primary source is FestivalEvent collection
+let jsonFallback = [];
+try {
+  jsonFallback = require("./festivalEvents.json");
+} catch (err) {
+  console.warn("[event-priority] Could not load festivalEvents.json:", err.message);
+}
 
 const EVENT_TIMEZONE = process.env.EVENT_TIMEZONE || "Asia/Kolkata";
 
@@ -34,9 +43,6 @@ function isDateWithinRange(dateText, startDate, endDate) {
   return dateText >= start && dateText <= end;
 }
 
-function escapeRegex(value = "") {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 async function runEventPriorityUpdate() {
   const today = formatDateInTimeZone(new Date(), EVENT_TIMEZONE);
@@ -44,7 +50,14 @@ async function runEventPriorityUpdate() {
     `[event-priority] Running update for ${today} (${EVENT_TIMEZONE})`,
   );
 
-  for (const rawEvent of events) {
+  // Load events from DB; fall back to JSON if DB is empty (e.g. fresh deploy)
+  let dbEvents = await FestivalEvent.find({ isActive: true }).lean();
+  if (dbEvents.length === 0 && jsonFallback.length > 0) {
+    console.log("[event-priority] DB has no events, using festivalEvents.json fallback");
+    dbEvents = jsonFallback;
+  }
+
+  for (const rawEvent of dbEvents) {
     const event = normalizeEvent(rawEvent);
     if (!isDateWithinRange(today, event.startDate, event.endDate)) {
       continue;
@@ -68,12 +81,15 @@ async function runEventPriorityUpdate() {
   }
 }
 
-cron.schedule("0 2 */2 * *", async () => {
-  try {
-    await runEventPriorityUpdate();
-  } catch (error) {
-    console.error("[event-priority] Update failed:", error.message);
-  }
-});
+function start() {
+  cron.schedule("0 2 */2 * *", async () => {
+    try {
+      await runEventPriorityUpdate();
+    } catch (error) {
+      console.error("[event-priority] Update failed:", error.message);
+    }
+  });
+  console.log("[event-priority] Cron job started (every 2 days at 02:00)");
+}
 
-module.exports = { runEventPriorityUpdate };
+module.exports = { runEventPriorityUpdate, start };

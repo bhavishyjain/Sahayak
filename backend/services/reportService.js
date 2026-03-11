@@ -1,6 +1,7 @@
 const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 const Complaint = require("../models/Complaint");
+const { normalizeStatus, getResolvedAt } = require("../utils/normalize");
 
 const REPORT_MAX_ROWS = Math.max(
   100,
@@ -18,29 +19,6 @@ const CSV_MAX_ROWS = Math.min(
   REPORT_MAX_ROWS,
   Number(process.env.CSV_REPORT_MAX_ROWS || 5000),
 );
-
-function normalizeStatus(status) {
-  const normalized = String(status || "")
-    .trim()
-    .toLowerCase();
-  if (normalized === "in progress") return "in-progress";
-  if (normalized === "canceled") return "cancelled";
-  return normalized;
-}
-
-function getResolvedAt(complaint) {
-  if (complaint?.resolvedAt) {
-    return new Date(complaint.resolvedAt);
-  }
-  const resolvedEvent = (complaint?.history || [])
-    .filter((event) => normalizeStatus(event?.status) === "resolved")
-    .sort(
-      (a, b) =>
-        new Date(b?.timestamp || 0).getTime() -
-        new Date(a?.timestamp || 0).getTime(),
-    )[0];
-  return resolvedEvent?.timestamp ? new Date(resolvedEvent.timestamp) : null;
-}
 
 function toCsvCell(value) {
   const normalized = value === null || value === undefined ? "" : String(value);
@@ -268,176 +246,146 @@ class ReportService {
 
   // Generate PDF Report
   async generatePDFReport(filters = {}, userId) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const doc = new PDFDocument({
-          margin: 50,
-          size: "A4",
-        });
-        const buffers = [];
+    // Fetch data before touching the PDF stream so async errors propagate naturally
+    const complaints = await fetchComplaintsForReport(filters, PDF_MAX_ROWS);
 
-        doc.on("data", buffers.push.bind(buffers));
-        doc.on("end", () => {
-          const pdfBuffer = Buffer.concat(buffers);
-          resolve(pdfBuffer);
-        });
-
-        // Fetch data
-        const complaints = await fetchComplaintsForReport(
-          filters,
-          PDF_MAX_ROWS,
-        );
-
-        // Header
-        doc
-          .fontSize(24)
-          .font("Helvetica-Bold")
-          .text("Complaint Management Report", { align: "center" });
-        doc.moveDown(0.5);
-        doc
-          .fontSize(10)
-          .font("Helvetica")
-          .text(`Generated on: ${new Date().toLocaleString()}`, {
-            align: "center",
-          });
-        doc.moveDown(1);
-
-        // Summary Section
-        doc.fontSize(16).font("Helvetica-Bold").text("Executive Summary");
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
-
-        const total = complaints.length;
-        const resolved = complaints.filter(
-          (c) => normalizeStatus(c.status) === "resolved",
-        ).length;
-        const pending = complaints.filter(
-          (c) => normalizeStatus(c.status) === "pending",
-        ).length;
-        const inProgress = complaints.filter(
-          (c) => normalizeStatus(c.status) === "in-progress",
-        ).length;
-        const avgResponseTime = this.calculateAverageResponseTime(complaints);
-
-        doc.fontSize(11).font("Helvetica");
-        doc.text(`Total Complaints: ${total}`, { continued: false });
-        doc.text(
-          `Resolved: ${resolved} (${total > 0 ? ((resolved / total) * 100).toFixed(1) : 0}%)`,
-        );
-        doc.text(`In Progress: ${inProgress}`);
-        doc.text(`Pending: ${pending}`);
-        doc.text(`Average Response Time: ${avgResponseTime} hours`);
-        doc.moveDown(1);
-
-        // Department Breakdown
-        doc
-          .fontSize(14)
-          .font("Helvetica-Bold")
-          .text("Department-wise Breakdown");
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
-
-        const deptStats = this.getDepartmentStats(complaints);
-        doc.fontSize(10).font("Helvetica");
-        Object.entries(deptStats).forEach(([dept, stats]) => {
-          doc.text(
-            `${dept}: ${stats.total} complaints (${stats.resolved} resolved, ${stats.pending} pending)`,
-          );
-        });
-        doc.moveDown(1);
-
-        // Priority Distribution
-        doc.fontSize(14).font("Helvetica-Bold").text("Priority Distribution");
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
-
-        const highPriority = complaints.filter(
-          (c) => c.priority === "High",
-        ).length;
-        const mediumPriority = complaints.filter(
-          (c) => c.priority === "Medium",
-        ).length;
-        const lowPriority = complaints.filter(
-          (c) => c.priority === "Low",
-        ).length;
-
-        doc.fontSize(10).font("Helvetica");
-        doc.text(
-          `High Priority: ${highPriority} (${total > 0 ? ((highPriority / total) * 100).toFixed(1) : 0}%)`,
-        );
-        doc.text(
-          `Medium Priority: ${mediumPriority} (${total > 0 ? ((mediumPriority / total) * 100).toFixed(1) : 0}%)`,
-        );
-        doc.text(
-          `Low Priority: ${lowPriority} (${total > 0 ? ((lowPriority / total) * 100).toFixed(1) : 0}%)`,
-        );
-        doc.moveDown(1);
-
-        // Recent Complaints (Limited to first 30)
-        if (complaints.length > 0) {
-          doc.addPage();
-          doc.fontSize(14).font("Helvetica-Bold").text("Recent Complaints");
-          doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-          doc.moveDown(0.5);
-
-          const displayComplaints = complaints.slice(0, 30);
-          doc.fontSize(9).font("Helvetica");
-
-          displayComplaints.forEach((complaint, index) => {
-            // Check if we need a new page
-            if (doc.y > 700) {
-              doc.addPage();
-              doc.fontSize(9);
-            }
-
-            doc
-              .font("Helvetica-Bold")
-              .text(`${index + 1}. ${complaint.ticketId}`, { continued: true });
-            doc
-              .font("Helvetica")
-              .text(
-                ` - ${complaint.refinedText || complaint.rawText || "No description"}`,
-              );
-            doc.text(
-              `   Status: ${complaint.status} | Priority: ${complaint.priority} | Department: ${complaint.department}`,
-            );
-            doc.text(
-              `   Location: ${complaint.locationName || "Not specified"}`,
-            );
-            if (complaint.assignedWorkers?.[0]?.workerId) {
-              const worker = complaint.assignedWorkers[0].workerId;
-              doc.text(`   Assigned to: ${worker.fullName || worker.username}`);
-            }
-            doc.moveDown(0.3);
-          });
-
-          if (complaints.length > 30) {
-            doc.moveDown(0.5);
-            doc
-              .fontSize(9)
-              .font("Helvetica-Oblique")
-              .text(`... and ${complaints.length - 30} more complaints`);
-          }
-        }
-
-        // Footer on each page
-        const pages = doc.bufferedPageRange();
-        for (let i = 0; i < pages.count; i++) {
-          doc.switchToPage(pages.start + i);
-          doc
-            .fontSize(8)
-            .font("Helvetica")
-            .text(`Page ${i + 1} of ${pages.count}`, 50, doc.page.height - 50, {
-              align: "center",
-            });
-        }
-
-        doc.end();
-      } catch (error) {
-        console.error("PDF generation error:", error);
-        reject(new Error("Failed to generate PDF report"));
-      }
+    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+    const buffers = [];
+    // Wrap stream events in a clean Promise (no async executor)
+    const bufferReady = new Promise((resolve, reject) => {
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
     });
+
+    // Header
+    doc
+      .fontSize(24)
+      .font("Helvetica-Bold")
+      .text("Complaint Management Report", { align: "center" });
+    doc.moveDown(0.5);
+    doc
+      .fontSize(10)
+      .font("Helvetica")
+      .text(`Generated on: ${new Date().toLocaleString()}`, {
+        align: "center",
+      });
+    doc.moveDown(1);
+
+    // Summary Section
+    doc.fontSize(16).font("Helvetica-Bold").text("Executive Summary");
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    const total = complaints.length;
+    const resolved = complaints.filter(
+      (c) => normalizeStatus(c.status) === "resolved",
+    ).length;
+    const pending = complaints.filter(
+      (c) => normalizeStatus(c.status) === "pending",
+    ).length;
+    const inProgress = complaints.filter(
+      (c) => normalizeStatus(c.status) === "in-progress",
+    ).length;
+    const avgResponseTime = this.calculateAverageResponseTime(complaints);
+
+    doc.fontSize(11).font("Helvetica");
+    doc.text(`Total Complaints: ${total}`, { continued: false });
+    doc.text(
+      `Resolved: ${resolved} (${total > 0 ? ((resolved / total) * 100).toFixed(1) : 0}%)`,
+    );
+    doc.text(`In Progress: ${inProgress}`);
+    doc.text(`Pending: ${pending}`);
+    doc.text(`Average Response Time: ${avgResponseTime} hours`);
+    doc.moveDown(1);
+
+    // Department Breakdown
+    doc.fontSize(14).font("Helvetica-Bold").text("Department-wise Breakdown");
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    const deptStats = this.getDepartmentStats(complaints);
+    doc.fontSize(10).font("Helvetica");
+    Object.entries(deptStats).forEach(([dept, stats]) => {
+      doc.text(
+        `${dept}: ${stats.total} complaints (${stats.resolved} resolved, ${stats.pending} pending)`,
+      );
+    });
+    doc.moveDown(1);
+
+    // Priority Distribution
+    doc.fontSize(14).font("Helvetica-Bold").text("Priority Distribution");
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    const highPriority = complaints.filter((c) => c.priority === "High").length;
+    const mediumPriority = complaints.filter(
+      (c) => c.priority === "Medium",
+    ).length;
+    const lowPriority = complaints.filter((c) => c.priority === "Low").length;
+
+    doc.fontSize(10).font("Helvetica");
+    doc.text(
+      `High Priority: ${highPriority} (${total > 0 ? ((highPriority / total) * 100).toFixed(1) : 0}%)`,
+    );
+    doc.text(
+      `Medium Priority: ${mediumPriority} (${total > 0 ? ((mediumPriority / total) * 100).toFixed(1) : 0}%)`,
+    );
+    doc.text(
+      `Low Priority: ${lowPriority} (${total > 0 ? ((lowPriority / total) * 100).toFixed(1) : 0}%)`,
+    );
+    doc.moveDown(1);
+
+    // Recent Complaints (Limited to first 30)
+    if (complaints.length > 0) {
+      doc.addPage();
+      doc.fontSize(14).font("Helvetica-Bold").text("Recent Complaints");
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(0.5);
+
+      doc.fontSize(9).font("Helvetica");
+
+      complaints.forEach((complaint, index) => {
+        // Check if we need a new page
+        if (doc.y > 700) {
+          doc.addPage();
+          doc.fontSize(9);
+        }
+
+        doc
+          .font("Helvetica-Bold")
+          .text(`${index + 1}. ${complaint.ticketId}`, { continued: true });
+        doc
+          .font("Helvetica")
+          .text(
+            ` - ${complaint.refinedText || complaint.rawText || "No description"}`,
+          );
+        doc.text(
+          `   Status: ${complaint.status} | Priority: ${complaint.priority} | Department: ${complaint.department}`,
+        );
+        doc.text(`   Location: ${complaint.locationName || "Not specified"}`);
+        if (complaint.assignedWorkers?.[0]?.workerId) {
+          const worker = complaint.assignedWorkers[0].workerId;
+          doc.text(`   Assigned to: ${worker.fullName || worker.username}`);
+        }
+        doc.moveDown(0.3);
+      });
+    }
+
+    // Footer on each page
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(pages.start + i);
+      doc
+        .fontSize(8)
+        .font("Helvetica")
+        .text(`Page ${i + 1} of ${pages.count}`, 50, doc.page.height - 50, {
+          align: "center",
+        });
+    }
+
+    doc.end();
+    return bufferReady;
   }
 
   // Generate CSV Report

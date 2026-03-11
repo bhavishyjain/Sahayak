@@ -70,8 +70,9 @@ import {
   cacheComplaintDetail,
   getCachedComplaintDetail,
 } from "../../../utils/complaintsCache";
+import ErrorBoundary from "../../../components/ErrorBoundary";
 
-export default function ComplaintDetails() {
+function ComplaintDetailsInner() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { colorScheme } = useTheme();
@@ -2910,5 +2911,13 @@ export default function ComplaintDetails() {
         </Modal>
       )}
     </View>
+  );
+}
+
+export default function ComplaintDetails() {
+  return (
+    <ErrorBoundary>
+      <ComplaintDetailsInner />
+    </ErrorBoundary>
   );
 }

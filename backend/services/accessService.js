@@ -1,18 +1,14 @@
 const Complaint = require("../models/Complaint");
 const User = require("../models/User");
 const AppError = require("../core/AppError");
-
-function normalizeDepartment(value) {
-  return String(value || "").trim().toLowerCase();
-}
+const { normalizeDepartment } = require("../utils/normalize");
 
 function getRequestUserId(req) {
   return req.user?.id || req.user?._id;
 }
 
-async function getHodOrThrow(req) {
-  const hodId = getRequestUserId(req);
-  const hod = await User.findById(hodId);
+function getHodOrThrow(req) {
+  const hod = req.user;
   if (!hod || hod.role !== "head") {
     throw new AppError("Access denied. HOD only.", 403);
   }

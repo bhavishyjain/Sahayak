@@ -3,18 +3,9 @@ const router = express.Router();
 const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 const authorize = require("../middlewares/authorize");
 const upload = require("../middlewares/multer");
-const {
-  createWorker,
-  updateWorker,
-  getAllWorkers,
-  getAvailableWorkers,
-  getWorkerOverview,
-  updateComplaintStatus,
-  getAssignedComplaints,
-  getCompletedComplaints,
-  getLeaderboard,
-  getWorkerAnalytics,
-} = require("../controllers/workerController");
+const { createWorker, updateWorker, getAllWorkers, getAvailableWorkers } = require("../controllers/worker/assignmentController");
+const { getWorkerOverview, getAssignedComplaints, getCompletedComplaints, getLeaderboard, getWorkerAnalytics } = require("../controllers/worker/analyticsController");
+const { updateComplaintStatus } = require("../controllers/worker/statusController");
 
 router.use(attachAuth, requireAuth);
 

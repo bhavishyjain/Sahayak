@@ -1,8 +1,6 @@
 import { router } from "expo-router";
 import { ChevronLeft } from "lucide-react-native/icons";
 import {
-  Platform,
-  StatusBar,
   Text,
   TouchableOpacity,
   View,
@@ -13,7 +11,6 @@ import { useTheme } from "../utils/context/theme";
 export default function BackButtonHeader({
   title,
   hasBackButton = true,
-  order = null,
   rightElement = null,
 }) {
   const { colorScheme } = useTheme();
@@ -26,26 +23,12 @@ export default function BackButtonHeader({
         backgroundColor: colors.backgroundPrimary,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
-        paddingTop:
-          Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 12,
+        paddingTop: 12,
       }}
     >
       {hasBackButton ? (
         <TouchableOpacity
           onPress={() => {
-            if (order && order.orderstatus_id) {
-              switch (order.orderstatus_id) {
-                case 3:
-                  router.replace("/(app)/(tabs)/accepted");
-                  return;
-                case 4:
-                  router.replace("/(app)/(tabs)/picked-up");
-                  return;
-                default:
-                  break;
-              }
-            }
-
             if (router.canGoBack()) {
               router.back();
             } else {

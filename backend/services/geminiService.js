@@ -11,8 +11,17 @@ function getGeminiApiKey() {
 const genAI = getGeminiApiKey()
   ? new GoogleGenerativeAI(getGeminiApiKey())
   : null;
-const GEMINI_ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-3-flash-preview"];
+const GEMINI_ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-1.5-flash"];
 const GEMINI_PRIMARY_MODEL = GEMINI_ALLOWED_MODELS[0];
+
+// Sanitize user-supplied text before interpolating into Gemini prompts
+function sanitizeInput(text, maxLength = 2000) {
+  return String(text ?? "")
+    .replace(/"""/g, '"')  // prevent breaking triple-quote prompt delimiters
+    .replace(/```/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
 
 // Analyze raw text and return structured complaint or FAQ info
 async function analyze(rawText) {
@@ -22,10 +31,11 @@ async function analyze(rawText) {
     const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
 
     // Prompt for Gemini
+    const safeText = sanitizeInput(rawText);
     const prompt = `
 You are an intelligent municipal assistant. Analyze the following user input and respond ONLY in valid JSON.
 
-User Input: """${rawText}"""
+User Input: """${safeText}"""
 
 Instructions:
 1. Determine type:
@@ -46,14 +56,6 @@ Instructions:
    - "answer": a helpful answer
 5. Return JSON only. No explanations.
 6. Respond in the same language as the user is using. If it is a FAQ, provide the answer in the same language as the user.
-
-Note: Certain locations may have higher importance during festivals or events.
-If the complaint location is near such areas during those times, set "priority": "High".
-Examples:
-- Rajwada on Holi => High priority
-- MG Road on Diwali => High priority
-- Normal day in same locations => follow default keyword logic
-
 
 Examples:
 
@@ -123,9 +125,10 @@ async function analyzeSentiment(description) {
   try {
     const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
 
+    const safeDesc = sanitizeInput(description);
     const prompt = `Analyze the sentiment and urgency of this complaint:
 
-"${description}"
+"${safeDesc}"
 
 Return ONLY valid JSON with:
 {
@@ -219,9 +222,10 @@ async function analyzeComplaintWithImage(description, imageUrl = null) {
       model: imageUrl ? "gemini-2.0-flash-exp" : GEMINI_PRIMARY_MODEL 
     });
 
+    const safeDesc = sanitizeInput(description);
     let prompt = `Analyze this complaint and categorize it:
 
-Description: "${description}"
+Description: "${safeDesc}"
 ${imageUrl ? `Image URL: ${imageUrl}` : ''}
 
 Return ONLY valid JSON:
@@ -279,5 +283,7 @@ module.exports = {
   analyze, 
   analyzeSentiment, 
   suggestWorker,
-  analyzeComplaintWithImage
+  analyzeComplaintWithImage,
+  genAI,
+  sanitizeInput,
 };

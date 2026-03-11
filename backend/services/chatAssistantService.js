@@ -1,19 +1,6 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { analyze } = require("./geminiService");
+const { analyze, genAI, sanitizeInput } = require("./geminiService");
 
-const CHAT_MODELS = ["gemini-2.5-flash", "gemini-3-flash-preview"];
-
-function getGeminiApiKey() {
-  const raw = process.env.GEMINI_API_KEY;
-  if (!raw) return "";
-  return String(raw)
-    .trim()
-    .replace(/^['"]|['"]$/g, "");
-}
-
-const genAI = getGeminiApiKey()
-  ? new GoogleGenerativeAI(getGeminiApiKey())
-  : null;
+const CHAT_MODELS = ["gemini-2.5-flash", "gemini-1.5-flash"];
 
 function hasGeminiClient() {
   return Boolean(genAI);
@@ -73,16 +60,17 @@ async function generateChatResponse(message, conversationHistory = []) {
 
   if (genAI) {
     try {
+      const safeMessage = sanitizeInput(message, 500);
       const context =
         conversationHistory.length > 0
           ? `Previous conversation:\n${conversationHistory
-              .map((msg) => `${msg.role || "user"}: ${msg.text}`)
+              .map((msg) => `${msg.role || "user"}: ${sanitizeInput(String(msg.text ?? ""), 500)}`)
               .join("\n")}\n\n`
           : "";
 
       const prompt = `${context}You are a helpful municipal assistant chatbot. The user is interacting with a municipal complaints system.
 
-Respond helpfully to their query: "${message}"
+Respond helpfully to their query: "${safeMessage}"
 
 Keep responses concise, friendly, and relevant to municipal services. If they ask about complaints, guide them to register or check status.
 
@@ -120,7 +108,7 @@ Respond in a conversational tone.`;
   }
 
   if (lowerMessage.includes("contact") || lowerMessage.includes("phone")) {
-    return "You can reach us at:\nPhone: 1800-123-4567\nEmail: complaints@municipality.gov\nAddress: Municipal Corporation Office, 123 Civic Center";
+    return "For contact details and office locations, please visit the Help section in this app or the official municipal corporation website.";
   }
 
   return "I understand you need assistance. I can help you register complaints, check status, or provide information about municipal services. Could you please be more specific about what you need help with?";

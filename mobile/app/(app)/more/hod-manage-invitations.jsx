@@ -9,6 +9,7 @@ import {
   Trash2,
   UserPlus,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
@@ -95,16 +96,10 @@ function InvitationCard({ item, colors, onRevoke }) {
               className="text-xs mt-0.5"
               style={{ color: colors.textSecondary }}
             >
-              Sent {formatDate(item.sentAt)} · Expires {formatDate(item.expiresAt)}
+              {canRevoke
+                ? `Sent ${formatDate(item.sentAt)} · Expires ${formatDate(item.expiresAt)}`
+                : `Sent ${formatDate(item.sentAt)}`}
             </Text>
-            {item.acceptedAt && (
-              <Text
-                className="text-xs mt-0.5"
-                style={{ color: "#10B981" }}
-              >
-                Joined {formatDate(item.acceptedAt)}
-              </Text>
-            )}
           </View>
         </View>
 
@@ -113,16 +108,27 @@ function InvitationCard({ item, colors, onRevoke }) {
             className="px-2 py-0.5 rounded-full mb-2"
             style={{ backgroundColor: cfg.color + "22" }}
           >
-            <Text className="text-xs font-semibold" style={{ color: cfg.color }}>
+            <Text
+              className="text-xs font-semibold"
+              style={{ color: cfg.color }}
+            >
               {cfg.label}
             </Text>
           </View>
+          {item.acceptedAt && (
+            <Text className="text-xs mb-1" style={{ color: "#10B981" }}>
+              Joined {formatDate(item.acceptedAt)}
+            </Text>
+          )}
           {canRevoke && (
             <TouchableOpacity
               onPress={() => onRevoke(item)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Trash2 size={16} color={colors.textMuted ?? colors.textSecondary} />
+              <Trash2
+                size={16}
+                color={colors.textMuted ?? colors.textSecondary}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -146,6 +152,7 @@ export default function ManageInvitations() {
 
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [revoking, setRevoking] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
 
   const load = async (isRefresh = false) => {
     try {
@@ -218,7 +225,9 @@ export default function ManageInvitations() {
       Toast.show({ type: "success", text1: "Invitation revoked" });
       setInvitations((prev) =>
         prev.map((inv) =>
-          inv.id === revokeTarget.id ? { ...inv, status: "revoked", revokedAt: new Date().toISOString() } : inv,
+          inv.id === revokeTarget.id
+            ? { ...inv, status: "revoked", revokedAt: new Date().toISOString() }
+            : inv,
         ),
       );
     } catch (e) {
@@ -242,7 +251,10 @@ export default function ManageInvitations() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Manage Invitations" onBack={() => router.back()} />
+      <BackButtonHeader
+        title="Manage Invitations"
+        onBack={() => router.back()}
+      />
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
@@ -263,24 +275,18 @@ export default function ManageInvitations() {
           contentContainerStyle={{ paddingTop: 16, paddingBottom: 60 }}
         >
           {/* Send invitation form */}
-          <Card style={{ margin: 0, marginBottom: 20, flex: 0 }}>
-            <View className="flex-row items-center mb-3">
-              <View
-                className="w-9 h-9 rounded-full items-center justify-center mr-3"
-                style={{ backgroundColor: colors.primary + "20" }}
-              >
-                <UserPlus size={17} color={colors.primary} />
-              </View>
+          <View className="mb-6">
+            <View className="flex-row items-center mb-2">
+              <UserPlus size={17} color={colors.primary} />
               <Text
-                className="text-base font-semibold"
+                className="text-base font-semibold ml-2"
                 style={{ color: colors.textPrimary }}
               >
                 Invite New Worker
               </Text>
             </View>
-
             <Text
-              className="text-xs mb-3"
+              className="text-xs mb-5"
               style={{ color: colors.textSecondary }}
             >
               An invitation link valid for 7 days will be sent to the email
@@ -288,14 +294,15 @@ export default function ManageInvitations() {
             </Text>
 
             <View
-              className="flex-row items-center px-3 py-2 rounded-xl mb-3"
+              className="flex-row items-center px-3 rounded-xl mb-3"
               style={{
                 backgroundColor: colors.backgroundSecondary,
                 borderWidth: 1,
                 borderColor: colors.border,
+                height: 48,
               }}
             >
-              <Mail size={18} color={colors.textSecondary} />
+              <Mail size={16} color={colors.textSecondary} />
               <TextInput
                 className="flex-1 ml-2 text-sm"
                 style={{ color: colors.textPrimary }}
@@ -313,26 +320,30 @@ export default function ManageInvitations() {
             <TouchableOpacity
               onPress={handleSend}
               disabled={sending || !email.trim()}
-              className="flex-row items-center justify-center py-3 rounded-xl"
+              className="flex-row items-center justify-center rounded-xl"
               style={{
+                height: 48,
                 backgroundColor:
-                  sending || !email.trim()
-                    ? colors.border
-                    : colors.primary,
+                  sending || !email.trim() ? colors.border : colors.primary,
               }}
             >
               {sending ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Send size={16} color="#fff" />
+                  <Send size={15} color="#fff" />
                   <Text className="text-sm font-semibold text-white ml-2">
                     Send Invitation
                   </Text>
                 </>
               )}
             </TouchableOpacity>
-          </Card>
+          </View>
+
+          <View
+            className="h-[1px] mb-5"
+            style={{ backgroundColor: colors.border }}
+          />
 
           {/* Pending invitations */}
           {pending.length > 0 && (
@@ -377,20 +388,34 @@ export default function ManageInvitations() {
                 className="h-[1px] my-4"
                 style={{ backgroundColor: colors.border }}
               />
-              <Text
-                className="text-sm font-semibold mb-3"
-                style={{ color: colors.textSecondary }}
+              <TouchableOpacity
+                onPress={() => setHistoryOpen((o) => !o)}
+                className="flex-row items-center mb-3"
+                activeOpacity={0.7}
               >
-                History ({others.length})
-              </Text>
-              {others.map((inv) => (
-                <InvitationCard
-                  key={inv.id}
-                  item={inv}
-                  colors={colors}
-                  onRevoke={setRevokeTarget}
-                />
-              ))}
+                <Text
+                  className="text-sm font-semibold flex-1"
+                  style={{ color: colors.textSecondary }}
+                >
+                  History ({others.length})
+                </Text>
+                <View
+                  style={{
+                    transform: [{ rotate: historyOpen ? "180deg" : "0deg" }],
+                  }}
+                >
+                  <ChevronDown size={18} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+              {historyOpen &&
+                others.map((inv) => (
+                  <InvitationCard
+                    key={inv.id}
+                    item={inv}
+                    colors={colors}
+                    onRevoke={setRevokeTarget}
+                  />
+                ))}
             </>
           )}
         </ScrollView>

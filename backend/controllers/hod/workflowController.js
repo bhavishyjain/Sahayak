@@ -129,8 +129,11 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
   if (["resolved", "cancelled"].includes(complaint.status)) {
     throw new AppError("Complaint is already finalized", 400);
   }
-  if (complaint.assignedWorkers && complaint.assignedWorkers.length > 0) {
-    throw new AppError("Only unassigned complaints can be cancelled", 400);
+  const activeWorkers = (complaint.assignedWorkers || []).filter(
+    (wa) => wa.status !== "completed",
+  );
+  if (activeWorkers.length > 0) {
+    throw new AppError("Cannot cancel: complaint has active worker assignments", 400);
   }
 
   complaint.status = "cancelled";

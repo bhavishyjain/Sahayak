@@ -1,11 +1,49 @@
-import { USER_AGENT_STRING } from "@/url";
+import { USER_AGENT_STRING, REFRESH_URL } from "@/url";
 import axios from "axios";
-import getUserAuth from "./userAuth";
+import { router } from "expo-router";
+import getUserAuth, { setUserAuth, clearUserAuth } from "./userAuth";
 
 let cachedUser = null;
 let userCachePromise = null;
 let lastCacheTime = 0;
 const CACHE_TTL = 5000; // 5 seconds cache
+
+// Track in-flight refresh to prevent parallel refresh storms
+let refreshPromise = null;
+
+async function attemptTokenRefresh() {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const user = await getUserAuth();
+      if (!user?.refresh_token) return null;
+
+      const resp = await axios.post(
+        REFRESH_URL,
+        { refreshToken: user.refresh_token },
+        { headers: { "User-Agent": USER_AGENT_STRING }, timeout: 10000 },
+      );
+      const newToken = resp.data?.data?.token;
+      const newRefresh = resp.data?.data?.refreshToken;
+      if (!newToken) return null;
+
+      const updated = { ...user, auth_token: newToken, token: newToken };
+      if (newRefresh) updated.refresh_token = newRefresh;
+      await setUserAuth(updated);
+      // Bust the cache so next apiCall picks up the new token
+      cachedUser = updated;
+      lastCacheTime = Date.now();
+      return newToken;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
 
 const getCachedUser = async () => {
   if (cachedUser && Date.now() - lastCacheTime < CACHE_TTL) {
@@ -124,8 +162,7 @@ const apiCall = async ({
 
     if (isMultipart) {
       const formData = new FormData();
-      const authPayload = await getAuthPayload(data);
-      const flatData = flatten(authPayload);
+      const flatData = flatten(data);
 
       Object.entries(flatData).forEach(([key, value]) => {
         if (value && typeof value === "object" && value.uri) {
@@ -141,9 +178,7 @@ const apiCall = async ({
 
       payload = formData;
     } else {
-      payload = auth
-        ? { ...data, token: auth.token }
-        : await getAuthPayload(data);
+      payload = data;
     }
 
     const axiosConfig = {
@@ -158,6 +193,46 @@ const apiCall = async ({
     };
 
     const response = await axios(axiosConfig);
+
+    // On 401, attempt a single token refresh then retry once
+    if (response.status === 401 && !auth) {
+      const newToken = await attemptTokenRefresh();
+      if (newToken) {
+        const retryHeaders = {
+          ...authHeaders,
+          Authorization: `Bearer ${newToken}`,
+        };
+        const retryResponse = await axios({ ...axiosConfig, headers: retryHeaders });
+        if (retryResponse.status === 401) {
+          // Refresh didn't help — force logout
+          await clearUserAuth();
+          router.replace("/(app)/(auth)/login");
+          const e = new Error("Session expired. Please log in again.");
+          e.response = retryResponse;
+          throw e;
+        }
+        if (retryResponse.status >= 400) {
+          const e = new Error(retryResponse.data?.message || `API Error: ${retryResponse.status}`);
+          e.response = retryResponse;
+          throw e;
+        }
+        const retryRaw = retryResponse.data;
+        return {
+          ...retryResponse,
+          data: retryRaw && typeof retryRaw === "object" && "data" in retryRaw ? retryRaw.data : retryRaw,
+          rawData: retryRaw,
+          success: retryRaw?.success ?? true,
+          message: retryRaw?.message,
+        };
+      } else {
+        // No refresh token or refresh failed — force logout
+        await clearUserAuth();
+        router.replace("/(app)/(auth)/login");
+        const e = new Error("Session expired. Please log in again.");
+        e.response = response;
+        throw e;
+      }
+    }
 
     if (response.status >= 400) {
       const error = new Error(
