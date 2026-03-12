@@ -557,12 +557,12 @@ export default function DateTimePickerModal({
     <>
       <PressableBlock
         onPress={open}
-        className="rounded-xl px-4 mb-4 justify-center h-[50px]"
+        className="rounded-xl px-4 justify-center h-[50px]"
         style={[
           {
-            backgroundColor: colors.backgroundPrimary,
-            borderWidth: 1,
-            borderColor: colors.textSecondary + "20",
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1.5,
+            borderColor: colors.border,
           },
           containerStyle,
         ]}

@@ -7,7 +7,7 @@ import {
   X,
   Navigation,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Modal,
   RefreshControl,
@@ -25,6 +25,7 @@ import { darkColors, lightColors } from "../../../colors";
 import AutoSkeleton from "../../../components/AutoSkeleton";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import FilterPanel from "../../../components/FilterPanel";
 import SearchBar from "../../../components/SearchBar";
 import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import CustomPicker from "../../../components/CustomPicker";
@@ -62,9 +63,17 @@ export default function Complaints() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [status, setStatus] = useState("all");
-  const [search, setSearch] = useState("");
   const [complaints, setComplaints] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("new-to-old");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -95,30 +104,58 @@ export default function Complaints() {
     { label: t("complaints.priority.high"), value: "High" },
   ];
 
-  const load = async (pull = false) => {
+  const LIMIT = 10;
+
+  const buildQuery = (currentPage) => {
+    const params = new URLSearchParams();
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (priorityFilter !== "all") params.set("priority", priorityFilter);
+    params.set("sort", sortOrder);
+    if (startDate) params.set("startDate", startDate);
+    if (endDate) params.set("endDate", endDate);
+    if (searchQuery.trim()) params.set("search", searchQuery.trim());
+    params.set("page", currentPage);
+    params.set("limit", LIMIT);
+    return params.toString();
+  };
+
+  const load = async (pull = false, reset = false) => {
+    const currentPage = reset || pull ? 1 : page;
     try {
       if (pull) setRefreshing(true);
-      else setLoading(true);
+      else if (reset) setLoading(true);
+      else setLoadingMore(true);
 
       if (!isOnline) {
-        const cached = await getCachedComplaints(status);
+        const cached = await getCachedComplaints(statusFilter);
         if (cached) setComplaints(cached);
         return;
       }
 
-      const q = status === "all" ? "" : `?status=${encodeURIComponent(status)}`;
       const res = await apiCall({
         method: "GET",
-        url: `${baseUrl}/complaints${q}`,
+        url: `${baseUrl}/complaints?${buildQuery(currentPage)}`,
       });
       const payload = res?.data;
       const fetched = payload?.complaints || [];
-      setComplaints(fetched);
-      await cacheComplaints(status, fetched);
+      const pages = payload?.pages ?? 1;
 
-      // Flush any queued offline submissions now that we're back online
+      if (reset || pull) {
+        setComplaints(fetched);
+        setPage(1);
+      } else {
+        setComplaints((prev) => [...prev, ...fetched]);
+      }
+      setTotalCount(payload?.total ?? 0);
+      setHasMore(currentPage < pages);
+
+      if (reset || pull) {
+        await cacheComplaints(statusFilter, fetched);
+      }
+
+      // Flush offline queue when back online
       const queue = await getQueue();
-      if (queue.length > 0) {
+      if (queue.length > 0 && (reset || pull)) {
         for (const entry of queue) {
           try {
             const formData = new FormData();
@@ -155,14 +192,16 @@ export default function Complaints() {
         // Reload after flushing
         const res2 = await apiCall({
           method: "GET",
-          url: `${baseUrl}/complaints${q}`,
+          url: `${baseUrl}/complaints?${buildQuery(1)}`,
         });
         const fresh = res2?.data?.complaints || [];
         setComplaints(fresh);
-        await cacheComplaints(status, fresh);
+        setPage(1);
+        setHasMore(1 < (res2?.data?.pages ?? 1));
+        await cacheComplaints(statusFilter, fresh);
       }
     } catch (e) {
-      const cached = await getCachedComplaints(status);
+      const cached = await getCachedComplaints(statusFilter);
       if (cached) {
         setComplaints(cached);
       } else {
@@ -176,30 +215,36 @@ export default function Complaints() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
-  useEffect(() => {
-    load(false);
-  }, [status]);
+  const loadMore = () => {
+    if (!hasMore || loadingMore) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    load(false, false);
+  };
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return complaints;
-    return complaints.filter((c) => {
-      return (
-        String(c.ticketId || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(c.department || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(c.locationName || "")
-          .toLowerCase()
-          .includes(q)
-      );
-    });
-  }, [complaints, search]);
+  useEffect(() => {
+    load(false, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, priorityFilter, sortOrder, startDate, endDate, searchQuery]);
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    priorityFilter !== "all" ||
+    sortOrder !== "new-to-old" ||
+    !!startDate ||
+    !!endDate;
+
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setSortOrder("new-to-old");
+    setStartDate("");
+    setEndDate("");
+  };
 
   const pickImages = async () => {
     try {
@@ -484,49 +529,45 @@ export default function Complaints() {
             {t("complaints.newComplaint")}
           </Text>
         </PressableBlock>
-        <Card style={{ margin: 0, flex: 0 }}>
-          <SearchBar
-            value={search}
-            onChangeText={setSearch}
-            placeholder={t("complaints.searchPlaceholder")}
-          />
-
-          <View className="flex-row flex-wrap mt-3 gap-y-2">
-            {["all", "pending", "assigned", "in-progress", "pending-approval", "needs-rework", "resolved", "cancelled"].map((chip) => (
-              <PressableBlock
-                key={chip}
-                onPress={() => setStatus(chip)}
-                className="mr-2 px-3 py-[7px] rounded-xl border"
-                style={{
-                  borderColor: status === chip ? colors.primary : colors.border,
-                  backgroundColor:
-                    status === chip
-                      ? `${colors.primary}22`
-                      : colors.backgroundPrimary,
-                }}
-              >
-                <Text
-                  className="text-xs font-semibold capitalize"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {chip === "all"
-                    ? t("common.all")
-                    : formatStatusLabel(t, chip)}
-                </Text>
-              </PressableBlock>
-            ))}
+        <View
+          className="flex-row items-center mb-3"
+          style={{ gap: 8 }}
+        >
+          <View className="flex-1">
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t("complaints.searchPlaceholder")}
+            />
           </View>
-        </Card>
+          <FilterPanel
+            variant="icon"
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            priorityFilter={priorityFilter}
+            setPriorityFilter={setPriorityFilter}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            startDate={startDate}
+            endDate={endDate}
+            setStartDate={setStartDate}
+            setEndDate={setEndDate}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+            t={t}
+            formatPriorityLabel={formatPriorityLabel}
+          />
+        </View>
 
         <AutoSkeleton isLoading={loading}>
-          {filtered.length === 0 && !loading ? (
+          {complaints.length === 0 && !loading ? (
             <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
               <Text style={{ color: colors.textSecondary }}>
                 {t("complaints.noComplaints")}
               </Text>
             </Card>
           ) : (
-            filtered.map((c) => {
+            complaints.map((c) => {
               const eta = formatEtaFromHours(
                 c.estimatedCompletionTime,
                 c.assignedAt,
@@ -723,6 +764,32 @@ export default function Complaints() {
             })
           )}
         </AutoSkeleton>
+
+        {/* Load More */}
+        {hasMore && (
+          <PressableBlock
+            onPress={loadMore}
+            disabled={loadingMore}
+            className="mt-4 mb-2 rounded-xl items-center justify-center py-3"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              opacity: loadingMore ? 0.6 : 1,
+            }}
+          >
+            {loadingMore ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: colors.textSecondary }}
+              >
+                Load more ({complaints.length} of {totalCount})
+              </Text>
+            )}
+          </PressableBlock>
+        )}
       </ScrollView>
 
       <Modal

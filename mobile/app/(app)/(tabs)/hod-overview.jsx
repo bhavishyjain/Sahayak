@@ -30,6 +30,7 @@ import { darkColors, lightColors } from "../../../colors";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
+import getUserAuth from "../../../utils/userAuth";
 import { HOD_OVERVIEW_URL } from "../../../url";
 
 export default function HodOverview() {
@@ -41,6 +42,15 @@ export default function HodOverview() {
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
+  const [user, setUser] = useState(null);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return t("greetings.morning");
+    if (hour < 17) return t("greetings.afternoon");
+    if (hour < 21) return t("greetings.evening");
+    return t("greetings.night");
+  };
 
   const load = async (isRefresh = false) => {
     try {
@@ -62,6 +72,9 @@ export default function HodOverview() {
 
   useEffect(() => {
     load(false);
+    getUserAuth().then((userData) => {
+      if (userData) setUser(userData);
+    });
   }, []);
 
   // Derived values
@@ -169,17 +182,29 @@ export default function HodOverview() {
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
       {/* Header */}
-      <View className="px-4 pt-4 pb-3">
+      <View className="px-4 pt-12 pb-6">
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>
+          {getGreeting()}
+        </Text>
         <Text
-          className="text-2xl font-bold"
+          className="text-3xl font-bold mt-1"
           style={{ color: colors.textPrimary }}
         >
-          {t("hod.dashboard.analyticsTitle")}
+          {user?.fullName || t("hod.dashboard.analyticsTitle")}
         </Text>
-        <Text className="text-sm mt-1" style={{ color: colors.textSecondary }}>
-          {stats?.department || t("hod.dashboard.department")} Department{" "}
-          {t("hod.dashboard.performanceOverview")}
-        </Text>
+        <View className="flex-row items-center mt-2">
+          <View
+            className="px-3 py-1 rounded-full"
+            style={{ backgroundColor: colors.primary + "20" }}
+          >
+            <Text
+              className="text-xs font-semibold"
+              style={{ color: colors.primary }}
+            >
+              {user?.department || stats?.department || ""} {t("worker.dashboard.department")}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {loading ? (

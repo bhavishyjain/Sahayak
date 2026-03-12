@@ -11,6 +11,19 @@ const CACHE_TTL = 5000; // 5 seconds cache
 // Track in-flight refresh to prevent parallel refresh storms
 let refreshPromise = null;
 
+// Set during intentional logout to suppress spurious 401 handling
+let isLoggingOut = false;
+
+/** Call before clearUserAuth() to drop the in-memory token cache and
+ *  prevent "Session expired" noise from still-mounted screens. */
+export function clearApiCache() {
+  cachedUser = null;
+  lastCacheTime = 0;
+  isLoggingOut = true;
+  // Reset flag after a short delay so the cache is usable again on next login
+  setTimeout(() => { isLoggingOut = false; }, 3000);
+}
+
 async function attemptTokenRefresh() {
   if (refreshPromise) return refreshPromise;
 
@@ -24,8 +37,8 @@ async function attemptTokenRefresh() {
         { refreshToken: user.refresh_token },
         { headers: { "User-Agent": USER_AGENT_STRING }, timeout: 10000 },
       );
-      const newToken = resp.data?.data?.token;
-      const newRefresh = resp.data?.data?.refreshToken;
+      const newToken = resp.data?.token ?? resp.data?.data?.token;
+      const newRefresh = resp.data?.refreshToken ?? resp.data?.data?.refreshToken;
       if (!newToken) return null;
 
       const updated = { ...user, auth_token: newToken, token: newToken };
@@ -145,6 +158,12 @@ const apiCall = async ({
   auth = null,
   responseType = undefined,
 }) => {
+  // Silently abort in-flight calls fired after intentional logout
+  if (isLoggingOut) {
+    const e = new Error("Logged out");
+    e.name = "LogoutError";
+    throw e;
+  }
   try {
     const authHeaders = auth
       ? {
@@ -205,6 +224,8 @@ const apiCall = async ({
         const retryResponse = await axios({ ...axiosConfig, headers: retryHeaders });
         if (retryResponse.status === 401) {
           // Refresh didn't help — force logout
+          cachedUser = null;
+          lastCacheTime = 0;
           await clearUserAuth();
           router.replace("/(app)/(auth)/login");
           const e = new Error("Session expired. Please log in again.");
@@ -226,6 +247,8 @@ const apiCall = async ({
         };
       } else {
         // No refresh token or refresh failed — force logout
+        cachedUser = null;
+        lastCacheTime = 0;
         await clearUserAuth();
         router.replace("/(app)/(auth)/login");
         const e = new Error("Session expired. Please log in again.");

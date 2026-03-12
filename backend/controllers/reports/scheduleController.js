@@ -35,7 +35,7 @@ exports.cancelSchedule = asyncHandler(async (req, res) => {
 });
 
 exports.scheduleEmailReport = asyncHandler(async (req, res) => {
-  const { email, frequency, department, format = "pdf" } = req.body;
+  const { email, frequency, department, format = "pdf", hour = 9 } = req.body;
   const normalizedEmail = normalizeString(email).toLowerCase();
   if (!normalizedEmail) {
     throw new AppError("Email is required", 400);
@@ -56,7 +56,7 @@ exports.scheduleEmailReport = asyncHandler(async (req, res) => {
   if (department && req.user?.role === "admin" && department !== "all") {
     filters.department = department;
   }
-  const cronExpression = getCronExpressionForFrequency(frequency);
+  const cronExpression = getCronExpressionForFrequency(frequency, hour);
   if (!cronExpression) {
     throw new AppError("Invalid schedule frequency", 400);
   }
@@ -80,6 +80,7 @@ exports.scheduleEmailReport = asyncHandler(async (req, res) => {
         filters,
         cronExpression,
         timezone: process.env.REPORT_SCHEDULE_TIMEZONE || "Asia/Kolkata",
+        hour: Number(hour) || 9,
         isActive: true,
       },
     },

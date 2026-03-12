@@ -3,9 +3,8 @@ import {
   Clock,
   MapPin,
   Star,
-  CheckCircle,
-  Calendar,
-  Filter,
+  CheckCircle2,
+  CalendarDays,
   X,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
@@ -14,6 +13,7 @@ import {
   RefreshControl,
   ScrollView,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
@@ -21,6 +21,7 @@ import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import PressableBlock from "../../../components/PressableBlock";
+import SearchBar from "../../../components/SearchBar";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
@@ -37,9 +38,9 @@ export default function WorkerCompleted() {
   const [refreshing, setRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
   const [filteredComplaints, setFilteredComplaints] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const load = async (isRefresh = false) => {
     try {
@@ -74,10 +75,20 @@ export default function WorkerCompleted() {
 
   useEffect(() => {
     applyFilters();
-  }, [startDate, endDate, complaints]);
+  }, [startDate, endDate, searchQuery, complaints]);
 
   const applyFilters = () => {
     let filtered = [...complaints];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          c.ticketId?.toLowerCase().includes(q) ||
+          c.title?.toLowerCase().includes(q) ||
+          c.description?.toLowerCase().includes(q),
+      );
+    }
 
     if (startDate) {
       const start = new Date(startDate);
@@ -97,8 +108,10 @@ export default function WorkerCompleted() {
   const clearFilters = () => {
     setStartDate("");
     setEndDate("");
-    setShowFilters(false);
+    setSearchQuery("");
   };
+
+  const hasActiveFilters = !!startDate || !!endDate || !!searchQuery.trim();
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -153,141 +166,64 @@ export default function WorkerCompleted() {
         }
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Stats Card */}
-        {complaints.length > 0 && (
-          <Card style={{ margin: 0, marginTop: 16, marginBottom: 16, flex: 0 }}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center flex-1">
-                <View
-                  className="w-12 h-12 rounded-full items-center justify-center"
-                  style={{
-                    backgroundColor: colors.success + "20" || "#10B98120",
-                  }}
-                >
-                  <CheckCircle size={24} color={colors.success || "#10B981"} />
-                </View>
-                <View className="ml-3 flex-1">
-                  <Text
-                    className="text-xs"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("worker.completedWork.completedTasks")}
-                  </Text>
-                  <Text
-                    className="text-2xl font-bold mt-1"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {filteredComplaints.length}
-                  </Text>
-                </View>
-              </View>
-              <PressableBlock onPress={() => setShowFilters(!showFilters)}>
-                <View
-                  className="w-10 h-10 rounded-full items-center justify-center"
-                  style={{
-                    backgroundColor:
-                      showFilters || startDate || endDate
-                        ? colors.primary + "20"
-                        : colors.backgroundSecondary,
-                  }}
-                >
-                  <Filter
-                    size={20}
-                    color={
-                      showFilters || startDate || endDate
-                        ? colors.primary
-                        : colors.textSecondary
-                    }
-                  />
-                </View>
-              </PressableBlock>
-            </View>
-          </Card>
-        )}
+        {/* Search bar */}
+        <View className="mt-4 mb-3">
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={
+              t("worker.completedWork.search") || "Search by title, ID…"
+            }
+          />
+        </View>
 
-        {/* Filters Section */}
-        {showFilters && (
-          <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-            <View className="flex-row items-center justify-between mb-3">
-              <Text
-                className="text-base font-bold"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("worker.completedWork.filterByDateRange")}
-              </Text>
-              {(startDate || endDate) && (
-                <PressableBlock onPress={clearFilters}>
-                  <View className="flex-row items-center">
-                    <X size={16} color={colors.textSecondary} />
-                    <Text
-                      className="text-sm font-semibold ml-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("worker.completedWork.clear")}
-                    </Text>
-                  </View>
-                </PressableBlock>
-              )}
-            </View>
-
-            <View
-              className="h-[1px] mb-3"
-              style={{ backgroundColor: colors.border }}
+        {/* Date range row */}
+        <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
+          <View className="flex-1">
+            <DateTimePickerModal
+              mode="date"
+              value={startDate}
+              onChange={setStartDate}
+              icon={CalendarDays}
+              placeholder={t("worker.completedWork.startDate") || "From"}
+              maxDateToday={true}
             />
+          </View>
+          <View className="flex-1">
+            <DateTimePickerModal
+              mode="date"
+              value={endDate}
+              onChange={setEndDate}
+              icon={CalendarDays}
+              placeholder={t("worker.completedWork.endDate") || "To"}
+              maxDateToday={true}
+            />
+          </View>
+        </View>
 
-            <View className="flex-row" style={{ gap: 8 }}>
-              <View className="flex-1">
-                <Text
-                  className="text-xs font-semibold mb-2"
-                  style={{ color: colors.textSecondary }}
+        {/* Count strip */}
+        {complaints.length > 0 && (
+          <View className="flex-row items-center mb-2" style={{ gap: 8 }}>
+            {hasActiveFilters &&
+              filteredComplaints.length !== complaints.length && (
+                <View
+                  className="flex-row items-center px-3 py-1.5 rounded-full"
+                  style={{
+                    backgroundColor: (colors.warning || "#F59E0B") + "20",
+                  }}
                 >
-                  {t("worker.completedWork.startDate")}
-                </Text>
-                <DateTimePickerModal
-                  mode="date"
-                  value={startDate}
-                  onChange={setStartDate}
-                  icon={Calendar}
-                  placeholder={t("worker.completedWork.selectDate")}
-                  maxDateToday={true}
-                />
-              </View>
-
-              <View className="flex-1">
-                <Text
-                  className="text-xs font-semibold mb-2"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t("worker.completedWork.endDate")}
-                </Text>
-                <DateTimePickerModal
-                  mode="date"
-                  value={endDate}
-                  onChange={setEndDate}
-                  icon={Calendar}
-                  placeholder={t("worker.completedWork.selectDate")}
-                  maxDateToday={true}
-                />
-              </View>
-            </View>
-
-            {filteredComplaints.length !== complaints.length && (
-              <View
-                className="mt-3 px-3 py-2 rounded-xl"
-                style={{ backgroundColor: colors.info + "20" || "#3B82F620" }}
-              >
-                <Text
-                  className="text-xs text-center"
-                  style={{ color: colors.info || "#3B82F6" }}
-                >
-                  {t("worker.completedWork.showing", {
-                    filtered: filteredComplaints.length,
-                    total: complaints.length,
-                  })}
-                </Text>
-              </View>
-            )}
-          </Card>
+                  <Text
+                    className="text-xs font-bold"
+                    style={{ color: colors.warning || "#F59E0B" }}
+                  >
+                    {t("worker.completedWork.showing", {
+                      filtered: filteredComplaints.length,
+                      total: complaints.length,
+                    }) || `Showing ${filteredComplaints.length}`}
+                  </Text>
+                </View>
+              )}
+          </View>
         )}
 
         {filteredComplaints.length === 0 && complaints.length > 0 ? (

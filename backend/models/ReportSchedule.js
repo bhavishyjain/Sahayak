@@ -42,6 +42,12 @@ const reportScheduleSchema = new mongoose.Schema(
       type: String,
       default: process.env.REPORT_SCHEDULE_TIMEZONE || "Asia/Kolkata",
     },
+    hour: {
+      type: Number,
+      default: 9,
+      min: 0,
+      max: 23,
+    },
     isActive: {
       type: Boolean,
       default: true,

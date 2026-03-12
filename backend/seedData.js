@@ -1214,6 +1214,7 @@ async function seedDatabase() {
         email: `user${i}@example.com`,
         phone: `91${8000000000 + i}`,
         fullName: `${firstName} ${lastName}`,
+        emailVerified: true,
       });
     }
 

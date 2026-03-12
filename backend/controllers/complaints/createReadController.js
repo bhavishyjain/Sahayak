@@ -144,18 +144,46 @@ exports.createComplaint = asyncHandler(async (req, res) => {
 });
 
 exports.myComplaints = asyncHandler(async (req, res) => {
-  const { status, limit = 20, page = 1 } = req.query;
-  const safeLimit = Math.min(Number(limit) || 20, 100);
+  const {
+    status,
+    priority,
+    sort = "new-to-old",
+    startDate,
+    endDate,
+    search,
+    limit = 10,
+    page = 1,
+  } = req.query;
+
+  const safeLimit = Math.min(Number(limit) || 10, 100);
   const safePage = Math.max(Number(page) || 1, 1);
 
   const filter = { userId: new mongoose.Types.ObjectId(req.user._id) };
-  if (status && status !== "all") {
-    filter.status = status;
+  if (status && status !== "all") filter.status = status;
+  if (priority && priority !== "all") filter.priority = new RegExp(`^${priority}$`, "i");
+  if (startDate || endDate) {
+    filter.createdAt = {};
+    if (startDate) filter.createdAt.$gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = end;
+    }
+  }
+  if (search && search.trim()) {
+    const re = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    filter.$or = [
+      { ticketId: re },
+      { locationName: re },
+      { rawText: re },
+      { refinedText: re },
+    ];
   }
 
+  const sortDir = sort === "old-to-new" ? 1 : -1;
   const [complaints, total] = await Promise.all([
     Complaint.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: sortDir })
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit),
     Complaint.countDocuments(filter),
@@ -164,6 +192,7 @@ exports.myComplaints = asyncHandler(async (req, res) => {
   return sendSuccess(res, {
     total,
     page: safePage,
+    pages: Math.ceil(total / safeLimit),
     limit: safeLimit,
     complaints: complaints.map(buildComplaintView),
   });

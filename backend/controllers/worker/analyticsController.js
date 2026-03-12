@@ -110,16 +110,10 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
   const query = { role: "worker" };
   if (req.user.role === "head") {
     const hod = await getHodOrThrow(req);
-    if (
-      requestedDepartment &&
-      requestedDepartment !== "all" &&
-      requestedDepartment !== hod.department
-    ) {
-      throw new AppError("You can only view workers from your department", 403);
-    }
     query.department = hod.department;
-  } else if (requestedDepartment && requestedDepartment !== "all") {
-    query.department = requestedDepartment;
+  } else {
+    // Workers always see only their own department
+    query.department = req.user.department;
   }
 
   const workers = await User.find(query).select(
@@ -163,9 +157,7 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
   ]);
 
   // Index by workerId string for O(1) lookup
-  const aggMap = new Map(
-    aggResults.map((r) => [String(r._id), r]),
-  );
+  const aggMap = new Map(aggResults.map((r) => [String(r._id), r]));
 
   const leaderboardData = workers.map((worker) => {
     const agg = aggMap.get(String(worker._id)) || {
@@ -180,8 +172,7 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
       today.setHours(0, 0, 0, 0);
       const completionSet = new Set(agg.completionDates);
 
-      const fmt = (d) =>
-        d.toISOString().slice(0, 10);
+      const fmt = (d) => d.toISOString().slice(0, 10);
 
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -189,8 +180,8 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
       let checkDate = completionSet.has(fmt(today))
         ? new Date(today)
         : completionSet.has(fmt(yesterday))
-        ? new Date(yesterday)
-        : null;
+          ? new Date(yesterday)
+          : null;
 
       while (checkDate && completionSet.has(fmt(checkDate))) {
         currentStreak++;
@@ -205,17 +196,53 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
     const badges = [];
 
     if (totalCompleted >= 10 && avgTime > 0 && avgTime <= 24)
-      badges.push({ id: "speed-demon", name: "Speed Demon", description: "Completes tasks in under 24 hours on average", icon: "⚡", color: "#F59E0B" });
+      badges.push({
+        id: "speed-demon",
+        name: "Speed Demon",
+        description: "Completes tasks in under 24 hours on average",
+        icon: "⚡",
+        color: "#F59E0B",
+      });
     if (totalCompleted >= 10 && rating >= 4.5)
-      badges.push({ id: "quality-master", name: "Quality Master", description: "Maintains 4.5+ star rating", icon: "⭐", color: "#EAB308" });
+      badges.push({
+        id: "quality-master",
+        name: "Quality Master",
+        description: "Maintains 4.5+ star rating",
+        icon: "⭐",
+        color: "#EAB308",
+      });
     if (totalCompleted >= 50)
-      badges.push({ id: "community-hero", name: "Community Hero", description: "Resolved 50+ complaints", icon: "🏆", color: "#10B981" });
+      badges.push({
+        id: "community-hero",
+        name: "Community Hero",
+        description: "Resolved 50+ complaints",
+        icon: "🏆",
+        color: "#10B981",
+      });
     if (totalCompleted >= 100)
-      badges.push({ id: "century-club", name: "Century Club", description: "Resolved 100+ complaints", icon: "💯", color: "#8B5CF6" });
+      badges.push({
+        id: "century-club",
+        name: "Century Club",
+        description: "Resolved 100+ complaints",
+        icon: "💯",
+        color: "#8B5CF6",
+      });
     if (currentStreak >= 7)
-      badges.push({ id: "consistent-performer", name: "Consistent Performer", description: "7+ day streak", icon: "🔥", color: "#EF4444" });
+      badges.push({
+        id: "consistent-performer",
+        name: "Consistent Performer",
+        description: "7+ day streak",
+        icon: "🔥",
+        color: "#EF4444",
+      });
     if (agg.periodCompleted >= 20 && period === "monthly")
-      badges.push({ id: "rising-star", name: "Rising Star", description: "20+ completions this month", icon: "🌟", color: "#06B6D4" });
+      badges.push({
+        id: "rising-star",
+        name: "Rising Star",
+        description: "20+ completions this month",
+        icon: "🌟",
+        color: "#06B6D4",
+      });
 
     return {
       id: worker._id,

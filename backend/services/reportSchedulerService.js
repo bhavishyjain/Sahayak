@@ -5,14 +5,15 @@ const { sendEmailWithAttachment } = require("./emailService");
 
 const activeJobs = new Map();
 
-function getCronExpressionForFrequency(frequency) {
+function getCronExpressionForFrequency(frequency, hour = 9) {
+  const h = Math.max(0, Math.min(23, Number(hour) || 9));
   switch (frequency) {
     case "daily":
-      return "0 8 * * *";
+      return `0 ${h} * * *`;
     case "weekly":
-      return "0 8 * * 1";
+      return `0 ${h} * * 1`;
     case "monthly":
-      return "0 8 1 * *";
+      return `0 ${h} 1 * *`;
     default:
       return null;
   }
@@ -59,7 +60,7 @@ async function sendScheduledReport(schedule) {
   await sendEmailWithAttachment({
     to: schedule.email,
     subject: "Scheduled Complaint Management Report",
-    text: `Your ${schedule.frequency} complaint report is attached. Generated at ${new Date().toLocaleString()}.`,
+    text: `Your ${schedule.frequency} complaint report is attached. Generated at ${new Date().toLocaleString("en-IN", { timeZone: schedule.timezone || "Asia/Kolkata" })}.`,
     attachments: [{ filename, content: buffer, contentType }],
   });
 }

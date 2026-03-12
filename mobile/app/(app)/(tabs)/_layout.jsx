@@ -279,10 +279,13 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* Hide worker tabs for citizens */}
+      {/* Hide worker/HOD tabs for citizens */}
+      <Tabs.Screen name="worker-home" options={{ href: null }} />
       <Tabs.Screen name="worker-assigned" options={{ href: null }} />
       <Tabs.Screen name="worker-leaderboard" options={{ href: null }} />
       <Tabs.Screen name="hod-overview" options={{ href: null }} />
+      <Tabs.Screen name="hod-workers" options={{ href: null }} />
+      <Tabs.Screen name="hod-complaints" options={{ href: null }} />
     </Tabs>
   );
 }

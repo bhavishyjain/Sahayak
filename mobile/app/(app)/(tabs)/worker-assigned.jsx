@@ -1,29 +1,21 @@
 import { useRouter } from "expo-router";
-import {
-  Clock,
-  MapPin,
-  Filter,
-  Calendar,
-  X,
-  ArrowUpDown,
-  Search,
-} from "lucide-react-native";
+import { Clock, MapPin } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import SearchBar from "../../../components/SearchBar";
+import FilterPanel from "../../../components/FilterPanel";
 import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import PressableBlock from "../../../components/PressableBlock";
-import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
@@ -48,10 +40,9 @@ export default function WorkerAssigned() {
   const [refreshing, setRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
   const [filteredComplaints, setFilteredComplaints] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [sortOrder, setSortOrder] = useState("old-to-new"); // "new-to-old" or "old-to-new"
+  const [sortOrder, setSortOrder] = useState("old-to-new");
   const [selectedPriority, setSelectedPriority] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,8 +65,7 @@ export default function WorkerAssigned() {
       Toast.show({
         type: "error",
         text1: t("worker.assigned.failed"),
-        text2:
-          e?.response?.data?.message || t("worker.assigned.loadingError"),
+        text2: e?.response?.data?.message || t("worker.assigned.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -162,19 +152,14 @@ export default function WorkerAssigned() {
     setSelectedPriority("all");
     setSelectedStatus("all");
     setSearchQuery("");
-    setShowFilters(false);
   };
 
-  const hasActiveFilters = () => {
-    return (
-      searchQuery.trim() ||
-      startDate ||
-      endDate ||
-      sortOrder !== "old-to-new" ||
-      selectedPriority !== "all" ||
-      selectedStatus !== "all"
-    );
-  };
+  const hasActiveFilters =
+    !!startDate ||
+    !!endDate ||
+    sortOrder !== "old-to-new" ||
+    selectedPriority !== "all" ||
+    selectedStatus !== "all";
 
   if (loading) {
     return (
@@ -200,7 +185,10 @@ export default function WorkerAssigned() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title={t("worker.assigned.title")} hasBackButton={false} />
+      <BackButtonHeader
+        title={t("worker.assigned.title")}
+        hasBackButton={false}
+      />
 
       <ScrollView
         className="flex-1 px-4"
@@ -215,356 +203,48 @@ export default function WorkerAssigned() {
         }
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Search Bar */}
+        {/* Search + Filter row */}
         {complaints.length > 0 && (
-          <View className="mt-4 mb-2">
-            <View
-              className="flex-row items-center px-4 py-3 rounded-xl"
-              style={{
-                backgroundColor: colors.backgroundSecondary,
-                borderWidth: 1,
-                borderColor: searchQuery ? colors.primary : colors.border,
-              }}
-            >
-              <Search
-                size={20}
-                color={searchQuery ? colors.primary : colors.textSecondary}
-              />
-              <TextInput
-                className="ml-3 flex-1 text-base"
-                style={{ color: colors.textPrimary }}
-                placeholder={t("worker.assigned.searchPlaceholder")}
-                placeholderTextColor={colors.textSecondary}
+          <View className="mt-4 mb-4 flex-row items-center" style={{ gap: 10 }}>
+            <View className="flex-1">
+              <SearchBar
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                placeholder={t("worker.assigned.searchPlaceholder")}
               />
-              {searchQuery && (
-                <PressableBlock onPress={() => setSearchQuery("")}>
-                  <X size={18} color={colors.textSecondary} />
-                </PressableBlock>
-              )}
             </View>
+            <FilterPanel
+              variant="icon"
+              statusFilter={selectedStatus}
+              setStatusFilter={setSelectedStatus}
+              priorityFilter={selectedPriority}
+              setPriorityFilter={setSelectedPriority}
+              sortOrder={sortOrder}
+              setSortOrder={setSortOrder}
+              startDate={startDate}
+              endDate={endDate}
+              setStartDate={setStartDate}
+              setEndDate={setEndDate}
+              hasActiveFilters={hasActiveFilters}
+              onClearFilters={clearFilters}
+              t={t}
+              formatPriorityLabel={formatPriorityLabel}
+            />
           </View>
         )}
 
-        {/* Stats Card */}
+        {/* Active count chip */}
         {complaints.length > 0 && (
-          <Card style={{ margin: 0, marginTop: 16, marginBottom: 16, flex: 0 }}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center flex-1">
-                <View
-                  className="w-12 h-12 rounded-full items-center justify-center"
-                  style={{
-                    backgroundColor: colors.warning + "20" || "#F59E0B20",
-                  }}
-                >
-                  <Clock size={24} color={colors.warning || "#F59E0B"} />
-                </View>
-                <View className="ml-3 flex-1">
-                  <Text
-                    className="text-xs"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("worker.dashboard.stats.active")}
-                  </Text>
-                  <Text
-                    className="text-2xl font-bold mt-1"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {filteredComplaints.length}
-                  </Text>
-                </View>
-              </View>
-              <PressableBlock onPress={() => setShowFilters(!showFilters)}>
-                <View
-                  className="w-10 h-10 rounded-full items-center justify-center"
-                  style={{
-                    backgroundColor:
-                      showFilters || hasActiveFilters()
-                        ? colors.primary + "20"
-                        : colors.backgroundSecondary,
-                  }}
-                >
-                  <Filter
-                    size={20}
-                    color={
-                      showFilters || hasActiveFilters()
-                        ? colors.primary
-                        : colors.textSecondary
-                    }
-                  />
-                </View>
-              </PressableBlock>
-            </View>
-          </Card>
-        )}
-
-        {/* Filters Section */}
-        {showFilters && (
-          <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
-            <View className="flex-row items-center justify-between mb-3">
-              <Text
-                className="text-base font-bold"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("common.filters")}
-              </Text>
-              {hasActiveFilters() && (
-                <PressableBlock onPress={clearFilters}>
-                  <View className="flex-row items-center">
-                    <X size={16} color={colors.textSecondary} />
-                    <Text
-                      className="text-sm font-semibold ml-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("worker.assigned.clearFilters")}
-                    </Text>
-                  </View>
-                </PressableBlock>
-              )}
-            </View>
-
-            <View
-              className="h-[1px] mb-3"
-              style={{ backgroundColor: colors.border }}
-            />
-
-            {/* Sort Order */}
-            <View className="mb-3">
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.assigned.sortBy")}
-              </Text>
-              <View className="flex-row" style={{ gap: 8 }}>
-                <PressableBlock
-                  onPress={() => setSortOrder("new-to-old")}
-                  style={{ flex: 1 }}
-                >
-                  <View
-                    className="px-3 py-2 rounded-xl flex-row items-center justify-center"
-                    style={{
-                      backgroundColor:
-                        sortOrder === "new-to-old"
-                          ? colors.primary + "20"
-                          : colors.backgroundPrimary,
-                      borderWidth: 1,
-                      borderColor:
-                        sortOrder === "new-to-old"
-                          ? colors.primary
-                          : colors.border,
-                    }}
-                  >
-                    <ArrowUpDown
-                      size={14}
-                      color={
-                        sortOrder === "new-to-old"
-                          ? colors.primary
-                          : colors.textPrimary
-                      }
-                    />
-                    <Text
-                      className="text-xs font-semibold ml-1"
-                      style={{
-                        color:
-                          sortOrder === "new-to-old"
-                            ? colors.primary
-                            : colors.textPrimary,
-                      }}
-                    >
-                      {t("worker.assigned.newToOld")}
-                    </Text>
-                  </View>
-                </PressableBlock>
-                <PressableBlock
-                  onPress={() => setSortOrder("old-to-new")}
-                  style={{ flex: 1 }}
-                >
-                  <View
-                    className="px-3 py-2 rounded-xl flex-row items-center justify-center"
-                    style={{
-                      backgroundColor:
-                        sortOrder === "old-to-new"
-                          ? colors.primary + "20"
-                          : colors.backgroundPrimary,
-                      borderWidth: 1,
-                      borderColor:
-                        sortOrder === "old-to-new"
-                          ? colors.primary
-                          : colors.border,
-                    }}
-                  >
-                    <ArrowUpDown
-                      size={14}
-                      color={
-                        sortOrder === "old-to-new"
-                          ? colors.primary
-                          : colors.textPrimary
-                      }
-                    />
-                    <Text
-                      className="text-xs font-semibold ml-1"
-                      style={{
-                        color:
-                          sortOrder === "old-to-new"
-                            ? colors.primary
-                            : colors.textPrimary,
-                      }}
-                    >
-                      {t("worker.assigned.oldToNew")}
-                    </Text>
-                  </View>
-                </PressableBlock>
-              </View>
-            </View>
-
-            {/* Date Range */}
-            <View className="mb-3">
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.assigned.filters.dateRange")}
-              </Text>
-              <View className="flex-row" style={{ gap: 8 }}>
-                <View className="flex-1">
-                  <DateTimePickerModal
-                    mode="date"
-                    value={startDate}
-                    onChange={setStartDate}
-                    icon={Calendar}
-                    placeholder={t("worker.assigned.filters.startDate")}
-                    maxDateToday={true}
-                  />
-                </View>
-                <View className="flex-1">
-                  <DateTimePickerModal
-                    mode="date"
-                    value={endDate}
-                    onChange={setEndDate}
-                    icon={Calendar}
-                    placeholder={t("worker.assigned.filters.endDate")}
-                    maxDateToday={true}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Priority Filter */}
-            <View className="mb-3">
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.assigned.filters.priority")}
-              </Text>
-              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-                {["all", "high", "medium", "low"].map((priority) => (
-                  <PressableBlock
-                    key={priority}
-                    onPress={() => setSelectedPriority(priority)}
-                  >
-                    <View
-                      className="px-3 py-2 rounded-xl"
-                      style={{
-                        backgroundColor:
-                          selectedPriority === priority
-                            ? colors.primary + "20"
-                            : colors.backgroundPrimary,
-                        borderWidth: 1,
-                        borderColor:
-                          selectedPriority === priority
-                            ? colors.primary
-                            : colors.border,
-                      }}
-                    >
-                      <Text
-                        className="text-xs font-semibold capitalize"
-                        style={{
-                          color:
-                            selectedPriority === priority
-                              ? colors.primary
-                              : colors.textPrimary,
-                        }}
-                      >
-                        {priority === "all"
-                          ? t("common.all")
-                          : formatPriorityLabel(t, priority)}
-                      </Text>
-                    </View>
-                  </PressableBlock>
-                ))}
-              </View>
-            </View>
-
-            {/* Status Filter */}
-            <View>
-              <Text
-                className="text-xs font-semibold mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.assigned.filters.status")}
-              </Text>
-              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-                {["all", "assigned", "in-progress", "resolved"].map(
-                  (status) => (
-                    <PressableBlock
-                      key={status}
-                      onPress={() => setSelectedStatus(status)}
-                    >
-                      <View
-                        className="px-3 py-2 rounded-xl"
-                        style={{
-                          backgroundColor:
-                            selectedStatus === status
-                              ? colors.primary + "20"
-                              : colors.backgroundPrimary,
-                          borderWidth: 1,
-                          borderColor:
-                            selectedStatus === status
-                              ? colors.primary
-                              : colors.border,
-                        }}
-                      >
-                        <Text
-                          className="text-xs font-semibold capitalize"
-                          style={{
-                            color:
-                              selectedStatus === status
-                                ? colors.primary
-                                : colors.textPrimary,
-                          }}
-                        >
-                          {status === "all"
-                            ? t("common.all")
-                            : formatStatusLabel(t, status)}
-                        </Text>
-                      </View>
-                    </PressableBlock>
-                  ),
-                )}
-              </View>
-            </View>
-
+          <View className="mb-4 flex-row items-center" style={{ gap: 6 }}>
             {filteredComplaints.length !== complaints.length && (
-              <View
-                className="mt-3 px-3 py-2 rounded-xl"
-                style={{ backgroundColor: colors.info + "20" || "#3B82F620" }}
-              >
-                <Text
-                  className="text-xs text-center"
-                  style={{ color: colors.info || "#3B82F6" }}
-                >
-                  {t("worker.assigned.showingResults", {
-                    count: filteredComplaints.length,
-                    filtered: filteredComplaints.length,
-                    total: complaints.length,
-                  })}
-                </Text>
-              </View>
+              <Text className="text-xs" style={{ color: colors.textSecondary }}>
+                {t("worker.assigned.showingResults", {
+                  count: filteredComplaints.length,
+                  total: complaints.length,
+                })}
+              </Text>
             )}
-          </Card>
+          </View>
         )}
 
         {filteredComplaints.length === 0 && complaints.length > 0 ? (
@@ -613,7 +293,9 @@ export default function WorkerAssigned() {
               <PressableBlock
                 key={complaint.id}
                 onPress={() =>
-                  router.push(`/complaints/complaint-details?id=${complaint.id}`)
+                  router.push(
+                    `/complaints/complaint-details?id=${complaint.id}`,
+                  )
                 }
               >
                 <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -666,7 +348,8 @@ export default function WorkerAssigned() {
                       className="text-xs ml-1 flex-1"
                       style={{ color: colors.textSecondary }}
                     >
-                      {complaint.locationName || t("worker.assigned.noLocation")}
+                      {complaint.locationName ||
+                        t("worker.assigned.noLocation")}
                     </Text>
                   </View>
 

@@ -20,10 +20,11 @@ exports.summary = asyncHandler(async (req, res) => {
   sixMonthsAgo.setDate(1);
   sixMonthsAgo.setHours(0, 0, 0, 0);
 
-  const [total, pending, inProgress, resolved, recentComplaints, resolvedComplaints, departmentStats, monthlyData] =
+  const [total, pending, assigned, inProgress, resolved, recentComplaints, resolvedComplaints, departmentStats, monthlyData] =
     await Promise.all([
       Complaint.countDocuments({ userId }),
       Complaint.countDocuments({ userId, status: "pending" }),
+      Complaint.countDocuments({ userId, status: "assigned" }),
       Complaint.countDocuments({ userId, status: "in-progress" }),
       Complaint.countDocuments({ userId, status: "resolved" }),
       Complaint.find({ userId })
@@ -80,6 +81,7 @@ exports.summary = asyncHandler(async (req, res) => {
     stats: {
       total,
       pending,
+      assigned,
       inProgress,
       resolved,
     },

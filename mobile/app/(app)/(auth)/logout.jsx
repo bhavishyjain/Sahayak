@@ -6,6 +6,7 @@ import { darkColors, lightColors } from "../../../colors";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth, { clearUserAuth } from "../../../utils/userAuth";
+import { clearApiCache } from "../../../utils/api";
 import axios from "axios";
 import { LOGOUT_URL } from "../../../url";
 
@@ -33,6 +34,7 @@ export default function LogoutScreen() {
       } catch (_) {
         // ignore — local logout must always succeed
       }
+      clearApiCache(); // drop in-memory token cache before clearing storage
       await clearUserAuth();
       router.replace("/(app)/(auth)/login");
     })();

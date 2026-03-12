@@ -43,7 +43,10 @@ async function attachAuth(req, res, next) {
     }
 
     // Reject tokens issued before tokenValidFrom (password reset, forced logout, etc.)
-    if (user.tokenValidFrom && payload.iat * 1000 < user.tokenValidFrom.getTime()) {
+    // Compare at second granularity because JWT iat is in whole seconds while
+    // tokenValidFrom has millisecond precision — tokens issued in the same second
+    // as tokenValidFrom must still be accepted.
+    if (user.tokenValidFrom && Math.floor(user.tokenValidFrom.getTime() / 1000) > payload.iat) {
       return next(new AppError("Token has been revoked", 401));
     }
 

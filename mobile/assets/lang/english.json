@@ -101,11 +101,13 @@
     "recentComplaints": "Recent Complaints",
     "hotspots": "Hotspots",
     "reminders": "Reminders",
+    "youHave": "You have",
     "stats": {
       "total": "Total",
       "pending": "Pending",
-      "inProgress": "Active",
-      "resolved": "Done",
+      "assigned": "Assigned",
+      "inProgress": "In Progress",
+      "resolved": "Resolved",
       "complaints": "Complaints"
     },
     "actions": {
@@ -131,6 +133,7 @@
     "complaint": "Complaint",
     "ticket": "Ticket",
     "date": "Date",
+    "location": "Location",
     "locationNotSet": "Location not set",
     "expectedResolution": "Expected Resolution",
     "overdue": "Overdue",
@@ -709,14 +712,14 @@
       "achievementBadge": "Achievement Badge",
       "gotIt": "Got it!",
       "metricsInfo": {
-        "title": "?? How Metrics Work",
+        "title": "How Metrics Work",
         "rating": {
           "title": "Rating",
           "desc": "Average of all citizen feedback ratings (1-5 stars) on your resolved complaints. Updated when citizens submit feedback after resolution."
         },
         "avgTime": {
           "title": "Average Time",
-          "desc": "Running average of hours taken from assignment to resolution. Calculated as: (previous avg � completions + new time) � (completions + 1). Updated on every HOD approval."
+          "desc": "Running average of hours taken from assignment to resolution. Calculated as: (previous avg x completions + new time) / (completions + 1). Updated on every HOD approval."
         },
         "streak": {
           "title": "Streak",
@@ -726,7 +729,7 @@
           "title": "Total Completed",
           "desc": "Lifetime count of all resolved complaints. This never decreases - it's your career achievement counter. Incremented on every HOD approval."
         },
-        "tip": "?? Tip: All metrics are calculated in real-time when the leaderboard loads!"
+        "tip": "Tip: All metrics are calculated in real-time when the leaderboard loads!"
       },
       "rank": "Rank",
       "worker": "Worker",

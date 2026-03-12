@@ -87,7 +87,7 @@ exports.getWorkerComplaints = asyncHandler(async (req, res) => {
     department: hod.department,
   };
   if (status === "active") {
-    query.status = { $in: ["assigned", "in-progress"] };
+    query.status = { $in: ["assigned", "in-progress", "needs-rework"] };
   } else if (status === "completed") {
     query.status = "resolved";
   }
