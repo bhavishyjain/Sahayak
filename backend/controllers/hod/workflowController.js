@@ -13,6 +13,38 @@ const {
   getComplaintOrThrow,
 } = require("../../services/accessService");
 const { sendComplaintCompleted } = require("../../services/emailService");
+const { notifyUser } = require("../notificationController");
+
+function notifyComplaintParticipants(complaint, actorId, status, body) {
+  const complaintId = String(complaint._id);
+  const ticketId = complaint.ticketId;
+  const recipientIds = new Set();
+
+  if (complaint.userId) {
+    recipientIds.add(String(complaint.userId));
+  }
+
+  (complaint.assignedWorkers || []).forEach((assignment) => {
+    if (assignment?.workerId) {
+      recipientIds.add(String(assignment.workerId));
+    }
+  });
+
+  recipientIds.delete(String(actorId));
+
+  recipientIds.forEach((recipientId) => {
+    notifyUser(recipientId, {
+      title: "Complaint Status Updated",
+      body,
+      data: {
+        type: "complaint-update",
+        complaintId,
+        ticketId,
+        status,
+      },
+    });
+  });
+}
 
 exports.approveCompletion = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
@@ -62,6 +94,13 @@ exports.approveCompletion = asyncHandler(async (req, res) => {
   });
 
   await complaint.save();
+
+  notifyComplaintParticipants(
+    complaint,
+    hodId,
+    "resolved",
+    `Complaint #${complaint.ticketId} has been marked as resolved.`,
+  );
 
   try {
     const user = await User.findById(complaint.userId).select(
@@ -114,7 +153,17 @@ exports.markNeedsRework = asyncHandler(async (req, res) => {
   });
 
   await complaint.save();
-  return sendSuccess(res, { data: complaint }, "Complaint sent back for rework");
+  notifyComplaintParticipants(
+    complaint,
+    hodId,
+    "needs-rework",
+    `Complaint #${complaint.ticketId} needs rework: ${reason}`,
+  );
+  return sendSuccess(
+    res,
+    { data: complaint },
+    "Complaint sent back for rework",
+  );
 });
 
 exports.cancelComplaint = asyncHandler(async (req, res) => {
@@ -133,7 +182,10 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
     (wa) => wa.status !== "completed",
   );
   if (activeWorkers.length > 0) {
-    throw new AppError("Cannot cancel: complaint has active worker assignments", 400);
+    throw new AppError(
+      "Cannot cancel: complaint has active worker assignments",
+      400,
+    );
   }
 
   complaint.status = "cancelled";
@@ -145,6 +197,12 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
   });
 
   await complaint.save();
+  notifyComplaintParticipants(
+    complaint,
+    hodId,
+    "cancelled",
+    `Complaint #${complaint.ticketId} has been cancelled.`,
+  );
   return sendSuccess(
     res,
     { data: complaint },
@@ -194,8 +252,11 @@ exports.updateWorkerTask = asyncHandler(async (req, res) => {
     (item) => item.status === "completed",
   );
 
+  let complaintStatusChanged = false;
+
   if (allCompleted && complaint.status !== "pending-approval") {
     complaint.status = "pending-approval";
+    complaintStatusChanged = true;
     complaint.history.push({
       status: "pending-approval",
       timestamp: new Date(),
@@ -204,6 +265,15 @@ exports.updateWorkerTask = asyncHandler(async (req, res) => {
   }
 
   await complaint.save();
+
+  if (complaintStatusChanged) {
+    notifyComplaintParticipants(
+      complaint,
+      req.user._id,
+      "pending-approval",
+      `Complaint #${complaint.ticketId} is now pending HOD approval.`,
+    );
+  }
 
   return sendSuccess(
     res,

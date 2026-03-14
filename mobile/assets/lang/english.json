@@ -46,6 +46,10 @@
     "reset": "Reset",
     "apply": "Apply"
   },
+  "filters": {
+    "add": "Add filters",
+    "applied": "Filters applied"
+  },
   "greetings": {
     "morning": "Good Morning",
     "afternoon": "Good Afternoon",
@@ -283,9 +287,11 @@
     "complaintCreated": "Complaint created",
     "savedSuccessfully": "Saved successfully",
     "ticketLabel": "Ticket",
-    "gpsCoordinates": "GPS Coordinates (Optional)",
+    "gpsCoordinates": "GPS Coordinates",
     "captureLocation": "Capture Location",
-    "proofImages": "Proof Images (Optional, Max 5)",
+    "proofImages": "Proof Images (Max 5)",
+    "coordinatesRequired": "Please capture GPS coordinates",
+    "proofImagesRequired": "Please upload at least one proof image",
     "takePhoto": "Take Photo",
     "choosePhotos": "Choose Photos",
     "loadMore": "Load more",
@@ -1584,6 +1590,56 @@
       "logout": {
         "title": "Logout",
         "subtitle": "Sign out of your account"
+      }
+    },
+    "manageInvitations": {
+      "title": "Manage Invitations",
+      "subtitle": "Invite workers and track invitation status",
+      "notAvailable": "N/A",
+      "emailUnavailable": "Email unavailable",
+      "status": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "revoked": "Revoked",
+        "expired": "Expired"
+      },
+      "meta": {
+        "sent": "Sent %{date}",
+        "expires": "Expires %{date}",
+        "joined": "Joined %{date}"
+      },
+      "form": {
+        "title": "Invite New Worker",
+        "description": "An invitation link valid for 7 days will be sent to the email address. The recipient registers as a worker in your department.",
+        "emailPlaceholder": "worker@example.com",
+        "send": "Send Invitation"
+      },
+      "sections": {
+        "pending": "Pending (%{count})",
+        "history": "History (%{count})"
+      },
+      "empty": {
+        "pending": "No pending invitations"
+      },
+      "revokeDialog": {
+        "title": "Revoke Invitation",
+        "message": "Cancel the pending invitation for %{email}? They won't be able to register with the invite link.",
+        "confirm": "Revoke",
+        "revoking": "Revoking...",
+        "cancel": "Keep"
+      },
+      "toasts": {
+        "loadFailedTitle": "Failed to load",
+        "loadFailedMessage": "Could not fetch invitations",
+        "emailRequired": "Email required",
+        "invalidEmail": "Enter a valid email address",
+        "sentTitle": "Invitation sent",
+        "sentMessage": "Email sent to %{email}",
+        "sendFailedTitle": "Failed to send",
+        "sendFailedMessage": "Could not send invitation",
+        "revokedTitle": "Invitation revoked",
+        "revokeFailedTitle": "Failed",
+        "revokeFailedMessage": "Could not revoke invitation"
       }
     },
     "theme": {

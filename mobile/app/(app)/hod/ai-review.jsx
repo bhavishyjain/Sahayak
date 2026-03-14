@@ -66,7 +66,8 @@ function ConfidenceBadge({ value, colors, t }) {
 
 function SentimentBadge({ sentiment, colors, t }) {
   const sentimentConfig = getSentimentConfig(colors);
-  const cfg = sentimentConfig[sentiment];
+  const normalizedSentiment = String(sentiment || "unknown").toLowerCase();
+  const cfg = sentimentConfig[normalizedSentiment] ?? sentimentConfig.unknown;
   return (
     <View
       className="px-2 py-0.5 rounded-full ml-2"
@@ -124,7 +125,32 @@ export default function AiReview() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       const res = await apiCall({ method: "GET", url: AI_REVIEW_URL });
-      setComplaints(res?.data?.complaints ?? []);
+      const normalizedComplaints = (res?.data?.complaints ?? [])
+        .map((item) => {
+          const id = item?._id ?? item?.id;
+          if (!id) return null;
+
+          const description =
+            item?.description ?? item?.refinedText ?? item?.rawText ?? item?.title;
+
+          if (
+            !description &&
+            !item?.aiSuggestion?.department &&
+            !item?.aiSuggestion?.priority
+          ) {
+            return null;
+          }
+
+          return {
+            ...item,
+            _id: id,
+            ticketId: item?.ticketId ?? t("hod.aiReview.notAvailable"),
+            description: description ?? t("hod.aiReview.notAvailable"),
+          };
+        })
+        .filter(Boolean);
+
+      setComplaints(normalizedComplaints);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -222,6 +248,8 @@ export default function AiReview() {
   };
 
   const renderItem = ({ item }) => {
+    if (!item?._id) return null;
+
     const c = item;
     const ai = c.aiSuggestion ?? {};
     const cur = c.currentValues ?? {};
@@ -503,7 +531,7 @@ export default function AiReview() {
       ) : (
         <FlatList
           data={complaints}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item, index) => String(item?._id ?? item?.id ?? index)}
           renderItem={renderItem}
           contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
           refreshControl={

@@ -98,10 +98,7 @@ function getRandomLocation() {
 const LAST_60_DAYS = 60;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
-const TOTAL_COMPLAINTS = Math.max(
-  200,
-  Number.parseInt(process.env.SEED_COMPLAINTS || "800", 10) || 800,
-);
+const TOTAL_COMPLAINTS = 2000;
 
 const LANGUAGE_WEIGHTS = [
   { value: "en", weight: 0.56 },

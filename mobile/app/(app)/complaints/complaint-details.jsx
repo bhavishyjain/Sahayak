@@ -480,43 +480,6 @@ function ComplaintDetailsInner() {
     }
   };
 
-  // Worker: Pick photos from gallery
-  const pickPhotosFromGallery = async () => {
-    try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (status !== "granted") {
-        Toast.show({
-          type: "error",
-          text1: t("complaints.permissionRequired"),
-          text2: t("complaints.galleryPermissionDenied"),
-        });
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        quality: 0.8,
-        aspect: [4, 3],
-        selectionLimit: 10,
-      });
-
-      if (!result.canceled && result.assets) {
-        setSelectedPhotos(result.assets);
-        setPhotoUploadModalVisible(false);
-        await uploadCompletionPhotos(result.assets);
-      }
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.pickPhotosFailed"),
-        text2: err.message,
-      });
-    }
-  };
-
   // Worker: Take photo with camera
   const takePhoto = async () => {
     try {
@@ -589,7 +552,8 @@ function ComplaintDetailsInner() {
       Toast.show({
         type: "error",
         text1: t("complaints.uploadFailed"),
-        text2: err?.response?.data?.message || t("complaints.couldNotUploadPhotos"),
+        text2:
+          err?.response?.data?.message || t("complaints.couldNotUploadPhotos"),
       });
     } finally {
       setUploadingPhotos(false);
@@ -648,7 +612,8 @@ function ComplaintDetailsInner() {
       Toast.show({
         type: "error",
         text1: t("complaints.voteFailed"),
-        text2: err?.response?.data?.message || t("complaints.couldNotRecordVote"),
+        text2:
+          err?.response?.data?.message || t("complaints.couldNotRecordVote"),
       });
     } finally {
       setVotingInProgress(false);
@@ -1575,7 +1540,7 @@ function ComplaintDetailsInner() {
                       className="text-xs mb-2"
                       style={{ color: colors.textSecondary }}
                     >
-                        {t("complaints.details.keywords")}
+                      {t("complaints.details.keywords")}
                     </Text>
                     <View className="flex-row flex-wrap gap-1">
                       {complaint.aiAnalysis.keywords.map((kw, i) => (
@@ -1607,12 +1572,13 @@ function ComplaintDetailsInner() {
                     className="text-xs ml-1.5"
                     style={{ color: colors.textSecondary }}
                   >
-                    {t("complaints.details.estimatedAffected")} {" "}
+                    {t("complaints.details.estimatedAffected")}{" "}
                     <Text
                       className="font-semibold"
                       style={{ color: colors.textPrimary }}
                     >
-                      ~{complaint.aiAnalysis.affectedCount} {t("complaints.details.people")}
+                      ~{complaint.aiAnalysis.affectedCount}{" "}
+                      {t("complaints.details.people")}
                     </Text>
                   </Text>
                 </View>
@@ -1844,7 +1810,7 @@ function ComplaintDetailsInner() {
                     className="text-base font-semibold ml-2"
                     style={{ color: colors.light }}
                   >
-                    {t("complaints.uploadAfterPhotos")}
+                    {t("complaints.details.uploadAfterPhotos")}
                   </Text>
                 </View>
               </Card>
@@ -1900,10 +1866,7 @@ function ComplaintDetailsInner() {
               />
               <View className="flex-row items-center mb-2">
                 <Tag size={14} color={colors.muted} />
-                <Text
-                  className="text-xs ml-1"
-                  style={{ color: colors.muted }}
-                >
+                <Text className="text-xs ml-1" style={{ color: colors.muted }}>
                   {t("complaints.details.tags")}
                 </Text>
               </View>
@@ -2032,7 +1995,11 @@ function ComplaintDetailsInner() {
                       backgroundColor: colors.primary,
                     }}
                   >
-                    <MaterialIcons name="place" size={14} color={colors.light} />
+                    <MaterialIcons
+                      name="place"
+                      size={14}
+                      color={colors.light}
+                    />
                     <Text
                       className="text-xs font-bold ml-1.5"
                       style={{ color: colors.light }}
@@ -2449,8 +2416,7 @@ function ComplaintDetailsInner() {
                         className="text-sm font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        {t("complaints.details.sla.level")}{" "}
-                        {entry.level}{" "}
+                        {t("complaints.details.sla.level")} {entry.level}{" "}
                         {t("complaints.details.sla.escalation")}
                       </Text>
                       <Text
@@ -2509,11 +2475,7 @@ function ComplaintDetailsInner() {
               </Text>
 
               <View className="flex-row items-center mb-2">
-                <Star
-                  size={18}
-                  color={colors.warning}
-                  fill={colors.warning}
-                />
+                <Star size={18} color={colors.warning} fill={colors.warning} />
                 <Text
                   className="text-lg font-bold ml-2"
                   style={{ color: colors.textPrimary }}
@@ -3006,7 +2968,7 @@ function ComplaintDetailsInner() {
                 <Pressable
                   onPress={takePhoto}
                   disabled={uploadingPhotos}
-                  className="flex-row items-center justify-center py-4 rounded-xl mb-3"
+                  className="flex-row items-center justify-center py-4 rounded-xl"
                   style={{
                     backgroundColor: colors.primary,
                     opacity: uploadingPhotos ? 0.5 : 1,
@@ -3018,24 +2980,6 @@ function ComplaintDetailsInner() {
                     style={{ color: colors.light }}
                   >
                     {t("complaints.takePhoto")}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={pickPhotosFromGallery}
-                  disabled={uploadingPhotos}
-                  className="flex-row items-center justify-center py-4 rounded-xl"
-                  style={{
-                    backgroundColor: colors.success,
-                    opacity: uploadingPhotos ? 0.5 : 1,
-                  }}
-                >
-                  <ImageIcon size={24} color={colors.light} />
-                  <Text
-                    className="text-base font-semibold ml-2"
-                    style={{ color: colors.light }}
-                  >
-                    {t("complaints.chooseFromGallery")}
                   </Text>
                 </Pressable>
               </View>

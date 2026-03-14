@@ -46,6 +46,10 @@
     "reset": "रीसेट",
     "apply": "लागू करें"
   },
+  "filters": {
+    "add": "फ़िल्टर जोड़ें",
+    "applied": "फ़िल्टर लागू हैं"
+  },
   "greetings": {
     "morning": "सुप्रभात",
     "afternoon": "नमस्कार",
@@ -283,9 +287,11 @@
     "complaintCreated": "शिकायत बनाई गई",
     "savedSuccessfully": "सफलतापूर्वक सहेजा गया",
     "ticketLabel": "टिकट",
-    "gpsCoordinates": "GPS निर्देशांक (वैकल्पिक)",
+    "gpsCoordinates": "GPS निर्देशांक",
     "captureLocation": "स्थान कैप्चर करें",
-    "proofImages": "प्रमाण छवियां (वैकल्पिक, अधिकतम 5)",
+    "proofImages": "प्रमाण छवियां (अधिकतम 5)",
+    "coordinatesRequired": "कृपया GPS निर्देशांक कैप्चर करें",
+    "proofImagesRequired": "कृपया कम से कम एक प्रमाण छवि अपलोड करें",
     "takePhoto": "फोटो लें",
     "choosePhotos": "फ़ोटो चुनें",
     "loadMore": "और लोड करें",
@@ -1584,6 +1590,56 @@
       "logout": {
         "title": "लॉगआउट करें",
         "subtitle": "अपने खाते से साइन आउट करें"
+      }
+    },
+    "manageInvitations": {
+      "title": "आमंत्रण प्रबंधन",
+      "subtitle": "कर्मचारियों को आमंत्रित करें और स्थिति ट्रैक करें",
+      "notAvailable": "उपलब्ध नहीं",
+      "emailUnavailable": "ईमेल उपलब्ध नहीं है",
+      "status": {
+        "pending": "लंबित",
+        "accepted": "स्वीकृत",
+        "revoked": "रद्द",
+        "expired": "समाप्त"
+      },
+      "meta": {
+        "sent": "भेजा गया %{date}",
+        "expires": "समाप्ति %{date}",
+        "joined": "जुड़ा %{date}"
+      },
+      "form": {
+        "title": "नया कर्मी आमंत्रित करें",
+        "description": "7 दिनों के लिए मान्य आमंत्रण लिंक ईमेल पते पर भेजा जाएगा। प्राप्तकर्ता आपके विभाग में कर्मी के रूप में पंजीकरण करेगा।",
+        "emailPlaceholder": "worker@example.com",
+        "send": "आमंत्रण भेजें"
+      },
+      "sections": {
+        "pending": "लंबित (%{count})",
+        "history": "इतिहास (%{count})"
+      },
+      "empty": {
+        "pending": "कोई लंबित आमंत्रण नहीं है"
+      },
+      "revokeDialog": {
+        "title": "आमंत्रण रद्द करें",
+        "message": "%{email} के लिए लंबित आमंत्रण रद्द करें? वे इस लिंक से पंजीकरण नहीं कर पाएंगे।",
+        "confirm": "रद्द करें",
+        "revoking": "रद्द किया जा रहा है...",
+        "cancel": "रखें"
+      },
+      "toasts": {
+        "loadFailedTitle": "लोड नहीं हो सका",
+        "loadFailedMessage": "आमंत्रण सूची प्राप्त नहीं हो सकी",
+        "emailRequired": "ईमेल आवश्यक है",
+        "invalidEmail": "मान्य ईमेल पता दर्ज करें",
+        "sentTitle": "आमंत्रण भेजा गया",
+        "sentMessage": "%{email} पर ईमेल भेजा गया",
+        "sendFailedTitle": "भेजना विफल हुआ",
+        "sendFailedMessage": "आमंत्रण नहीं भेजा जा सका",
+        "revokedTitle": "आमंत्रण रद्द कर दिया गया",
+        "revokeFailedTitle": "विफल",
+        "revokeFailedMessage": "आमंत्रण रद्द नहीं किया जा सका"
       }
     },
     "theme": {

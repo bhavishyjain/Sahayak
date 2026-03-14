@@ -5,6 +5,7 @@ import {
   BarChart2,
   Bell,
   Brain,
+  CirclePlus,
   Globe,
   ListChecks,
   LogOut,
@@ -159,6 +160,12 @@ export default function More() {
   const SETTINGS_ITEMS = [
     ...(user?.role === "user"
       ? [
+          {
+            icon: CirclePlus,
+            title: "complaints.newComplaint",
+            subtitle: "complaints.registerComplaint",
+            route: "/(app)/more/new-complaint",
+          },
           {
             icon: ListChecks,
             title: "more.menu.myComplaints.title",

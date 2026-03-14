@@ -23,14 +23,13 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
-  TextInput,
 } from "react-native";
+import { TextInput as PaperTextInput } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
-import Card from "../../../components/Card";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import FilterPanel from "../../../components/FilterPanel";
-
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useDownloadReport } from "../../../utils/hooks/useReports";
@@ -123,6 +122,7 @@ export default function HODReports() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
 
   // Tab state
   const [activeTab, setActiveTab] = useState("export"); // "export" or "schedule"
@@ -739,8 +739,11 @@ export default function HODReports() {
           onPress={() => setShowScheduleModal(false)}
         >
           <Pressable
-            className="rounded-t-3xl p-6"
-            style={{ backgroundColor: colors.backgroundPrimary }}
+            className="rounded-t-3xl px-6 pt-6"
+            style={{
+              backgroundColor: colors.backgroundPrimary,
+              paddingBottom: Math.max(insets.bottom + 16, 24),
+            }}
             onPress={(e) => e.stopPropagation()}
           >
             <View className="flex-row items-center justify-between mb-4">
@@ -763,20 +766,29 @@ export default function HODReports() {
             >
               {t("reports.emailAddressLabel")}
             </Text>
-            <TextInput
+            <PaperTextInput
+              mode="flat"
               value={scheduleEmail}
               onChangeText={setScheduleEmail}
               placeholder={t("reports.emailPlaceholder")}
               placeholderTextColor={colors.textSecondary}
               keyboardType="email-address"
               autoCapitalize="none"
-              className="rounded-xl px-4 py-3 mb-4 text-sm"
               style={{
+                marginBottom: 16,
                 backgroundColor: colors.backgroundSecondary,
                 color: colors.textPrimary,
+                borderRadius: 12,
                 borderWidth: 1,
                 borderColor: colors.border,
               }}
+              contentStyle={{
+                color: colors.textPrimary,
+                fontSize: 14,
+                paddingHorizontal: 16,
+              }}
+              underlineStyle={{ display: "none" }}
+              theme={{ colors: { text: colors.textPrimary } }}
             />
 
             <Text
@@ -850,8 +862,11 @@ export default function HODReports() {
           onPress={() => setShowEmailModal(false)}
         >
           <Pressable
-            className="rounded-t-3xl p-6"
-            style={{ backgroundColor: colors.backgroundPrimary }}
+            className="rounded-t-3xl px-6 pt-6"
+            style={{
+              backgroundColor: colors.backgroundPrimary,
+              paddingBottom: Math.max(insets.bottom + 16, 24),
+            }}
             onPress={(e) => e.stopPropagation()}
           >
             <View className="flex-row items-center justify-between mb-4">
@@ -872,20 +887,29 @@ export default function HODReports() {
             >
               {t("reports.emailAddressLabel")}
             </Text>
-            <TextInput
+            <PaperTextInput
+              mode="flat"
               value={emailAddress}
               onChangeText={setEmailAddress}
               placeholder={t("reports.emailPlaceholder")}
               placeholderTextColor={colors.textSecondary}
               keyboardType="email-address"
               autoCapitalize="none"
-              className="rounded-xl px-4 py-3 mb-4 text-sm"
               style={{
+                marginBottom: 16,
                 backgroundColor: colors.backgroundSecondary,
                 color: colors.textPrimary,
+                borderRadius: 12,
                 borderWidth: 1,
                 borderColor: colors.border,
               }}
+              contentStyle={{
+                color: colors.textPrimary,
+                fontSize: 14,
+                paddingHorizontal: 16,
+              }}
+              underlineStyle={{ display: "none" }}
+              theme={{ colors: { text: colors.textPrimary } }}
             />
 
             <Text

@@ -112,8 +112,9 @@ exports.updatePreferences = asyncHandler(async (req, res) => {
   );
 });
 
-exports.notifyUser = async (userId, payload) => {
+exports.notifyUser = async (userId, payload, options = {}) => {
   try {
+    const { saveHistory = true } = options;
     const user = await User.findById(userId).select(
       "pushTokens notificationPreferences",
     );
@@ -128,14 +129,18 @@ exports.notifyUser = async (userId, payload) => {
     if (type === "escalation" && prefs.escalations === false) return;
     if (type === "system" && prefs.systemAlerts === false) return;
 
-    // Persist to history
-    Notification.create({
-      userId,
-      title: payload.title || "Notification",
-      body: payload.body || "",
-      type: type || "other",
-      data: payload.data || {},
-    }).catch((err) => console.error("notifyUser: save error", err));
+    // Chat messages are push-only and must never be persisted in notification history.
+    const shouldPersist = saveHistory && type !== "chat-message";
+
+    if (shouldPersist) {
+      Notification.create({
+        userId,
+        title: payload.title || "Notification",
+        body: payload.body || "",
+        type: type || "other",
+        data: payload.data || {},
+      }).catch((err) => console.error("notifyUser: save error", err));
+    }
 
     if (!user.pushTokens?.length) return;
     await sendExpoPushNotifications(user.pushTokens, payload);

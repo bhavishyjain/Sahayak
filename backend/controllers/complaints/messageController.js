@@ -4,6 +4,7 @@ const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const { assertCanAccessComplaint } = require("../../policies/complaintPolicy");
+const { notifyUser } = require("../notificationController");
 
 const PAGE_SIZE = 50;
 
@@ -38,10 +39,11 @@ exports.getMessages = asyncHandler(async (req, res) => {
 exports.postMessage = asyncHandler(async (req, res) => {
   const text = (req.body.text || "").trim();
   if (!text) throw new AppError("Message text is required", 400);
-  if (text.length > 2000) throw new AppError("Message too long (max 2000 chars)", 400);
+  if (text.length > 2000)
+    throw new AppError("Message too long (max 2000 chars)", 400);
 
   const complaint = await Complaint.findById(req.params.id).select(
-    "userId department assignedWorkers messages",
+    "ticketId userId department assignedWorkers messages",
   );
   if (!complaint) throw new AppError("Complaint not found", 404);
 
@@ -64,6 +66,49 @@ exports.postMessage = asyncHandler(async (req, res) => {
 
   complaint.messages.push(message);
   await complaint.save();
+
+  const complaintId = String(complaint._id);
+  const ticketId = complaint.ticketId;
+  const senderId = String(req.user._id);
+  const recipientIds = new Set();
+
+  if (complaint.userId) {
+    recipientIds.add(String(complaint.userId));
+  }
+
+  (complaint.assignedWorkers || []).forEach((assignment) => {
+    if (assignment?.workerId) {
+      recipientIds.add(String(assignment.workerId));
+    }
+  });
+
+  if (complaint.department) {
+    const heads = await User.find({
+      role: "head",
+      department: complaint.department,
+    }).select("_id");
+    heads.forEach((head) => recipientIds.add(String(head._id)));
+  }
+
+  recipientIds.delete(senderId);
+
+  const preview = text.length > 120 ? `${text.slice(0, 117)}...` : text;
+  recipientIds.forEach((recipientId) => {
+    notifyUser(
+      recipientId,
+      {
+        title: `New message on #${ticketId}`,
+        body: `${senderName}: ${preview}`,
+        data: {
+          type: "chat-message",
+          complaintId,
+          ticketId,
+          senderId,
+        },
+      },
+      { saveHistory: false },
+    );
+  });
 
   const saved = complaint.messages[complaint.messages.length - 1];
   return sendSuccess(res, { message: saved }, "Message sent", 201);

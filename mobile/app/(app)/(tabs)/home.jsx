@@ -28,6 +28,7 @@ import {
 import Svg, { Rect, Text as SvgText } from "react-native-svg";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import NotificationBellButton from "../../../components/NotificationBellButton";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import {
@@ -192,7 +193,7 @@ export default function Home() {
       label: t("home.actions.newComplaint"),
       icon: FilePlus2,
       color: colors.primary,
-      onPress: () => router.push("/(app)/(tabs)/complaints"),
+      onPress: () => router.push("/(app)/(more)/new-complaints"),
     },
     {
       key: "heatmap",
@@ -237,18 +238,14 @@ export default function Home() {
     >
       {/* Header */}
       <View className="mb-6">
-        <View className="flex-row items-center mb-1">
+        <View className="flex-row items-center justify-between mb-1">
           <Text
             className="text-sm font-medium"
             style={{ color: colors.textSecondary }}
           >
             {getGreeting()}
           </Text>
-          <TrendingUp
-            size={14}
-            color={colors.textSecondary}
-            style={{ marginLeft: 6 }}
-          />
+          <NotificationBellButton />
         </View>
         <Text
           className="text-3xl font-extrabold mb-3"

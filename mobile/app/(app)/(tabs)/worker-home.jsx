@@ -23,6 +23,7 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import Card from "../../../components/Card";
 import MetricCard from "../../../components/MetricCard";
+import NotificationBellButton from "../../../components/NotificationBellButton";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
@@ -160,9 +161,12 @@ export default function WorkerHome() {
       >
         {/* Header with Gradient Effect */}
         <View className="px-4 pt-12 pb-6">
-          <Text className="text-sm" style={{ color: colors.textSecondary }}>
-            {getGreeting()}
-          </Text>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>
+              {getGreeting()}
+            </Text>
+            <NotificationBellButton />
+          </View>
           <Text
             className="text-3xl font-bold mt-1"
             style={{ color: colors.textPrimary }}
@@ -365,8 +369,7 @@ export default function WorkerHome() {
                     className="text-xl font-bold"
                     style={{ color: colors.success }}
                   >
-                    {completionPercent}
-                    %
+                    {completionPercent}%
                   </Text>
                 </View>
                 <View
@@ -443,17 +446,15 @@ export default function WorkerHome() {
                 {t("worker.dashboard.activeAssignments")}
               </Text>
               {activeComplaints.length > 3 && (
-                  <PressableBlock
-                    onPress={() => router.push("/worker-assigned")}
+                <PressableBlock onPress={() => router.push("/worker-assigned")}>
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: colors.primary }}
                   >
-                    <Text
-                      className="text-sm font-semibold"
-                      style={{ color: colors.primary }}
-                    >
-                      {t("worker.dashboard.viewAll")}
-                    </Text>
-                  </PressableBlock>
-                )}
+                    {t("worker.dashboard.viewAll")}
+                  </Text>
+                </PressableBlock>
+              )}
             </View>
 
             {activeComplaints.length > 0 ? (

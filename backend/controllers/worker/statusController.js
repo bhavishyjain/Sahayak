@@ -10,8 +10,11 @@ const {
   getRequestUserId,
   getComplaintOrThrow,
 } = require("../../services/accessService");
-const { appendCompletionPhotos } = require("../../services/completionPhotoService");
+const {
+  appendCompletionPhotos,
+} = require("../../services/completionPhotoService");
 const { WORKER_STATUS_TRANSITIONS } = require("./helpers");
+const { notifyUser } = require("../notificationController");
 
 exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
@@ -44,7 +47,10 @@ exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   if (workerNotes) complaint.workerNotes = workerNotes;
 
   if (status === "pending-approval") {
-    if (!complaint.completionPhotos || complaint.completionPhotos.length === 0) {
+    if (
+      !complaint.completionPhotos ||
+      complaint.completionPhotos.length === 0
+    ) {
       throw new AppError(
         "Completion photos are required when submitting for approval",
         400,
@@ -69,6 +75,45 @@ exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   });
 
   await complaint.save();
+
+  const complaintEntityId = String(complaint._id);
+  const ticketId = complaint.ticketId;
+  const statusLabel = String(status).replace(/-/g, " ");
+  const recipientIds = new Set();
+
+  if (complaint.userId) {
+    recipientIds.add(String(complaint.userId));
+  }
+
+  (complaint.assignedWorkers || []).forEach((assignment) => {
+    if (assignment?.workerId) {
+      recipientIds.add(String(assignment.workerId));
+    }
+  });
+
+  if (complaint.department) {
+    const heads = await User.find({
+      role: "head",
+      department: complaint.department,
+    }).select("_id");
+    heads.forEach((head) => recipientIds.add(String(head._id)));
+  }
+
+  recipientIds.delete(String(workerId));
+
+  recipientIds.forEach((recipientId) => {
+    notifyUser(recipientId, {
+      title: "Complaint Status Updated",
+      body: `Complaint #${ticketId} is now ${statusLabel}.`,
+      data: {
+        type: "complaint-update",
+        complaintId: complaintEntityId,
+        ticketId,
+        status,
+      },
+    });
+  });
+
   return sendSuccess(
     res,
     { data: complaint },

@@ -1,14 +1,57 @@
 const AppError = require("../core/AppError");
 
-function validateCreateComplaint(body) {
-  const required = ["title", "description", "locationName"];
-  const missing = required.filter((field) => !String(body?.[field] || "").trim());
+const VALID_DEPARTMENTS = [
+  "Road",
+  "Water",
+  "Electricity",
+  "Waste",
+  "Drainage",
+  "Other",
+];
+
+const VALID_PRIORITIES = ["Low", "Medium", "High"];
+
+function validateCreateComplaint({ body, coordinates, files }) {
+  const required = [
+    "title",
+    "description",
+    "department",
+    "locationName",
+    "priority",
+  ];
+  const missing = required.filter(
+    (field) => !String(body?.[field] || "").trim(),
+  );
+
   if (missing.length > 0) {
     throw new AppError(
-      "title, description and locationName are required",
+      "title, description, department, priority and locationName are required",
       400,
       { missing },
     );
+  }
+
+  if (!VALID_DEPARTMENTS.includes(String(body.department).trim())) {
+    throw new AppError("Invalid department value", 400, {
+      allowed: VALID_DEPARTMENTS,
+    });
+  }
+
+  if (!VALID_PRIORITIES.includes(String(body.priority).trim())) {
+    throw new AppError("Invalid priority value", 400, {
+      allowed: VALID_PRIORITIES,
+    });
+  }
+
+  if (!coordinates) {
+    throw new AppError(
+      "coordinates are required and must include valid lat and lng",
+      400,
+    );
+  }
+
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new AppError("At least one proof image is required", 400);
   }
 }
 

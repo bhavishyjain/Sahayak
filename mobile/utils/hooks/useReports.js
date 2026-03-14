@@ -1,10 +1,14 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Linking, Platform } from "react-native";
 import useApiQuery from "./useApiQuery";
 import { REPORT_DOWNLOAD_URL, REPORT_STATS_URL } from "../../url";
 import { getCachedToken } from "../cache/auth";
 import getUserAuth from "../userAuth";
+
+const REPORTS_FOLDER_NAME = "Sahayak";
+const REPORTS_DIRECTORY_URI_KEY = "reportsDirectoryUri";
 
 async function getAuthToken() {
   // Try fast in-memory cache first
@@ -23,6 +27,134 @@ function buildReportQueryString(filters = {}) {
   if (filters.endDate) params.append("endDate", filters.endDate);
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+function getTimestampLabel() {
+  return new Date().toISOString().replace(/[.:]/g, "-");
+}
+
+function stripExtension(fileName) {
+  return fileName.replace(/\.[^/.]+$/, "");
+}
+
+function getDirectoryNameFromUri(uri) {
+  const decoded = decodeURIComponent(uri);
+  const slashIdx = decoded.lastIndexOf("/");
+  return (slashIdx >= 0 ? decoded.slice(slashIdx + 1) : decoded).toLowerCase();
+}
+
+async function getAndroidFilesBaseUri() {
+  const cachedUri = await AsyncStorage.getItem(REPORTS_DIRECTORY_URI_KEY);
+
+  if (cachedUri) {
+    try {
+      await FileSystem.StorageAccessFramework.readDirectoryAsync(cachedUri);
+      return cachedUri;
+    } catch {
+      await AsyncStorage.removeItem(REPORTS_DIRECTORY_URI_KEY);
+    }
+  }
+
+  const initialUri =
+    FileSystem.StorageAccessFramework.getUriForDirectoryInRoot("Download");
+  const permission =
+    await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(
+      initialUri,
+    );
+
+  if (!permission.granted || !permission.directoryUri) {
+    throw new Error("Storage permission was not granted");
+  }
+
+  await AsyncStorage.setItem(
+    REPORTS_DIRECTORY_URI_KEY,
+    permission.directoryUri,
+  );
+  return permission.directoryUri;
+}
+
+async function ensureAndroidReportsDirectory() {
+  const baseUri = await getAndroidFilesBaseUri();
+  const existingItems =
+    await FileSystem.StorageAccessFramework.readDirectoryAsync(baseUri);
+
+  const existingReportsUri = existingItems.find(
+    (itemUri) =>
+      getDirectoryNameFromUri(itemUri) === REPORTS_FOLDER_NAME.toLowerCase(),
+  );
+
+  if (existingReportsUri) {
+    return existingReportsUri;
+  }
+
+  try {
+    return await FileSystem.StorageAccessFramework.makeDirectoryAsync(
+      baseUri,
+      REPORTS_FOLDER_NAME,
+    );
+  } catch {
+    const refreshedItems =
+      await FileSystem.StorageAccessFramework.readDirectoryAsync(baseUri);
+    const recoveredUri = refreshedItems.find(
+      (itemUri) =>
+        getDirectoryNameFromUri(itemUri) === REPORTS_FOLDER_NAME.toLowerCase(),
+    );
+    if (recoveredUri) {
+      return recoveredUri;
+    }
+    throw new Error("Could not create Sahayak folder in Files");
+  }
+}
+
+async function downloadToAndroidFiles({ url, fileName, mimeType, headers }) {
+  const reportsDirUri = await ensureAndroidReportsDirectory();
+  const tempUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+  const downloadResult = await FileSystem.downloadAsync(url, tempUri, {
+    headers,
+  });
+  if (downloadResult.status !== 200) {
+    throw new Error(`Download failed with status ${downloadResult.status}`);
+  }
+
+  const safFileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+    reportsDirUri,
+    stripExtension(fileName),
+    mimeType,
+  );
+
+  const base64Data = await FileSystem.readAsStringAsync(downloadResult.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  await FileSystem.writeAsStringAsync(safFileUri, base64Data, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  await FileSystem.deleteAsync(downloadResult.uri, { idempotent: true });
+
+  return safFileUri;
+}
+
+async function openDownloadedFile(uri, mimeType) {
+  try {
+    if (Platform.OS === "android") {
+      if (uri.startsWith("content://")) {
+        await Linking.openURL(uri);
+        return;
+      }
+
+      const contentUri = await FileSystem.getContentUriAsync(uri);
+      await Linking.openURL(contentUri);
+      return;
+    }
+
+    await Linking.openURL(uri);
+  } catch {
+    await Sharing.shareAsync(uri, {
+      mimeType,
+      dialogTitle: "Open Report",
+      UTI: mimeType === "application/pdf" ? "com.adobe.pdf" : "public.data",
+    });
+  }
 }
 
 export function useReportStats(filters, options = {}) {
@@ -48,54 +180,34 @@ export function useDownloadReport() {
       csv: "text/csv",
     };
     const mimeType = mimeTypes[ext] || "application/octet-stream";
-    const fileName = `sahayak_report_${Date.now()}.${ext}`;
-    const cacheUri = `${FileSystem.cacheDirectory}${fileName}`;
+    const timestamp = getTimestampLabel();
+    const fileName = `sahayak_report_${timestamp}.${ext}`;
 
-    // 1. Download to cache
     const token = await getAuthToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const result = await FileSystem.downloadAsync(url, cacheUri, { headers });
-
-    if (result.status !== 200) {
-      throw new Error(`Download failed with status ${result.status}`);
-    }
+    let savedFileUri = null;
 
     if (Platform.OS === "android") {
-      // Android: use StorageAccessFramework to save directly to a user-chosen folder (defaults to Downloads)
-      const SAF = FileSystem.StorageAccessFramework;
-      const perms = await SAF.requestDirectoryPermissionsAsync();
-
-      if (perms.granted) {
-        // Read cache file as base64
-        const base64 = await FileSystem.readAsStringAsync(result.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        // Create file in chosen directory and write to it
-        const destUri = await SAF.createFileAsync(
-          perms.directoryUri,
-          fileName,
-          mimeType,
-        );
-        await FileSystem.writeAsStringAsync(destUri, base64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        // Clean up cache copy
-        await FileSystem.deleteAsync(result.uri, { idempotent: true });
-      } else {
-        // User denied folder picker — fall back to share sheet
-        await Sharing.shareAsync(result.uri, {
-          mimeType,
-          dialogTitle: `Save ${format.toUpperCase()} Report`,
-        });
-      }
-    } else {
-      // iOS: share sheet includes native "Save to Files" option
-      await Sharing.shareAsync(result.uri, {
+      savedFileUri = await downloadToAndroidFiles({
+        url,
+        fileName,
         mimeType,
-        dialogTitle: `Save ${format.toUpperCase()} Report`,
-        UTI: ext === "pdf" ? "com.adobe.pdf" : "public.data",
+        headers,
       });
+    } else {
+      const reportsDir = `${FileSystem.documentDirectory}${REPORTS_FOLDER_NAME}/`;
+      const fileUri = `${reportsDir}${fileName}`;
+      await FileSystem.makeDirectoryAsync(reportsDir, { intermediates: true });
+      const result = await FileSystem.downloadAsync(url, fileUri, { headers });
+
+      if (result.status !== 200) {
+        throw new Error(`Download failed with status ${result.status}`);
+      }
+
+      savedFileUri = result.uri;
     }
+
+    await openDownloadedFile(savedFileUri, mimeType);
   };
 
   return { download };

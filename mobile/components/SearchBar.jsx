@@ -1,5 +1,6 @@
 import { Search, X } from "lucide-react-native";
-import { TextInput, TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View } from "react-native";
+import { TextInput as PaperTextInput } from "react-native-paper";
 import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
 
@@ -23,18 +24,38 @@ export default function SearchBar({
 
   return (
     <View
-      className="flex-row items-center px-4 py-1 rounded-xl"
+      className="flex-row items-center px-4 rounded-xl"
       style={{
         backgroundColor: colors.backgroundSecondary,
-        borderWidth: 1.5,
+        minHeight: 44,
+        borderWidth: 1,
         borderColor: value ? colors.primary : colors.border,
         ...style,
       }}
     >
-      <Search size={18} color={value ? colors.primary : colors.textSecondary} />
-      <TextInput
-        className="flex-1 ml-3 text-base"
-        style={{ color: colors.textPrimary }}
+      <Search size={16} color={value ? colors.primary : colors.textSecondary} />
+      <PaperTextInput
+        mode="flat"
+        dense
+        style={{
+          flex: 1,
+          marginLeft: 8,
+          backgroundColor: "transparent",
+          fontSize: 14,
+          color: colors.textPrimary,
+        }}
+        contentStyle={{
+          color: colors.textPrimary,
+          fontSize: 14,
+          paddingVertical: 6,
+          paddingHorizontal: 0,
+        }}
+        underlineStyle={{ display: "none" }}
+        theme={{
+          colors: {
+            text: colors.textPrimary,
+          },
+        }}
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}
         value={value}
@@ -42,7 +63,7 @@ export default function SearchBar({
       />
       {!!value && (
         <TouchableOpacity onPress={handleClear} hitSlop={8}>
-          <X size={16} color={colors.textSecondary} />
+          <X size={14} color={colors.textSecondary} />
         </TouchableOpacity>
       )}
     </View>

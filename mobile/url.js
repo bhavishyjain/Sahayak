@@ -1,5 +1,12 @@
 // Base URL configuration
-export const API_BASE = "https://sahayak-zqp7.onrender.com/api";
+const normalizeApiBase = (value) => value?.trim().replace(/\/+$/, "") || "";
+const API_BASE_DEV = normalizeApiBase(process.env.EXPO_PUBLIC_API_URL_DEV);
+const API_BASE_PROD = normalizeApiBase(process.env.RESEND_API_URL);
+
+export const API_BASE =
+  (__DEV__ ? API_BASE_DEV : API_BASE_PROD) ||
+  API_BASE_PROD ||
+  API_BASE_DEV;
 
 // ============================================================================
 // AUTH URLs

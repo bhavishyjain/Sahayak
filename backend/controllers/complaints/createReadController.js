@@ -22,10 +22,14 @@ const {
 const { assertCanAccessComplaint } = require("../../policies/complaintPolicy");
 
 exports.createComplaint = asyncHandler(async (req, res) => {
-  validateCreateComplaint(req.body);
+  const coordinates = parseCoordinates(req.body.coordinates);
+  validateCreateComplaint({
+    body: req.body,
+    coordinates,
+    files: req.files,
+  });
 
   const { title, description, department, locationName, priority } = req.body;
-  const coordinates = parseCoordinates(req.body.coordinates);
   const proofImages = await uploadComplaintImages(req.files || []);
 
   let aiAnalysis = null;

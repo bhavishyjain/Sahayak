@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   Modal,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
@@ -85,7 +86,9 @@ export default function WorkerLeaderboard() {
       ),
       Icon: Flame,
       color: colors.danger,
-      requirement: t("worker.leaderboard.badges.consistentPerformer.requirement"),
+      requirement: t(
+        "worker.leaderboard.badges.consistentPerformer.requirement",
+      ),
     },
     {
       id: "rising-star",
@@ -322,10 +325,7 @@ export default function WorkerLeaderboard() {
         {worker.badges && worker.badges.length > 0 && (
           <View className="flex-row flex-wrap">
             {worker.badges.map((badge, idx) => (
-              <BadgeItem
-                key={badge?.id ?? idx}
-                badge={getBadgeData(badge)}
-              />
+              <BadgeItem key={badge?.id ?? idx} badge={getBadgeData(badge)} />
             ))}
           </View>
         )}
@@ -793,7 +793,8 @@ export default function WorkerLeaderboard() {
                                 : colors.textSecondary,
                             }}
                           >
-                            {t("worker.leaderboard.requirementPrefix")}: {badge.requirement}
+                            {t("worker.leaderboard.requirementPrefix")}:{" "}
+                            {badge.requirement}
                           </Text>
                         </View>
                       );
@@ -843,74 +844,79 @@ export default function WorkerLeaderboard() {
           className="flex-1 justify-end"
           style={{ backgroundColor: `${colors.dark}80` }}
         >
-          <View
-            className="rounded-t-3xl p-6"
-            style={{
-              backgroundColor: colors.backgroundPrimary,
-            }}
+          <SafeAreaView
+            edges={["bottom"]}
+            style={{ backgroundColor: colors.backgroundPrimary }}
           >
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="flex-row items-center">
-                <SelectedBadgeIcon
-                  size={34}
-                  color={selectedBadge?.color ?? colors.primary}
-                  style={{ marginRight: 12 }}
-                />
-                <View>
-                  <Text
-                    className="text-xl font-bold"
-                    style={{
-                      color: selectedBadge?.color ?? colors.textPrimary,
-                    }}
-                  >
-                    {selectedBadge?.name}
-                  </Text>
-                  <Text
-                    className="text-xs mt-1"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("worker.leaderboard.achievementBadge")}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setSelectedBadge(null)}>
-                <X size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
             <View
-              className="p-4 rounded-2xl mb-4"
+              className="rounded-t-3xl p-6"
               style={{
-                backgroundColor: selectedBadge?.color
-                  ? selectedBadge.color + "20"
-                  : colors.backgroundSecondary,
-                borderWidth: 2,
-                borderColor: selectedBadge?.color
-                  ? selectedBadge.color + "40"
-                  : colors.border,
+                backgroundColor: colors.backgroundPrimary,
               }}
             >
-              <Text
-                className="text-base leading-6"
-                style={{ color: colors.textPrimary }}
-              >
-                {selectedBadge?.description}
-              </Text>
-            </View>
+              <View className="flex-row items-center justify-between mb-4">
+                <View className="flex-row items-center">
+                  <SelectedBadgeIcon
+                    size={34}
+                    color={selectedBadge?.color ?? colors.primary}
+                    style={{ marginRight: 12 }}
+                  />
+                  <View>
+                    <Text
+                      className="text-xl font-bold"
+                      style={{
+                        color: selectedBadge?.color ?? colors.textPrimary,
+                      }}
+                    >
+                      {selectedBadge?.name}
+                    </Text>
+                    <Text
+                      className="text-xs mt-1"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {t("worker.leaderboard.achievementBadge")}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedBadge(null)}>
+                  <X size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
 
-            <TouchableOpacity
-              onPress={() => setSelectedBadge(null)}
-              className="py-4 rounded-2xl"
-              style={{ backgroundColor: colors.primary }}
-            >
-              <Text
-                className="text-center text-base font-bold"
-                style={{ color: colors.light }}
+              <View
+                className="p-4 rounded-2xl mb-4"
+                style={{
+                  backgroundColor: selectedBadge?.color
+                    ? selectedBadge.color + "20"
+                    : colors.backgroundSecondary,
+                  borderWidth: 2,
+                  borderColor: selectedBadge?.color
+                    ? selectedBadge.color + "40"
+                    : colors.border,
+                }}
               >
-                {t("worker.leaderboard.gotIt")}
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <Text
+                  className="text-base leading-6"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {selectedBadge?.description}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setSelectedBadge(null)}
+                className="py-4 rounded-2xl"
+                style={{ backgroundColor: colors.primary }}
+              >
+                <Text
+                  className="text-center text-base font-bold"
+                  style={{ color: colors.light }}
+                >
+                  {t("worker.leaderboard.gotIt")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
         </View>
       </Modal>
     </View>

@@ -25,8 +25,10 @@ import {
   TouchableOpacity,
   Pressable,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import NotificationBellButton from "../../../components/NotificationBellButton";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
@@ -37,6 +39,7 @@ export default function HodOverview() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,6 +104,10 @@ export default function HodOverview() {
       : (stats?.performanceScore ?? 0) >= 60
         ? colors.warning
         : colors.danger;
+  const formulaLines = t("hod.dashboard.performance.formulaText")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 
   const SectionLabel = ({ label }) => (
     <Text
@@ -125,9 +132,12 @@ export default function HodOverview() {
     >
       {/* Header */}
       <View className="px-4 pt-12 pb-6">
-        <Text className="text-sm" style={{ color: colors.textSecondary }}>
-          {getGreeting()}
-        </Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-sm" style={{ color: colors.textSecondary }}>
+            {getGreeting()}
+          </Text>
+          <NotificationBellButton />
+        </View>
         <Text
           className="text-3xl font-bold mt-1"
           style={{ color: colors.textPrimary }}
@@ -226,7 +236,7 @@ export default function HodOverview() {
                     {
                       label: t("hod.dashboard.complaints.inProgress"),
                       value: stats.inProgress ?? 0,
-                      color: colors.purple,
+                      color: colors.info,
                     },
                   ].map((col, i, arr) => (
                     <View
@@ -316,13 +326,13 @@ export default function HodOverview() {
                   <View className="flex-1 items-center">
                     <Text
                       className="text-2xl font-bold"
-                      style={{ color: colors.textSecondary }}
+                      style={{ color: colors.danger }}
                     >
                       {stats.cancelled ?? 0}
                     </Text>
                     <Text
                       className="text-xs mt-1"
-                      style={{ color: colors.textSecondary }}
+                      style={{ color: colors.danger }}
                     >
                       {t("hod.dashboard.complaints.cancelled")}
                     </Text>
@@ -537,10 +547,10 @@ export default function HodOverview() {
                   <View
                     className="w-10 h-10 rounded-xl items-center justify-center"
                     style={{
-                      backgroundColor: colors.purple + "18",
+                      backgroundColor: colors.info + "18",
                     }}
                   >
-                    <Clock size={20} color={colors.purple} />
+                    <Clock size={20} color={colors.info} />
                   </View>
                   <View className="flex-1 ml-3">
                     <Text
@@ -560,7 +570,7 @@ export default function HodOverview() {
                   </View>
                   <Text
                     className="text-xl font-bold"
-                    style={{ color: colors.purple }}
+                    style={{ color: colors.info }}
                   >
                     {stats.avgResponseTime ?? t("hod.dashboard.noData")}
                   </Text>
@@ -787,7 +797,9 @@ export default function HodOverview() {
 
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 32 }}
+              contentContainerStyle={{
+                paddingBottom: Math.max(insets.bottom + 20, 32),
+              }}
             >
               {/* Score Banner */}
               <View className="mx-5 mb-4 rounded-2xl overflow-hidden">
@@ -844,14 +856,39 @@ export default function HodOverview() {
                 </View>
                 <View
                   className="rounded-xl px-4 py-3"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
                 >
-                  <Text
-                    className="text-xs font-mono leading-5"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("hod.dashboard.performance.formulaText")}
-                  </Text>
+                  {formulaLines.length > 0 ? (
+                    formulaLines.map((line, index) => (
+                      <Text
+                        key={index}
+                        className={
+                          index === 0 ? "text-sm font-semibold" : "text-sm"
+                        }
+                        style={{
+                          color:
+                            index === 0
+                              ? colors.textPrimary
+                              : colors.textSecondary,
+                          marginTop: index === 0 ? 0 : 4,
+                          lineHeight: 22,
+                        }}
+                      >
+                        {line}
+                      </Text>
+                    ))
+                  ) : (
+                    <Text
+                      className="text-sm"
+                      style={{ color: colors.textSecondary, lineHeight: 22 }}
+                    >
+                      {t("hod.dashboard.performance.formulaText")}
+                    </Text>
+                  )}
                 </View>
               </View>
 

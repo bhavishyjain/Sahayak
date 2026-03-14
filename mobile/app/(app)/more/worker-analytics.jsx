@@ -16,12 +16,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Svg, {
-  G,
-  Line,
-  Rect,
-  Text as SvgText,
-} from "react-native-svg";
+import Svg, { G, Line, Rect, Text as SvgText } from "react-native-svg";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
@@ -139,7 +134,9 @@ function PriorityBar({
           {priorityConfig.map(({ key, color }) => {
             const pct = total > 0 ? (breakdown[key] ?? 0) / total : 0;
             if (pct === 0) return null;
-            return <View key={key} style={{ flex: pct, backgroundColor: color }} />;
+            return (
+              <View key={key} style={{ flex: pct, backgroundColor: color }} />
+            );
           })}
         </View>
       )}
@@ -259,12 +256,12 @@ export default function WorkerAnalytics() {
       {
         key: "pending",
         label: formatStatusLabel(t, "pending"),
-        color: colors.secondary,
+        color: colors.warning + "40",
       },
       {
         key: "cancelled",
         label: formatStatusLabel(t, "cancelled"),
-        color: colors.muted,
+        color: colors.danger,
       },
     ],
     [colors, t],
@@ -323,7 +320,10 @@ export default function WorkerAnalytics() {
 
   if (loading) {
     return (
-      <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+      <View
+        className="flex-1"
+        style={{ backgroundColor: colors.backgroundPrimary }}
+      >
         <BackButtonHeader title={title} />
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={colors.primary} />
@@ -333,7 +333,10 @@ export default function WorkerAnalytics() {
   }
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
+    >
       <BackButtonHeader title={title} />
 
       <ScrollView
@@ -444,7 +447,11 @@ export default function WorkerAnalytics() {
         {/* Weekly Completion Trend */}
         <Card style={{ marginBottom: 12 }}>
           <View className="flex-row items-center mb-3">
-            <BarChart2 size={16} color={colors.info} style={{ marginRight: 6 }} />
+            <BarChart2
+              size={16}
+              color={colors.info}
+              style={{ marginRight: 6 }}
+            />
             <Text
               className="text-sm font-bold"
               style={{ color: colors.textPrimary }}
@@ -475,7 +482,11 @@ export default function WorkerAnalytics() {
         {/* Priority Breakdown */}
         <Card style={{ marginBottom: 12 }}>
           <View className="flex-row items-center mb-3">
-            <Target size={16} color={colors.warning} style={{ marginRight: 6 }} />
+            <Target
+              size={16}
+              color={colors.warning}
+              style={{ marginRight: 6 }}
+            />
             <Text
               className="text-sm font-bold"
               style={{ color: colors.textPrimary }}
@@ -500,7 +511,11 @@ export default function WorkerAnalytics() {
         {/* Status Distribution */}
         <Card style={{ marginBottom: 4 }}>
           <View className="flex-row items-center mb-3">
-            <CheckCircle size={16} color={colors.success} style={{ marginRight: 6 }} />
+            <CheckCircle
+              size={16}
+              color={colors.success}
+              style={{ marginRight: 6 }}
+            />
             <Text
               className="text-sm font-bold"
               style={{ color: colors.textPrimary }}

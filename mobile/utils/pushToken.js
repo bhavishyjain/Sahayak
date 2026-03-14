@@ -6,6 +6,8 @@ import getUserAuth from "./userAuth";
 import { NOTIFICATION_REGISTER_TOKEN_URL } from "../url";
 
 const PUSH_TOKEN_CACHE_KEY = "registered_push_token";
+let hasLoggedPushSetupWarning = false;
+let skipPushRegistrationForSession = false;
 
 /**
  * Requests notification permissions, retrieves the Expo push token,
@@ -16,6 +18,8 @@ const PUSH_TOKEN_CACHE_KEY = "registered_push_token";
 export async function registerPushToken() {
   try {
     if (Platform.OS === "web") return;
+
+    if (skipPushRegistrationForSession) return;
 
     // Ensure a logged-in user exists before hitting the authenticated endpoint
     const user = await getUserAuth();
@@ -48,7 +52,24 @@ export async function registerPushToken() {
 
     await AsyncStorage.setItem(PUSH_TOKEN_CACHE_KEY, pushToken);
   } catch (error) {
+    const message = error?.message || "";
+    const missingAndroidFcmSetup =
+      Platform.OS === "android" &&
+      (message.includes("Default FirebaseApp is not initialized") ||
+        message.includes("fcm-credentials"));
+
+    if (missingAndroidFcmSetup) {
+      skipPushRegistrationForSession = true;
+      if (!hasLoggedPushSetupWarning) {
+        console.warn(
+          "Push token registration disabled for this session: Android push requires Firebase/FCM setup (google-services.json + FCM credentials in Expo).",
+        );
+        hasLoggedPushSetupWarning = true;
+      }
+      return;
+    }
+
     // Non-critical — log but don't surface to user
-    console.warn("Push token registration failed:", error?.message);
+    console.warn("Push token registration failed:", message);
   }
 }

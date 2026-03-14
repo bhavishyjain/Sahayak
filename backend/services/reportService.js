@@ -376,12 +376,22 @@ class ReportService {
     const pages = doc.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
       doc.switchToPage(pages.start + i);
+      const footerY =
+        doc.page.height - Math.max(doc.page.margins.bottom, 40) - 12;
       doc
         .fontSize(8)
         .font("Helvetica")
-        .text(`Page ${i + 1} of ${pages.count}`, 50, doc.page.height - 50, {
-          align: "center",
-        });
+        .text(
+          `Page ${i + 1} of ${pages.count}`,
+          doc.page.margins.left,
+          footerY,
+          {
+            width:
+              doc.page.width - doc.page.margins.left - doc.page.margins.right,
+            align: "center",
+            lineBreak: false,
+          },
+        );
     }
 
     doc.end();
