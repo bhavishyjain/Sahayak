@@ -65,7 +65,8 @@
       "loading": "लॉगिन हो रहा है...",
       "noAccount": "खाता नहीं है?",
       "signUp": "साइन अप करें",
-      "rememberMe": "मुझे याद रखें"
+      "rememberMe": "मुझे याद रखें",
+      "changeLanguage": "भाषा बदलें"
     },
     "register": {
       "title": "खाता बनाएं",

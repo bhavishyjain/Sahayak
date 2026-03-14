@@ -65,7 +65,8 @@
       "loading": "Logging in...",
       "noAccount": "Don't have an account?",
       "signUp": "Sign Up",
-      "rememberMe": "Remember me"
+      "rememberMe": "Remember me",
+      "changeLanguage": "Change Language"
     },
     "register": {
       "title": "Create Account",

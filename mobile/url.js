@@ -1,15 +1,5 @@
-import { Platform } from "react-native";
-
 // Base URL configuration
-export const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL || "https://sahayak-zqp7.onrender.com/api";
-
-export const USER_AGENT_STRING =
-  Platform.OS === "ios"
-    ? "SAHAYAK_IOS"
-    : Platform.OS === "android"
-      ? "SAHAYAK_ANDROID"
-      : "SAHAYAK_RN";
+export const API_BASE = "https://sahayak-zqp7.onrender.com/api";
 
 // ============================================================================
 // AUTH URLs

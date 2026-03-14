@@ -52,8 +52,9 @@ const allowedOrigins = isProd
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Allow non-browser requests (Postman, mobile) only in dev
-      if (!origin && !isProd) return cb(null, true);
+      // Allow non-browser requests (mobile apps, Postman, server-to-server)
+      // which typically do not send an Origin header.
+      if (!origin) return cb(null, true);
       if (origin && allowedOrigins.includes(origin)) return cb(null, true);
       return cb(new Error("Not allowed by CORS"));
     },
