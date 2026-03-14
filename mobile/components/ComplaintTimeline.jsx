@@ -8,6 +8,7 @@ import {
   XCircle,
   AlertCircle,
 } from "lucide-react-native";
+import { useMemo } from "react";
 import { Text, View } from "react-native";
 
 const STATUS_CONFIG = {
@@ -68,7 +69,11 @@ function getStatusConfig(status) {
 
 function resolveActor(updatedBy) {
   if (!updatedBy) return null;
-  if (typeof updatedBy === "string") return updatedBy;
+  if (typeof updatedBy === "string") {
+    const value = updatedBy.trim();
+    if (/^[a-f0-9]{24}$/i.test(value)) return null;
+    return value;
+  }
   if (typeof updatedBy === "object") {
     return updatedBy.fullName ?? updatedBy.username ?? null;
   }
@@ -78,25 +83,79 @@ function resolveActor(updatedBy) {
 function formatDate(timestamp) {
   if (!timestamp) return "";
   const d = new Date(timestamp);
+  if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString("en-IN", {
     month: "short",
     day: "numeric",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
   });
 }
 
+function getTimelineTimestamp(item) {
+  return (
+    item?.timestamp || item?.updatedAt || item?.createdAt || item?.at || null
+  );
+}
+
+function toMinuteKey(timestamp) {
+  if (!timestamp) return "none";
+  const d = new Date(timestamp);
+  if (Number.isNaN(d.getTime())) return String(timestamp);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day} ${hh}:${mm}`;
+}
+
 export default function ComplaintTimeline({ history, colors }) {
   if (!history || history.length === 0) return null;
 
+  const timelineItems = useMemo(() => {
+    const normalized = history.map((item) => ({
+      ...item,
+      __timestamp: getTimelineTimestamp(item),
+    }));
+
+    const compact = [];
+    for (const item of normalized) {
+      const prev = compact[compact.length - 1];
+      if (!prev) {
+        compact.push(item);
+        continue;
+      }
+
+      const sameStatus =
+        String(prev.status || "") === String(item.status || "");
+      const sameNote = String(prev.note || "") === String(item.note || "");
+      const sameActor =
+        String(resolveActor(prev.updatedBy) || "") ===
+        String(resolveActor(item.updatedBy) || "");
+      const sameMinute =
+        toMinuteKey(prev.__timestamp) === toMinuteKey(item.__timestamp);
+
+      if (sameStatus && sameNote && sameActor && sameMinute) {
+        continue;
+      }
+
+      compact.push(item);
+    }
+
+    return compact;
+  }, [history]);
+
   return (
     <View>
-      {history.map((item, index) => {
-        const isLast = index === history.length - 1;
+      {timelineItems.map((item, index) => {
+        const isLast = index === timelineItems.length - 1;
         const cfg = getStatusConfig(item.status);
         const { Icon } = cfg;
         const actor = resolveActor(item.updatedBy);
+        const timestamp = item.__timestamp;
 
         return (
           <View key={index} className="flex-row">
@@ -148,18 +207,25 @@ export default function ComplaintTimeline({ history, colors }) {
                 paddingTop: index > 0 ? 10 : 0,
               }}
             >
-              {/* Status label + timestamp */}
-              <View className="flex-row items-center justify-between">
+              {/* Status label */}
+              <View className="flex-row items-center">
                 <Text
                   className="text-sm font-semibold"
                   style={{ color: cfg.color }}
                 >
                   {cfg.label}
                 </Text>
-                <Text className="text-xs" style={{ color: colors.textMuted }}>
-                  {formatDate(item.timestamp)}
-                </Text>
               </View>
+
+              {/* Date + time */}
+              {!!timestamp && (
+                <Text
+                  className="text-xs mt-0.5"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {formatDate(timestamp)}
+                </Text>
+              )}
 
               {/* Note */}
               {item.note && (

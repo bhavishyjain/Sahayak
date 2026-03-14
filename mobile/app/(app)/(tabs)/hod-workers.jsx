@@ -5,9 +5,6 @@ import {
   Clock,
   Star,
   Search,
-  UserPlus,
-  X,
-  Mail,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -60,13 +57,12 @@ export default function HodWorkersTab() {
       });
 
       const payload = res?.data;
-      setWorkers(payload?.workers || []);
+      setWorkers(payload?.workers ?? []);
     } catch (e) {
       Toast.show({
         type: "error",
         text1: t("toast.error.failed"),
-        text2:
-          e?.response?.data?.message || t("hod.workers.couldNotLoadWorkers"),
+        text2: t("hod.workers.couldNotLoadWorkers"),
       });
     } finally {
       setLoading(false);
@@ -191,7 +187,7 @@ export default function HodWorkersTab() {
         ) : (
           filteredWorkers.map((worker, index) => (
             <PressableBlock
-              key={worker.id || index}
+              key={worker.id ?? String(index)}
               onPress={() => router.push(`/hod/worker-details?id=${worker.id}`)}
             >
               <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -209,7 +205,7 @@ export default function HodWorkersTab() {
                         className="text-base font-bold"
                         style={{ color: colors.textPrimary }}
                       >
-                        {worker.fullName || worker.username}
+                        {worker.fullName ?? worker.username ?? t("hod.workers.notAvailable")}
                       </Text>
                       <Text
                         className="text-xs mt-0.5"
@@ -225,12 +221,12 @@ export default function HodWorkersTab() {
                 <View className="flex-row justify-between">
                   <View className="flex-1 items-center">
                     <View className="flex-row items-center mb-1">
-                      <Clock size={14} color={colors.warning || "#F59E0B"} />
+                      <Clock size={14} color={colors.warning} />
                       <Text
                         className="text-lg font-bold ml-1"
                         style={{ color: colors.textPrimary }}
                       >
-                        {worker.activeComplaints || 0}
+                        {worker.activeComplaints ?? 0}
                       </Text>
                     </View>
                     <Text
@@ -248,15 +244,12 @@ export default function HodWorkersTab() {
 
                   <View className="flex-1 items-center">
                     <View className="flex-row items-center mb-1">
-                      <CheckCircle
-                        size={14}
-                        color={colors.success || "#10B981"}
-                      />
+                      <CheckCircle size={14} color={colors.success} />
                       <Text
                         className="text-lg font-bold ml-1"
                         style={{ color: colors.textPrimary }}
                       >
-                        {worker.completedCount || 0}
+                        {worker.completedCount ?? 0}
                       </Text>
                     </View>
                     <Text

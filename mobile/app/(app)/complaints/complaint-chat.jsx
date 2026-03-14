@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
-import { MessageSquare, Send } from "lucide-react-native";
+import { Clock, MessageSquare, Send } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,13 +20,14 @@ import {
 } from "../../../url";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
 
-const ROLE_LABEL = {
-  user: "Citizen",
-  worker: "Worker",
-  head: "HOD",
-  admin: "Admin",
+const ROLE_LABEL_KEY = {
+  user: "complaintChat.roles.user",
+  worker: "complaintChat.roles.worker",
+  head: "complaintChat.roles.head",
+  admin: "complaintChat.roles.admin",
 };
 
 const ROLE_COLOR = (colors) => ({
@@ -36,10 +37,12 @@ const ROLE_COLOR = (colors) => ({
   admin: colors.danger,
 });
 
-function MessageBubble({ msg, currentUserId, colors }) {
+function MessageBubble({ msg, currentUserId, colors, t }) {
   const isOwn = String(msg.senderId) === String(currentUserId);
   const roleColors = ROLE_COLOR(colors);
-  const roleColor = roleColors[msg.senderRole] || colors.primary;
+  const roleColor = roleColors[msg.senderRole] ?? colors.primary;
+  const roleLabelKey = ROLE_LABEL_KEY[msg.senderRole];
+  const roleLabel = roleLabelKey ? t(roleLabelKey) : t("complaintChat.roles.unknown");
 
   const date = new Date(msg.createdAt);
   const timeStr = date.toLocaleTimeString([], {
@@ -68,7 +71,7 @@ function MessageBubble({ msg, currentUserId, colors }) {
               className="text-[10px] font-medium"
               style={{ color: roleColor }}
             >
-              {ROLE_LABEL[msg.senderRole] || msg.senderRole}
+              {roleLabel}
             </Text>
           </View>
         </View>
@@ -83,23 +86,24 @@ function MessageBubble({ msg, currentUserId, colors }) {
       >
         <Text
           className="text-sm leading-relaxed"
-          style={{ color: isOwn ? "#fff" : colors.textPrimary }}
+          style={{ color: isOwn ? colors.light : colors.textPrimary }}
         >
           {msg.text}
         </Text>
       </View>
-      <Text
-        className="text-[10px] mt-1 mx-1"
-        style={{ color: colors.textSecondary }}
-      >
-        {dateStr} · {timeStr}
-      </Text>
+      <View className="flex-row items-center mt-1 mx-1">
+        <Clock size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
+        <Text className="text-[10px]" style={{ color: colors.textSecondary }}>
+          {dateStr} {timeStr}
+        </Text>
+      </View>
     </View>
   );
 }
 
 export default function ComplaintChat() {
   const { id, ticketId } = useLocalSearchParams();
+  const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
@@ -125,9 +129,9 @@ export default function ComplaintChat() {
           url: `${GET_COMPLAINT_MESSAGES_URL(id)}?page=${pageNum}`,
         });
 
-        const fetched = res?.data?.messages || [];
-        const total = res?.data?.total || 0;
-        const pageSize = res?.data?.pageSize || 50;
+        const fetched = res?.data?.messages ?? [];
+        const total = res?.data?.total ?? 0;
+        const pageSize = res?.data?.pageSize ?? 50;
 
         if (append) {
           // Prepend older messages (they come in ascending order)
@@ -145,8 +149,8 @@ export default function ComplaintChat() {
       } catch (e) {
         Toast.show({
           type: "error",
-          text1: "Failed to load messages",
-          text2: e?.response?.data?.message || "Please try again",
+          text1: t("complaintChat.toasts.loadFailedTitle"),
+          text2: e?.response?.data?.message ?? t("complaintChat.toasts.tryAgain"),
         });
       } finally {
         setLoading(false);
@@ -159,15 +163,15 @@ export default function ComplaintChat() {
   useEffect(() => {
     const init = async () => {
       const user = await getUserAuth();
-      setCurrentUserId(String(user?.id || user?._id));
+      setCurrentUserId(String(user?.id ?? user?._id ?? ""));
       await fetchMessages(1);
     };
     if (id) init();
-  }, [id]);
+  }, [id, fetchMessages]);
 
   const handleSend = async () => {
     const msg = text.trim();
-    if (!msg || sending) return;
+    if ([!msg, sending].some(Boolean)) return;
 
     setText("");
     setSending(true);
@@ -189,8 +193,8 @@ export default function ComplaintChat() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed to send",
-        text2: e?.response?.data?.message || "Please try again",
+        text1: t("complaintChat.toasts.sendFailedTitle"),
+        text2: e?.response?.data?.message ?? t("complaintChat.toasts.tryAgain"),
       });
       // Restore text so user doesn't lose their message
       setText(msg);
@@ -205,7 +209,9 @@ export default function ComplaintChat() {
     }
   };
 
-  const title = ticketId ? `#${ticketId}` : "Discussion";
+  const discussionTitle = ticketId
+    ? t("complaintChat.ticketTitle", { ticketId: String(ticketId) })
+    : t("complaintChat.discussionTitle");
 
   return (
     <KeyboardAvoidingView
@@ -214,7 +220,9 @@ export default function ComplaintChat() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
     >
-      <BackButtonHeader title={`Thread · ${title}`} />
+      <BackButtonHeader
+        title={t("complaintChat.threadTitle", { title: discussionTitle })}
+      />
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
@@ -233,14 +241,13 @@ export default function ComplaintChat() {
                 className="text-base font-semibold text-center mb-2"
                 style={{ color: colors.textPrimary }}
               >
-                No messages yet
+                {t("complaintChat.empty.title")}
               </Text>
               <Text
                 className="text-sm text-center"
                 style={{ color: colors.textSecondary }}
               >
-                Start the conversation. Citizens, workers and the department
-                head can all reply here.
+                {t("complaintChat.empty.description")}
               </Text>
             </View>
           ) : (
@@ -253,6 +260,7 @@ export default function ComplaintChat() {
                   msg={item}
                   currentUserId={currentUserId}
                   colors={colors}
+                  t={t}
                 />
               )}
               contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
@@ -271,7 +279,7 @@ export default function ComplaintChat() {
                       className="text-sm font-medium"
                       style={{ color: colors.primary }}
                     >
-                      Load older messages
+                      {t("complaintChat.loadOlder")}
                     </Text>
                   </TouchableOpacity>
                 ) : null
@@ -291,7 +299,7 @@ export default function ComplaintChat() {
             <TextInput
               value={text}
               onChangeText={setText}
-              placeholder="Type a message…"
+              placeholder={t("complaintChat.inputPlaceholder")}
               placeholderTextColor={colors.placeholder}
               multiline
               maxLength={2000}
@@ -309,7 +317,7 @@ export default function ComplaintChat() {
             />
             <TouchableOpacity
               onPress={handleSend}
-              disabled={!text.trim() || sending}
+              disabled={[!text.trim(), sending].some(Boolean)}
               className="w-11 h-11 rounded-full items-center justify-center"
               style={{
                 backgroundColor:
@@ -317,9 +325,9 @@ export default function ComplaintChat() {
               }}
             >
               {sending ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.light} />
               ) : (
-                <Send size={18} color="#fff" />
+                <Send size={18} color={colors.light} />
               )}
             </TouchableOpacity>
           </View>

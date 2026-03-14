@@ -8,11 +8,12 @@ import {
   Calendar,
   Mail,
   Phone,
+  AtSign,
+  Hash,
   ChevronDown,
   ChevronUp,
   UserMinus,
   AlertTriangle,
-  X,
   BarChart2,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
@@ -41,9 +42,10 @@ import {
   HOD_REMOVE_WORKER_URL,
 } from "../../../url";
 import { getPriorityColor } from "../../../utils/colorHelpers";
+import { formatPriorityLabel } from "../../../utils/complaintFormatters";
 
 export default function WorkerDetails() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { colorScheme } = useTheme();
@@ -58,6 +60,27 @@ export default function WorkerDetails() {
   const [showPastWork, setShowPastWork] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [removing, setRemoving] = useState(false);
+
+  const getWorkerName = (workerData) =>
+    workerData?.fullName ??
+    workerData?.username ??
+    t("hod.workers.details.workerFallback");
+
+  const formatCompletedDate = (dateValue) => {
+    if (dateValue == null) {
+      return t("hod.workers.details.dateUnavailable");
+    }
+
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) {
+      return t("hod.workers.details.dateUnavailable");
+    }
+
+    return new Intl.DateTimeFormat(locale, {
+      month: "short",
+      day: "numeric",
+    }).format(date);
+  };
 
   const load = async (isRefresh = false) => {
     try {
@@ -85,16 +108,18 @@ export default function WorkerDetails() {
 
       const activePayload = activeComplaintsRes?.data;
       const completedPayload = completedComplaintsRes?.data;
-      setWorker(workerRes?.data?.worker || null);
+      setWorker(workerRes?.data?.worker ?? null);
 
       // Set complaints from dedicated endpoints
-      setActiveComplaints(activePayload?.complaints || []);
-      setCompletedComplaints(completedPayload?.complaints || []);
+      setActiveComplaints(activePayload?.complaints ?? []);
+      setCompletedComplaints(completedPayload?.complaints ?? []);
     } catch (e) {
       Toast.show({
         type: "error",
         text1: t("hod.workers.details.failed"),
-        text2: e?.response?.data?.message || t("hod.workers.details.couldNotLoadDetails"),
+        text2:
+          e?.response?.data?.message ??
+          t("hod.workers.details.couldNotLoadDetails"),
       });
     } finally {
       setLoading(false);
@@ -119,7 +144,9 @@ export default function WorkerDetails() {
       Toast.show({
         type: "success",
         text1: t("hod.workers.details.workerRemoved"),
-        text2: t("hod.workers.details.workerRemovedMessage", { name: worker.fullName }),
+        text2: t("hod.workers.details.workerRemovedMessage", {
+          name: getWorkerName(worker),
+        }),
       });
 
       setShowRemoveModal(false);
@@ -128,7 +155,8 @@ export default function WorkerDetails() {
       Toast.show({
         type: "error",
         text1: t("hod.workers.details.failed"),
-        text2: e?.response?.data?.message || t("hod.workers.details.couldNotRemove"),
+        text2:
+          e?.response?.data?.message ?? t("hod.workers.details.couldNotRemove"),
       });
     } finally {
       setRemoving(false);
@@ -175,6 +203,22 @@ export default function WorkerDetails() {
     );
   }
 
+  const workerName = getWorkerName(worker);
+  const workerUsername = worker.username ?? t("hod.workers.details.notAvailable");
+  const activeCount =
+    worker.activeComplaints ??
+    worker.metrics?.activeComplaints ??
+    activeComplaints.length;
+  const completedCount =
+    worker.completedCount ??
+    worker.metrics?.completedCount ??
+    worker.performanceMetrics?.totalCompleted ??
+    0;
+  const ratingValue =
+    typeof worker.rating === "number"
+      ? worker.rating.toFixed(1)
+      : t("hod.workers.details.notAvailable");
+
   return (
     <View
       className="flex-1"
@@ -207,14 +251,17 @@ export default function WorkerDetails() {
               className="text-xl font-bold"
               style={{ color: colors.textPrimary }}
             >
-              {worker.fullName || worker.username}
+              {workerName}
             </Text>
-            <Text
-              className="text-sm mt-1"
-              style={{ color: colors.textSecondary }}
-            >
-              @{worker.username}
-            </Text>
+            <View className="flex-row items-center mt-1">
+              <AtSign size={14} color={colors.textSecondary} />
+              <Text
+                className="text-sm ml-1"
+                style={{ color: colors.textSecondary }}
+              >
+                {workerUsername}
+              </Text>
+            </View>
           </View>
 
           <View
@@ -230,7 +277,7 @@ export default function WorkerDetails() {
                 className="text-sm ml-2"
                 style={{ color: colors.textPrimary }}
               >
-                {worker.email}
+                {worker.email ?? t("hod.workers.details.notAvailable")}
               </Text>
             </View>
             <View className="flex-row items-center mb-2">
@@ -239,7 +286,7 @@ export default function WorkerDetails() {
                 className="text-sm ml-2"
                 style={{ color: colors.textPrimary }}
               >
-                {worker.phone || t("hod.workers.details.notAvailable")}
+                {worker.phone ?? t("hod.workers.details.notAvailable")}
               </Text>
             </View>
             <View className="flex-row items-center">
@@ -248,7 +295,11 @@ export default function WorkerDetails() {
                 className="text-sm ml-2 capitalize"
                 style={{ color: colors.textPrimary }}
               >
-                {worker.department} {t("hod.workers.details.department")}
+                {worker.department != null
+                  ? t("hod.workers.details.departmentValue", {
+                      department: worker.department,
+                    })
+                  : t("hod.workers.details.notAvailable")}
               </Text>
             </View>
           </View>
@@ -259,14 +310,12 @@ export default function WorkerDetails() {
           <Card style={{ margin: 0, marginRight: 6, flex: 1 }}>
             <View className="items-center">
               <View className="flex-row items-center mb-1">
-                <Clock size={16} color={colors.warning || "#F59E0B"} />
+                <Clock size={16} color={colors.warning} />
                 <Text
                   className="text-2xl font-bold ml-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  {worker.activeComplaints ||
-                    worker.metrics?.activeComplaints ||
-                    activeComplaints.length}
+                  {activeCount}
                 </Text>
               </View>
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
@@ -278,15 +327,12 @@ export default function WorkerDetails() {
           <Card style={{ margin: 0, marginLeft: 6, marginRight: 6, flex: 1 }}>
             <View className="items-center">
               <View className="flex-row items-center mb-1">
-                <CheckCircle size={16} color={colors.success || "#10B981"} />
+                <CheckCircle size={16} color={colors.success} />
                 <Text
                   className="text-2xl font-bold ml-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  {worker.completedCount ||
-                    worker.metrics?.completedCount ||
-                    worker.performanceMetrics?.totalCompleted ||
-                    0}
+                  {completedCount}
                 </Text>
               </View>
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
@@ -303,7 +349,7 @@ export default function WorkerDetails() {
                   className="text-2xl font-bold ml-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  {worker.rating ? worker.rating.toFixed(1) : t("hod.workers.details.notAvailable")}
+                  {ratingValue}
                 </Text>
               </View>
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
@@ -316,7 +362,11 @@ export default function WorkerDetails() {
         {/* Analytics Button */}
         <TouchableOpacity
           className="flex-row items-center justify-center rounded-2xl py-3 mb-4"
-          style={{ backgroundColor: colors.primary + "18", borderWidth: 1, borderColor: colors.primary + "44" }}
+          style={{
+            backgroundColor: colors.primary + "18",
+            borderWidth: 1,
+            borderColor: colors.primary + "44",
+          }}
           activeOpacity={0.7}
           onPress={() =>
             router.push(`/(app)/more/worker-analytics?workerId=${id}`)
@@ -327,7 +377,7 @@ export default function WorkerDetails() {
             className="text-sm font-semibold ml-2"
             style={{ color: colors.primary }}
           >
-            View Performance Analytics
+            {t("hod.workers.details.analyticsButton")}
           </Text>
         </TouchableOpacity>
 
@@ -340,7 +390,9 @@ export default function WorkerDetails() {
               className="text-lg font-bold"
               style={{ color: colors.textPrimary }}
             >
-              {t("hod.workers.details.currentAssignments")} ({activeComplaints.length})
+              {t("hod.workers.details.currentAssignmentsWithCount", {
+                count: activeComplaints.length,
+              })}
             </Text>
             {showActiveComplaints ? (
               <ChevronUp size={20} color={colors.textPrimary} />
@@ -365,22 +417,28 @@ export default function WorkerDetails() {
               </Card>
             ) : (
               activeComplaints.map((complaint) => (
+                (() => {
+                  const complaintId = complaint.id ?? complaint._id ?? complaint.ticketId;
+                  return (
                 <PressableBlock
-                  key={complaint.id}
+                  key={String(complaintId)}
                   onPress={() =>
                     router.push(
-                      `/complaints/complaint-details?id=${complaint.id}`,
+                      `/complaints/complaint-details?id=${complaintId}`,
                     )
                   }
                 >
                   <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
                     <View className="flex-row items-start justify-between mb-2">
-                      <Text
-                        className="text-base font-bold"
-                        style={{ color: colors.primary }}
-                      >
-                        #{complaint.ticketId}
-                      </Text>
+                      <View className="flex-row items-center">
+                        <Hash size={15} color={colors.primary} />
+                        <Text
+                          className="text-base font-bold ml-1"
+                          style={{ color: colors.primary }}
+                        >
+                          {complaint.ticketId ?? t("hod.workers.details.notAvailable")}
+                        </Text>
+                      </View>
                       <StatusPill status={complaint.status} />
                     </View>
 
@@ -388,7 +446,7 @@ export default function WorkerDetails() {
                       className="text-base font-semibold mb-2"
                       style={{ color: colors.textPrimary }}
                     >
-                      {complaint.title}
+                      {complaint.title ?? t("hod.workers.details.complaintFallback")}
                     </Text>
 
                     <Text
@@ -396,7 +454,8 @@ export default function WorkerDetails() {
                       style={{ color: colors.textSecondary }}
                       numberOfLines={2}
                     >
-                      {complaint.description}
+                      {complaint.description ??
+                        t("hod.workers.details.descriptionUnavailable")}
                     </Text>
 
                     <View className="flex-row items-center justify-between">
@@ -407,7 +466,8 @@ export default function WorkerDetails() {
                           style={{ color: colors.textSecondary }}
                           numberOfLines={1}
                         >
-                          {complaint.locationName}
+                          {complaint.locationName ??
+                            t("hod.workers.details.locationUnavailable")}
                         </Text>
                       </View>
 
@@ -424,12 +484,14 @@ export default function WorkerDetails() {
                             color: getPriorityColor(complaint.priority, colors),
                           }}
                         >
-                          {complaint.priority}
+                          {formatPriorityLabel(t, complaint.priority)}
                         </Text>
                       </View>
                     </View>
                   </Card>
                 </PressableBlock>
+                  );
+                })()
               ))
             )}
           </>
@@ -442,7 +504,9 @@ export default function WorkerDetails() {
               className="text-lg font-bold"
               style={{ color: colors.textPrimary }}
             >
-              {t("hod.workers.details.pastWork")} ({completedComplaints.length})
+              {t("hod.workers.details.pastWorkWithCount", {
+                count: completedComplaints.length,
+              })}
             </Text>
             {showPastWork ? (
               <ChevronUp size={20} color={colors.textPrimary} />
@@ -467,22 +531,28 @@ export default function WorkerDetails() {
               </Card>
             ) : (
               completedComplaints.map((complaint) => (
+                (() => {
+                  const complaintId = complaint.id ?? complaint._id ?? complaint.ticketId;
+                  return (
                 <PressableBlock
-                  key={complaint.id}
+                  key={String(complaintId)}
                   onPress={() =>
                     router.push(
-                      `/complaints/complaint-details?id=${complaint.id}`,
+                      `/complaints/complaint-details?id=${complaintId}`,
                     )
                   }
                 >
                   <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
                     <View className="flex-row items-start justify-between mb-2">
-                      <Text
-                        className="text-base font-bold"
-                        style={{ color: colors.success || "#10B981" }}
-                      >
-                        #{complaint.ticketId}
-                      </Text>
+                      <View className="flex-row items-center">
+                        <Hash size={15} color={colors.success} />
+                        <Text
+                          className="text-base font-bold ml-1"
+                          style={{ color: colors.success }}
+                        >
+                          {complaint.ticketId ?? t("hod.workers.details.notAvailable")}
+                        </Text>
+                      </View>
                       <StatusPill status={complaint.status} />
                     </View>
 
@@ -490,7 +560,7 @@ export default function WorkerDetails() {
                       className="text-base font-semibold mb-2"
                       style={{ color: colors.textPrimary }}
                     >
-                      {complaint.title}
+                      {complaint.title ?? t("hod.workers.details.complaintFallback")}
                     </Text>
 
                     <View className="flex-row items-center justify-between">
@@ -500,13 +570,7 @@ export default function WorkerDetails() {
                           className="text-xs ml-1"
                           style={{ color: colors.textSecondary }}
                         >
-                          {new Date(complaint.updatedAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                            },
-                          )}
+                          {formatCompletedDate(complaint.updatedAt)}
                         </Text>
                       </View>
 
@@ -523,12 +587,14 @@ export default function WorkerDetails() {
                             color: getPriorityColor(complaint.priority, colors),
                           }}
                         >
-                          {complaint.priority}
+                          {formatPriorityLabel(t, complaint.priority)}
                         </Text>
                       </View>
                     </View>
                   </Card>
                 </PressableBlock>
+                  );
+                })()
               ))
             )}
           </>
@@ -539,35 +605,35 @@ export default function WorkerDetails() {
           <Card
             style={{
               margin: 0,
-              backgroundColor: "#FEF2F2",
+              backgroundColor: colors.danger + "14",
               borderWidth: 1,
-              borderColor: "#FCA5A5",
+              borderColor: colors.danger + "55",
             }}
           >
             <View className="flex-row items-start mb-3">
-              <AlertTriangle size={20} color="#EF4444" />
+              <AlertTriangle size={20} color={colors.danger} />
               <View className="flex-1 ml-2">
                 <Text
                   className="text-sm font-semibold mb-1"
-                  style={{ color: "#991B1B" }}
+                  style={{ color: colors.danger }}
                 >
                   {t("hod.workers.details.removeWorker")}
                 </Text>
-                <Text className="text-xs" style={{ color: "#991B1B" }}>
+                <Text className="text-xs" style={{ color: colors.danger }}>
                   {t("hod.workers.details.removeWorkerDesc")}
                 </Text>
               </View>
             </View>
             <TouchableOpacity
               className="rounded-xl py-3 px-4 flex-row items-center justify-center"
-              style={{ backgroundColor: "#EF4444" }}
+              style={{ backgroundColor: colors.danger }}
               onPress={() => setShowRemoveModal(true)}
               activeOpacity={0.7}
             >
-              <UserMinus size={18} color="#FFFFFF" />
+              <UserMinus size={18} color={colors.light} />
               <Text
                 className="text-sm font-semibold ml-2"
-                style={{ color: "#FFFFFF" }}
+                style={{ color: colors.light }}
               >
                 {t("hod.workers.details.removeFromDepartment")}
               </Text>
@@ -579,12 +645,13 @@ export default function WorkerDetails() {
       {/* Remove Worker Confirmation Modal */}
       <Modal
         visible={showRemoveModal}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => !removing && setShowRemoveModal(false)}
       >
         <Pressable
-          className="flex-1 bg-black/50 justify-center items-center px-4"
+          className="flex-1 justify-center items-center px-4"
+          style={{ backgroundColor: colors.dark + "80" }}
           onPress={() => !removing && setShowRemoveModal(false)}
         >
           <Pressable
@@ -596,9 +663,9 @@ export default function WorkerDetails() {
             <View className="items-center mb-4">
               <View
                 className="w-16 h-16 rounded-full items-center justify-center mb-3"
-                style={{ backgroundColor: "#FEE2E2" }}
+                style={{ backgroundColor: colors.danger + "18" }}
               >
-                <AlertTriangle size={32} color="#EF4444" />
+                <AlertTriangle size={32} color={colors.danger} />
               </View>
               <Text
                 className="text-xl font-bold text-center"
@@ -612,7 +679,9 @@ export default function WorkerDetails() {
               className="text-base text-center mb-2"
               style={{ color: colors.textPrimary }}
             >
-              {t("hod.workers.details.removeModalMessage", { name: worker?.fullName })}{" "}
+              {t("hod.workers.details.removeModalMessage", {
+                name: workerName,
+              })}
             </Text>
 
             <Text
@@ -625,11 +694,11 @@ export default function WorkerDetails() {
             {activeComplaints.length > 0 && (
               <View
                 className="rounded-lg p-3 mb-4"
-                style={{ backgroundColor: "#FEF2F2" }}
+                style={{ backgroundColor: colors.danger + "14" }}
               >
                 <Text
                   className="text-xs font-semibold"
-                  style={{ color: "#991B1B" }}
+                  style={{ color: colors.danger }}
                 >
                   {t("hod.workers.details.removeWarning", {
                     count: activeComplaints.length,
@@ -662,17 +731,17 @@ export default function WorkerDetails() {
                 className="flex-1 rounded-xl py-3 flex-row items-center justify-center"
                 style={{
                   backgroundColor:
-                    activeComplaints.length > 0 ? "#D1D5DB" : "#EF4444",
+                    activeComplaints.length > 0 ? colors.border : colors.danger,
                 }}
                 onPress={handleRemoveWorker}
-                disabled={removing || activeComplaints.length > 0}
+                disabled={removing ? true : activeComplaints.length > 0}
               >
                 {removing ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={colors.light} />
                 ) : (
                   <Text
                     className="text-center font-semibold"
-                    style={{ color: "#FFFFFF" }}
+                    style={{ color: colors.light }}
                   >
                     {t("hod.workers.details.remove")}
                   </Text>

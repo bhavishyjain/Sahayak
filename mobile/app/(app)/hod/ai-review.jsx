@@ -1,9 +1,7 @@
 import { useRouter } from "expo-router";
 import {
-  Brain,
   CheckCircle,
   ChevronRight,
-  AlertCircle,
   Layers,
   Tag,
   Zap,
@@ -21,7 +19,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ScrollView,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
@@ -33,44 +30,50 @@ import apiCall from "../../../utils/api";
 import { AI_REVIEW_URL, APPLY_AI_SUGGESTION_URL } from "../../../url";
 import { useFocusEffect } from "expo-router";
 
-const SENTIMENT_CONFIG = {
-  calm: { label: "Calm", color: "#10B981" },
-  frustrated: { label: "Frustrated", color: "#F59E0B" },
-  angry: { label: "Angry", color: "#F97316" },
-  desperate: { label: "Desperate", color: "#EF4444" },
-  unknown: { label: "Unknown", color: "#6B7280" },
-};
+const getSentimentConfig = (colors) => ({
+  calm: { labelKey: "hod.aiReview.sentiments.calm", color: colors.success },
+  frustrated: {
+    labelKey: "hod.aiReview.sentiments.frustrated",
+    color: colors.warning,
+  },
+  angry: { labelKey: "hod.aiReview.sentiments.angry", color: colors.danger },
+  desperate: {
+    labelKey: "hod.aiReview.sentiments.desperate",
+    color: colors.danger,
+  },
+  unknown: {
+    labelKey: "hod.aiReview.sentiments.unknown",
+    color: colors.textSecondary,
+  },
+});
 
-const PRIORITY_COLOR = {
-  Low: "#10B981",
-  Medium: "#F59E0B",
-  High: "#EF4444",
-};
-
-function ConfidenceBadge({ value, colors }) {
-  const pct = Math.round(value * 100);
-  const color = pct >= 90 ? "#10B981" : pct >= 75 ? "#F59E0B" : "#F97316";
+function ConfidenceBadge({ value, colors, t }) {
+  const confidence = Number(value ?? 0);
+  const pct = Math.round(confidence * 100);
+  const color =
+    pct >= 90 ? colors.success : pct >= 75 ? colors.warning : colors.danger;
   return (
     <View
       className="px-2 py-0.5 rounded-full"
       style={{ backgroundColor: color + "22" }}
     >
       <Text className="text-xs font-semibold" style={{ color }}>
-        {pct}% confident
+        {t("hod.aiReview.confidence", { pct })}
       </Text>
     </View>
   );
 }
 
-function SentimentBadge({ sentiment }) {
-  const cfg = SENTIMENT_CONFIG[sentiment] ?? SENTIMENT_CONFIG.unknown;
+function SentimentBadge({ sentiment, colors, t }) {
+  const sentimentConfig = getSentimentConfig(colors);
+  const cfg = sentimentConfig[sentiment];
   return (
     <View
       className="px-2 py-0.5 rounded-full ml-2"
       style={{ backgroundColor: cfg.color + "22" }}
     >
       <Text className="text-xs font-semibold" style={{ color: cfg.color }}>
-        {cfg.label}
+        {t(cfg.labelKey)}
       </Text>
     </View>
   );
@@ -80,7 +83,7 @@ function DiffRow({ label, current, suggested, colors }) {
   const hasDiff = current !== suggested;
   return (
     <View className="flex-row items-center mt-1">
-      <Text className="text-xs w-20" style={{ color: colors.textMuted }}>
+      <Text className="text-xs w-20" style={{ color: colors.textSecondary }}>
         {label}
       </Text>
       <Text
@@ -91,8 +94,8 @@ function DiffRow({ label, current, suggested, colors }) {
       </Text>
       {hasDiff && (
         <>
-          <ChevronRight size={12} color={colors.textMuted} />
-          <Text className="text-xs font-bold" style={{ color: "#8B5CF6" }}>
+          <ChevronRight size={12} color={colors.textSecondary} />
+          <Text className="text-xs font-bold" style={{ color: colors.info }}>
             {suggested}
           </Text>
         </>
@@ -121,12 +124,14 @@ export default function AiReview() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       const res = await apiCall({ method: "GET", url: AI_REVIEW_URL });
-      setComplaints(res?.data?.complaints || []);
+      setComplaints(res?.data?.complaints ?? []);
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed to load",
-        text2: e?.response?.data?.message || "Could not fetch AI review queue",
+        text1: t("hod.aiReview.toasts.loadFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("hod.aiReview.toasts.loadFailedMessage"),
       });
     } finally {
       setLoading(false);
@@ -137,10 +142,15 @@ export default function AiReview() {
   useFocusEffect(
     useCallback(() => {
       load(false);
-    }, []),
+    }, [t]),
   );
 
-  const applyOne = async (complaintId, applyDepartment, applyPriority) => {
+  const applyOne = async (
+    complaintId,
+    applyDepartment,
+    applyPriority,
+    showSuccessToast = true,
+  ) => {
     setApplying((prev) => new Set(prev).add(complaintId));
     try {
       await apiCall({
@@ -148,14 +158,23 @@ export default function AiReview() {
         url: APPLY_AI_SUGGESTION_URL(complaintId),
         data: { applyDepartment, applyPriority },
       });
-      Toast.show({ type: "success", text1: "AI suggestion applied" });
+      if (showSuccessToast) {
+        Toast.show({
+          type: "success",
+          text1: t("hod.aiReview.toasts.applySuccessTitle"),
+        });
+      }
       setComplaints((prev) => prev.filter((c) => c._id !== complaintId));
+      return true;
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message || "Could not apply suggestion",
+        text1: t("hod.aiReview.toasts.applyFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("hod.aiReview.toasts.applyFailedMessage"),
       });
+      return false;
     } finally {
       setApplying((prev) => {
         const next = new Set(prev);
@@ -172,18 +191,24 @@ export default function AiReview() {
 
     let successCount = 0;
     for (const id of ids) {
-      try {
-        await applyOne(id, applyDepartment, applyPriority);
+      const wasSuccessful = await applyOne(
+        id,
+        applyDepartment,
+        applyPriority,
+        false,
+      );
+      if (wasSuccessful) {
         successCount++;
-      } catch (_) {
-        // individual errors already toasted
       }
     }
     setSelected(new Set());
     setSelectMode(false);
     Toast.show({
       type: "success",
-      text1: `Applied to ${successCount} complaint${successCount !== 1 ? "s" : ""}`,
+      text1: t("hod.aiReview.toasts.bulkApplied", {
+        count: successCount,
+        plural: successCount !== 1 ? "s" : "",
+      }),
     });
   };
 
@@ -200,11 +225,16 @@ export default function AiReview() {
     const c = item;
     const ai = c.aiSuggestion ?? {};
     const cur = c.currentValues ?? {};
-    const deptDiff = ai.department && ai.department !== cur.department;
-    const priorityDiff = ai.priority && ai.priority !== cur.priority;
+    const deptDiff = ai.department != null && ai.department !== cur.department;
+    const priorityDiff = ai.priority != null && ai.priority !== cur.priority;
     const isApplying = applying.has(c._id);
     const isSelected = selected.has(c._id);
-    const sentiment = SENTIMENT_CONFIG[ai.sentiment] ?? SENTIMENT_CONFIG.unknown;
+    const confidenceValue = c.aiConfidence ?? Number(ai.confidence ?? 0) / 100;
+    const complaintText =
+      c.description ??
+      c.refinedText ??
+      c.rawText ??
+      t("hod.aiReview.notAvailable");
 
     return (
       <TouchableOpacity
@@ -223,7 +253,7 @@ export default function AiReview() {
             marginBottom: 12,
             flex: 0,
             borderWidth: isSelected ? 2 : 1,
-            borderColor: isSelected ? "#8B5CF6" : colors.border,
+            borderColor: isSelected ? colors.info : colors.border,
           }}
         >
           {/* Header row */}
@@ -235,7 +265,7 @@ export default function AiReview() {
                   className="mr-2"
                 >
                   {isSelected ? (
-                    <CheckSquare size={20} color="#8B5CF6" />
+                    <CheckSquare size={20} color={colors.info} />
                   ) : (
                     <Square size={20} color={colors.textSecondary} />
                   )}
@@ -244,7 +274,7 @@ export default function AiReview() {
               <View className="flex-1">
                 <Text
                   className="text-xs font-mono"
-                  style={{ color: colors.textMuted }}
+                  style={{ color: colors.textSecondary }}
                 >
                   {c.ticketId}
                 </Text>
@@ -253,41 +283,31 @@ export default function AiReview() {
                   style={{ color: colors.textPrimary }}
                   numberOfLines={2}
                 >
-                  {c.description || c.refinedText || c.rawText}
+                  {complaintText}
                 </Text>
               </View>
             </View>
-            <ConfidenceBadge value={c.aiConfidence ?? ai.confidence / 100} colors={colors} />
+            <ConfidenceBadge value={confidenceValue} colors={colors} t={t} />
           </View>
 
           {/* Sentiment + urgency */}
           <View className="flex-row items-center mb-3">
-            <View
-              className="px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: sentiment.color + "22" }}
-            >
-              <Text
-                className="text-xs font-semibold"
-                style={{ color: sentiment.color }}
-              >
-                {sentiment.label}
-              </Text>
-            </View>
+            <SentimentBadge sentiment={ai.sentiment} colors={colors} t={t} />
             {ai.urgency != null && (
               <View className="flex-row items-center ml-2">
-                <Zap size={11} color="#F59E0B" />
+                <Zap size={11} color={colors.warning} />
                 <Text
                   className="text-xs ml-0.5"
-                  style={{ color: colors.textMuted }}
+                  style={{ color: colors.textSecondary }}
                 >
-                  Urgency {ai.urgency}/10
+                  {t("hod.aiReview.urgency", { value: ai.urgency })}
                 </Text>
               </View>
             )}
             {ai.affectedCount != null && (
               <View className="flex-row items-center ml-2">
-                <Text className="text-xs" style={{ color: colors.textMuted }}>
-                  ~{ai.affectedCount} affected
+                <Text className="text-xs" style={{ color: colors.textSecondary }}>
+                  {t("hod.aiReview.affected", { count: ai.affectedCount })}
                 </Text>
               </View>
             )}
@@ -300,11 +320,11 @@ export default function AiReview() {
                 <View
                   key={i}
                   className="px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: "#8B5CF618" }}
+                  style={{ backgroundColor: colors.info + "18" }}
                 >
                   <Text
                     className="text-xs font-medium"
-                    style={{ color: "#8B5CF6" }}
+                    style={{ color: colors.info }}
                   >
                     {kw}
                   </Text>
@@ -320,29 +340,29 @@ export default function AiReview() {
           >
             <Text
               className="text-xs font-semibold mb-2"
-              style={{ color: "#8B5CF6" }}
+              style={{ color: colors.info }}
             >
-              AI Suggestions
+              {t("hod.aiReview.suggestionsTitle")}
             </Text>
             {deptDiff && (
               <DiffRow
-                label="Dept"
-                current={cur.department}
-                suggested={ai.department}
+                label={t("hod.aiReview.labels.department")}
+                current={cur.department ?? t("hod.aiReview.notAvailable")}
+                suggested={ai.department ?? t("hod.aiReview.notAvailable")}
                 colors={colors}
               />
             )}
             {priorityDiff && (
               <DiffRow
-                label="Priority"
-                current={cur.priority}
-                suggested={ai.priority}
+                label={t("hod.aiReview.labels.priority")}
+                current={cur.priority ?? t("hod.aiReview.notAvailable")}
+                suggested={ai.priority ?? t("hod.aiReview.notAvailable")}
                 colors={colors}
               />
             )}
             {!deptDiff && !priorityDiff && (
-              <Text className="text-xs" style={{ color: colors.textMuted }}>
-                Priority suggestion only
+              <Text className="text-xs" style={{ color: colors.textSecondary }}>
+                {t("hod.aiReview.priorityOnly")}
               </Text>
             )}
           </View>
@@ -366,14 +386,18 @@ export default function AiReview() {
                   onPress={() => applyOne(c._id, true, false)}
                   disabled={isApplying}
                   className="flex-row items-center px-3 py-1.5 rounded-lg"
-                  style={{ backgroundColor: "#3B82F620", borderWidth: 1, borderColor: "#3B82F6" }}
+                  style={{
+                    backgroundColor: colors.info + "20",
+                    borderWidth: 1,
+                    borderColor: colors.info,
+                  }}
                 >
-                  <Layers size={13} color="#3B82F6" />
+                  <Layers size={13} color={colors.info} />
                   <Text
                     className="text-xs font-semibold ml-1"
-                    style={{ color: "#3B82F6" }}
+                    style={{ color: colors.info }}
                   >
-                    Apply Dept
+                    {t("hod.aiReview.actions.applyDepartment")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -382,14 +406,18 @@ export default function AiReview() {
                   onPress={() => applyOne(c._id, false, true)}
                   disabled={isApplying}
                   className="flex-row items-center px-3 py-1.5 rounded-lg"
-                  style={{ backgroundColor: "#F59E0B20", borderWidth: 1, borderColor: "#F59E0B" }}
+                  style={{
+                    backgroundColor: colors.warning + "20",
+                    borderWidth: 1,
+                    borderColor: colors.warning,
+                  }}
                 >
-                  <Tag size={13} color="#F59E0B" />
+                  <Tag size={13} color={colors.warning} />
                   <Text
                     className="text-xs font-semibold ml-1"
-                    style={{ color: "#F59E0B" }}
+                    style={{ color: colors.warning }}
                   >
-                    Apply Priority
+                    {t("hod.aiReview.actions.applyPriority")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -398,14 +426,18 @@ export default function AiReview() {
                   onPress={() => applyOne(c._id, true, true)}
                   disabled={isApplying}
                   className="flex-row items-center px-3 py-1.5 rounded-lg"
-                  style={{ backgroundColor: "#8B5CF620", borderWidth: 1, borderColor: "#8B5CF6" }}
+                  style={{
+                    backgroundColor: colors.primary + "20",
+                    borderWidth: 1,
+                    borderColor: colors.primary,
+                  }}
                 >
-                  <CheckCircle size={13} color="#8B5CF6" />
+                  <CheckCircle size={13} color={colors.primary} />
                   <Text
                     className="text-xs font-semibold ml-1"
-                    style={{ color: "#8B5CF6" }}
+                    style={{ color: colors.primary }}
                   >
-                    Apply Both
+                    {t("hod.aiReview.actions.applyBoth")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -422,7 +454,11 @@ export default function AiReview() {
   return (
     <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
       <BackButtonHeader
-        title={`AI Review${complaints.length ? ` (${complaints.length})` : ""}`}
+        title={
+          complaints.length
+            ? t("hod.aiReview.titleWithCount", { count: complaints.length })
+            : t("hod.aiReview.title")
+        }
         onBack={() => router.back()}
         rightElement={
           complaints.length > 0 ? (
@@ -437,14 +473,20 @@ export default function AiReview() {
               }}
               className="px-3 py-1.5 rounded-lg"
               style={{
-                backgroundColor: selectMode ? colors.backgroundSecondary : "#8B5CF620",
+                backgroundColor: selectMode
+                  ? colors.backgroundSecondary
+                  : colors.info + "20",
               }}
             >
               <Text
                 className="text-xs font-semibold"
-                style={{ color: selectMode ? colors.textSecondary : "#8B5CF6" }}
+                style={{
+                  color: selectMode ? colors.textSecondary : colors.info,
+                }}
               >
-                {selectMode ? "Cancel" : "Select"}
+                {selectMode
+                  ? t("hod.aiReview.actions.cancel")
+                  : t("hod.aiReview.actions.select")}
               </Text>
             </TouchableOpacity>
           ) : null
@@ -455,7 +497,7 @@ export default function AiReview() {
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={colors.primary} />
           <Text className="text-sm mt-3" style={{ color: colors.textSecondary }}>
-            Loading AI review queue...
+            {t("hod.aiReview.loading")}
           </Text>
         </View>
       ) : (
@@ -477,21 +519,21 @@ export default function AiReview() {
               <View className="items-center py-10">
                 <View
                   className="w-16 h-16 rounded-full items-center justify-center mb-4"
-                  style={{ backgroundColor: "#10B98120" }}
+                  style={{ backgroundColor: colors.success + "20" }}
                 >
-                  <CheckCircle size={32} color="#10B981" />
+                  <CheckCircle size={32} color={colors.success} />
                 </View>
                 <Text
                   className="text-base font-semibold"
                   style={{ color: colors.textPrimary }}
                 >
-                  All caught up!
+                  {t("hod.aiReview.empty.title")}
                 </Text>
                 <Text
                   className="text-sm mt-1 text-center"
                   style={{ color: colors.textSecondary }}
                 >
-                  No complaints need AI review right now.
+                  {t("hod.aiReview.empty.description")}
                 </Text>
               </View>
             </Card>
@@ -503,17 +545,29 @@ export default function AiReview() {
       {selectMode && selected.size > 0 && (
         <View
           className="absolute bottom-24 left-4 right-4 rounded-2xl p-4 flex-row items-center justify-between"
-          style={{ backgroundColor: "#8B5CF6", shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 }}
+          style={{
+            backgroundColor: colors.info,
+            shadowColor: colors.dark,
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          }}
         >
-          <Text className="text-sm font-semibold text-white">
-            {selected.size} selected
+          <Text className="text-sm font-semibold" style={{ color: colors.light }}>
+            {t("hod.aiReview.bulk.selectedCount", { count: selected.size })}
           </Text>
           <TouchableOpacity
             onPress={() => setBulkModalVisible(true)}
-            className="flex-row items-center px-4 py-2 rounded-xl bg-white/20"
+            className="flex-row items-center px-4 py-2 rounded-xl"
+            style={{ backgroundColor: colors.light + "33" }}
           >
-            <CheckCircle size={16} color="white" />
-            <Text className="text-sm font-bold text-white ml-1">Apply AI</Text>
+            <CheckCircle size={16} color={colors.light} />
+            <Text
+              className="text-sm font-bold ml-1"
+              style={{ color: colors.light }}
+            >
+              {t("hod.aiReview.bulk.applyCta")}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -526,7 +580,8 @@ export default function AiReview() {
         onRequestClose={() => setBulkModalVisible(false)}
       >
         <Pressable
-          className="flex-1 bg-black/50 justify-end"
+          className="flex-1 justify-end"
+          style={{ backgroundColor: colors.dark + "80" }}
           onPress={() => setBulkModalVisible(false)}
         >
           <Pressable
@@ -539,8 +594,10 @@ export default function AiReview() {
                 className="text-lg font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Apply AI suggestion to {selected.size} complaint
-                {selected.size !== 1 ? "s" : ""}
+                {t("hod.aiReview.bulk.modalTitle", {
+                  count: selected.size,
+                  plural: selected.size !== 1 ? "s" : "",
+                })}
               </Text>
               <TouchableOpacity onPress={() => setBulkModalVisible(false)}>
                 <X size={20} color={colors.textSecondary} />
@@ -551,35 +608,37 @@ export default function AiReview() {
               className="text-sm mb-5"
               style={{ color: colors.textSecondary }}
             >
-              Choose what to apply where the AI suggestion differs from the
-              current value:
+              {t("hod.aiReview.bulk.modalHint")}
             </Text>
 
             {[
               {
-                label: "Department only",
-                sub: "Update department to AI suggestion",
+                id: "department",
+                label: t("hod.aiReview.bulk.options.departmentOnly.label"),
+                sub: t("hod.aiReview.bulk.options.departmentOnly.sub"),
                 icon: Layers,
-                color: "#3B82F6",
+                color: colors.info,
                 action: () => applyBulk(true, false),
               },
               {
-                label: "Priority only",
-                sub: "Update priority to AI suggestion",
+                id: "priority",
+                label: t("hod.aiReview.bulk.options.priorityOnly.label"),
+                sub: t("hod.aiReview.bulk.options.priorityOnly.sub"),
                 icon: Tag,
-                color: "#F59E0B",
+                color: colors.warning,
                 action: () => applyBulk(false, true),
               },
               {
-                label: "Department + Priority",
-                sub: "Apply both AI suggestions",
+                id: "both",
+                label: t("hod.aiReview.bulk.options.departmentAndPriority.label"),
+                sub: t("hod.aiReview.bulk.options.departmentAndPriority.sub"),
                 icon: CheckCircle,
-                color: "#8B5CF6",
+                color: colors.primary,
                 action: () => applyBulk(true, true),
               },
-            ].map(({ label, sub, icon: Icon, color, action }) => (
+            ].map(({ id, label, sub, icon: Icon, color, action }) => (
               <TouchableOpacity
-                key={label}
+                key={id}
                 onPress={action}
                 className="flex-row items-center p-4 rounded-xl mb-3"
                 style={{ backgroundColor: color + "15", borderWidth: 1, borderColor: color + "40" }}
@@ -604,7 +663,7 @@ export default function AiReview() {
                     {sub}
                   </Text>
                 </View>
-                <ChevronRight size={16} color={colors.textMuted} />
+                <ChevronRight size={16} color={colors.textSecondary} />
               </TouchableOpacity>
             ))}
           </Pressable>

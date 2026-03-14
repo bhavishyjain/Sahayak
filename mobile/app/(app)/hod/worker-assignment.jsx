@@ -1,18 +1,14 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Users,
-  User,
   CheckCircle,
-  Clock,
-  AlertCircle,
-  XCircle,
   Search,
   X,
-  ChevronRight,
   Briefcase,
   Plus,
   Trash2,
   RefreshCw,
+  Hash,
 } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -46,27 +42,43 @@ import {
 
 // ─── Status configs ────────────────────────────────────────────────────────────
 
-const TASK_STATUSES = [
-  { value: "assigned", label: "Assigned", color: "#3B82F6" },
-  { value: "in-progress", label: "In Progress", color: "#F59E0B" },
-  { value: "completed", label: "Completed", color: "#10B981" },
-  { value: "needs-rework", label: "Needs Rework", color: "#EF4444" },
+const getTaskStatuses = (t, colors) => [
+  {
+    value: "assigned",
+    label: t("hod.workerAssignment.statuses.assigned"),
+    color: colors.info,
+  },
+  {
+    value: "in-progress",
+    label: t("hod.workerAssignment.statuses.inProgress"),
+    color: colors.warning,
+  },
+  {
+    value: "completed",
+    label: t("hod.workerAssignment.statuses.completed"),
+    color: colors.success,
+  },
+  {
+    value: "needs-rework",
+    label: t("hod.workerAssignment.statuses.needsRework"),
+    color: colors.danger,
+  },
 ];
 
-function statusConfig(status) {
+function statusConfig(status, t, colors) {
   return (
-    TASK_STATUSES.find((s) => s.value === status) ?? {
+    getTaskStatuses(t, colors).find((item) => item.value === status) ?? {
       value: status,
-      label: status,
-      color: "#6B7280",
+      label: t("hod.workerAssignment.statuses.unknown"),
+      color: colors.textSecondary,
     }
   );
 }
 
 // ─── Helper components ─────────────────────────────────────────────────────────
 
-function StatusBadge({ status }) {
-  const cfg = statusConfig(status);
+function StatusBadge({ status, t, colors }) {
+  const cfg = statusConfig(status, t, colors);
   return (
     <View
       className="px-2 py-0.5 rounded-full"
@@ -79,8 +91,10 @@ function StatusBadge({ status }) {
   );
 }
 
-function WorkerAvatar({ name, colors }) {
-  const initials = (name ?? "?").charAt(0).toUpperCase();
+function WorkerAvatar({ name, colors, t }) {
+  const fallbackName = t("hod.workerAssignment.fallbacks.worker");
+  const displayName = name ?? fallbackName;
+  const initials = displayName.charAt(0).toUpperCase();
   const palette = [
     "#6366F1",
     "#F59E0B",
@@ -137,6 +151,17 @@ export default function WorkerAssignment() {
   const [removeTarget, setRemoveTarget] = useState(null);
   const [removing, setRemoving] = useState(false);
 
+  const getWorkerName = useCallback(
+    (worker) =>
+      worker?.fullName ??
+      worker?.username ??
+      worker?.workerName ??
+      worker?.workerId?.fullName ??
+      worker?.workerId?.username ??
+      t("hod.workerAssignment.fallbacks.worker"),
+    [t],
+  );
+
   // ── Load ──────────────────────────────────────────────────────────────────
   const load = async (isRefresh = false) => {
     try {
@@ -156,12 +181,8 @@ export default function WorkerAssignment() {
 
       // The /workers endpoint returns populated worker docs
       const populated = (workersRes?.data?.workers ?? []).map((w) => ({
-        workerId: String(w.workerId?._id || w.workerId || w._id || ""),
-        workerName:
-          w.workerId?.fullName ||
-          w.workerId?.username ||
-          w.workerName ||
-          "Unknown",
+        workerId: String(w.workerId?._id ?? w.workerId ?? w._id ?? ""),
+        workerName: getWorkerName(w),
         taskDescription: w.taskDescription ?? "",
         status: w.status ?? "assigned",
         notes: w.notes ?? "",
@@ -173,8 +194,10 @@ export default function WorkerAssignment() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed to load",
-        text2: e?.response?.data?.message ?? "Could not load assignment data",
+        text1: t("hod.workerAssignment.toasts.loadFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("hod.workerAssignment.toasts.loadFailedMessage"),
       });
     } finally {
       setLoading(false);
@@ -185,7 +208,7 @@ export default function WorkerAssignment() {
   useFocusEffect(
     useCallback(() => {
       load(false);
-    }, [complaintId]),
+    }, [complaintId, t, getWorkerName]),
   );
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -197,17 +220,16 @@ export default function WorkerAssignment() {
   const filteredWorkers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allWorkers.filter((w) => {
-      const id = String(w.id || w._id || "");
+      const id = String(w.id ?? w._id ?? "");
       if (assignedIds.has(id)) return false; // already assigned
       if (!q) return true;
-      return (
-        String(w.fullName || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(w.username || "")
-          .toLowerCase()
-          .includes(q)
-      );
+      const matchesFullName = String(w.fullName ?? "")
+        .toLowerCase()
+        .includes(q);
+      const matchesUsername = String(w.username ?? "")
+        .toLowerCase()
+        .includes(q);
+      return matchesFullName ? true : matchesUsername;
     });
   }, [allWorkers, search, assignedIds]);
 
@@ -231,7 +253,10 @@ export default function WorkerAssignment() {
 
   const handleAssign = async () => {
     if (selected.size === 0) {
-      Toast.show({ type: "error", text1: "Select at least one worker" });
+      Toast.show({
+        type: "error",
+        text1: t("hod.workerAssignment.toasts.selectWorker"),
+      });
       return;
     }
     try {
@@ -240,11 +265,11 @@ export default function WorkerAssignment() {
       // Build the complete new worker list: currently assigned + newly selected
       const existingWorkers = assignedWorkers.map((w) => ({
         workerId: w.workerId,
-        taskDescription: w.taskDescription || "",
+        taskDescription: w.taskDescription ?? "",
       }));
       const newWorkers = [...selected].map((id) => ({
         workerId: id,
-        taskDescription: taskDescs[id] || "",
+        taskDescription: taskDescs[id] ?? "",
       }));
 
       await apiCall({
@@ -255,8 +280,11 @@ export default function WorkerAssignment() {
 
       Toast.show({
         type: "success",
-        text1: "Workers assigned",
-        text2: `${selected.size} worker(s) added to this complaint`,
+        text1: t("hod.workerAssignment.toasts.assignSuccessTitle"),
+        text2: t("hod.workerAssignment.toasts.assignSuccessMessage", {
+          count: selected.size,
+          plural: selected.size > 1 ? "s" : "",
+        }),
       });
 
       setSelected(new Set());
@@ -266,8 +294,10 @@ export default function WorkerAssignment() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Assignment failed",
-        text2: e?.response?.data?.message ?? "Could not assign workers",
+        text1: t("hod.workerAssignment.toasts.assignFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("hod.workerAssignment.toasts.assignFailedMessage"),
       });
     } finally {
       setAssigning(false);
@@ -283,7 +313,7 @@ export default function WorkerAssignment() {
         .filter((w) => w.workerId !== removeTarget.workerId)
         .map((w) => ({
           workerId: w.workerId,
-          taskDescription: w.taskDescription || "",
+          taskDescription: w.taskDescription ?? "",
         }));
 
       await apiCall({
@@ -292,13 +322,18 @@ export default function WorkerAssignment() {
         data: { workers: remaining },
       });
 
-      Toast.show({ type: "success", text1: "Worker removed" });
+      Toast.show({
+        type: "success",
+        text1: t("hod.workerAssignment.toasts.removeSuccessTitle"),
+      });
       await load(true);
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Remove failed",
-        text2: e?.response?.data?.message ?? "Could not remove worker",
+        text1: t("hod.workerAssignment.toasts.removeFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("hod.workerAssignment.toasts.removeFailedMessage"),
       });
     } finally {
       setRemoving(false);
@@ -310,7 +345,7 @@ export default function WorkerAssignment() {
   const openUpdateModal = (w) => {
     setUpdateTarget(w);
     setEditStatus(w.status);
-    setEditNotes(w.notes || "");
+    setEditNotes(w.notes ?? "");
   };
 
   const handleUpdateTask = async () => {
@@ -325,8 +360,10 @@ export default function WorkerAssignment() {
 
       Toast.show({
         type: "success",
-        text1: "Task updated",
-        text2: `${updateTarget.workerName}'s task has been updated`,
+        text1: t("hod.workerAssignment.toasts.updateSuccessTitle"),
+        text2: t("hod.workerAssignment.toasts.updateSuccessMessage", {
+          name: updateTarget.workerName,
+        }),
       });
 
       setUpdateTarget(null);
@@ -334,8 +371,10 @@ export default function WorkerAssignment() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Update failed",
-        text2: e?.response?.data?.message ?? "Could not update task",
+        text1: t("hod.workerAssignment.toasts.updateFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("hod.workerAssignment.toasts.updateFailedMessage"),
       });
     } finally {
       setUpdating(false);
@@ -349,7 +388,10 @@ export default function WorkerAssignment() {
         className="flex-1"
         style={{ backgroundColor: colors.backgroundPrimary }}
       >
-        <BackButtonHeader title="Manage Workers" onBack={() => router.back()} />
+        <BackButtonHeader
+          title={t("hod.workerAssignment.title")}
+          onBack={() => router.back()}
+        />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -363,7 +405,10 @@ export default function WorkerAssignment() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Manage Workers" onBack={() => router.back()} />
+      <BackButtonHeader
+        title={t("hod.workerAssignment.title")}
+        onBack={() => router.back()}
+      />
 
       <ScrollView
         className="flex-1 px-4"
@@ -383,21 +428,24 @@ export default function WorkerAssignment() {
           <Card style={{ margin: 0, marginBottom: 16, flex: 0 }}>
             <View className="flex-row items-center justify-between">
               <View className="flex-1">
-                <Text
-                  className="text-xs mb-0.5"
-                  style={{ color: colors.textSecondary }}
-                >
-                  #{complaint.ticketId}
-                </Text>
+                <View className="flex-row items-center mb-0.5">
+                  <Hash size={12} color={colors.textSecondary} />
+                  <Text
+                    className="text-xs ml-1"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {complaint.ticketId ?? t("hod.workerAssignment.fallbacks.notAvailable")}
+                  </Text>
+                </View>
                 <Text
                   className="text-sm font-semibold"
                   style={{ color: colors.textPrimary }}
                   numberOfLines={2}
                 >
-                  {complaint.title || "Complaint"}
+                  {complaint.title ?? t("hod.workerAssignment.fallbacks.complaint")}
                 </Text>
               </View>
-              <StatusBadge status={complaint.status} />
+              <StatusBadge status={complaint.status} t={t} colors={colors} />
             </View>
           </Card>
         )}
@@ -410,7 +458,9 @@ export default function WorkerAssignment() {
               className="text-sm font-semibold ml-2"
               style={{ color: colors.textPrimary }}
             >
-              Assigned Workers ({assignedWorkers.length})
+              {t("hod.workerAssignment.assignedWorkersTitle", {
+                count: assignedWorkers.length,
+              })}
             </Text>
           </View>
 
@@ -430,7 +480,7 @@ export default function WorkerAssignment() {
               className="text-xs font-semibold ml-1"
               style={{ color: colors.primary }}
             >
-              Add Workers
+              {t("hod.workerAssignment.actions.addWorkers")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -443,7 +493,7 @@ export default function WorkerAssignment() {
                 className="text-sm mt-2"
                 style={{ color: colors.textSecondary }}
               >
-                No workers assigned yet
+                {t("hod.workerAssignment.empty.noAssignedWorkers")}
               </Text>
             </View>
           </Card>
@@ -454,7 +504,7 @@ export default function WorkerAssignment() {
               style={{ margin: 0, marginBottom: 10, flex: 0 }}
             >
               <View className="flex-row items-start">
-                <WorkerAvatar name={w.workerName} colors={colors} />
+                <WorkerAvatar name={w.workerName} colors={colors} t={t} />
                 <View className="flex-1">
                   <View className="flex-row items-center justify-between mb-1">
                     <Text
@@ -464,7 +514,7 @@ export default function WorkerAssignment() {
                     >
                       {w.workerName}
                     </Text>
-                    <StatusBadge status={w.status} />
+                    <StatusBadge status={w.status} t={t} colors={colors} />
                   </View>
 
                   {!!w.taskDescription && (
@@ -473,7 +523,9 @@ export default function WorkerAssignment() {
                       style={{ color: colors.textSecondary }}
                       numberOfLines={2}
                     >
-                      Task: {w.taskDescription}
+                      {t("hod.workerAssignment.labels.task", {
+                        value: w.taskDescription,
+                      })}
                     </Text>
                   )}
 
@@ -483,7 +535,9 @@ export default function WorkerAssignment() {
                       style={{ color: colors.textSecondary }}
                       numberOfLines={2}
                     >
-                      Notes: {w.notes}
+                      {t("hod.workerAssignment.labels.notes", {
+                        value: w.notes,
+                      })}
                     </Text>
                   )}
 
@@ -498,21 +552,21 @@ export default function WorkerAssignment() {
                         className="text-xs font-semibold ml-1"
                         style={{ color: colors.primary }}
                       >
-                        Update Task
+                        {t("hod.workerAssignment.actions.updateTask")}
                       </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       onPress={() => setRemoveTarget(w)}
                       className="flex-row items-center px-3 py-1.5 rounded-lg"
-                      style={{ backgroundColor: "#EF444420" }}
+                      style={{ backgroundColor: colors.danger + "20" }}
                     >
-                      <Trash2 size={13} color="#EF4444" />
+                      <Trash2 size={13} color={colors.danger} />
                       <Text
                         className="text-xs font-semibold ml-1"
-                        style={{ color: "#EF4444" }}
+                        style={{ color: colors.danger }}
                       >
-                        Remove
+                        {t("hod.workerAssignment.actions.remove")}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -531,7 +585,7 @@ export default function WorkerAssignment() {
                 className="text-sm font-semibold ml-2"
                 style={{ color: colors.textPrimary }}
               >
-                Add Workers
+                {t("hod.workerAssignment.actions.addWorkers")}
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -560,7 +614,7 @@ export default function WorkerAssignment() {
               <TextInput
                 className="flex-1 ml-2 text-sm"
                 style={{ color: colors.textPrimary }}
-                placeholder="Search workers…"
+                placeholder={t("hod.workerAssignment.searchPlaceholder")}
                 placeholderTextColor={colors.textSecondary}
                 value={search}
                 onChangeText={setSearch}
@@ -575,13 +629,14 @@ export default function WorkerAssignment() {
                 style={{ color: colors.textSecondary }}
               >
                 {allWorkers.length === 0
-                  ? "No workers in your department"
-                  : "All workers already assigned"}
+                  ? t("hod.workerAssignment.empty.noDepartmentWorkers")
+                  : t("hod.workerAssignment.empty.allAssigned")}
               </Text>
             ) : (
               filteredWorkers.map((w) => {
-                const id = String(w.id || w._id || "");
+                const id = String(w.id ?? w._id ?? "");
                 const isSelected = selected.has(id);
+                const workerName = getWorkerName(w);
                 return (
                   <View key={id}>
                     <TouchableOpacity
@@ -595,20 +650,18 @@ export default function WorkerAssignment() {
                           borderColor: isSelected
                             ? colors.primary
                             : colors.border,
-                          backgroundColor: isSelected
-                            ? colors.primary
-                            : "transparent",
+                          backgroundColor: isSelected ? colors.primary : undefined,
                         }}
                       >
-                        {isSelected && <CheckCircle size={14} color="#fff" />}
+                        {isSelected && <CheckCircle size={14} color={colors.light} />}
                       </View>
-                      <WorkerAvatar name={w.fullName} colors={colors} />
+                      <WorkerAvatar name={workerName} colors={colors} t={t} />
                       <View className="flex-1">
                         <Text
                           className="text-sm font-semibold"
                           style={{ color: colors.textPrimary }}
                         >
-                          {w.fullName || w.username}
+                          {workerName}
                         </Text>
                         {w.email && (
                           <Text
@@ -632,9 +685,12 @@ export default function WorkerAssignment() {
                             borderWidth: 1,
                             borderColor: colors.border,
                           }}
-                          placeholder={`Task description for ${w.fullName || "worker"} (optional)`}
+                          placeholder={t(
+                            "hod.workerAssignment.taskDescriptionPlaceholder",
+                            { name: workerName },
+                          )}
                           placeholderTextColor={colors.textSecondary}
-                          value={taskDescs[id] || ""}
+                          value={taskDescs[id] ?? ""}
                           onChangeText={(v) =>
                             setTaskDescs((prev) => ({ ...prev, [id]: v }))
                           }
@@ -664,13 +720,18 @@ export default function WorkerAssignment() {
                 }}
               >
                 {assigning ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.light} />
                 ) : (
                   <>
-                    <CheckCircle size={16} color="#fff" />
-                    <Text className="text-sm font-semibold text-white ml-2">
-                      Assign {selected.size} Worker
-                      {selected.size > 1 ? "s" : ""}
+                    <CheckCircle size={16} color={colors.light} />
+                    <Text
+                      className="text-sm font-semibold ml-2"
+                      style={{ color: colors.light }}
+                    >
+                      {t("hod.workerAssignment.actions.assignCount", {
+                        count: selected.size,
+                        plural: selected.size > 1 ? "s" : "",
+                      })}
                     </Text>
                   </>
                 )}
@@ -690,7 +751,7 @@ export default function WorkerAssignment() {
         >
           <View
             className="flex-1 justify-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            style={{ backgroundColor: colors.dark + "80" }}
           >
             <View
               className="rounded-t-3xl p-6"
@@ -698,7 +759,11 @@ export default function WorkerAssignment() {
             >
               {/* Header */}
               <View className="flex-row items-center mb-4">
-                <WorkerAvatar name={updateTarget.workerName} colors={colors} />
+                <WorkerAvatar
+                  name={updateTarget.workerName}
+                  colors={colors}
+                  t={t}
+                />
                 <View className="flex-1">
                   <Text
                     className="text-base font-bold"
@@ -710,7 +775,7 @@ export default function WorkerAssignment() {
                     className="text-xs"
                     style={{ color: colors.textSecondary }}
                   >
-                    Update task status & notes
+                    {t("hod.workerAssignment.updateModal.subtitle")}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -726,10 +791,10 @@ export default function WorkerAssignment() {
                 className="text-sm font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Task Status
+                {t("hod.workerAssignment.updateModal.statusLabel")}
               </Text>
               <View className="flex-row flex-wrap mb-4">
-                {TASK_STATUSES.map((s) => (
+                {getTaskStatuses(t, colors).map((s) => (
                   <TouchableOpacity
                     key={s.value}
                     onPress={() => setEditStatus(s.value)}
@@ -744,7 +809,7 @@ export default function WorkerAssignment() {
                     <Text
                       className="text-xs font-semibold"
                       style={{
-                        color: editStatus === s.value ? "#fff" : s.color,
+                        color: editStatus === s.value ? colors.light : s.color,
                       }}
                     >
                       {s.label}
@@ -758,7 +823,7 @@ export default function WorkerAssignment() {
                 className="text-sm font-semibold mb-2"
                 style={{ color: colors.textSecondary }}
               >
-                Notes (optional)
+                {t("hod.workerAssignment.updateModal.notesLabel")}
               </Text>
               <TextInput
                 className="rounded-xl px-4 py-3 mb-5 text-sm"
@@ -769,7 +834,7 @@ export default function WorkerAssignment() {
                   borderColor: colors.border,
                   textAlignVertical: "top",
                 }}
-                placeholder="Add notes about this worker's task…"
+                placeholder={t("hod.workerAssignment.updateModal.notesPlaceholder")}
                 placeholderTextColor={colors.textSecondary}
                 value={editNotes}
                 onChangeText={setEditNotes}
@@ -789,7 +854,7 @@ export default function WorkerAssignment() {
                     className="text-base font-semibold"
                     style={{ color: colors.textPrimary }}
                   >
-                    Cancel
+                    {t("hod.workerAssignment.actions.cancel")}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -801,10 +866,13 @@ export default function WorkerAssignment() {
                   }}
                 >
                   {updating ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={colors.light} />
                   ) : (
-                    <Text className="text-base font-semibold text-white">
-                      Save Changes
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: colors.light }}
+                    >
+                      {t("hod.workerAssignment.actions.saveChanges")}
                     </Text>
                   )}
                 </Pressable>
@@ -817,10 +885,18 @@ export default function WorkerAssignment() {
       {/* ── Remove Confirm ─────────────────────────────────────────────────────── */}
       <DialogBox
         visible={!!removeTarget}
-        title="Remove Worker"
-        message={`Remove ${removeTarget?.workerName} from this complaint? Their task progress will be lost.`}
-        confirmText={removing ? "Removing…" : "Remove"}
-        cancelText="Keep"
+        title={t("hod.workerAssignment.removeDialog.title")}
+        message={t("hod.workerAssignment.removeDialog.message", {
+          name:
+            removeTarget?.workerName ??
+            t("hod.workerAssignment.fallbacks.worker"),
+        })}
+        confirmText={
+          removing
+            ? t("hod.workerAssignment.removeDialog.removing")
+            : t("hod.workerAssignment.actions.remove")
+        }
+        cancelText={t("hod.workerAssignment.removeDialog.keep")}
         onConfirm={handleRemove}
         onCancel={() => setRemoveTarget(null)}
       />

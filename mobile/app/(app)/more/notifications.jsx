@@ -31,60 +31,72 @@ import {
   NOTIFICATION_PREFERENCES_URL,
 } from "../../../url";
 
-const TYPE_CONFIG = {
-  "complaint-update": { Icon: FileText, color: "#3B82F6" },
-  assignment: { Icon: UserCheck, color: "#8B5CF6" },
-  escalation: { Icon: TriangleAlert, color: "#EF4444" },
-  system: { Icon: Wrench, color: "#6B7280" },
-  test: { Icon: Bell, color: "#10B981" },
-  other: { Icon: Bell, color: "#F59E0B" },
-};
+const getTypeConfig = (colors) => ({
+  "complaint-update": { Icon: FileText, color: colors.info },
+  assignment: { Icon: UserCheck, color: colors.primary },
+  escalation: { Icon: TriangleAlert, color: colors.error },
+  system: { Icon: Wrench, color: colors.secondary },
+  test: { Icon: Bell, color: colors.success },
+  other: { Icon: Bell, color: colors.warning },
+});
 
 const PREF_ROWS = [
   {
     key: "complaintsUpdates",
-    label: "Complaint updates",
-    sub: "Status changes on your complaints",
+    labelKey: "more.notificationsScreen.preferences.complaintsUpdates.label",
+    subKey: "more.notificationsScreen.preferences.complaintsUpdates.sub",
     Icon: FileText,
-    color: "#3B82F6",
   },
   {
     key: "assignments",
-    label: "Assignments",
-    sub: "When a complaint is assigned to you",
+    labelKey: "more.notificationsScreen.preferences.assignments.label",
+    subKey: "more.notificationsScreen.preferences.assignments.sub",
     Icon: UserCheck,
-    color: "#8B5CF6",
   },
   {
     key: "escalations",
-    label: "Escalations",
-    sub: "SLA breaches and priority alerts",
+    labelKey: "more.notificationsScreen.preferences.escalations.label",
+    subKey: "more.notificationsScreen.preferences.escalations.sub",
     Icon: TriangleAlert,
-    color: "#EF4444",
   },
   {
     key: "systemAlerts",
-    label: "System alerts",
-    sub: "App announcements and updates",
+    labelKey: "more.notificationsScreen.preferences.systemAlerts.label",
+    subKey: "more.notificationsScreen.preferences.systemAlerts.sub",
     Icon: Wrench,
-    color: "#6B7280",
   },
 ];
 
-function formatRelativeTime(dateStr) {
+function formatRelativeTime(t, dateStr) {
   if (!dateStr) return "";
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-  });
+  if (diff < 60) return t("time.justNow");
+  if (diff < 3600) {
+    const minutes = Math.floor(diff / 60);
+    return t("time.minutesAgo", {
+      count: minutes,
+      plural: minutes === 1 ? "" : "s",
+    });
+  }
+  if (diff < 86400) {
+    const hours = Math.floor(diff / 3600);
+    return t("time.hoursAgo", {
+      count: hours,
+      plural: hours === 1 ? "" : "s",
+    });
+  }
+  const days = Math.floor(diff / 86400);
+  if (days <= 7) {
+    return t("time.daysAgo", {
+      count: days,
+      plural: days === 1 ? "" : "s",
+    });
+  }
+  return new Date(dateStr).toLocaleDateString();
 }
 
-function NotificationItem({ item, colors, onRead }) {
-  const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.other;
+function NotificationItem({ item, colors, onRead, t, typeConfig }) {
+  const cfg = typeConfig[item.type] || typeConfig.other;
   const { Icon } = cfg;
   const isUnread = !item.readAt;
 
@@ -98,7 +110,7 @@ function NotificationItem({ item, colors, onRead }) {
         style={{
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
-          backgroundColor: isUnread ? cfg.color + "08" : "transparent",
+          backgroundColor: isUnread ? cfg.color + "10" : "transparent",
         }}
       >
         <View
@@ -117,7 +129,7 @@ function NotificationItem({ item, colors, onRead }) {
               {item.title}
             </Text>
             <Text className="text-xs" style={{ color: colors.textSecondary }}>
-              {formatRelativeTime(item.createdAt)}
+              {formatRelativeTime(t, item.createdAt)}
             </Text>
           </View>
           <Text
@@ -146,6 +158,17 @@ export default function NotificationsScreen() {
     () => (colorScheme === "dark" ? darkColors : lightColors),
     [colorScheme],
   );
+  const typeConfig = useMemo(() => getTypeConfig(colors), [colors]);
+
+  const getPreferenceColor = useCallback(
+    (key) => {
+      if (key === "complaintsUpdates") return colors.info;
+      if (key === "assignments") return colors.primary;
+      if (key === "escalations") return colors.error;
+      return colors.secondary;
+    },
+    [colors],
+  );
 
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -172,15 +195,14 @@ export default function NotificationsScreen() {
         method: "GET",
         url: `${NOTIFICATION_HISTORY_URL}?page=${page}&limit=20`,
       });
-      if (res?.data?.notifications) {
-        setNotifications((prev) =>
-          append && page > 1
-            ? [...prev, ...res.data.notifications]
-            : res.data.notifications,
-        );
-        setUnreadCount(res.data.unreadCount ?? 0);
-        setPagination(res.data.pagination ?? null);
-      }
+      const payload = res.data;
+      setNotifications((prev) =>
+        append && page > 1
+          ? [...prev, ...payload.notifications]
+          : payload.notifications,
+      );
+      setUnreadCount(payload.unreadCount);
+      setPagination(payload.pagination);
     } catch {
       /* silently fail */
     } finally {
@@ -196,9 +218,8 @@ export default function NotificationsScreen() {
         method: "GET",
         url: NOTIFICATION_PREFERENCES_URL,
       });
-      if (res?.data?.preferences) {
-        setPreferences((prev) => ({ ...prev, ...res.data.preferences }));
-      }
+      const payload = res.data;
+      setPreferences((prev) => ({ ...prev, ...payload.preferences }));
     } catch {
       /* silently fail */
     }
@@ -221,9 +242,12 @@ export default function NotificationsScreen() {
       );
       setUnreadCount((c) => Math.max(0, c - 1));
     } catch {
-      Toast.show({ type: "error", text1: "Failed to mark as read" });
+      Toast.show({
+        type: "error",
+        text1: t("more.notificationsScreen.toasts.markReadFailed"),
+      });
     }
-  }, []);
+  }, [t]);
 
   const handleMarkAllRead = useCallback(async () => {
     try {
@@ -235,11 +259,17 @@ export default function NotificationsScreen() {
         })),
       );
       setUnreadCount(0);
-      Toast.show({ type: "success", text1: "All marked as read" });
+      Toast.show({
+        type: "success",
+        text1: t("more.notificationsScreen.toasts.markAllReadSuccess"),
+      });
     } catch {
-      Toast.show({ type: "error", text1: "Failed to mark all as read" });
+      Toast.show({
+        type: "error",
+        text1: t("more.notificationsScreen.toasts.markAllReadFailed"),
+      });
     }
-  }, []);
+  }, [t]);
 
   const handleToggle = useCallback(async (key, value) => {
     setPreferences((prev) => ({ ...prev, [key]: value }));
@@ -250,16 +280,18 @@ export default function NotificationsScreen() {
         url: NOTIFICATION_PREFERENCES_URL,
         data: { [key]: value },
       });
-      if (res?.data?.preferences) {
-        setPreferences((prev) => ({ ...prev, ...res.data.preferences }));
-      }
+      const payload = res.data;
+      setPreferences((prev) => ({ ...prev, ...payload.preferences }));
     } catch {
       setPreferences((prev) => ({ ...prev, [key]: !value }));
-      Toast.show({ type: "error", text1: "Failed to save preference" });
+      Toast.show({
+        type: "error",
+        text1: t("more.notificationsScreen.toasts.savePreferenceFailed"),
+      });
     } finally {
       setSavingPref(null);
     }
-  }, []);
+  }, [t]);
 
   const handleLoadMore = useCallback(() => {
     if (!loadingMore && pagination && pagination.page < pagination.totalPages) {
@@ -275,7 +307,7 @@ export default function NotificationsScreen() {
           className="text-xs font-semibold uppercase mb-3"
           style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
         >
-          Preferences
+          {t("more.notificationsScreen.preferences.title")}
         </Text>
         <View
           className="rounded-2xl overflow-hidden mb-6"
@@ -285,37 +317,40 @@ export default function NotificationsScreen() {
             borderColor: colors.border,
           }}
         >
-          {PREF_ROWS.map(({ key, label, sub, Icon, color }, idx) => (
+          {PREF_ROWS.map(({ key, labelKey, subKey, Icon }, idx) => {
+            const toneColor = getPreferenceColor(key);
+
+            return (
             <View key={key}>
               <View className="flex-row items-center px-4 py-3.5">
                 <View
                   className="w-8 h-8 rounded-lg items-center justify-center mr-3"
-                  style={{ backgroundColor: color + "20" }}
+                  style={{ backgroundColor: toneColor + "20" }}
                 >
-                  <Icon size={16} color={color} />
+                  <Icon size={16} color={toneColor} />
                 </View>
                 <View className="flex-1 mr-3">
                   <Text
                     className="text-sm font-semibold"
                     style={{ color: colors.textPrimary }}
                   >
-                    {label}
+                    {t(labelKey)}
                   </Text>
                   <Text
                     className="text-xs mt-0.5"
                     style={{ color: colors.textSecondary }}
                   >
-                    {sub}
+                    {t(subKey)}
                   </Text>
                 </View>
                 {savingPref === key ? (
-                  <ActivityIndicator size="small" color={color} />
+                  <ActivityIndicator size="small" color={toneColor} />
                 ) : (
                   <Switch
-                    value={preferences[key] ?? true}
+                    value={preferences[key]}
                     onValueChange={(val) => handleToggle(key, val)}
-                    trackColor={{ false: colors.border, true: color }}
-                    thumbColor="#FFFFFF"
+                    trackColor={{ false: colors.border, true: toneColor }}
+                    thumbColor={colors.light}
                   />
                 )}
               </View>
@@ -326,7 +361,8 @@ export default function NotificationsScreen() {
                 />
               )}
             </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* History header */}
@@ -336,18 +372,20 @@ export default function NotificationsScreen() {
               className="text-xs font-semibold uppercase"
               style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
             >
-              History
+              {t("more.notificationsScreen.history.title")}
             </Text>
             {unreadCount > 0 && (
               <View
                 className="ml-2 px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: "#EF444420" }}
+                style={{ backgroundColor: colors.error + "20" }}
               >
                 <Text
                   className="text-xs font-semibold"
-                  style={{ color: "#EF4444" }}
+                  style={{ color: colors.error }}
                 >
-                  {unreadCount} unread
+                  {t("more.notificationsScreen.history.unread", {
+                    count: unreadCount,
+                  })}
                 </Text>
               </View>
             )}
@@ -363,7 +401,7 @@ export default function NotificationsScreen() {
                 className="text-xs font-medium ml-1"
                 style={{ color: colors.primary }}
               >
-                Mark all read
+                {t("more.notificationsScreen.history.markAllRead")}
               </Text>
             </TouchableOpacity>
           )}
@@ -391,6 +429,8 @@ export default function NotificationsScreen() {
       notifications.length,
       handleToggle,
       handleMarkAllRead,
+      getPreferenceColor,
+      t,
     ],
   );
 
@@ -399,7 +439,7 @@ export default function NotificationsScreen() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Notifications" />
+      <BackButtonHeader title={t("more.menu.notifications.title")} />
 
       {loadingHistory ? (
         <View className="flex-1 items-center justify-center">
@@ -414,6 +454,8 @@ export default function NotificationsScreen() {
               item={item}
               colors={colors}
               onRead={handleMarkRead}
+              t={t}
+              typeConfig={typeConfig}
             />
           )}
           ListHeaderComponent={ListHeader}
@@ -431,7 +473,7 @@ export default function NotificationsScreen() {
                 className="text-sm mt-3"
                 style={{ color: colors.textSecondary }}
               >
-                No notifications yet
+                {t("more.notificationsScreen.empty")}
               </Text>
             </View>
           }

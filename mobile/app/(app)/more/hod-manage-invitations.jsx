@@ -3,6 +3,7 @@ import {
   Mail,
   Send,
   Clock,
+  Calendar,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -37,42 +38,57 @@ import {
   HOD_REVOKE_INVITATION_URL,
 } from "../../../url";
 
-const STATUS_CONFIG = {
+const getStatusConfig = (t, colors) => ({
   pending: {
-    label: "Pending",
-    color: "#F59E0B",
+    label: t("more.manageInvitations.status.pending"),
+    color: colors.warning,
     Icon: Clock,
   },
   accepted: {
-    label: "Accepted",
-    color: "#10B981",
+    label: t("more.manageInvitations.status.accepted"),
+    color: colors.success,
     Icon: CheckCircle,
   },
   revoked: {
-    label: "Revoked",
-    color: "#6B7280",
+    label: t("more.manageInvitations.status.revoked"),
+    color: colors.textSecondary,
     Icon: XCircle,
   },
   expired: {
-    label: "Expired",
-    color: "#EF4444",
+    label: t("more.manageInvitations.status.expired"),
+    color: colors.danger,
     Icon: AlertCircle,
   },
-};
+});
 
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-IN", {
+function formatDate(dateStr, locale, t) {
+  if (dateStr == null) {
+    return t("more.manageInvitations.notAvailable");
+  }
+
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) {
+    return t("more.manageInvitations.notAvailable");
+  }
+
+  return new Intl.DateTimeFormat(locale === "hi" ? "hi-IN" : "en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  });
+  }).format(date);
 }
 
-function InvitationCard({ item, colors, onRevoke }) {
-  const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pending;
+function InvitationCard({ item, colors, t, locale, onRevoke }) {
+  const statusConfig = getStatusConfig(t, colors);
+  const cfg = statusConfig[item.status] ?? statusConfig.pending;
   const { Icon } = cfg;
   const canRevoke = item.status === "pending";
+  const invitationId = item.id ?? item._id;
+  const invitationEmail =
+    item.email ?? t("more.manageInvitations.emailUnavailable");
+  const sentDate = formatDate(item.sentAt, locale, t);
+  const expiresDate = formatDate(item.expiresAt, locale, t);
+  const acceptedDate = formatDate(item.acceptedAt, locale, t);
 
   return (
     <Card style={{ margin: 0, marginBottom: 10, flex: 0 }}>
@@ -90,16 +106,32 @@ function InvitationCard({ item, colors, onRevoke }) {
               style={{ color: colors.textPrimary }}
               numberOfLines={1}
             >
-              {item.email}
+              {invitationEmail}
             </Text>
-            <Text
-              className="text-xs mt-0.5"
-              style={{ color: colors.textSecondary }}
-            >
-              {canRevoke
-                ? `Sent ${formatDate(item.sentAt)} · Expires ${formatDate(item.expiresAt)}`
-                : `Sent ${formatDate(item.sentAt)}`}
-            </Text>
+            <View className="mt-0.5">
+              <View className="flex-row items-center">
+                <Send size={11} color={colors.textSecondary} />
+                <Text
+                  className="text-xs ml-1"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("more.manageInvitations.meta.sent", { date: sentDate })}
+                </Text>
+              </View>
+              {canRevoke && (
+                <View className="flex-row items-center mt-1">
+                  <Calendar size={11} color={colors.textSecondary} />
+                  <Text
+                    className="text-xs ml-1"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("more.manageInvitations.meta.expires", {
+                      date: expiresDate,
+                    })}
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
@@ -116,8 +148,8 @@ function InvitationCard({ item, colors, onRevoke }) {
             </Text>
           </View>
           {item.acceptedAt && (
-            <Text className="text-xs mb-1" style={{ color: "#10B981" }}>
-              Joined {formatDate(item.acceptedAt)}
+            <Text className="text-xs mb-1" style={{ color: colors.success }}>
+              {t("more.manageInvitations.meta.joined", { date: acceptedDate })}
             </Text>
           )}
           {canRevoke && (
@@ -127,7 +159,7 @@ function InvitationCard({ item, colors, onRevoke }) {
             >
               <Trash2
                 size={16}
-                color={colors.textMuted ?? colors.textSecondary}
+                color={colors.muted}
               />
             </TouchableOpacity>
           )}
@@ -138,7 +170,7 @@ function InvitationCard({ item, colors, onRevoke }) {
 }
 
 export default function ManageInvitations() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const router = useRouter();
@@ -163,8 +195,10 @@ export default function ManageInvitations() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed to load",
-        text2: e?.response?.data?.message ?? "Could not fetch invitations",
+        text1: t("more.manageInvitations.toasts.loadFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("more.manageInvitations.toasts.loadFailedMessage"),
       });
     } finally {
       setLoading(false);
@@ -175,17 +209,23 @@ export default function ManageInvitations() {
   useFocusEffect(
     useCallback(() => {
       load(false);
-    }, []),
+    }, [t]),
   );
 
   const handleSend = async () => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
-      Toast.show({ type: "error", text1: "Email required" });
+      Toast.show({
+        type: "error",
+        text1: t("more.manageInvitations.toasts.emailRequired"),
+      });
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      Toast.show({ type: "error", text1: "Enter a valid email address" });
+      Toast.show({
+        type: "error",
+        text1: t("more.manageInvitations.toasts.invalidEmail"),
+      });
       return;
     }
 
@@ -198,16 +238,20 @@ export default function ManageInvitations() {
       });
       Toast.show({
         type: "success",
-        text1: "Invitation sent",
-        text2: `Email sent to ${trimmed}`,
+        text1: t("more.manageInvitations.toasts.sentTitle"),
+        text2: t("more.manageInvitations.toasts.sentMessage", {
+          email: trimmed,
+        }),
       });
       setEmail("");
       await load(true);
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed to send",
-        text2: e?.response?.data?.message ?? "Could not send invitation",
+        text1: t("more.manageInvitations.toasts.sendFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("more.manageInvitations.toasts.sendFailedMessage"),
       });
     } finally {
       setSending(false);
@@ -218,14 +262,18 @@ export default function ManageInvitations() {
     if (!revokeTarget) return;
     try {
       setRevoking(true);
+      const targetId = revokeTarget.id ?? revokeTarget._id;
       await apiCall({
         method: "DELETE",
-        url: HOD_REVOKE_INVITATION_URL(revokeTarget.id),
+        url: HOD_REVOKE_INVITATION_URL(targetId),
       });
-      Toast.show({ type: "success", text1: "Invitation revoked" });
+      Toast.show({
+        type: "success",
+        text1: t("more.manageInvitations.toasts.revokedTitle"),
+      });
       setInvitations((prev) =>
         prev.map((inv) =>
-          inv.id === revokeTarget.id
+          (inv.id ?? inv._id) === targetId
             ? { ...inv, status: "revoked", revokedAt: new Date().toISOString() }
             : inv,
         ),
@@ -233,8 +281,10 @@ export default function ManageInvitations() {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Failed",
-        text2: e?.response?.data?.message ?? "Could not revoke invitation",
+        text1: t("more.manageInvitations.toasts.revokeFailedTitle"),
+        text2:
+          e?.response?.data?.message ??
+          t("more.manageInvitations.toasts.revokeFailedMessage"),
       });
     } finally {
       setRevoking(false);
@@ -244,6 +294,7 @@ export default function ManageInvitations() {
 
   const pending = invitations.filter((i) => i.status === "pending");
   const others = invitations.filter((i) => i.status !== "pending");
+  const isSendDisabled = sending ? true : email.trim().length === 0;
 
   return (
     <KeyboardAvoidingView
@@ -252,7 +303,7 @@ export default function ManageInvitations() {
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
       <BackButtonHeader
-        title="Manage Invitations"
+        title={t("more.manageInvitations.title")}
         onBack={() => router.back()}
       />
 
@@ -282,15 +333,14 @@ export default function ManageInvitations() {
                 className="text-base font-semibold ml-2"
                 style={{ color: colors.textPrimary }}
               >
-                Invite New Worker
+                {t("more.manageInvitations.form.title")}
               </Text>
             </View>
             <Text
               className="text-xs mb-5"
               style={{ color: colors.textSecondary }}
             >
-              An invitation link valid for 7 days will be sent to the email
-              address. The recipient registers as a worker in your department.
+              {t("more.manageInvitations.form.description")}
             </Text>
 
             <View
@@ -306,7 +356,7 @@ export default function ManageInvitations() {
               <TextInput
                 className="flex-1 ml-2 text-sm"
                 style={{ color: colors.textPrimary }}
-                placeholder="worker@example.com"
+                placeholder={t("more.manageInvitations.form.emailPlaceholder")}
                 placeholderTextColor={colors.textSecondary}
                 value={email}
                 onChangeText={setEmail}
@@ -319,21 +369,23 @@ export default function ManageInvitations() {
 
             <TouchableOpacity
               onPress={handleSend}
-              disabled={sending || !email.trim()}
+              disabled={isSendDisabled}
               className="flex-row items-center justify-center rounded-xl"
               style={{
                 height: 48,
-                backgroundColor:
-                  sending || !email.trim() ? colors.border : colors.primary,
+                backgroundColor: isSendDisabled ? colors.border : colors.primary,
               }}
             >
               {sending ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.light} />
               ) : (
                 <>
-                  <Send size={15} color="#fff" />
-                  <Text className="text-sm font-semibold text-white ml-2">
-                    Send Invitation
+                  <Send size={15} color={colors.light} />
+                  <Text
+                    className="text-sm font-semibold ml-2"
+                    style={{ color: colors.light }}
+                  >
+                    {t("more.manageInvitations.form.send")}
                   </Text>
                 </>
               )}
@@ -353,14 +405,18 @@ export default function ManageInvitations() {
                   className="text-sm font-semibold flex-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  Pending ({pending.length})
+                  {t("more.manageInvitations.sections.pending", {
+                    count: pending.length,
+                  })}
                 </Text>
               </View>
               {pending.map((inv) => (
                 <InvitationCard
-                  key={inv.id}
+                  key={String(inv.id ?? inv._id ?? inv.email)}
                   item={inv}
                   colors={colors}
+                  t={t}
+                  locale={locale}
                   onRevoke={setRevokeTarget}
                 />
               ))}
@@ -375,7 +431,7 @@ export default function ManageInvitations() {
                   className="text-sm mt-2"
                   style={{ color: colors.textSecondary }}
                 >
-                  No pending invitations
+                  {t("more.manageInvitations.empty.pending")}
                 </Text>
               </View>
             </Card>
@@ -397,7 +453,9 @@ export default function ManageInvitations() {
                   className="text-sm font-semibold flex-1"
                   style={{ color: colors.textSecondary }}
                 >
-                  History ({others.length})
+                  {t("more.manageInvitations.sections.history", {
+                    count: others.length,
+                  })}
                 </Text>
                 <View
                   style={{
@@ -410,9 +468,11 @@ export default function ManageInvitations() {
               {historyOpen &&
                 others.map((inv) => (
                   <InvitationCard
-                    key={inv.id}
+                    key={String(inv.id ?? inv._id ?? inv.email)}
                     item={inv}
                     colors={colors}
+                    t={t}
+                    locale={locale}
                     onRevoke={setRevokeTarget}
                   />
                 ))}
@@ -423,10 +483,17 @@ export default function ManageInvitations() {
 
       <DialogBox
         visible={!!revokeTarget}
-        title="Revoke Invitation"
-        message={`Cancel the pending invitation for ${revokeTarget?.email}? They won't be able to register with the invite link.`}
-        confirmText={revoking ? "Revoking…" : "Revoke"}
-        cancelText="Keep"
+        title={t("more.manageInvitations.revokeDialog.title")}
+        message={t("more.manageInvitations.revokeDialog.message", {
+          email:
+            revokeTarget?.email ?? t("more.manageInvitations.emailUnavailable"),
+        })}
+        confirmText={
+          revoking
+            ? t("more.manageInvitations.revokeDialog.revoking")
+            : t("more.manageInvitations.revokeDialog.confirm")
+        }
+        cancelText={t("more.manageInvitations.revokeDialog.cancel")}
         onConfirm={handleRevoke}
         onCancel={() => setRevokeTarget(null)}
       />

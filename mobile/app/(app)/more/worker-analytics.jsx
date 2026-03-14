@@ -28,6 +28,11 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import MetricCard from "../../../components/MetricCard";
 import { useTheme } from "../../../utils/context/theme";
+import {
+  formatPriorityLabel,
+  formatStatusLabel,
+} from "../../../utils/complaintFormatters";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import { WORKER_ANALYTICS_URL } from "../../../url";
 
@@ -111,48 +116,44 @@ function WeeklyBarChart({ data, barColor, gridColor, labelColor }) {
 }
 
 // ─── Segmented priority bar ───────────────────────────────────────────────────
-const PRIORITY_CFG = [
-  { key: "Low", label: "Low", color: "#10B981" },
-  { key: "Medium", label: "Med", color: "#F59E0B" },
-  { key: "High", label: "High", color: "#EF4444" },
-];
-
-function PriorityBar({ breakdown }) {
-  const total =
-    (breakdown.Low || 0) + (breakdown.Medium || 0) + (breakdown.High || 0);
+function PriorityBar({
+  breakdown,
+  priorityConfig,
+  legendTextColor,
+  emptyTrackColor,
+}) {
+  const total = priorityConfig.reduce(
+    (sum, item) => sum + (breakdown[item.key] ?? 0),
+    0,
+  );
 
   return (
     <View>
       {total === 0 ? (
         <View
           className="h-5 rounded-full"
-          style={{ backgroundColor: "#E5E7EB" }}
+          style={{ backgroundColor: emptyTrackColor }}
         />
       ) : (
         <View className="flex-row rounded-full overflow-hidden h-5">
-          {PRIORITY_CFG.map(({ key, color }) => {
-            const pct = total > 0 ? (breakdown[key] || 0) / total : 0;
+          {priorityConfig.map(({ key, color }) => {
+            const pct = total > 0 ? (breakdown[key] ?? 0) / total : 0;
             if (pct === 0) return null;
-            return (
-              <View
-                key={key}
-                style={{ flex: pct, backgroundColor: color }}
-              />
-            );
+            return <View key={key} style={{ flex: pct, backgroundColor: color }} />;
           })}
         </View>
       )}
 
       {/* Legend */}
       <View className="flex-row mt-2 flex-wrap gap-3">
-        {PRIORITY_CFG.map(({ key, label, color }) => (
+        {priorityConfig.map(({ key, label, color }) => (
           <View key={key} className="flex-row items-center mr-3">
             <View
               className="w-2.5 h-2.5 rounded-full mr-1.5"
               style={{ backgroundColor: color }}
             />
-            <Text className="text-xs" style={{ color: "#6B7280" }}>
-              {label}: {breakdown[key] || 0}
+            <Text className="text-xs" style={{ color: legendTextColor }}>
+              {label}: {breakdown[key] ?? 0}
             </Text>
           </View>
         ))}
@@ -160,17 +161,6 @@ function PriorityBar({ breakdown }) {
     </View>
   );
 }
-
-// ─── Status distribution rows ─────────────────────────────────────────────────
-const STATUS_CFG = [
-  { key: "resolved", label: "Resolved", color: "#10B981" },
-  { key: "in-progress", label: "In Progress", color: "#3B82F6" },
-  { key: "assigned", label: "Assigned", color: "#8B5CF6" },
-  { key: "pending-approval", label: "Pending Approval", color: "#F59E0B" },
-  { key: "needs-rework", label: "Needs Rework", color: "#EF4444" },
-  { key: "pending", label: "Pending", color: "#6B7280" },
-  { key: "cancelled", label: "Cancelled", color: "#9CA3AF" },
-];
 
 function StatusRow({ label, count, total, color, textColor, trackColor }) {
   const pct = total > 0 ? count / total : 0;
@@ -205,6 +195,7 @@ function StatusRow({ label, count, total, color, textColor, trackColor }) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function WorkerAnalytics() {
+  const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const { workerId } = useLocalSearchParams();
 
@@ -217,6 +208,68 @@ export default function WorkerAnalytics() {
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState(null);
 
+  const priorityConfig = useMemo(
+    () => [
+      {
+        key: "Low",
+        label: formatPriorityLabel(t, "low"),
+        color: colors.success,
+      },
+      {
+        key: "Medium",
+        label: formatPriorityLabel(t, "medium"),
+        color: colors.warning,
+      },
+      {
+        key: "High",
+        label: formatPriorityLabel(t, "high"),
+        color: colors.error,
+      },
+    ],
+    [colors, t],
+  );
+
+  const statusConfig = useMemo(
+    () => [
+      {
+        key: "resolved",
+        label: formatStatusLabel(t, "resolved"),
+        color: colors.success,
+      },
+      {
+        key: "in-progress",
+        label: formatStatusLabel(t, "in-progress"),
+        color: colors.info,
+      },
+      {
+        key: "assigned",
+        label: formatStatusLabel(t, "assigned"),
+        color: colors.primary,
+      },
+      {
+        key: "pending-approval",
+        label: formatStatusLabel(t, "pending-approval"),
+        color: colors.warning,
+      },
+      {
+        key: "needs-rework",
+        label: formatStatusLabel(t, "needs-rework"),
+        color: colors.error,
+      },
+      {
+        key: "pending",
+        label: formatStatusLabel(t, "pending"),
+        color: colors.secondary,
+      },
+      {
+        key: "cancelled",
+        label: formatStatusLabel(t, "cancelled"),
+        color: colors.muted,
+      },
+    ],
+    [colors, t],
+  );
+
   const load = useCallback(
     async (isRefresh = false) => {
       try {
@@ -228,19 +281,22 @@ export default function WorkerAnalytics() {
           : WORKER_ANALYTICS_URL;
 
         const res = await apiCall({ method: "GET", url });
-        if (res?.data) setData(res.data);
+        const payload = res.data;
+        setData(payload);
       } catch (e) {
         Toast.show({
           type: "error",
-          text1: "Failed to load analytics",
-          text2: e?.response?.data?.message || "Please try again",
+          text1: t("more.workerAnalyticsScreen.failedTitle"),
+          text2:
+            e?.response?.data?.message ??
+            t("more.workerAnalyticsScreen.failedMessage"),
         });
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [workerId],
+    [t, workerId],
   );
 
   useFocusEffect(
@@ -251,17 +307,19 @@ export default function WorkerAnalytics() {
 
   const title = workerId
     ? data?.worker?.fullName
-      ? `${data.worker.fullName}'s Analytics`
-      : "Worker Analytics"
-    : "My Analytics";
+      ? t("more.workerAnalyticsScreen.titleForWorker", {
+          name: data.worker.fullName,
+        })
+      : t("more.workerAnalyticsScreen.titleWorker")
+    : t("more.menu.workerAnalytics.title");
 
   const totalForStatus = data
-    ? Object.values(data.statusDistribution || {}).reduce((a, b) => a + b, 0)
+    ? Object.values(data.statusDistribution ?? {}).reduce((a, b) => a + b, 0)
     : 0;
 
-  const gridColor = colorScheme === "dark" ? "#374151" : "#E5E7EB";
-  const labelColor = colorScheme === "dark" ? "#9CA3AF" : "#6B7280";
-  const trackColor = colorScheme === "dark" ? "#374151" : "#F3F4F6";
+  const gridColor = colors.border;
+  const labelColor = colors.textSecondary;
+  const trackColor = colors.backgroundSecondary;
 
   if (loading) {
     return (
@@ -286,6 +344,7 @@ export default function WorkerAnalytics() {
             refreshing={refreshing}
             onRefresh={() => load(true)}
             tintColor={colors.textSecondary}
+            colors={[colors.primary]}
           />
         }
       >
@@ -304,19 +363,23 @@ export default function WorkerAnalytics() {
                   className="text-xs mt-0.5"
                   style={{ color: colors.textSecondary }}
                 >
-                  {data.worker.department} Department
+                  {t("more.workerAnalyticsScreen.departmentWithName", {
+                    department: data.worker.department,
+                  })}
                   {data.worker.specializations?.length > 0
-                    ? ` · ${data.worker.specializations.slice(0, 2).join(", ")}`
+                    ? `, ${data.worker.specializations.slice(0, 2).join(", ")}`
                     : ""}
                 </Text>
               </View>
               <View className="flex-row items-center">
-                <Star size={14} color="#F59E0B" />
+                <Star size={14} color={colors.warning} />
                 <Text
                   className="text-sm font-bold ml-1"
                   style={{ color: colors.textPrimary }}
                 >
-                  {(data.worker.rating || 4.5).toFixed(1)}
+                  {Number.isFinite(data.worker.rating)
+                    ? data.worker.rating.toFixed(1)
+                    : t("more.workerAnalyticsScreen.noValue")}
                 </Text>
               </View>
             </View>
@@ -329,9 +392,9 @@ export default function WorkerAnalytics() {
             <MetricCard
               colors={colors}
               Icon={Target}
-              iconColor="#3B82F6"
-              iconBgColor="#3B82F622"
-              title="Total Assigned"
+              iconColor={colors.info}
+              iconBgColor={colors.info + "22"}
+              title={t("more.workerAnalyticsScreen.metrics.totalAssigned")}
               value={data?.summary?.totalAssigned ?? 0}
             />
           </View>
@@ -339,9 +402,9 @@ export default function WorkerAnalytics() {
             <MetricCard
               colors={colors}
               Icon={CheckCircle}
-              iconColor="#10B981"
-              iconBgColor="#10B98122"
-              title="Completed"
+              iconColor={colors.success}
+              iconBgColor={colors.success + "22"}
+              title={t("more.workerAnalyticsScreen.metrics.completed")}
               value={data?.summary?.totalCompleted ?? 0}
             />
           </View>
@@ -351,24 +414,28 @@ export default function WorkerAnalytics() {
             <MetricCard
               colors={colors}
               Icon={TrendingUp}
-              iconColor="#8B5CF6"
-              iconBgColor="#8B5CF622"
-              title="Completion Rate"
-              value={`${data?.summary?.completionRate ?? 0}%`}
-              valueColor="#8B5CF6"
+              iconColor={colors.primary}
+              iconBgColor={colors.primary + "22"}
+              title={t("more.workerAnalyticsScreen.metrics.completionRate")}
+              value={t("more.workerAnalyticsScreen.percentValue", {
+                value: data?.summary?.completionRate ?? 0,
+              })}
+              valueColor={colors.primary}
             />
           </View>
           <View className="flex-1 ml-1">
             <MetricCard
               colors={colors}
               Icon={Clock}
-              iconColor="#F59E0B"
-              iconBgColor="#F59E0B22"
-              title="Avg Completion"
+              iconColor={colors.warning}
+              iconBgColor={colors.warning + "22"}
+              title={t("more.workerAnalyticsScreen.metrics.avgCompletion")}
               value={
-                data?.summary?.avgCompletionTime
-                  ? `${data.summary.avgCompletionTime.toFixed(1)}h`
-                  : "—"
+                typeof data?.summary?.avgCompletionTime === "number"
+                  ? t("more.workerAnalyticsScreen.hoursValue", {
+                      value: data.summary.avgCompletionTime.toFixed(1),
+                    })
+                  : t("more.workerAnalyticsScreen.noValue")
               }
             />
           </View>
@@ -377,30 +444,30 @@ export default function WorkerAnalytics() {
         {/* Weekly Completion Trend */}
         <Card style={{ marginBottom: 12 }}>
           <View className="flex-row items-center mb-3">
-            <BarChart2 size={16} color="#3B82F6" style={{ marginRight: 6 }} />
+            <BarChart2 size={16} color={colors.info} style={{ marginRight: 6 }} />
             <Text
               className="text-sm font-bold"
               style={{ color: colors.textPrimary }}
             >
-              Weekly Completion Trend
+              {t("more.workerAnalyticsScreen.weeklyTrend.title")}
             </Text>
           </View>
           <Text
             className="text-xs mb-4"
             style={{ color: colors.textSecondary }}
           >
-            Resolved complaints per week (last 8 weeks)
+            {t("more.workerAnalyticsScreen.weeklyTrend.subtitle")}
           </Text>
           {data?.weeklyTrend?.length > 0 ? (
             <WeeklyBarChart
               data={data.weeklyTrend}
-              barColor="#3B82F6"
+              barColor={colors.info}
               gridColor={gridColor}
               labelColor={labelColor}
             />
           ) : (
             <Text className="text-xs" style={{ color: colors.textSecondary }}>
-              No data available
+              {t("more.workerAnalyticsScreen.noData")}
             </Text>
           )}
         </Card>
@@ -408,42 +475,49 @@ export default function WorkerAnalytics() {
         {/* Priority Breakdown */}
         <Card style={{ marginBottom: 12 }}>
           <View className="flex-row items-center mb-3">
-            <Target size={16} color="#F59E0B" style={{ marginRight: 6 }} />
+            <Target size={16} color={colors.warning} style={{ marginRight: 6 }} />
             <Text
               className="text-sm font-bold"
               style={{ color: colors.textPrimary }}
             >
-              Priority Distribution
+              {t("more.workerAnalyticsScreen.priority.title")}
             </Text>
           </View>
           <Text
             className="text-xs mb-3"
             style={{ color: colors.textSecondary }}
           >
-            All assigned complaints by priority
+            {t("more.workerAnalyticsScreen.priority.subtitle")}
           </Text>
-          <PriorityBar breakdown={data?.priorityBreakdown || {}} />
+          <PriorityBar
+            breakdown={data?.priorityBreakdown ?? {}}
+            priorityConfig={priorityConfig}
+            legendTextColor={colors.textSecondary}
+            emptyTrackColor={colors.border}
+          />
         </Card>
 
         {/* Status Distribution */}
         <Card style={{ marginBottom: 4 }}>
           <View className="flex-row items-center mb-3">
-            <CheckCircle size={16} color="#10B981" style={{ marginRight: 6 }} />
+            <CheckCircle size={16} color={colors.success} style={{ marginRight: 6 }} />
             <Text
               className="text-sm font-bold"
               style={{ color: colors.textPrimary }}
             >
-              Status Overview
+              {t("more.workerAnalyticsScreen.status.title")}
             </Text>
           </View>
           <Text
             className="text-xs mb-4"
             style={{ color: colors.textSecondary }}
           >
-            Distribution across all {totalForStatus} tasks
+            {t("more.workerAnalyticsScreen.status.subtitle", {
+              count: totalForStatus,
+            })}
           </Text>
-          {STATUS_CFG.map(({ key, label, color }) => {
-            const count = data?.statusDistribution?.[key] || 0;
+          {statusConfig.map(({ key, label, color }) => {
+            const count = data?.statusDistribution?.[key] ?? 0;
             return (
               <StatusRow
                 key={key}

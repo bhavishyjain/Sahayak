@@ -35,6 +35,17 @@ export default function HeatMap() {
 
   const [userLocation, setUserLocation] = useState(null);
 
+  const formatCompactCount = useCallback((value) => {
+    const number = Number(value || 0);
+    if (number < 1000) return String(number);
+    if (number < 1000000) {
+      const compact = (number / 1000).toFixed(number >= 10000 ? 0 : 1);
+      return `${compact.replace(/\.0$/, "")}K`;
+    }
+    const compact = (number / 1000000).toFixed(number >= 10000000 ? 0 : 1);
+    return `${compact.replace(/\.0$/, "")}M`;
+  }, []);
+
   // Function to fetch user's current location
   const fetchUserLocation = useCallback(async () => {
     try {
@@ -99,6 +110,7 @@ export default function HeatMap() {
   // Update map when user location changes
   useEffect(() => {
     if (userLocation && webViewRef.current) {
+      const userLocationLabel = JSON.stringify(t("heatmap.userLocation"));
       const updateScript = `
         if (typeof map !== 'undefined' && typeof userLocation !== 'undefined') {
           userLocation = { lat: ${userLocation.lat}, lng: ${userLocation.lng} };
@@ -120,7 +132,7 @@ export default function HeatMap() {
             })
           })
           .addTo(map)
-          .bindPopup('Your Location');
+          .bindPopup(${userLocationLabel});
           
           // Center map on user location
           map.setView([${userLocation.lat}, ${userLocation.lng}], 15, {
@@ -132,7 +144,7 @@ export default function HeatMap() {
       `;
       webViewRef.current.injectJavaScript(updateScript);
     }
-  }, [userLocation]);
+  }, [t, userLocation]);
 
   // Fetch heatmap data
   const {
@@ -153,6 +165,7 @@ export default function HeatMap() {
       if (filters.timeframe) {
         params.append("timeframe", filters.timeframe);
       }
+      params.append("granularity", "complaint");
 
       const url = params.toString()
         ? `${GET_HEATMAP_URL}?${params.toString()}`
@@ -169,104 +182,134 @@ export default function HeatMap() {
 
   const spots = heatmapData?.spots || [];
 
+  const getUnresolvedCount = (spot) =>
+    Number(spot?.unresolvedComplaints ?? spot?.openComplaints ?? 0);
+
   const stats = {
-    total: spots.reduce((sum, s) => sum + s.totalComplaints, 0),
-    open: spots.reduce((sum, s) => sum + s.openComplaints, 0),
-    highPriority: spots.reduce((sum, s) => sum + s.highPriorityComplaints, 0),
-    hotspots: spots.filter(
-      (s) => s.severity === "very-high" || s.severity === "high",
-    ).length,
+    total: spots.reduce((sum, s) => sum + Number(s.totalComplaints || 0), 0),
+    unresolved: spots.reduce((sum, s) => sum + getUnresolvedCount(s), 0),
   };
 
   // Filter options
   const departments = [
-    { label: t("heatmap.allDepartments") || "All Departments", value: "all" },
-    { label: t("complaints.departments.road") || "Roads", value: "Road" },
+    { label: t("heatmap.allDepartments"), value: "all" },
+    { label: t("complaints.departments.road"), value: "Road" },
     {
-      label: t("complaints.departments.water") || "Water Supply",
+      label: t("complaints.departments.water"),
       value: "Water",
     },
     {
-      label: t("complaints.departments.electricity") || "Electricity",
+      label: t("complaints.departments.electricity"),
       value: "Electricity",
     },
     {
-      label: t("complaints.departments.waste") || "Waste Management",
+      label: t("complaints.departments.waste"),
       value: "Waste",
     },
     {
-      label: t("complaints.departments.drainage") || "Drainage",
+      label: t("complaints.departments.drainage"),
       value: "Drainage",
     },
-    { label: t("complaints.departments.other") || "Other", value: "Other" },
+    { label: t("complaints.departments.other"), value: "Other" },
   ];
 
   const priorities = [
-    { label: t("heatmap.allPriorities") || "All Priorities", value: "all" },
-    { label: t("complaints.priority.high") || "High", value: "High" },
-    { label: t("complaints.priority.medium") || "Medium", value: "Medium" },
-    { label: t("complaints.priority.low") || "Low", value: "Low" },
+    { label: t("heatmap.allPriorities"), value: "all" },
+    { label: t("complaints.priority.high"), value: "High" },
+    { label: t("complaints.priority.medium"), value: "Medium" },
+    { label: t("complaints.priority.low"), value: "Low" },
   ];
 
   const timeframes = [
-    { label: t("heatmap.timePeriods.7days") || "Last 7 Days", value: "7days" },
+    { label: t("heatmap.timePeriods.7days"), value: "7days" },
     {
-      label: t("heatmap.timePeriods.30days") || "Last 30 Days",
+      label: t("heatmap.timePeriods.30days"),
       value: "30days",
     },
     {
-      label: t("heatmap.timePeriods.3months") || "Last 3 Months",
+      label: t("heatmap.timePeriods.3months"),
       value: "3months",
     },
     {
-      label: t("heatmap.timePeriods.6months") || "Last 6 Months",
+      label: t("heatmap.timePeriods.6months"),
       value: "6months",
     },
   ];
 
   // Generate Leaflet map HTML
   const generateMapHTML = () => {
+    const popupLabels = {
+      unresolved: t("heatmap.popup.unresolved"),
+      total: t("heatmap.popup.total"),
+      resolved: t("heatmap.popup.resolved"),
+      department: t("heatmap.popup.department"),
+      severity: t("heatmap.popup.severity"),
+    };
+    const legendLabels = {
+      severity: t("heatmap.legend.severity"),
+      critical: t("heatmap.severity.critical"),
+      high: t("heatmap.severity.high"),
+      medium: t("heatmap.severity.medium"),
+      low: t("heatmap.severity.low"),
+    };
+    const severityLabelMap = JSON.stringify({
+      "very-high": t("heatmap.severity.critical"),
+      high: t("heatmap.severity.high"),
+      medium: t("heatmap.severity.medium"),
+      low: t("heatmap.severity.low"),
+      default: t("heatmap.severity.normal"),
+    });
+    const userLocationLabel = JSON.stringify(t("heatmap.userLocation"));
     const mapCenter = userLocation
       ? [userLocation.lat, userLocation.lng]
       : [22.7196, 75.8577]; // Indore as default
 
     // Group complaints by department for clustering
     const getDepartmentColor = (dept) => {
-      const colors = {
-        Water: "#3B82F6", // blue
-        Road: "#6B7280", // gray
-        Electricity: "#FBBF24", // yellow
+      const palette = {
+        water: "#3B82F6", // blue
+        road: "#6B7280", // gray
+        electricity: "#FBBF24", // yellow
         waste: "#10B981", // green
         drainage: "#8B5CF6", // purple
-        other: "#6B7280", // gray
+        other: "#9CA3AF", // slate
       };
-      return colors[dept] || "#6B7280";
+      return palette[String(dept ?? "").toLowerCase()] ?? palette.other;
     };
 
     const markers = spots
-      .map(
-        (spot, index) => `
+      .filter((spot) => {
+        const lat = Number(spot.coordinates?.lat);
+        const lng = Number(spot.coordinates?.lng);
+        return Number.isFinite(lat) && Number.isFinite(lng);
+      })
+      .map((spot) => {
+        const totalCount = Number(spot.totalComplaints || 0);
+        const unresolvedCount = getUnresolvedCount(spot);
+        const resolvedCount = Math.max(totalCount - unresolvedCount, 0);
+        return `
         L.circleMarker([${spot.coordinates?.lat || 0}, ${spot.coordinates?.lng || 0}], {
           color: '${getSeverityColor(spot.severity)}',
           fillColor: '${getSeverityColor(spot.severity)}',
           fillOpacity: 0.6,
-          radius: Math.min(${spot.totalComplaints} * 2 + 5, 20)
+          radius: Math.min(${unresolvedCount} * 2 + 6, 22),
+          unresolvedCount: ${unresolvedCount}
         })
         .addTo(markers)
         .bindPopup(\`
           <div style="font-family: system-ui; min-width: 200px;">
             <h3 style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">${spot.locationName}</h3>
             <div style="font-size: 12px; color: #4b5563; line-height: 1.6;">
-              <div><strong>Total Complaints:</strong> ${spot.totalComplaints}</div>
-              <div><strong>Open:</strong> ${spot.openComplaints}</div>
-              <div><strong>High Priority:</strong> ${spot.highPriorityComplaints}</div>
-              <div><strong>Department:</strong> <span style="color: ${getDepartmentColor(spot.topDepartment)}; font-weight: 600;">${spot.topDepartment}</span></div>
-              <div><strong>Severity:</strong> <span style="color: ${getSeverityColor(spot.severity)}; font-weight: 600;">${getSeverityLabel(spot.severity)}</span></div>
+              <div><strong>${popupLabels.unresolved}:</strong> ${unresolvedCount}</div>
+              <div><strong>${popupLabels.total}:</strong> ${totalCount}</div>
+              <div><strong>${popupLabels.resolved}:</strong> ${resolvedCount}</div>
+              <div><strong>${popupLabels.department}:</strong> <span style="color: ${getDepartmentColor(spot.topDepartment)}; font-weight: 600;">${spot.topDepartment}</span></div>
+              <div><strong>${popupLabels.severity}:</strong> <span style="color: ${getSeverityColor(spot.severity)}; font-weight: 600;">${getSeverityLabel(spot.severity)}</span></div>
             </div>
           </div>
         \`);
-      `,
-      )
+      `;
+      })
       .join("");
 
     return `
@@ -275,7 +318,7 @@ export default function HeatMap() {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Heat Map</title>
+        <title>${t("heatmap.title")}</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
@@ -311,6 +354,7 @@ export default function HeatMap() {
             border-radius: 50%;
             color: white;
             font-weight: bold;
+            font-size: 11px;
             text-align: center;
             font-family: system-ui;
             line-height: 1;
@@ -321,46 +365,48 @@ export default function HeatMap() {
           
           .legend {
             position: absolute;
-            bottom: 20px;
-            right: 10px;
+            bottom: 12px;
+            right: 8px;
             background: white;
-            padding: 10px;
-            border-radius: 8px;
+            padding: 6px;
+            border-radius: 6px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             font-family: system-ui;
-            font-size: 11px;
+            font-size: 10px;
             z-index: 1000;
-            max-width: 200px;
+            max-width: 130px;
+            max-height: 120px;
+            overflow-y: auto;
           }
           .legend-title {
             font-weight: 600;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             color: #1f2937;
-            font-size: 12px;
+            font-size: 10px;
           }
           .legend-section {
-            margin-bottom: 8px;
+            margin-bottom: 5px;
           }
           .legend-section:last-child {
             margin-bottom: 0;
           }
           .legend-section-title {
             font-weight: 600;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             color: #1f2937;
-            font-size: 10px;
+            font-size: 9px;
             text-transform: uppercase;
           }
           .legend-item {
             display: flex;
             align-items: center;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
           }
           .legend-color {
-            width: 12px;
-            height: 12px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            margin-right: 6px;
+            margin-right: 5px;
             border: 1px solid rgba(0,0,0,0.1);
           }
           .current-location-btn {
@@ -394,45 +440,28 @@ export default function HeatMap() {
         </button>
         <div class="legend">
           <div class="legend-section">
-            <div class="legend-section-title">Severity</div>
+            <div class="legend-section-title">${legendLabels.severity}</div>
             <div class="legend-item">
               <div class="legend-color" style="background-color: #DC2626;"></div>
-              <span>Critical</span>
+              <span>${legendLabels.critical}</span>
             </div>
             <div class="legend-item">
               <div class="legend-color" style="background-color: #F59E0B;"></div>
-              <span>High</span>
+              <span>${legendLabels.high}</span>
             </div>
             <div class="legend-item">
               <div class="legend-color" style="background-color: #10B981;"></div>
-              <span>Medium</span>
+              <span>${legendLabels.medium}</span>
             </div>
             <div class="legend-item">
               <div class="legend-color" style="background-color: #3B82F6;"></div>
-              <span>Low</span>
-            </div>
-          </div>
-          <div class="legend-section">
-            <div class="legend-section-title">Departments</div>
-            <div class="legend-item">
-              <div class="legend-color" style="background-color: #3B82F6;"></div>
-              <span>Water</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background-color: #6B7280;"></div>
-              <span>Road</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background-color: #FBBF24;"></div>
-              <span>Electricity</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background-color: #10B981;"></div>
-              <span>Waste</span>
+              <span>${legendLabels.low}</span>
             </div>
           </div>
         </div>
         <script>
+          const severityLabelMap = ${severityLabelMap};
+
           function getSeverityColor(severity) {
             switch (severity) {
               case 'very-high': return '#DC2626';
@@ -443,13 +472,18 @@ export default function HeatMap() {
             }
           }
           function getSeverityLabel(severity) {
-            switch (severity) {
-              case 'very-high': return 'Critical';
-              case 'high':      return 'High';
-              case 'medium':    return 'Medium';
-              case 'low':       return 'Low';
-              default:          return 'Normal';
+            return severityLabelMap[severity] || severityLabelMap.default;
+          }
+
+          function formatCompactCount(value) {
+            const number = Number(value || 0);
+            if (number < 1000) return String(number);
+            if (number < 1000000) {
+              const compact = (number / 1000).toFixed(number >= 10000 ? 0 : 1);
+              return compact.replace(/\.0$/, '') + 'K';
             }
+            const compact = (number / 1000000).toFixed(number >= 10000000 ? 0 : 1);
+            return compact.replace(/\.0$/, '') + 'M';
           }
 
           const map = L.map('map').setView([${mapCenter[0]}, ${mapCenter[1]}], 12);
@@ -466,20 +500,25 @@ export default function HeatMap() {
             showCoverageOnHover: false,
             zoomToBoundsOnClick: true,
             iconCreateFunction: function(cluster) {
-              const childCount = cluster.getChildCount();
+              const unresolvedCount = cluster.getAllChildMarkers().reduce(function(sum, marker) {
+                return sum + (Number(marker.options.unresolvedCount) || 0);
+              }, 0);
+
+              const displayCount = unresolvedCount;
+              const displayLabel = formatCompactCount(displayCount);
               let c = ' marker-cluster-';
-              if (childCount < 5) {
+              if (displayCount < 20) {
                 c += 'small';
-              } else if (childCount < 15) {
+              } else if (displayCount < 100) {
                 c += 'medium';
               } else {
                 c += 'large';
               }
               
               return new L.DivIcon({ 
-                html: '<div><span>' + childCount + '</span></div>', 
+                html: '<div><span>' + displayLabel + '</span></div>', 
                 className: 'marker-cluster' + c, 
-                iconSize: new L.Point(40, 40) 
+                iconSize: new L.Point(44, 44) 
               });
             }
           });
@@ -499,7 +538,7 @@ export default function HeatMap() {
             })
           })
           .addTo(map)
-          .bindPopup('Your Location');
+            .bindPopup(${userLocationLabel});
           `
               : ""
           }
@@ -548,15 +587,15 @@ export default function HeatMap() {
   const getSeverityLabel = (severity) => {
     switch (severity) {
       case "very-high":
-        return "Critical";
+        return t("heatmap.severity.critical");
       case "high":
-        return "High";
+        return t("heatmap.severity.high");
       case "medium":
-        return "Medium";
+        return t("heatmap.severity.medium");
       case "low":
-        return "Low";
+        return t("heatmap.severity.low");
       default:
-        return "Normal";
+        return t("heatmap.severity.normal");
     }
   };
 
@@ -584,10 +623,7 @@ export default function HeatMap() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader
-        title={t("heatmap.title") || "Heat Map"}
-        hasBackButton={false}
-      />
+      <BackButtonHeader title={t("heatmap.title")} hasBackButton={false} />
       <ScrollView
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
@@ -604,43 +640,117 @@ export default function HeatMap() {
         <View className="px-4 mb-4">
           <View
             className="p-4 rounded-xl"
-            style={{ backgroundColor: colors.cardBackground }}
+            style={{
+              backgroundColor: colors.cardBackground,
+            }}
           >
             <Text
               style={{ color: colors.textPrimary }}
               className="text-lg font-bold mb-4"
             >
-              {t("heatmap.filters") || "Filters"}
+              {t("heatmap.filters")}
             </Text>
 
-            <View className="flex-row gap-2">
-              <View style={{ flex: 1 }}>
+            <View className="flex-row mb-4" style={{ gap: 8 }}>
+              <View
+                className="px-3 py-2 rounded-lg"
+                style={{ backgroundColor: colors.backgroundSecondary, flex: 1 }}
+              >
+                <Text
+                  className="text-xs"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("heatmap.totalComplaints")}
+                </Text>
+                <Text
+                  className="text-base font-bold"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {formatCompactCount(stats.total)}
+                </Text>
+              </View>
+              <View
+                className="px-3 py-2 rounded-lg"
+                style={{
+                  backgroundColor: colors.warning + "1A",
+                  borderWidth: 1,
+                  borderColor: colors.warning + "55",
+                  flex: 1,
+                }}
+              >
+                <Text
+                  className="text-xs"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("heatmap.unresolvedComplaints")}
+                </Text>
+                <Text
+                  className="text-base font-bold"
+                  style={{ color: colors.warning }}
+                >
+                  {formatCompactCount(stats.unresolved)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 10 }}>
+              <View>
+                <Text
+                  className="text-xs font-semibold mb-1.5"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("heatmap.department")}
+                </Text>
                 <CustomPicker
-                  placeholder={t("heatmap.department") || "Department"}
+                  placeholder={t("heatmap.department")}
                   value={filters.department}
                   onChange={(item) => updateFilter("department", item.value)}
                   data={departments}
                   searchPlaceholder={null}
+                  containerStyle={{
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                  }}
                 />
               </View>
 
-              <View style={{ flex: 1 }}>
+              <View>
+                <Text
+                  className="text-xs font-semibold mb-1.5"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("heatmap.priority")}
+                </Text>
                 <CustomPicker
-                  placeholder={t("heatmap.priority") || "Priority"}
+                  placeholder={t("heatmap.priority")}
                   value={filters.priority}
                   onChange={(item) => updateFilter("priority", item.value)}
                   data={priorities}
                   searchPlaceholder={null}
+                  containerStyle={{
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                  }}
                 />
               </View>
 
-              <View style={{ flex: 1 }}>
+              <View>
+                <Text
+                  className="text-xs font-semibold mb-1.5"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("heatmap.timeframe")}
+                </Text>
                 <CustomPicker
-                  placeholder={t("heatmap.timeframe") || "Time Period"}
+                  placeholder={t("heatmap.timeframe")}
                   value={filters.timeframe}
                   onChange={(item) => updateFilter("timeframe", item.value)}
                   data={timeframes}
                   searchPlaceholder={null}
+                  containerStyle={{
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                  }}
                 />
               </View>
             </View>
@@ -670,7 +780,7 @@ export default function HeatMap() {
                   style={{ color: colors.textSecondary, marginTop: 10 }}
                   className="text-sm"
                 >
-                  {t("heatmap.loadingMap") || "Loading map..."}
+                  {t("heatmap.loadingMap")}
                 </Text>
               </View>
             ) : !isOnline ? (
@@ -690,13 +800,12 @@ export default function HeatMap() {
                     marginBottom: 8,
                   }}
                 >
-                  {t("common.noInternet") || "No Internet Connection"}
+                  {t("heatmap.offlineTitle")}
                 </Text>
                 <Text
                   style={{ color: colors.textSecondary, textAlign: "center" }}
                 >
-                  {t("heatmap.offlineMessage") ||
-                    "The map requires an internet connection to load."}
+                  {t("heatmap.offlineMessage")}
                 </Text>
               </View>
             ) : (

@@ -12,7 +12,7 @@ import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { setUserAuth } from "../../../utils/userAuth";
-import { API_BASE, LOGIN_URL } from "../../../url";
+import { LOGIN_URL } from "../../../url";
 import { registerPushToken } from "../../../utils/pushToken";
 
 export default function Login() {
@@ -79,7 +79,7 @@ export default function Login() {
 
         Toast.show({
           type: "success",
-          text1: t("toast.loginSuccess.title") || "Success",
+          text1: t("toast.loginSuccess.title"),
           text2: responseData?.message || t("toast.loginSuccess.message"),
         });
 
@@ -102,6 +102,16 @@ export default function Login() {
     } catch (error) {
       console.error("Login error:", error);
       console.error("Error response:", error?.response?.data);
+
+      const isUnverified =
+        error?.response?.data?.details?.emailUnverified === true;
+      if (isUnverified) {
+        router.push({
+          pathname: "/(app)/(auth)/verify-email",
+          params: { email: email.trim().toLowerCase() },
+        });
+      }
+
       Toast.show({
         type: "error",
         text1: t("toast.loginError.title"),
@@ -233,6 +243,18 @@ export default function Login() {
             }
           />
         </View>
+
+        <PressableBlock
+          onPress={() => router.push("/(app)/(auth)/forgot-password")}
+          className="self-end mb-5"
+        >
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: colors.primary }}
+          >
+            {t("auth.login.forgotPassword")}
+          </Text>
+        </PressableBlock>
 
         {/* Login Button */}
         <PressableBlock

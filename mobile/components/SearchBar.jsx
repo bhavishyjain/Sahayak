@@ -9,7 +9,13 @@ import { useTheme } from "../utils/context/theme";
  * The clear button is shown automatically when value is non-empty.
  * onClear defaults to calling onChangeText("") if not provided.
  */
-export default function SearchBar({ value, onChangeText, placeholder, onClear, style }) {
+export default function SearchBar({
+  value,
+  onChangeText,
+  placeholder,
+  onClear,
+  style,
+}) {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
@@ -17,7 +23,7 @@ export default function SearchBar({ value, onChangeText, placeholder, onClear, s
 
   return (
     <View
-      className="flex-row items-center px-4 py-2 rounded-xl"
+      className="flex-row items-center px-4 py-1 rounded-xl"
       style={{
         backgroundColor: colors.backgroundSecondary,
         borderWidth: 1.5,

@@ -1,47 +1,49 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import {
-  Clock,
-  MapPin,
-  User,
-  CheckCircle,
-  FileText,
   AlertCircle,
-  Image as ImageIcon,
-  ThumbsUp,
-  ThumbsDown,
-  Star,
-  MessageSquare,
-  Users,
-  Camera,
-  Upload,
   AlertTriangle,
+  Camera,
   ChevronUp,
-  ShieldAlert,
-  Brain,
-  Tag,
-  Zap,
-  Share2,
+  Clock,
   FileDown,
+  FileText,
+  Image as ImageIcon,
+  Info,
+  MapPin,
+  MessageSquare,
+  Share2,
+  ShieldAlert,
+  Star,
+  Tag,
+  ThumbsDown,
+  ThumbsUp,
+  User,
+  Users,
+  Upload,
+  X,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Linking,
+  Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   Share,
   Text,
-  View,
-  Modal,
-  Pressable,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Toast from "react-native-toast-message";
+import { WebView } from "react-native-webview";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
@@ -115,6 +117,7 @@ function ComplaintDetailsInner() {
 
   // Common states
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [upvoteInfoModalVisible, setUpvoteInfoModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   // SLA live countdown — recomputed every 60 s
@@ -241,8 +244,8 @@ function ComplaintDetailsInner() {
           ? t("complaints.details.upvoteRemoved")
           : t("complaints.details.upvotedSuccess"),
         text2: hasUpvoted
-          ? t("complaints.details.supportRemoved")
-          : t("complaints.details.thanksForSupporting"),
+          ? t("complaints.details.upvoteRemovedMessage")
+          : t("complaints.details.thanksForUpvoting"),
       });
     } catch (e) {
       Toast.show({
@@ -417,23 +420,17 @@ function ComplaintDetailsInner() {
 
       Toast.show({
         type: "success",
-        text1:
-          t("complaints.details.aiSuggestionApplied") ||
-          "AI Suggestion Applied",
-        text2:
-          t("complaints.details.complaintUpdated") ||
-          "Complaint has been updated",
+        text1: t("complaints.details.aiSuggestionApplied"),
+        text2: t("complaints.details.complaintUpdated"),
       });
 
       await load(true);
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: t("complaints.details.updateFailed") || "Update Failed",
+        text1: t("complaints.details.updateFailed"),
         text2:
-          e?.response?.data?.message ||
-          t("complaints.details.couldNotApplyAI") ||
-          "Failed to apply AI suggestion",
+          e?.response?.data?.message || t("complaints.details.couldNotApplyAI"),
       });
     }
   };
@@ -492,10 +489,8 @@ function ComplaintDetailsInner() {
       if (status !== "granted") {
         Toast.show({
           type: "error",
-          text1: t("complaints.permissionRequired") || "Permission Required",
-          text2:
-            t("complaints.galleryPermissionDenied") ||
-            "Please allow access to your gallery",
+          text1: t("complaints.permissionRequired"),
+          text2: t("complaints.galleryPermissionDenied"),
         });
         return;
       }
@@ -516,7 +511,7 @@ function ComplaintDetailsInner() {
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: t("complaints.pickPhotosFailed") || "Failed to pick photos",
+        text1: t("complaints.pickPhotosFailed"),
         text2: err.message,
       });
     }
@@ -530,10 +525,8 @@ function ComplaintDetailsInner() {
       if (status !== "granted") {
         Toast.show({
           type: "error",
-          text1: t("complaints.permissionRequired") || "Permission Required",
-          text2:
-            t("complaints.cameraPermissionDenied") ||
-            "Please allow access to your camera",
+          text1: t("complaints.permissionRequired"),
+          text2: t("complaints.cameraPermissionDenied"),
         });
         return;
       }
@@ -552,7 +545,7 @@ function ComplaintDetailsInner() {
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: t("complaints.takePhotoFailed") || "Failed to take photo",
+        text1: t("complaints.takePhotoFailed"),
         text2: err.message,
       });
     }
@@ -586,10 +579,8 @@ function ComplaintDetailsInner() {
 
       Toast.show({
         type: "success",
-        text1: t("complaints.uploadSuccess") || "Upload Successful",
-        text2:
-          t("complaints.afterPhotosUploaded") ||
-          "After photos have been uploaded",
+        text1: t("complaints.uploadSuccess"),
+        text2: t("complaints.afterPhotosUploaded"),
       });
 
       setSelectedPhotos([]);
@@ -597,11 +588,8 @@ function ComplaintDetailsInner() {
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: t("complaints.uploadFailed") || "Upload Failed",
-        text2:
-          err?.response?.data?.message ||
-          t("complaints.couldNotUploadPhotos") ||
-          "Failed to upload photos",
+        text1: t("complaints.uploadFailed"),
+        text2: err?.response?.data?.message || t("complaints.couldNotUploadPhotos"),
       });
     } finally {
       setUploadingPhotos(false);
@@ -642,13 +630,11 @@ function ComplaintDetailsInner() {
 
       Toast.show({
         type: "success",
-        text1: t("complaints.voteRecorded") || "Vote Recorded",
+        text1: t("complaints.voteRecorded"),
         text2:
           voteType === "up"
-            ? t("complaints.thanksForPositiveFeedback") ||
-              "Thanks for your positive feedback!"
-            : t("complaints.feedbackReceived") ||
-              "Your feedback has been received",
+            ? t("complaints.thanksForPositiveFeedback")
+            : t("complaints.feedbackReceived"),
       });
 
       // Update satisfaction votes from response
@@ -661,11 +647,8 @@ function ComplaintDetailsInner() {
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: t("complaints.voteFailed") || "Vote Failed",
-        text2:
-          err?.response?.data?.message ||
-          t("complaints.couldNotRecordVote") ||
-          "Failed to record your vote",
+        text1: t("complaints.voteFailed"),
+        text2: err?.response?.data?.message || t("complaints.couldNotRecordVote"),
       });
     } finally {
       setVotingInProgress(false);
@@ -710,8 +693,20 @@ function ComplaintDetailsInner() {
   const handleShare = async () => {
     try {
       const link = `sahayak://complaints/complaint-details?id=${id}`;
+      const shareMessage = [
+        t("complaints.details.shareHeader", {
+          ticketId: complaint.ticketId,
+          department: complaint.department,
+        }),
+        t("complaints.details.shareStatusLine", {
+          status: complaint.status,
+          priority: complaint.priority,
+        }),
+        t("complaints.details.shareOpenInApp", { link }),
+      ].join("\n\n");
+
       await Share.share({
-        message: `📋 Complaint #${complaint.ticketId} — ${complaint.department}\nStatus: ${complaint.status} | Priority: ${complaint.priority}\n\nOpen in Sahayak: ${link}`,
+        message: shareMessage,
         url: link,
       });
     } catch (_) {
@@ -781,6 +776,22 @@ function ComplaintDetailsInner() {
     }
   };
 
+  const handleOpenInMaps = async (latitude, longitude) => {
+    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      }
+    } catch (_) {
+      Toast.show({
+        type: "error",
+        text1: t("common.failed"),
+        text2: t("complaints.details.couldNotLoad"),
+      });
+    }
+  };
+
   if (loading) {
     return (
       <View
@@ -835,6 +846,72 @@ function ComplaintDetailsInner() {
       label: t("complaints.status.pendingApproval"),
     },
   ];
+
+  const latitude = Number(complaint?.coordinates?.lat);
+  const longitude = Number(complaint?.coordinates?.lng);
+  const hasCoordinates =
+    Number.isFinite(latitude) && Number.isFinite(longitude);
+  const mapEmbedUrl = (() => {
+    if (!hasCoordinates) return null;
+
+    const delta = 0.0006;
+    const left = longitude - delta;
+    const right = longitude + delta;
+    const top = latitude + delta;
+    const bottom = latitude - delta;
+
+    const bbox = encodeURIComponent(`${left},${bottom},${right},${top}`);
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik`;
+  })();
+
+  const complaintOwnerId = String(
+    complaint?.userId?._id || complaint?.userId?.id || complaint?.userId || "",
+  );
+  const isComplaintOwner =
+    !complaintOwnerId || String(currentUserId || "") === complaintOwnerId;
+
+  const showDiscussionThread =
+    userRole === "user"
+      ? isComplaintOwner
+      : userRole === "head" || userRole === "worker" || userRole === "admin";
+
+  const upvoteCount = complaint.upvoteCount || 0;
+  const upvoteImpactLabel =
+    upvoteCount >= 200
+      ? t("complaints.details.eligibleHighPriorityEscalation")
+      : upvoteCount >= 100
+        ? t("complaints.details.eligibleMediumPriorityEscalation")
+        : t("complaints.details.belowEscalationThreshold");
+  const nextUpvoteThresholdLabel =
+    upvoteCount < 100
+      ? t("complaints.details.nextLowToMedium", {
+          count: 100 - upvoteCount,
+        })
+      : upvoteCount < 200
+        ? t("complaints.details.nextMediumToHigh", {
+            count: 200 - upvoteCount,
+          })
+        : t("complaints.details.highestThresholdReached");
+
+  const complaintTimelineHistory = (complaint.history || []).map(
+    (entry, index) => {
+      if (
+        entry?.timestamp ||
+        entry?.updatedAt ||
+        entry?.createdAt ||
+        entry?.at
+      ) {
+        return entry;
+      }
+      return {
+        ...entry,
+        timestamp:
+          (index === 0 ? complaint.createdAt : complaint.updatedAt) ||
+          complaint.createdAt ||
+          null,
+      };
+    },
+  );
 
   return (
     <View
@@ -924,6 +1001,58 @@ function ComplaintDetailsInner() {
           </Card>
         </View>
 
+        {/* Discussion Thread - Moved up for quicker access */}
+        {showDiscussionThread && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 pr-2">
+                <View
+                  className="w-9 h-9 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: colors.primary + "18" }}
+                >
+                  <MessageSquare size={16} color={colors.primary} />
+                </View>
+                <View className="ml-2.5 flex-1">
+                  <Text
+                    className="text-base font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {t("complaints.details.complaintChat")}
+                  </Text>
+                  <Text
+                    className="text-xs mt-0.5"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("complaints.details.complaintChatSubtitle")}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/complaints/complaint-chat",
+                    params: { id, ticketId: complaint.ticketId },
+                  })
+                }
+                className="h-10 flex-row items-center justify-center px-3.5 rounded-xl"
+                style={{
+                  backgroundColor: colors.primary,
+                  borderWidth: 1,
+                  borderColor: `${colors.backgroundPrimary}CC`,
+                }}
+              >
+                <MessageSquare size={14} color={colors.light} />
+                <Text
+                  className="text-sm font-semibold ml-1.5"
+                  style={{ color: colors.light }}
+                >
+                  {t("complaints.details.openChat")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
+        )}
+
         {/* SLA Status Card */}
         {complaint.sla && complaint.sla.dueDate && (
           <Card
@@ -934,11 +1063,11 @@ function ComplaintDetailsInner() {
               borderWidth: 1.5,
               borderColor:
                 complaint.sla.isOverdue || slaCountdown?.isOverdue
-                  ? "#EF4444"
+                  ? colors.error
                   : slaCountdown?.isCritical
-                    ? "#EF4444"
+                    ? colors.error
                     : slaCountdown?.isUrgent
-                      ? "#F59E0B"
+                      ? colors.warning
                       : colors.border,
             }}
           >
@@ -949,19 +1078,19 @@ function ComplaintDetailsInner() {
                   size={18}
                   color={
                     complaint.sla.isOverdue || slaCountdown?.isOverdue
-                      ? "#EF4444"
+                      ? colors.error
                       : slaCountdown?.isCritical
-                        ? "#EF4444"
+                        ? colors.error
                         : slaCountdown?.isUrgent
-                          ? "#F59E0B"
-                          : colors.success || "#10B981"
+                          ? colors.warning
+                          : colors.success
                   }
                 />
                 <Text
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  {t("complaints.details.sla.title") || "SLA Status"}
+                  {t("complaints.details.sla.title")}
                 </Text>
               </View>
 
@@ -969,14 +1098,14 @@ function ComplaintDetailsInner() {
               {(complaint.sla.escalationLevel || 0) > 0 && (
                 <View
                   className="flex-row items-center px-2 py-1 rounded-lg"
-                  style={{ backgroundColor: "#F9731622" }}
+                  style={{ backgroundColor: colors.warning + "22" }}
                 >
-                  <ChevronUp size={12} color="#F97316" />
+                  <ChevronUp size={12} color={colors.warning} />
                   <Text
                     className="text-xs font-bold ml-1"
-                    style={{ color: "#F97316" }}
+                    style={{ color: colors.warning }}
                   >
-                    {t("complaints.details.sla.level") || "Level"}{" "}
+                    {t("complaints.details.sla.level")}{" "}
                     {complaint.sla.escalationLevel}
                   </Text>
                 </View>
@@ -986,7 +1115,7 @@ function ComplaintDetailsInner() {
             {/* Due Date row */}
             <View className="flex-row items-center justify-between mb-2">
               <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                {t("complaints.details.sla.dueDate") || "SLA Due Date"}
+                {t("complaints.details.sla.dueDate")}
               </Text>
               <Text
                 className="text-sm font-semibold"
@@ -1011,21 +1140,21 @@ function ComplaintDetailsInner() {
             <View className="flex-row items-center justify-between">
               <Text className="text-sm" style={{ color: colors.textSecondary }}>
                 {complaint.sla.isOverdue || slaCountdown?.isOverdue
-                  ? t("complaints.details.sla.status") || "Status"
-                  : t("complaints.details.sla.timeLeft") || "Time Remaining"}
+                  ? t("complaints.details.sla.status")
+                  : t("complaints.details.sla.timeLeft")}
               </Text>
 
               {complaint.sla.isOverdue || slaCountdown?.isOverdue ? (
                 <View
                   className="flex-row items-center px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: "#EF444422" }}
+                  style={{ backgroundColor: colors.error + "22" }}
                 >
-                  <AlertTriangle size={14} color="#EF4444" />
+                  <AlertTriangle size={14} color={colors.error} />
                   <Text
                     className="text-sm font-bold ml-1.5"
-                    style={{ color: "#EF4444" }}
+                    style={{ color: colors.error }}
                   >
-                    {t("complaints.details.sla.overdue") || "OVERDUE"}
+                    {t("complaints.details.sla.overdue")}
                   </Text>
                 </View>
               ) : slaCountdown ? (
@@ -1033,30 +1162,30 @@ function ComplaintDetailsInner() {
                   className="flex-row items-center px-3 py-1 rounded-lg"
                   style={{
                     backgroundColor: slaCountdown.isCritical
-                      ? "#EF444422"
+                      ? colors.error + "22"
                       : slaCountdown.isUrgent
-                        ? "#F59E0B22"
-                        : "#10B98122",
+                        ? colors.warning + "22"
+                        : colors.success + "22",
                   }}
                 >
                   <Clock
                     size={14}
                     color={
                       slaCountdown.isCritical
-                        ? "#EF4444"
+                        ? colors.error
                         : slaCountdown.isUrgent
-                          ? "#F59E0B"
-                          : "#10B981"
+                          ? colors.warning
+                          : colors.success
                     }
                   />
                   <Text
                     className="text-sm font-bold ml-1.5"
                     style={{
                       color: slaCountdown.isCritical
-                        ? "#EF4444"
+                        ? colors.error
                         : slaCountdown.isUrgent
-                          ? "#F59E0B"
-                          : "#10B981",
+                          ? colors.warning
+                          : colors.success,
                     }}
                   >
                     {slaCountdown.text}
@@ -1065,13 +1194,13 @@ function ComplaintDetailsInner() {
               ) : (
                 <View
                   className="px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: "#10B98122" }}
+                  style={{ backgroundColor: colors.success + "22" }}
                 >
                   <Text
                     className="text-sm font-bold"
-                    style={{ color: "#10B981" }}
+                    style={{ color: colors.success }}
                   >
-                    {t("complaints.details.sla.onTime") || "On Time"}
+                    {t("complaints.details.sla.onTime")}
                   </Text>
                 </View>
               )}
@@ -1089,26 +1218,26 @@ function ComplaintDetailsInner() {
                 marginBottom: 12,
                 flex: 0,
                 borderWidth: 1.5,
-                borderColor: colors.info ? colors.info + "60" : "#3B82F660",
+                borderColor: colors.info + "60",
               }}
             >
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center">
-                  <Clock size={18} color={colors.info || "#3B82F6"} />
+                  <Clock size={18} color={colors.info} />
                   <Text
                     className="text-base font-semibold ml-2"
                     style={{ color: colors.textPrimary }}
                   >
-                    {t("complaints.details.estimatedCompletion") || "ETA"}
+                    {t("complaints.details.estimatedCompletion")}
                   </Text>
                 </View>
                 <View
                   className="px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: (colors.info || "#3B82F6") + "18" }}
+                  style={{ backgroundColor: colors.info + "18" }}
                 >
                   <Text
                     className="text-sm font-bold"
-                    style={{ color: colors.info || "#3B82F6" }}
+                    style={{ color: colors.info }}
                   >
                     {complaint.estimatedCompletionTime < 24
                       ? `${complaint.estimatedCompletionTime}h`
@@ -1147,23 +1276,35 @@ function ComplaintDetailsInner() {
                       }}
                     >
                       {hasUpvoted
-                        ? t("complaints.details.youSupportThis")
-                        : t("complaints.details.supportThisComplaint")}
+                        ? t("complaints.details.upvoted")
+                        : t("complaints.details.upvote")}
                     </Text>
                     <Text
                       className="text-sm mt-0.5"
                       style={{ color: colors.textSecondary }}
                     >
-                      {complaint.upvoteCount || 0}{" "}
+                      {upvoteCount}{" "}
                       {(complaint.upvoteCount || 0) === 1
                         ? t("complaints.details.personAffected")
                         : t("complaints.details.peopleAffected")}
                     </Text>
                   </View>
                 </View>
-                {upvoting && (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                )}
+                <View className="flex-row items-center">
+                  {upvoting && (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  )}
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      setUpvoteInfoModalVisible(true);
+                    }}
+                    className="w-8 h-8 rounded-full items-center justify-center ml-2"
+                    style={{ backgroundColor: colors.backgroundSecondary }}
+                  >
+                    <Info size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
               </View>
             </Card>
           </PressableBlock>
@@ -1172,20 +1313,29 @@ function ComplaintDetailsInner() {
         {/* HOD/Worker: Upvote Count (Read-only) */}
         {(userRole === "head" || userRole === "worker") && (
           <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <View className="flex-row items-center">
-              <ThumbsUp size={20} color={colors.primary} />
-              <Text
-                className="text-base font-semibold ml-2"
-                style={{ color: colors.textPrimary }}
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <ThumbsUp size={20} color={colors.primary} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("complaints.details.communityUpvotes")}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setUpvoteInfoModalVisible(true)}
+                className="w-8 h-8 rounded-full items-center justify-center"
+                style={{ backgroundColor: colors.backgroundPrimary }}
               >
-                {t("complaints.details.communitySupport")}
-              </Text>
+                <Info size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
             <Text
               className="text-sm mt-2"
               style={{ color: colors.textSecondary }}
             >
-              {complaint.upvoteCount || 0}{" "}
+              {upvoteCount}{" "}
               {(complaint.upvoteCount || 0) === 1
                 ? t("complaints.details.personAffected")
                 : t("complaints.details.peopleAffected")}
@@ -1204,31 +1354,33 @@ function ComplaintDetailsInner() {
                 marginBottom: 12,
                 flex: 0,
                 borderWidth: 2,
-                borderColor: colors.purple || "#8B5CF6",
+                borderColor: colors.info,
               }}
             >
               <View className="flex-row items-center mb-3">
                 <View
                   className="w-8 h-8 rounded-full items-center justify-center"
                   style={{
-                    backgroundColor: colors.purple + "20" || "#8B5CF620",
+                    backgroundColor: colors.info + "20",
                   }}
                 >
-                  <AlertCircle size={16} color={colors.purple || "#8B5CF6"} />
+                  <AlertCircle size={16} color={colors.info} />
                 </View>
                 <View className="ml-2 flex-1">
                   <Text
                     className="text-sm font-semibold"
                     style={{ color: colors.textPrimary }}
                   >
-                    AI Suggestion Available
+                    {t("complaints.details.aiSuggestionAvailable")}
                   </Text>
                   {complaint.aiConfidence && (
                     <Text
                       className="text-xs"
                       style={{ color: colors.textSecondary }}
                     >
-                      {Math.round(complaint.aiConfidence * 100)}% confident
+                      {t("hod.aiReview.confidence", {
+                        pct: Math.round(complaint.aiConfidence * 100),
+                      })}
                     </Text>
                   )}
                 </View>
@@ -1245,7 +1397,7 @@ function ComplaintDetailsInner() {
                       className="text-xs mb-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      Department Suggestion
+                      {t("complaints.details.departmentSuggestion")}
                     </Text>
                     <View className="flex-row items-center justify-between">
                       <View className="flex-1">
@@ -1253,7 +1405,7 @@ function ComplaintDetailsInner() {
                           className="text-sm"
                           style={{ color: colors.textSecondary }}
                         >
-                          Current:{" "}
+                          {t("complaints.details.currentLabel")}{" "}
                           <Text
                             className="font-semibold"
                             style={{ color: colors.textPrimary }}
@@ -1265,10 +1417,10 @@ function ComplaintDetailsInner() {
                           className="text-sm mt-1"
                           style={{ color: colors.textSecondary }}
                         >
-                          AI suggests:{" "}
+                          {t("complaints.details.aiSuggestsLabel")}{" "}
                           <Text
                             className="font-semibold"
-                            style={{ color: colors.success || "#10B981" }}
+                            style={{ color: colors.success }}
                           >
                             {complaint.aiSuggestedDepartment}
                           </Text>
@@ -1279,8 +1431,11 @@ function ComplaintDetailsInner() {
                         className="px-4 py-2 rounded-lg"
                         style={{ backgroundColor: colors.primary }}
                       >
-                        <Text className="text-sm font-semibold text-white">
-                          Apply
+                        <Text
+                          className="text-sm font-semibold"
+                          style={{ color: colors.light }}
+                        >
+                          {t("common.apply")}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1301,7 +1456,7 @@ function ComplaintDetailsInner() {
                         className="text-xs mb-2"
                         style={{ color: colors.textSecondary }}
                       >
-                        Priority Suggestion
+                        {t("complaints.details.prioritySuggestion")}
                       </Text>
                       <View className="flex-row items-center justify-between">
                         <View className="flex-1">
@@ -1309,7 +1464,7 @@ function ComplaintDetailsInner() {
                             className="text-sm"
                             style={{ color: colors.textSecondary }}
                           >
-                            Current:{" "}
+                            {t("complaints.details.currentLabel")}{" "}
                             <Text
                               className="font-semibold"
                               style={{ color: colors.textPrimary }}
@@ -1321,10 +1476,10 @@ function ComplaintDetailsInner() {
                             className="text-sm mt-1"
                             style={{ color: colors.textSecondary }}
                           >
-                            AI suggests:{" "}
+                            {t("complaints.details.aiSuggestsLabel")}{" "}
                             <Text
                               className="font-semibold"
-                              style={{ color: colors.warning || "#F59E0B" }}
+                              style={{ color: colors.warning }}
                             >
                               {complaint.aiAnalysis.suggestedPriority}
                             </Text>
@@ -1336,7 +1491,7 @@ function ComplaintDetailsInner() {
                           style={{ backgroundColor: colors.primary }}
                         >
                           <Text className="text-sm font-semibold text-white">
-                            Apply
+                            {t("common.apply")}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -1354,7 +1509,7 @@ function ComplaintDetailsInner() {
                     className="text-xs mb-1"
                     style={{ color: colors.textSecondary }}
                   >
-                    AI Reasoning
+                    {t("complaints.details.aiReasoning")}
                   </Text>
                   <Text
                     className="text-sm"
@@ -1377,7 +1532,7 @@ function ComplaintDetailsInner() {
                         className="text-xs"
                         style={{ color: colors.textSecondary }}
                       >
-                        Sentiment
+                        {t("complaints.details.sentiment")}
                       </Text>
                       <Text
                         className="text-sm font-semibold capitalize"
@@ -1396,7 +1551,7 @@ function ComplaintDetailsInner() {
                         className="text-xs"
                         style={{ color: colors.textSecondary }}
                       >
-                        Urgency
+                        {t("complaints.details.urgency")}
                       </Text>
                       <Text
                         className="text-sm font-semibold"
@@ -1420,18 +1575,18 @@ function ComplaintDetailsInner() {
                       className="text-xs mb-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      Keywords
+                        {t("complaints.details.keywords")}
                     </Text>
                     <View className="flex-row flex-wrap gap-1">
                       {complaint.aiAnalysis.keywords.map((kw, i) => (
                         <View
                           key={i}
                           className="px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: "#8B5CF618" }}
+                          style={{ backgroundColor: colors.info + "18" }}
                         >
                           <Text
                             className="text-xs font-medium"
-                            style={{ color: "#8B5CF6" }}
+                            style={{ color: colors.info }}
                           >
                             {kw}
                           </Text>
@@ -1447,17 +1602,17 @@ function ComplaintDetailsInner() {
                   className="flex-row items-center mt-3 rounded-lg p-3"
                   style={{ backgroundColor: colors.backgroundSecondary }}
                 >
-                  <Users size={14} color={colors.textMuted} />
+                  <Users size={14} color={colors.muted} />
                   <Text
                     className="text-xs ml-1.5"
                     style={{ color: colors.textSecondary }}
                   >
-                    Estimated affected:{" "}
+                    {t("complaints.details.estimatedAffected")} {" "}
                     <Text
                       className="font-semibold"
                       style={{ color: colors.textPrimary }}
                     >
-                      ~{complaint.aiAnalysis.affectedCount} people
+                      ~{complaint.aiAnalysis.affectedCount} {t("complaints.details.people")}
                     </Text>
                   </Text>
                 </View>
@@ -1476,7 +1631,9 @@ function ComplaintDetailsInner() {
               >
                 {complaint.assignedWorkers?.length === 1
                   ? t("complaints.details.currentlyAssigned")
-                  : `Assigned Workers (${complaint.assignedWorkers?.length ?? 0})`}
+                  : t("complaints.details.assignedWorkersCount", {
+                      count: complaint.assignedWorkers?.length ?? 0,
+                    })}
               </Text>
             </View>
             {(complaint.assignedWorkers ?? []).slice(0, 4).map((w, i) => (
@@ -1496,12 +1653,12 @@ function ComplaintDetailsInner() {
                   style={{
                     backgroundColor:
                       w.status === "completed"
-                        ? "#10B98122"
+                        ? colors.success + "22"
                         : w.status === "in-progress"
-                          ? "#F59E0B22"
+                          ? colors.warning + "22"
                           : w.status === "needs-rework"
-                            ? "#EF444422"
-                            : "#3B82F622",
+                            ? colors.error + "22"
+                            : colors.info + "22",
                   }}
                 >
                   <Text
@@ -1509,12 +1666,12 @@ function ComplaintDetailsInner() {
                     style={{
                       color:
                         w.status === "completed"
-                          ? "#10B981"
+                          ? colors.success
                           : w.status === "in-progress"
-                            ? "#F59E0B"
+                            ? colors.warning
                             : w.status === "needs-rework"
-                              ? "#EF4444"
-                              : "#3B82F6",
+                              ? colors.error
+                              : colors.info,
                     }}
                   >
                     {(w.status ?? "assigned").replace("-", " ")}
@@ -1546,13 +1703,13 @@ function ComplaintDetailsInner() {
                 }}
               >
                 <View className="flex-row items-center justify-center">
-                  <Users size={20} color="#FFFFFF" />
+                  <Users size={20} color={colors.light} />
                   <Text
                     className="text-base font-semibold ml-2"
-                    style={{ color: "#FFFFFF" }}
+                    style={{ color: colors.light }}
                   >
                     {complaint.isAssigned
-                      ? "Manage Workers"
+                      ? t("complaints.details.manageWorkers")
                       : t("complaints.details.assignToWorker")}
                   </Text>
                 </View>
@@ -1573,16 +1730,16 @@ function ComplaintDetailsInner() {
                   margin: 0,
                   marginBottom: 12,
                   flex: 0,
-                  backgroundColor: colors.error || "#EF4444",
+                  backgroundColor: colors.error,
                 }}
               >
                 <View className="flex-row items-center justify-center">
                   {cancelling ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={colors.light} />
                   ) : (
                     <Text
                       className="text-base font-semibold"
-                      style={{ color: "#FFFFFF" }}
+                      style={{ color: colors.light }}
                     >
                       {t("complaints.details.cancelComplaint")}
                     </Text>
@@ -1600,7 +1757,7 @@ function ComplaintDetailsInner() {
                 margin: 0,
                 marginBottom: 8,
                 flex: 0,
-                backgroundColor: colors.success || "#10B981",
+                backgroundColor: colors.success,
               }}
             >
               <PressableBlock
@@ -1609,12 +1766,12 @@ function ComplaintDetailsInner() {
               >
                 <View className="flex-row items-center justify-center py-1">
                   {approving ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={colors.light} />
                   ) : (
                     <>
                       <Text
                         className="text-base font-semibold"
-                        style={{ color: "#FFFFFF" }}
+                        style={{ color: colors.light }}
                       >
                         {t("complaints.details.approveCompletion")}
                       </Text>
@@ -1628,14 +1785,14 @@ function ComplaintDetailsInner() {
               style={{
                 margin: 0,
                 flex: 0,
-                backgroundColor: colors.error || "#EF4444",
+                backgroundColor: colors.error,
               }}
             >
               <PressableBlock onPress={() => setApprovalModalVisible(true)}>
                 <View className="flex-row items-center justify-center py-1">
                   <Text
                     className="text-base font-semibold"
-                    style={{ color: "#FFFFFF" }}
+                    style={{ color: colors.light }}
                   >
                     {t("complaints.details.requestRework")}
                   </Text>
@@ -1660,7 +1817,7 @@ function ComplaintDetailsInner() {
               >
                 <Text
                   className="text-base font-semibold text-center"
-                  style={{ color: "#FFFFFF" }}
+                  style={{ color: colors.light }}
                 >
                   {t("complaints.details.updateStatus")}
                 </Text>
@@ -1678,16 +1835,16 @@ function ComplaintDetailsInner() {
                   margin: 0,
                   marginBottom: 12,
                   flex: 0,
-                  backgroundColor: colors.success || "#10B981",
+                  backgroundColor: colors.success,
                 }}
               >
                 <View className="flex-row items-center justify-center py-1">
-                  <Upload size={20} color="#FFFFFF" />
+                  <Upload size={20} color={colors.light} />
                   <Text
                     className="text-base font-semibold ml-2"
-                    style={{ color: "#FFFFFF" }}
+                    style={{ color: colors.light }}
                   >
-                    {t("complaints.uploadAfterPhotos") || "Upload After Photos"}
+                    {t("complaints.uploadAfterPhotos")}
                   </Text>
                 </View>
               </Card>
@@ -1703,7 +1860,7 @@ function ComplaintDetailsInner() {
                 className="text-sm ml-2"
                 style={{ color: colors.textSecondary }}
               >
-                Title
+                {t("complaints.details.complaintTitle")}
               </Text>
             </View>
             <Text
@@ -1742,12 +1899,12 @@ function ComplaintDetailsInner() {
                 style={{ backgroundColor: colors.border }}
               />
               <View className="flex-row items-center mb-2">
-                <Tag size={14} color={colors.textMuted} />
+                <Tag size={14} color={colors.muted} />
                 <Text
                   className="text-xs ml-1"
-                  style={{ color: colors.textMuted }}
+                  style={{ color: colors.muted }}
                 >
-                  Tags
+                  {t("complaints.details.tags")}
                 </Text>
               </View>
               <View className="flex-row flex-wrap gap-1">
@@ -1810,14 +1967,80 @@ function ComplaintDetailsInner() {
               >
                 {complaint.locationName || t("complaints.details.notSpecified")}
               </Text>
-              {complaint.coordinates && (
+              {hasCoordinates && (
                 <Text
                   className="text-xs mt-1"
                   style={{ color: colors.textSecondary }}
                 >
-                  {complaint.coordinates.lat?.toFixed(6)},{" "}
-                  {complaint.coordinates.lng?.toFixed(6)}
+                  {latitude.toFixed(6)}, {longitude.toFixed(6)}
                 </Text>
+              )}
+
+              {hasCoordinates && mapEmbedUrl && (
+                <Pressable
+                  onPress={() => handleOpenInMaps(latitude, longitude)}
+                  className="mt-3 overflow-hidden rounded-xl"
+                  style={{
+                    height: 220,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.backgroundSecondary,
+                  }}
+                >
+                  <WebView
+                    source={{ uri: mapEmbedUrl }}
+                    style={{ flex: 1 }}
+                    pointerEvents="none"
+                    javaScriptEnabled
+                    domStorageEnabled
+                    startInLoadingState
+                    renderLoading={() => (
+                      <View
+                        className="absolute inset-0 items-center justify-center"
+                        style={{
+                          backgroundColor: colors.backgroundSecondary,
+                        }}
+                      >
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.primary}
+                        />
+                      </View>
+                    )}
+                  />
+
+                  <View
+                    pointerEvents="none"
+                    className="absolute inset-0 items-center justify-center"
+                  >
+                    <MaterialIcons
+                      name="location-on"
+                      size={42}
+                      color={colors.primary}
+                      style={{
+                        textShadowColor: colors.dark + "2E",
+                        textShadowOffset: { width: 0, height: 1 },
+                        textShadowRadius: 2,
+                      }}
+                    />
+                  </View>
+
+                  <View
+                    pointerEvents="none"
+                    className="absolute right-3 bottom-3 px-3.5 py-2 rounded-xl flex-row items-center"
+                    style={{
+                      backgroundColor: colors.primary,
+                    }}
+                  >
+                    <MaterialIcons name="place" size={14} color={colors.light} />
+                    <Text
+                      className="text-xs font-bold ml-1.5"
+                      style={{ color: colors.light }}
+                    >
+                      {t("complaints.details.openInMaps")}
+                    </Text>
+                  </View>
+                </Pressable>
               )}
             </View>
           </View>
@@ -1886,7 +2109,7 @@ function ComplaintDetailsInner() {
           complaint.completionPhotos.length > 0 && (
             <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
               <View className="flex-row items-center mb-3">
-                <ImageIcon size={20} color={colors.success || "#10B981"} />
+                <ImageIcon size={20} color={colors.success} />
                 <Text
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
@@ -1919,12 +2142,10 @@ function ComplaintDetailsInner() {
                 className="text-base font-semibold mb-2"
                 style={{ color: colors.textPrimary }}
               >
-                {t("complaints.satisfactionVote") ||
-                  "How satisfied are you with the resolution?"}
+                {t("complaints.satisfactionVote")}
               </Text>
               <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                {t("complaints.satisfactionVoteDesc") ||
-                  "Let us know if you're satisfied with how this complaint was resolved"}
+                {t("complaints.satisfactionVoteDesc")}
               </Text>
             </View>
 
@@ -1936,7 +2157,7 @@ function ComplaintDetailsInner() {
                 style={{
                   backgroundColor:
                     satisfactionVotes.userVote === "up"
-                      ? colors.success || "#10B981"
+                      ? colors.success
                       : colors.backgroundSecondary,
                   opacity: votingInProgress ? 0.5 : 1,
                 }}
@@ -1945,7 +2166,7 @@ function ComplaintDetailsInner() {
                   size={28}
                   color={
                     satisfactionVotes.userVote === "up"
-                      ? "#FFFFFF"
+                      ? colors.light
                       : colors.textPrimary
                   }
                 />
@@ -1954,7 +2175,7 @@ function ComplaintDetailsInner() {
                   style={{
                     color:
                       satisfactionVotes.userVote === "up"
-                        ? "#FFFFFF"
+                        ? colors.light
                         : colors.textPrimary,
                   }}
                 >
@@ -1965,11 +2186,11 @@ function ComplaintDetailsInner() {
                   style={{
                     color:
                       satisfactionVotes.userVote === "up"
-                        ? "#FFFFFF"
+                        ? colors.light
                         : colors.textSecondary,
                   }}
                 >
-                  {t("complaints.satisfied") || "Satisfied"}
+                  {t("complaints.satisfied")}
                 </Text>
               </Pressable>
 
@@ -1980,7 +2201,7 @@ function ComplaintDetailsInner() {
                 style={{
                   backgroundColor:
                     satisfactionVotes.userVote === "down"
-                      ? colors.error || "#EF4444"
+                      ? colors.error
                       : colors.backgroundSecondary,
                   opacity: votingInProgress ? 0.5 : 1,
                 }}
@@ -1989,7 +2210,7 @@ function ComplaintDetailsInner() {
                   size={28}
                   color={
                     satisfactionVotes.userVote === "down"
-                      ? "#FFFFFF"
+                      ? colors.light
                       : colors.textPrimary
                   }
                 />
@@ -1998,7 +2219,7 @@ function ComplaintDetailsInner() {
                   style={{
                     color:
                       satisfactionVotes.userVote === "down"
-                        ? "#FFFFFF"
+                        ? colors.light
                         : colors.textPrimary,
                   }}
                 >
@@ -2009,11 +2230,11 @@ function ComplaintDetailsInner() {
                   style={{
                     color:
                       satisfactionVotes.userVote === "down"
-                        ? "#FFFFFF"
+                        ? colors.light
                         : colors.textSecondary,
                   }}
                 >
-                  {t("complaints.notSatisfied") || "Not Satisfied"}
+                  {t("complaints.notSatisfied")}
                 </Text>
               </Pressable>
             </View>
@@ -2031,7 +2252,7 @@ function ComplaintDetailsInner() {
                   <View className="flex-row items-center mb-1.5">
                     <Text
                       className="text-xs font-bold w-10 text-right"
-                      style={{ color: colors.success || "#10B981" }}
+                      style={{ color: colors.success }}
                     >
                       {upPct}%
                     </Text>
@@ -2046,14 +2267,14 @@ function ComplaintDetailsInner() {
                         style={{
                           width: `${upPct}%`,
                           height: 8,
-                          backgroundColor: colors.success || "#10B981",
+                          backgroundColor: colors.success,
                           borderRadius: 4,
                         }}
                       />
                     </View>
                     <Text
                       className="text-xs font-bold w-10"
-                      style={{ color: colors.error || "#EF4444" }}
+                      style={{ color: colors.error }}
                     >
                       {downPct}%
                     </Text>
@@ -2077,8 +2298,7 @@ function ComplaintDetailsInner() {
                   className="text-xs text-center"
                   style={{ color: colors.textSecondary }}
                 >
-                  {t("complaints.yourVoteRecorded") ||
-                    "Your vote has been recorded. You can change it anytime."}
+                  {t("complaints.yourVoteRecorded")}
                 </Text>
               </View>
             )}
@@ -2144,7 +2364,7 @@ function ComplaintDetailsInner() {
                   </Text>
                   <Text
                     className="text-base font-semibold mt-1"
-                    style={{ color: colors.warning || "#f59e0b" }}
+                    style={{ color: colors.warning }}
                   >
                     {complaint.estimatedCompletionTime < 24
                       ? `${complaint.estimatedCompletionTime} ${t("complaints.details.hours")}`
@@ -2172,7 +2392,10 @@ function ComplaintDetailsInner() {
             >
               {t("complaints.details.complaintTimeline")}
             </Text>
-            <ComplaintTimeline history={complaint.history} colors={colors} />
+            <ComplaintTimeline
+              history={complaintTimelineHistory}
+              colors={colors}
+            />
           </Card>
         )}
 
@@ -2181,21 +2404,20 @@ function ComplaintDetailsInner() {
           complaint.sla.escalationHistory.length > 0 && (
             <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
               <View className="flex-row items-center mb-3">
-                <ShieldAlert size={18} color="#F97316" />
+                <ShieldAlert size={18} color={colors.warning} />
                 <Text
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  {t("complaints.details.sla.escalationHistory") ||
-                    "Escalation History"}
+                  {t("complaints.details.sla.escalationHistory")}
                 </Text>
                 <View
                   className="ml-2 px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: "#F9731622" }}
+                  style={{ backgroundColor: colors.warning + "22" }}
                 >
                   <Text
                     className="text-xs font-bold"
-                    style={{ color: "#F97316" }}
+                    style={{ color: colors.warning }}
                   >
                     {complaint.sla.escalationHistory.length}
                   </Text>
@@ -2213,11 +2435,11 @@ function ComplaintDetailsInner() {
                   <View className="flex-row items-start">
                     <View
                       className="px-2 py-0.5 rounded-md mr-3 mt-0.5"
-                      style={{ backgroundColor: "#F9731622" }}
+                      style={{ backgroundColor: colors.warning + "22" }}
                     >
                       <Text
                         className="text-xs font-bold"
-                        style={{ color: "#F97316" }}
+                        style={{ color: colors.warning }}
                       >
                         L{entry.level}
                       </Text>
@@ -2227,9 +2449,9 @@ function ComplaintDetailsInner() {
                         className="text-sm font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        {t("complaints.details.sla.level") || "Level"}{" "}
+                        {t("complaints.details.sla.level")}{" "}
                         {entry.level}{" "}
-                        {t("complaints.details.sla.escalation") || "Escalation"}
+                        {t("complaints.details.sla.escalation")}
                       </Text>
                       <Text
                         className="text-xs mt-0.5"
@@ -2240,7 +2462,7 @@ function ComplaintDetailsInner() {
                       {entry.escalatedTo && (
                         <Text
                           className="text-xs mt-0.5"
-                          style={{ color: colors.textMuted }}
+                          style={{ color: colors.muted }}
                         >
                           → {entry.escalatedTo}
                         </Text>
@@ -2252,51 +2474,6 @@ function ComplaintDetailsInner() {
             </Card>
           )}
 
-        {/* Discussion Thread - Visible to all parties with access */}
-        {(userRole === "user" ||
-          userRole === "head" ||
-          userRole === "worker" ||
-          userRole === "admin") && (
-          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center">
-                <MessageSquare size={18} color={colors.primary} />
-                <Text
-                  className="text-base font-semibold ml-2"
-                  style={{ color: colors.textPrimary }}
-                >
-                  Discussion Thread
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/complaints/complaint-chat",
-                    params: { id, ticketId: complaint.ticketId },
-                  })
-                }
-                className="flex-row items-center px-4 py-2 rounded-xl"
-                style={{ backgroundColor: colors.primary }}
-              >
-                <MessageSquare size={14} color="#fff" />
-                <Text
-                  className="text-sm font-semibold ml-1.5"
-                  style={{ color: "#fff" }}
-                >
-                  Open Chat
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <Text
-              className="text-xs mt-2"
-              style={{ color: colors.textSecondary }}
-            >
-              Chat with the citizen, worker and department head on this
-              complaint.
-            </Text>
-          </Card>
-        )}
-
         {/* Worker Notes - Visible to HOD and Worker */}
         {(userRole === "head" || userRole === "worker") &&
           complaint.workerNotes && (
@@ -2307,7 +2484,7 @@ function ComplaintDetailsInner() {
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  Worker Notes
+                  {t("complaints.details.workerNotes")}
                 </Text>
               </View>
               <Text
@@ -2334,8 +2511,8 @@ function ComplaintDetailsInner() {
               <View className="flex-row items-center mb-2">
                 <Star
                   size={18}
-                  color={colors.warning || "#ffc107"}
-                  fill={colors.warning || "#ffc107"}
+                  color={colors.warning}
+                  fill={colors.warning}
                 />
                 <Text
                   className="text-lg font-bold ml-2"
@@ -2370,7 +2547,7 @@ function ComplaintDetailsInner() {
         {/* Citizen: Rate Resolution Button */}
         {userRole === "user" &&
           complaint.status === "resolved" &&
-          String(complaint.userId) === String(currentUserId) &&
+          isComplaintOwner &&
           !complaint.feedback?.rating && (
             <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
               <View className="items-center">
@@ -2393,7 +2570,7 @@ function ComplaintDetailsInner() {
                   >
                     <Text
                       className="text-base font-semibold"
-                      style={{ color: "#FFFFFF" }}
+                      style={{ color: colors.light }}
                     >
                       {t("complaints.details.submitFeedback")}
                     </Text>
@@ -2457,14 +2634,14 @@ function ComplaintDetailsInner() {
       >
         <View
           className="flex-1"
-          style={{ backgroundColor: "rgba(0,0,0,0.95)" }}
+          style={{ backgroundColor: colors.dark + "F2" }}
         >
           <View className="flex-1 justify-center items-center">
             <Pressable
               onPress={() => setImageModalVisible(false)}
               className="absolute top-12 right-4 z-10 w-10 h-10 bg-white/20 rounded-full items-center justify-center"
             >
-              <Text className="text-white text-2xl font-bold">×</Text>
+              <X size={22} color={colors.light} />
             </Pressable>
             <Image
               source={{
@@ -2479,6 +2656,81 @@ function ComplaintDetailsInner() {
         </View>
       </Modal>
 
+      <Modal
+        visible={upvoteInfoModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUpvoteInfoModalVisible(false)}
+      >
+        <View
+          className="flex-1 justify-center px-5"
+          style={{ backgroundColor: colors.dark + "73" }}
+        >
+          <View
+            className="rounded-2xl p-5"
+            style={{ backgroundColor: colors.backgroundPrimary }}
+          >
+            <View className="flex-row items-center justify-between mb-2">
+              <Text
+                className="text-lg font-semibold"
+                style={{ color: colors.textPrimary }}
+              >
+                {t("complaints.details.upvotesPriorityTitle")}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setUpvoteInfoModalVisible(false)}
+                className="w-8 h-8 rounded-full items-center justify-center"
+                style={{ backgroundColor: colors.backgroundSecondary }}
+              >
+                <X size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text
+              className="text-sm mb-3"
+              style={{ color: colors.textSecondary }}
+            >
+              {t("complaints.details.currentUpvotesStatus", {
+                count: upvoteCount,
+                status: upvoteImpactLabel,
+              })}
+            </Text>
+
+            <Text
+              className="text-sm"
+              style={{ color: colors.textPrimary, lineHeight: 20 }}
+            >
+              {t("complaints.details.upvotesPriorityDescription")}
+            </Text>
+
+            <Text
+              className="text-sm mt-2"
+              style={{ color: colors.textSecondary }}
+            >
+              {nextUpvoteThresholdLabel}
+            </Text>
+
+            <View className="mt-3">
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                {t("complaints.details.lowToMediumAt100")}
+              </Text>
+              <Text
+                className="text-sm mt-1"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("complaints.details.mediumToHighAt200")}
+              </Text>
+              <Text
+                className="text-sm mt-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("complaints.details.noAutoDowngradeFromUpvotes")}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Citizen: Feedback Modal */}
       {userRole === "user" && (
         <Modal
@@ -2489,7 +2741,7 @@ function ComplaintDetailsInner() {
         >
           <View
             className="flex-1 justify-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            style={{ backgroundColor: colors.dark + "80" }}
           >
             <View
               className="rounded-t-3xl p-6"
@@ -2579,11 +2831,11 @@ function ComplaintDetailsInner() {
                   }}
                 >
                   {submittingFeedback ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={colors.light} />
                   ) : (
                     <Text
                       className="text-base font-semibold"
-                      style={{ color: "#FFFFFF" }}
+                      style={{ color: colors.light }}
                     >
                       {t("common.submit")}
                     </Text>
@@ -2607,7 +2859,7 @@ function ComplaintDetailsInner() {
         >
           <View
             className="flex-1 justify-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            style={{ backgroundColor: colors.dark + "80" }}
           >
             <View
               className="rounded-t-3xl p-6"
@@ -2704,11 +2956,11 @@ function ComplaintDetailsInner() {
                   }}
                 >
                   {updating ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={colors.light} />
                   ) : (
                     <Text
                       className="text-base font-semibold"
-                      style={{ color: "#FFFFFF" }}
+                      style={{ color: colors.light }}
                     >
                       {t("common.update")}
                     </Text>
@@ -2730,7 +2982,7 @@ function ComplaintDetailsInner() {
         >
           <View
             className="flex-1 justify-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            style={{ backgroundColor: colors.dark + "80" }}
           >
             <View
               className="rounded-t-3xl p-6"
@@ -2740,15 +2992,14 @@ function ComplaintDetailsInner() {
                 className="text-xl font-bold mb-4 text-center"
                 style={{ color: colors.textPrimary }}
               >
-                {t("complaints.uploadAfterPhotos") || "Upload After Photos"}
+                {t("complaints.uploadAfterPhotos")}
               </Text>
 
               <Text
                 className="text-sm mb-6 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                {t("complaints.uploadAfterPhotosDesc") ||
-                  "Upload photos showing the work completed"}
+                {t("complaints.uploadAfterPhotosDesc")}
               </Text>
 
               <View className="mb-4">
@@ -2761,12 +3012,12 @@ function ComplaintDetailsInner() {
                     opacity: uploadingPhotos ? 0.5 : 1,
                   }}
                 >
-                  <Camera size={24} color="#FFFFFF" />
+                  <Camera size={24} color={colors.light} />
                   <Text
                     className="text-base font-semibold ml-2"
-                    style={{ color: "#FFFFFF" }}
+                    style={{ color: colors.light }}
                   >
-                    {t("complaints.takePhoto") || "Take Photo"}
+                    {t("complaints.takePhoto")}
                   </Text>
                 </Pressable>
 
@@ -2775,16 +3026,16 @@ function ComplaintDetailsInner() {
                   disabled={uploadingPhotos}
                   className="flex-row items-center justify-center py-4 rounded-xl"
                   style={{
-                    backgroundColor: colors.success || "#10B981",
+                    backgroundColor: colors.success,
                     opacity: uploadingPhotos ? 0.5 : 1,
                   }}
                 >
-                  <ImageIcon size={24} color="#FFFFFF" />
+                  <ImageIcon size={24} color={colors.light} />
                   <Text
                     className="text-base font-semibold ml-2"
-                    style={{ color: "#FFFFFF" }}
+                    style={{ color: colors.light }}
                   >
-                    {t("complaints.chooseFromGallery") || "Choose from Gallery"}
+                    {t("complaints.chooseFromGallery")}
                   </Text>
                 </Pressable>
               </View>
@@ -2796,7 +3047,7 @@ function ComplaintDetailsInner() {
                     className="text-sm mt-2"
                     style={{ color: colors.textSecondary }}
                   >
-                    {t("complaints.uploading") || "Uploading..."}
+                    {t("complaints.uploading")}
                   </Text>
                 </View>
               )}
@@ -2832,7 +3083,7 @@ function ComplaintDetailsInner() {
         >
           <View
             className="flex-1 justify-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            style={{ backgroundColor: colors.dark + "80" }}
           >
             <View
               className="rounded-t-3xl p-6"
@@ -2890,16 +3141,16 @@ function ComplaintDetailsInner() {
                   disabled={sendingRework || !reworkReason.trim()}
                   className="flex-1 ml-2 py-3 rounded-xl items-center"
                   style={{
-                    backgroundColor: colors.error || "#EF4444",
+                    backgroundColor: colors.error,
                     opacity: sendingRework || !reworkReason.trim() ? 0.5 : 1,
                   }}
                 >
                   {sendingRework ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={colors.light} />
                   ) : (
                     <Text
                       className="text-base font-semibold"
-                      style={{ color: "#FFFFFF" }}
+                      style={{ color: colors.light }}
                     >
                       {t("complaints.details.sendForRework")}
                     </Text>

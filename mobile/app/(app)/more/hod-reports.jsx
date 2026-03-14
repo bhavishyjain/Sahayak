@@ -3,7 +3,6 @@ import {
   Download,
   FileSpreadsheet,
   FileBarChart,
-  RotateCcw,
   Calendar,
   Clock,
   Mail,
@@ -30,12 +29,12 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import Card from "../../../components/Card";
 import BackButtonHeader from "../../../components/BackButtonHeader";
-import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import FilterPanel from "../../../components/FilterPanel";
 
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useDownloadReport } from "../../../utils/hooks/useReports";
+import { formatStatusLabel } from "../../../utils/complaintFormatters";
 import getUserAuth from "../../../utils/userAuth";
 import apiCall from "../../../utils/api";
 import {
@@ -47,15 +46,77 @@ import {
 
 function normalizeFilters(filters) {
   const normalized = {};
-  if (filters.department && filters.department !== "all") {
+  if (filters.department !== "" && filters.department !== "all") {
     normalized.department = filters.department;
   }
-  if (filters.status && filters.status !== "all") {
+  if (filters.status !== "" && filters.status !== "all") {
     normalized.status = filters.status;
   }
-  if (filters.startDate) normalized.startDate = filters.startDate;
-  if (filters.endDate) normalized.endDate = filters.endDate;
+  if (filters.startDate !== "") normalized.startDate = filters.startDate;
+  if (filters.endDate !== "") normalized.endDate = filters.endDate;
   return normalized;
+}
+
+const DOWNLOAD_OPTIONS = [
+  {
+    format: "pdf",
+    labelKey: "reports.pdfReport",
+    descKey: "reports.pdfDescription",
+    icon: FileText,
+    colorKey: "danger",
+  },
+  {
+    format: "excel",
+    labelKey: "reports.excelReport",
+    descKey: "reports.excelDescription",
+    icon: FileSpreadsheet,
+    colorKey: "success",
+  },
+  {
+    format: "csv",
+    labelKey: "reports.csvReport",
+    descKey: "reports.csvDescription",
+    icon: FileBarChart,
+    colorKey: "info",
+  },
+];
+
+const SCHEDULE_OPTIONS = [
+  {
+    freq: "daily",
+    labelKey: "reports.schedule.dailyLabel",
+    descKey: "reports.schedule.dailyDesc",
+    icon: Clock,
+    colorKey: "primary",
+  },
+  {
+    freq: "weekly",
+    labelKey: "reports.schedule.weeklyLabel",
+    descKey: "reports.schedule.weeklyDesc",
+    icon: Calendar,
+    colorKey: "info",
+  },
+  {
+    freq: "monthly",
+    labelKey: "reports.schedule.monthlyLabel",
+    descKey: "reports.schedule.monthlyDesc",
+    icon: BarChart3,
+    colorKey: "success",
+  },
+];
+
+const FREQUENCY_LABEL_KEYS = {
+  daily: "reports.schedule.frequency.daily",
+  weekly: "reports.schedule.frequency.weekly",
+  monthly: "reports.schedule.frequency.monthly",
+};
+
+function getFrequencyLabel(t, frequency) {
+  const key = FREQUENCY_LABEL_KEYS[frequency];
+  if (key == null) {
+    return t("reports.notAvailable");
+  }
+  return t(key);
 }
 
 export default function HODReports() {
@@ -66,13 +127,9 @@ export default function HODReports() {
   // Tab state
   const [activeTab, setActiveTab] = useState("export"); // "export" or "schedule"
 
-  // HOD's own department (loaded from auth)
-  const [hodDepartment, setHodDepartment] = useState("");
-
   useEffect(() => {
     getUserAuth().then((user) => {
-      const dept = user?.department || "";
-      setHodDepartment(dept);
+      const dept = user?.department ?? "";
       setAppliedFilters((prev) => ({ ...prev, department: dept }));
     });
   }, []);
@@ -113,7 +170,7 @@ export default function HODReports() {
     try {
       setLoadingSchedules(true);
       const res = await apiCall({ method: "GET", url: REPORT_SCHEDULES_URL });
-      setActiveSchedules(res?.data?.schedules || []);
+      setActiveSchedules(res?.data?.schedules ?? []);
     } catch {
       // silently ignore
     } finally {
@@ -126,12 +183,38 @@ export default function HODReports() {
   }, [activeTab]);
 
   const hasActiveFilters = useMemo(() => {
-    return Boolean(
-      appliedFilters.status !== "all" ||
-      appliedFilters.startDate ||
-      appliedFilters.endDate,
-    );
+    const flags = [
+      appliedFilters.status !== "all",
+      appliedFilters.startDate !== "",
+      appliedFilters.endDate !== "",
+    ];
+    return flags.some(Boolean);
   }, [appliedFilters]);
+
+  const statusSummary =
+    appliedFilters.status !== "all"
+      ? t("reports.filterSummary.status", {
+          value: formatStatusLabel(t, appliedFilters.status),
+        })
+      : null;
+  const fromSummary =
+    appliedFilters.startDate !== ""
+      ? t("reports.filterSummary.from", { date: appliedFilters.startDate })
+      : null;
+  const toSummary =
+    appliedFilters.endDate !== ""
+      ? t("reports.filterSummary.to", { date: appliedFilters.endDate })
+      : null;
+  const filterSummary = [statusSummary, fromSummary, toSummary]
+    .filter((value) => value != null)
+    .join(", ");
+
+  const scheduleEmailTrimmed = scheduleEmail.trim();
+  const emailAddressTrimmed = emailAddress.trim();
+  const isScheduleEmailInvalid =
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(scheduleEmailTrimmed);
+  const isEmailAddressInvalid =
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddressTrimmed);
 
   const downloadReport = async (format) => {
     try {
@@ -140,13 +223,13 @@ export default function HODReports() {
       Toast.show({
         type: "success",
         text1: t("reports.reportGenerated"),
-        text2: `${format.toUpperCase()} report is ready`,
+        text2: t("reports.reportReady", { format: format.toUpperCase() }),
       });
     } catch (error) {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
-        text2: error?.response?.data?.message || t("reports.generateFailed"),
+        text2: error?.response?.data?.message ?? t("reports.generateFailed"),
       });
     } finally {
       setDownloadingFormat(null);
@@ -154,14 +237,23 @@ export default function HODReports() {
   };
 
   const handleScheduleReport = async () => {
-    if (!scheduleEmail || !scheduleEmail.includes("@")) {
+    if (isScheduleEmailInvalid) {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
-        text2: "Please enter a valid email address",
+        text2: t("reports.invalidEmail"),
       });
       return;
     }
+
+    const departmentValue =
+      appliedFilters.department !== "all" ? appliedFilters.department : undefined;
+    const statusValue =
+      appliedFilters.status !== "all" ? appliedFilters.status : undefined;
+    const startDateValue =
+      appliedFilters.startDate !== "" ? appliedFilters.startDate : undefined;
+    const endDateValue =
+      appliedFilters.endDate !== "" ? appliedFilters.endDate : undefined;
 
     try {
       setScheduling(true);
@@ -169,24 +261,23 @@ export default function HODReports() {
         method: "POST",
         url: REPORT_SCHEDULE_URL,
         data: {
-          email: scheduleEmail,
+          email: scheduleEmailTrimmed,
           frequency: scheduleFrequency,
           format: scheduleFormat,
-          department:
-            appliedFilters.department !== "all"
-              ? appliedFilters.department
-              : undefined,
-          status:
-            appliedFilters.status !== "all" ? appliedFilters.status : undefined,
-          startDate: appliedFilters.startDate || undefined,
-          endDate: appliedFilters.endDate || undefined,
+          department: departmentValue,
+          status: statusValue,
+          startDate: startDateValue,
+          endDate: endDateValue,
         },
       });
 
       Toast.show({
         type: "success",
-        text1: "Report Scheduled",
-        text2: `You'll receive ${scheduleFrequency} reports at ${scheduleEmail}`,
+        text1: t("reports.schedule.scheduledTitle"),
+        text2: t("reports.schedule.scheduledMessage", {
+          frequency: getFrequencyLabel(t, scheduleFrequency),
+          email: scheduleEmailTrimmed,
+        }),
       });
 
       setShowScheduleModal(false);
@@ -198,7 +289,8 @@ export default function HODReports() {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
-        text2: error?.response?.data?.message || "Failed to schedule report",
+        text2:
+          error?.response?.data?.message ?? t("reports.schedule.scheduleFailed"),
       });
     } finally {
       setScheduling(false);
@@ -212,13 +304,17 @@ export default function HODReports() {
         method: "DELETE",
         url: REPORT_CANCEL_SCHEDULE_URL(scheduleId),
       });
-      Toast.show({ type: "success", text1: "Schedule Cancelled" });
+      Toast.show({
+        type: "success",
+        text1: t("reports.schedule.cancelledTitle"),
+      });
       loadSchedules();
     } catch (error) {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
-        text2: error?.response?.data?.message || "Failed to cancel schedule",
+        text2:
+          error?.response?.data?.message ?? t("reports.schedule.cancelFailed"),
       });
     } finally {
       setCancellingId(null);
@@ -226,14 +322,23 @@ export default function HODReports() {
   };
 
   const handleSendEmail = async () => {
-    if (!emailAddress || !emailAddress.includes("@")) {
+    if (isEmailAddressInvalid) {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
-        text2: "Please enter a valid email address",
+        text2: t("reports.invalidEmail"),
       });
       return;
     }
+
+    const departmentValue =
+      appliedFilters.department !== "all" ? appliedFilters.department : undefined;
+    const statusValue =
+      appliedFilters.status !== "all" ? appliedFilters.status : undefined;
+    const startDateValue =
+      appliedFilters.startDate !== "" ? appliedFilters.startDate : undefined;
+    const endDateValue =
+      appliedFilters.endDate !== "" ? appliedFilters.endDate : undefined;
 
     try {
       setSendingEmail(true);
@@ -241,23 +346,19 @@ export default function HODReports() {
         method: "POST",
         url: REPORT_EMAIL_URL,
         data: {
-          email: emailAddress,
+          email: emailAddressTrimmed,
           format: emailFormat,
-          department:
-            appliedFilters.department !== "all"
-              ? appliedFilters.department
-              : undefined,
-          status:
-            appliedFilters.status !== "all" ? appliedFilters.status : undefined,
-          startDate: appliedFilters.startDate || undefined,
-          endDate: appliedFilters.endDate || undefined,
+          department: departmentValue,
+          status: statusValue,
+          startDate: startDateValue,
+          endDate: endDateValue,
         },
       });
 
       Toast.show({
         type: "success",
-        text1: "Report Sent",
-        text2: `Report has been sent to ${emailAddress}`,
+        text1: t("reports.email.sentTitle"),
+        text2: t("reports.email.sentMessage", { email: emailAddressTrimmed }),
       });
 
       setShowEmailModal(false);
@@ -266,7 +367,7 @@ export default function HODReports() {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
-        text2: error?.response?.data?.message || "Failed to send report",
+        text2: error?.response?.data?.message ?? t("reports.email.sendFailed"),
       });
     } finally {
       setSendingEmail(false);
@@ -303,13 +404,7 @@ export default function HODReports() {
               setAppliedFilters((prev) => ({ ...prev, endDate: val }))
             }
             hasActiveFilters={hasActiveFilters}
-            summary={[
-              appliedFilters.status !== "all" && appliedFilters.status,
-              appliedFilters.startDate && `From: ${appliedFilters.startDate}`,
-              appliedFilters.endDate && `To: ${appliedFilters.endDate}`,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+            summary={filterSummary}
             t={t}
             style={{ marginBottom: 16 }}
           />
@@ -323,18 +418,16 @@ export default function HODReports() {
               onPress={() => setActiveTab("export")}
               className="flex-1 py-3 rounded-xl items-center"
               style={{
-                backgroundColor:
-                  activeTab === "export" ? colors.primary : "transparent",
+                backgroundColor: activeTab === "export" ? colors.primary : undefined,
               }}
             >
               <Text
                 className="text-sm font-semibold"
                 style={{
-                  color:
-                    activeTab === "export" ? "#FFFFFF" : colors.textSecondary,
+                  color: activeTab === "export" ? colors.light : colors.textSecondary,
                 }}
               >
-                Export & Download
+                {t("reports.tabs.export")}
               </Text>
             </TouchableOpacity>
 
@@ -343,17 +436,17 @@ export default function HODReports() {
               className="flex-1 py-3 rounded-xl items-center"
               style={{
                 backgroundColor:
-                  activeTab === "schedule" ? colors.primary : "transparent",
+                  activeTab === "schedule" ? colors.primary : undefined,
               }}
             >
               <Text
                 className="text-sm font-semibold"
                 style={{
                   color:
-                    activeTab === "schedule" ? "#FFFFFF" : colors.textSecondary,
+                    activeTab === "schedule" ? colors.light : colors.textSecondary,
                 }}
               >
-                Schedule Reports
+                {t("reports.tabs.schedule")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -367,7 +460,7 @@ export default function HODReports() {
                   className="text-xs font-semibold uppercase mb-3"
                   style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
                 >
-                  Download
+                  {t("reports.sections.download")}
                 </Text>
                 <View
                   className="rounded-2xl overflow-hidden"
@@ -377,30 +470,10 @@ export default function HODReports() {
                     borderColor: colors.border,
                   }}
                 >
-                  {[
-                    {
-                      format: "pdf",
-                      label: "PDF Report",
-                      desc: "Professional document format",
-                      icon: FileText,
-                      color: "#EF4444",
-                    },
-                    {
-                      format: "excel",
-                      label: "Excel Spreadsheet",
-                      desc: "Detailed data with charts",
-                      icon: FileSpreadsheet,
-                      color: colors.success || "#10B981",
-                    },
-                    {
-                      format: "csv",
-                      label: "CSV Data",
-                      desc: "Raw data for analysis",
-                      icon: FileBarChart,
-                      color: colors.info || "#3B82F6",
-                    },
-                  ].map(
-                    ({ format, label, desc, icon: Icon, color }, idx, arr) => (
+                  {DOWNLOAD_OPTIONS.map(
+                    ({ format, labelKey, descKey, icon: Icon, colorKey }, idx, arr) => {
+                      const color = colors[colorKey] ?? colors.primary;
+                      return (
                       <View key={format}>
                         <TouchableOpacity
                           onPress={() => downloadReport(format)}
@@ -419,13 +492,13 @@ export default function HODReports() {
                               className="text-sm font-semibold"
                               style={{ color: colors.textPrimary }}
                             >
-                              {label}
+                              {t(labelKey)}
                             </Text>
                             <Text
                               className="text-xs mt-0.5"
                               style={{ color: colors.textSecondary }}
                             >
-                              {desc}
+                              {t(descKey)}
                             </Text>
                           </View>
                           {downloadingFormat === format ? (
@@ -444,7 +517,8 @@ export default function HODReports() {
                           />
                         )}
                       </View>
-                    ),
+                    );
+                    },
                   )}
                 </View>
               </View>
@@ -455,7 +529,7 @@ export default function HODReports() {
                   className="text-xs font-semibold uppercase mb-3"
                   style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
                 >
-                  Email
+                  {t("reports.sections.email")}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowEmailModal(true)}
@@ -470,23 +544,23 @@ export default function HODReports() {
                   <View
                     className="w-8 h-8 rounded-lg items-center justify-center mr-3"
                     style={{
-                      backgroundColor: (colors.purple || "#8B5CF6") + "20",
+                      backgroundColor: colors.info + "20",
                     }}
                   >
-                    <Mail size={17} color={colors.purple || "#8B5CF6"} />
+                    <Mail size={17} color={colors.info} />
                   </View>
                   <View className="flex-1">
                     <Text
                       className="text-sm font-semibold"
                       style={{ color: colors.textPrimary }}
                     >
-                      Send via Email
+                      {t("reports.email.cardTitle")}
                     </Text>
                     <Text
                       className="text-xs mt-0.5"
                       style={{ color: colors.textSecondary }}
                     >
-                      Send report to any email address
+                      {t("reports.email.cardDescription")}
                     </Text>
                   </View>
                   <ChevronRight size={17} color={colors.textSecondary} />
@@ -504,7 +578,7 @@ export default function HODReports() {
                     className="text-xs font-semibold uppercase flex-1"
                     style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
                   >
-                    Automated Reports
+                    {t("reports.sections.automated")}
                   </Text>
                   {loadingSchedules && (
                     <ActivityIndicator size="small" color={colors.primary} />
@@ -519,30 +593,9 @@ export default function HODReports() {
                     borderColor: colors.border,
                   }}
                 >
-                  {[
-                    {
-                      freq: "daily",
-                      label: "Daily",
-                      desc: "Every day at 9:00 AM",
-                      icon: Clock,
-                      color: colors.primary,
-                    },
-                    {
-                      freq: "weekly",
-                      label: "Weekly",
-                      desc: "Every Monday at 9:00 AM",
-                      icon: Calendar,
-                      color: colors.info || "#3B82F6",
-                    },
-                    {
-                      freq: "monthly",
-                      label: "Monthly",
-                      desc: "1st of every month",
-                      icon: BarChart3,
-                      color: colors.success || "#10B981",
-                    },
-                  ].map(
-                    ({ freq, label, desc, icon: Icon, color }, idx, arr) => {
+                  {SCHEDULE_OPTIONS.map(
+                    ({ freq, labelKey, descKey, icon: Icon, colorKey }, idx, arr) => {
+                      const color = colors[colorKey] ?? colors.primary;
                       const existing = activeSchedules.find(
                         (s) => s.frequency === freq && s.isActive,
                       );
@@ -570,22 +623,28 @@ export default function HODReports() {
                                   color: existing ? color : colors.textPrimary,
                                 }}
                               >
-                                {label} Reports
+                                {t(labelKey)} {t("reports.schedule.reportsSuffix")}
                               </Text>
                               {existing ? (
                                 <Text
                                   className="text-xs mt-0.5"
                                   style={{ color: colors.textSecondary }}
                                 >
-                                  {existing.email} ·{" "}
-                                  {existing.format.toUpperCase()}
+                                  {t("reports.schedule.activeMeta", {
+                                    email:
+                                      existing.email ?? t("reports.notAvailable"),
+                                    format:
+                                      existing.format != null
+                                        ? String(existing.format).toUpperCase()
+                                        : t("reports.notAvailable"),
+                                  })}
                                 </Text>
                               ) : (
                                 <Text
                                   className="text-xs mt-0.5"
                                   style={{ color: colors.textSecondary }}
                                 >
-                                  {desc}
+                                  {t(descKey)}
                                 </Text>
                               )}
                             </View>
@@ -605,10 +664,10 @@ export default function HODReports() {
                                 {cancellingId === existing._id ? (
                                   <ActivityIndicator
                                     size="small"
-                                    color="#EF4444"
+                                    color={colors.danger}
                                   />
                                 ) : (
-                                  <Trash2 size={16} color="#EF4444" />
+                                  <Trash2 size={16} color={colors.danger} />
                                 )}
                               </TouchableOpacity>
                             ) : (
@@ -624,7 +683,7 @@ export default function HODReports() {
                                   className="text-xs font-semibold"
                                   style={{ color }}
                                 >
-                                  Set up
+                                  {t("reports.schedule.setUp")}
                                 </Text>
                               </TouchableOpacity>
                             )}
@@ -659,8 +718,7 @@ export default function HODReports() {
                   className="text-xs ml-2.5 flex-1 leading-5"
                   style={{ color: colors.textSecondary }}
                 >
-                  Reports are generated automatically and sent to your email.
-                  You can cancel schedules anytime.
+                  {t("reports.schedule.info")}
                 </Text>
               </View>
             </>
@@ -676,7 +734,8 @@ export default function HODReports() {
         onRequestClose={() => setShowScheduleModal(false)}
       >
         <Pressable
-          className="flex-1 bg-black/50 justify-end"
+          className="flex-1 justify-end"
+          style={{ backgroundColor: colors.dark + "80" }}
           onPress={() => setShowScheduleModal(false)}
         >
           <Pressable
@@ -689,10 +748,9 @@ export default function HODReports() {
                 className="text-lg font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Schedule{" "}
-                {scheduleFrequency.charAt(0).toUpperCase() +
-                  scheduleFrequency.slice(1)}{" "}
-                Report
+                {t("reports.schedule.modalTitle", {
+                  frequency: getFrequencyLabel(t, scheduleFrequency),
+                })}
               </Text>
               <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
                 <X size={24} color={colors.textSecondary} />
@@ -703,12 +761,12 @@ export default function HODReports() {
               className="text-xs mb-2"
               style={{ color: colors.textSecondary }}
             >
-              Email Address
+              {t("reports.emailAddressLabel")}
             </Text>
             <TextInput
               value={scheduleEmail}
               onChangeText={setScheduleEmail}
-              placeholder="Enter email address"
+              placeholder={t("reports.emailPlaceholder")}
               placeholderTextColor={colors.textSecondary}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -725,7 +783,7 @@ export default function HODReports() {
               className="text-xs mb-2"
               style={{ color: colors.textSecondary }}
             >
-              Format
+              {t("reports.formatLabel")}
             </Text>
             <View className="flex-row mb-5" style={{ gap: 8 }}>
               {["pdf", "excel", "csv"].map((fmt) => (
@@ -765,13 +823,13 @@ export default function HODReports() {
               style={{ backgroundColor: colors.primary }}
             >
               {scheduling ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.light} />
               ) : (
                 <Text
                   className="text-sm font-semibold"
-                  style={{ color: "#FFFFFF" }}
+                  style={{ color: colors.light }}
                 >
-                  Schedule Report
+                  {t("reports.schedule.cta")}
                 </Text>
               )}
             </TouchableOpacity>
@@ -787,7 +845,8 @@ export default function HODReports() {
         onRequestClose={() => setShowEmailModal(false)}
       >
         <Pressable
-          className="flex-1 bg-black/50 justify-end"
+          className="flex-1 justify-end"
+          style={{ backgroundColor: colors.dark + "80" }}
           onPress={() => setShowEmailModal(false)}
         >
           <Pressable
@@ -800,7 +859,7 @@ export default function HODReports() {
                 className="text-lg font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Send Report via Email
+                {t("reports.email.modalTitle")}
               </Text>
               <TouchableOpacity onPress={() => setShowEmailModal(false)}>
                 <X size={24} color={colors.textSecondary} />
@@ -811,12 +870,12 @@ export default function HODReports() {
               className="text-xs mb-2"
               style={{ color: colors.textSecondary }}
             >
-              Email Address
+              {t("reports.emailAddressLabel")}
             </Text>
             <TextInput
               value={emailAddress}
               onChangeText={setEmailAddress}
-              placeholder="Enter email address"
+              placeholder={t("reports.emailPlaceholder")}
               placeholderTextColor={colors.textSecondary}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -833,7 +892,7 @@ export default function HODReports() {
               className="text-xs mb-2"
               style={{ color: colors.textSecondary }}
             >
-              Format
+              {t("reports.formatLabel")}
             </Text>
             <View className="flex-row mb-5" style={{ gap: 8 }}>
               {["pdf", "excel", "csv"].map((fmt) => (
@@ -870,16 +929,16 @@ export default function HODReports() {
               onPress={handleSendEmail}
               disabled={sendingEmail}
               className="py-3.5 rounded-xl items-center"
-              style={{ backgroundColor: colors.purple || "#8B5CF6" }}
+              style={{ backgroundColor: colors.info }}
             >
               {sendingEmail ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.light} />
               ) : (
                 <Text
                   className="text-sm font-semibold"
-                  style={{ color: "#FFFFFF" }}
+                  style={{ color: colors.light }}
                 >
-                  Send Report
+                  {t("reports.email.cta")}
                 </Text>
               )}
             </TouchableOpacity>

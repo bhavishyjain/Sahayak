@@ -1,5 +1,5 @@
 import * as Clarity from "@microsoft/react-native-clarity";
-import { Moon, Settings, Sun } from "lucide-react-native";
+import { Check, Moon, Settings, Sun } from "lucide-react-native";
 import { useEffect } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { darkColors, lightColors } from "../../../colors";
@@ -116,7 +116,7 @@ export default function ThemeSettings() {
                 marginBottom: 10,
                 backgroundColor: colors.backgroundSecondary,
                 borderWidth: 2,
-                borderColor: selected ? colors.primary : "transparent",
+                borderColor: selected ? colors.primary : colors.border,
               }}
             >
               <Icon
@@ -151,9 +151,7 @@ export default function ThemeSettings() {
                     justifyContent: "center",
                   }}
                 >
-                  <Text style={{ color: colors.dark, fontWeight: "bold" }}>
-                    ✓
-                  </Text>
+                  <Check size={14} color={colors.dark} strokeWidth={3} />
                 </View>
               )}
             </TouchableOpacity>

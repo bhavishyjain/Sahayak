@@ -13,11 +13,29 @@ function buildComplaintView(complaint, options = {}) {
   const includeAssignment =
     options.includeAssignment === undefined ? true : options.includeAssignment;
 
+  const history = (complaint.history || []).map((item) => {
+    const source =
+      typeof item?.toObject === "function" ? item.toObject() : item || {};
+    return {
+      status: normalizeComplaintStatus(source.status),
+      updatedBy: source.updatedBy || null,
+      timestamp:
+        source.timestamp ||
+        source.updatedAt ||
+        source.createdAt ||
+        complaint.createdAt ||
+        null,
+      note: source.note || "",
+    };
+  });
+
   const base = {
     id: complaint._id,
+    userId: complaint.userId?._id || complaint.userId || null,
     ticketId: complaint.ticketId,
     title: getComplaintTitle(complaint),
-    description: complaint.refinedText || complaint.rawText || complaint.description,
+    description:
+      complaint.refinedText || complaint.rawText || complaint.description,
     department: complaint.department,
     priority: complaint.priority,
     status: normalizeComplaintStatus(complaint.status),
@@ -29,10 +47,7 @@ function buildComplaintView(complaint, options = {}) {
     updatedAt: complaint.updatedAt,
     assignedAt: complaint.assignedAt,
     estimatedCompletionTime: complaint.estimatedCompletionTime,
-    history: (complaint.history || []).map((item) => ({
-      ...item,
-      status: normalizeComplaintStatus(item?.status),
-    })),
+    history,
     upvoteCount: complaint.upvoteCount || 0,
     upvotes: (complaint.upvotes || []).map((id) => String(id)),
     feedback: complaint.feedback,

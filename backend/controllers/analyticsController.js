@@ -20,50 +20,66 @@ exports.summary = asyncHandler(async (req, res) => {
   sixMonthsAgo.setDate(1);
   sixMonthsAgo.setHours(0, 0, 0, 0);
 
-  const [total, pending, assigned, inProgress, resolved, recentComplaints, resolvedComplaints, departmentStats, monthlyData] =
-    await Promise.all([
-      Complaint.countDocuments({ userId }),
-      Complaint.countDocuments({ userId, status: "pending" }),
-      Complaint.countDocuments({ userId, status: "assigned" }),
-      Complaint.countDocuments({ userId, status: "in-progress" }),
-      Complaint.countDocuments({ userId, status: "resolved" }),
-      Complaint.find({ userId })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select(
-          "ticketId rawText refinedText department priority status locationName createdAt",
-        ),
-      Complaint.find({ userId, status: "resolved", resolvedAt: { $ne: null } })
-        .select("createdAt resolvedAt")
-        .lean(),
-      Complaint.aggregate([
-        { $match: { userId } },
-        { $group: { _id: "$department", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 1 },
-      ]),
-      Complaint.aggregate([
-        { $match: { userId, createdAt: { $gte: sixMonthsAgo } } },
-        {
-          $group: {
-            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-            count: { $sum: 1 },
+  const [
+    total,
+    pending,
+    assigned,
+    inProgress,
+    resolved,
+    recentComplaints,
+    resolvedComplaints,
+    departmentBreakdownRaw,
+    monthlyData,
+  ] = await Promise.all([
+    Complaint.countDocuments({ userId }),
+    Complaint.countDocuments({ userId, status: "pending" }),
+    Complaint.countDocuments({ userId, status: "assigned" }),
+    Complaint.countDocuments({ userId, status: "in-progress" }),
+    Complaint.countDocuments({ userId, status: "resolved" }),
+    Complaint.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select(
+        "ticketId rawText refinedText department priority status locationName createdAt",
+      ),
+    Complaint.find({ userId, status: "resolved", resolvedAt: { $ne: null } })
+      .select("createdAt resolvedAt")
+      .lean(),
+    Complaint.aggregate([
+      { $match: { userId } },
+      { $group: { _id: "$department", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+    Complaint.aggregate([
+      { $match: { userId, createdAt: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
           },
+          count: { $sum: 1 },
         },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-      ]),
-    ]);
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+    ]),
+  ]);
 
   let avgResolutionTime = null;
   if (resolvedComplaints.length > 0) {
     const totalHours = resolvedComplaints.reduce((sum, c) => {
-      const hrs = (new Date(c.resolvedAt) - new Date(c.createdAt)) / (1000 * 60 * 60);
+      const hrs =
+        (new Date(c.resolvedAt) - new Date(c.createdAt)) / (1000 * 60 * 60);
       return sum + (Number.isFinite(hrs) && hrs >= 0 ? hrs : 0);
     }, 0);
     avgResolutionTime = Math.round(totalHours / resolvedComplaints.length);
   }
 
-  const mostActiveDepartment = departmentStats[0]?._id || null;
+  const departmentBreakdown = (departmentBreakdownRaw || [])
+    .filter((item) => item?._id)
+    .map((item) => ({ department: item._id, count: item.count }));
+
+  const mostActiveDepartment = departmentBreakdown[0]?.department || null;
 
   const monthlyTrend = [];
   for (let i = 5; i >= 0; i--) {
@@ -87,6 +103,7 @@ exports.summary = asyncHandler(async (req, res) => {
     },
     avgResolutionTime,
     mostActiveDepartment,
+    departmentBreakdown,
     monthlyTrend,
     recent: recentComplaints.map((item) => buildComplaintView(item)),
   });
@@ -94,8 +111,9 @@ exports.summary = asyncHandler(async (req, res) => {
 
 exports.heatmap = asyncHandler(async (req, res) => {
   // Parse filters from query params
-  const { department, priority, timeframe } = req.query;
+  const { department, priority, timeframe, granularity } = req.query;
   const role = req.user?.role;
+  const complaintLevel = granularity === "complaint";
 
   // Calculate time window based on timeframe filter
   const windowStart = new Date();
@@ -137,6 +155,51 @@ exports.heatmap = asyncHandler(async (req, res) => {
   const complaints = await Complaint.find(query).select(
     "locationName coordinates status priority department createdAt",
   );
+
+  if (complaintLevel) {
+    const spots = complaints
+      .map((complaint) => {
+        const lat = Number(complaint.coordinates?.lat);
+        const lng = Number(complaint.coordinates?.lng);
+        const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+        if (!hasCoords) return null;
+
+        const isOpen = ["pending", "assigned", "in-progress"].includes(
+          complaint.status,
+        );
+        const isHighPriority = complaint.priority === "High";
+        const intensity = (isOpen ? 8 : 2) + (isHighPriority ? 4 : 0);
+
+        return {
+          locationName:
+            complaint.locationName?.trim() ||
+            `${lat.toFixed(3)}, ${lng.toFixed(3)}`,
+          coordinates: {
+            lat: Number(lat.toFixed(6)),
+            lng: Number(lng.toFixed(6)),
+          },
+          totalComplaints: 1,
+          openComplaints: isOpen ? 1 : 0,
+          unresolvedComplaints: isOpen ? 1 : 0,
+          highPriorityComplaints: isHighPriority ? 1 : 0,
+          topDepartment: complaint.department || "other",
+          intensity,
+          severity: severityFromIntensity(intensity),
+          lastReportedAt: complaint.createdAt,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.intensity - a.intensity);
+
+    return sendSuccess(res, {
+      updatedAt: new Date().toISOString(),
+      windowDays: timeframe || "30days",
+      totalSpots: spots.length,
+      granularity: "complaint",
+      spots,
+    });
+  }
 
   const spotsByKey = new Map();
 
@@ -232,6 +295,7 @@ exports.heatmap = asyncHandler(async (req, res) => {
     updatedAt: new Date().toISOString(),
     windowDays: timeframe || "30days",
     totalSpots: spots.length,
+    granularity: "cluster",
     spots,
   });
 });

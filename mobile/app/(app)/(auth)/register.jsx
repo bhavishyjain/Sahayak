@@ -91,7 +91,14 @@ export default function Register() {
         text2: responseData?.message || t("toast.registerSuccess.message"),
       });
 
-      router.replace("/(app)/(tabs)/home");
+      if (userData.role === "user") {
+        router.replace({
+          pathname: "/(app)/(auth)/verify-email",
+          params: { email: userData.email || email.trim().toLowerCase() },
+        });
+      } else {
+        router.replace("/(app)/(tabs)/home");
+      }
     } catch (error) {
       Toast.show({
         type: "error",

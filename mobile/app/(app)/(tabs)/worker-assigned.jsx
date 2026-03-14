@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import { Clock, MapPin } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,19 +11,14 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import ComplaintCard from "../../../components/ComplaintCard";
 import SearchBar from "../../../components/SearchBar";
 import FilterPanel from "../../../components/FilterPanel";
-import SlaStatusBadge from "../../../components/SlaStatusBadge";
-import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
-import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
 import {
-  formatDateShort,
-  formatEtaFromHours,
   formatPriorityLabel,
-  formatStatusLabel,
   normalizePriority,
   normalizeStatus,
 } from "../../../utils/complaintFormatters";
@@ -58,14 +52,14 @@ export default function WorkerAssigned() {
       });
 
       const payload = res?.data;
-      const data = payload?.complaints || [];
+      const data = payload?.complaints ?? [];
       setComplaints(data);
       setFilteredComplaints(data);
     } catch (e) {
       Toast.show({
         type: "error",
         text1: t("worker.assigned.failed"),
-        text2: e?.response?.data?.message || t("worker.assigned.loadingError"),
+        text2: e?.response?.data?.message ?? t("worker.assigned.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -97,10 +91,9 @@ export default function WorkerAssigned() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (c) =>
-          c.ticketId?.toLowerCase().includes(query) ||
-          c.title?.toLowerCase().includes(query) ||
-          c.description?.toLowerCase().includes(query) ||
-          c.location?.toLowerCase().includes(query),
+          [c.ticketId, c.title, c.description, c.location].some((value) =>
+            value?.toLowerCase().includes(query),
+          ),
       );
     }
 
@@ -109,7 +102,7 @@ export default function WorkerAssigned() {
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
       filtered = filtered.filter(
-        (c) => new Date(c.assignedAt || c.createdAt) >= start,
+        (c) => new Date(c.assignedAt ?? c.createdAt) >= start,
       );
     }
 
@@ -117,7 +110,7 @@ export default function WorkerAssigned() {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
       filtered = filtered.filter(
-        (c) => new Date(c.assignedAt || c.createdAt) <= end,
+        (c) => new Date(c.assignedAt ?? c.createdAt) <= end,
       );
     }
 
@@ -137,8 +130,8 @@ export default function WorkerAssigned() {
 
     // Sort
     filtered.sort((a, b) => {
-      const dateA = new Date(a.assignedAt || a.createdAt);
-      const dateB = new Date(b.assignedAt || b.createdAt);
+      const dateA = new Date(a.assignedAt ?? a.createdAt);
+      const dateB = new Date(b.assignedAt ?? b.createdAt);
       return sortOrder === "new-to-old" ? dateB - dateA : dateA - dateB;
     });
 
@@ -154,12 +147,13 @@ export default function WorkerAssigned() {
     setSearchQuery("");
   };
 
-  const hasActiveFilters =
-    !!startDate ||
-    !!endDate ||
-    sortOrder !== "old-to-new" ||
-    selectedPriority !== "all" ||
-    selectedStatus !== "all";
+  const hasActiveFilters = [
+    Boolean(startDate),
+    Boolean(endDate),
+    sortOrder !== "old-to-new",
+    selectedPriority !== "all",
+    selectedStatus !== "all",
+  ].some(Boolean);
 
   if (loading) {
     return (
@@ -240,6 +234,7 @@ export default function WorkerAssigned() {
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
                 {t("worker.assigned.showingResults", {
                   count: filteredComplaints.length,
+                  filtered: filteredComplaints.length,
                   total: complaints.length,
                 })}
               </Text>
@@ -282,143 +277,16 @@ export default function WorkerAssigned() {
             </View>
           </Card>
         ) : (
-          filteredComplaints.map((complaint) => {
-            const eta = formatEtaFromHours(
-              complaint.estimatedCompletionTime,
-              complaint.assignedAt,
-              t("worker.assigned.overdue"),
-            );
-
-            return (
-              <PressableBlock
-                key={complaint.id}
-                onPress={() =>
-                  router.push(
-                    `/complaints/complaint-details?id=${complaint.id}`,
-                  )
-                }
-              >
-                <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-                  <View className="flex-row justify-between items-start mb-2">
-                    <Text
-                      className="text-lg font-bold flex-1"
-                      style={{ color: colors.primary }}
-                    >
-                      #{complaint.ticketId}
-                    </Text>
-                    <View style={{ alignItems: "flex-end", gap: 4 }}>
-                      <View
-                        className="px-2 py-1 rounded"
-                        style={{
-                          backgroundColor:
-                            getStatusColor(complaint.status, colors) + "20",
-                        }}
-                      >
-                        <Text
-                          className="text-xs font-semibold capitalize"
-                          style={{
-                            color: getStatusColor(complaint.status, colors),
-                          }}
-                        >
-                          {formatStatusLabel(t, complaint.status)}
-                        </Text>
-                      </View>
-                      {complaint.sla && <SlaStatusBadge sla={complaint.sla} />}
-                    </View>
-                  </View>
-
-                  <Text
-                    className="text-base font-semibold mb-1"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {complaint.title}
-                  </Text>
-
-                  <Text
-                    className="text-sm mb-3 leading-5"
-                    numberOfLines={2}
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {complaint.description}
-                  </Text>
-
-                  <View className="flex-row items-center mb-2">
-                    <MapPin size={14} color={colors.textSecondary} />
-                    <Text
-                      className="text-xs ml-1 flex-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {complaint.locationName ||
-                        t("worker.assigned.noLocation")}
-                    </Text>
-                  </View>
-
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center">
-                      <Clock size={14} color={colors.textSecondary} />
-                      <Text
-                        className="text-xs ml-1"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("worker.assigned.assignedAt", {
-                          date: formatDateShort(complaint.assignedAt),
-                        })}
-                      </Text>
-                    </View>
-                    <View
-                      className="px-2 py-1 rounded"
-                      style={{
-                        backgroundColor:
-                          getPriorityColor(complaint.priority, colors) + "20",
-                      }}
-                    >
-                      <Text
-                        className="text-xs font-semibold"
-                        style={{
-                          color: getPriorityColor(complaint.priority, colors),
-                        }}
-                      >
-                        {formatPriorityLabel(t, complaint.priority)}
-                      </Text>
-                    </View>
-                  </View>
-                  {eta && (
-                    <View
-                      className="mt-3 px-3 py-2 rounded-xl flex-row items-center justify-center"
-                      style={{
-                        backgroundColor:
-                          eta === t("worker.assigned.overdue")
-                            ? "#FEE2E2"
-                            : colors.info
-                              ? colors.info + "20"
-                              : "#DBEAFE",
-                      }}
-                    >
-                      <Clock
-                        size={16}
-                        color={
-                          eta === t("worker.assigned.overdue")
-                            ? "#EF4444"
-                            : colors.info || "#3B82F6"
-                        }
-                      />
-                      <Text
-                        className="text-sm font-bold ml-2"
-                        style={{
-                          color:
-                            eta === t("worker.assigned.overdue")
-                              ? "#EF4444"
-                              : colors.info || "#3B82F6",
-                        }}
-                      >
-                        {t("worker.assigned.eta")}: {eta}
-                      </Text>
-                    </View>
-                  )}
-                </Card>
-              </PressableBlock>
-            );
-          })
+          filteredComplaints.map((complaint) => (
+            <ComplaintCard
+              key={complaint.id}
+              complaint={complaint}
+              showAssignedAt
+              onOpen={() =>
+                router.push(`/complaints/complaint-details?id=${complaint.id}`)
+              }
+            />
+          ))
         )}
       </ScrollView>
     </View>

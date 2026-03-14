@@ -35,18 +35,20 @@ import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import getUserAuth, { setUserAuth } from "../../../utils/userAuth";
 import { ACCEPT_INVITE_URL, REGISTER_URL } from "../../../url";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
 const BENEFITS = [
-  { Icon: ClipboardList, text: "Receive and manage complaint assignments" },
-  { Icon: Smartphone, text: "Update complaint status in real-time" },
-  { Icon: BarChart2, text: "Track your performance metrics" },
-  { Icon: Trophy, text: "Compete in leaderboards and earn recognition" },
+  { Icon: ClipboardList, key: "manageAssignments" },
+  { Icon: Smartphone, key: "updateStatus" },
+  { Icon: BarChart2, key: "trackMetrics" },
+  { Icon: Trophy, key: "leaderboard" },
 ];
 
 export default function AcceptInvite() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
 
   const token = params.token ? decodeURIComponent(String(params.token)) : "";
@@ -110,21 +112,20 @@ export default function AcceptInvite() {
           className="text-2xl font-bold mt-4 mb-2 text-center"
           style={{ color: colors.textPrimary }}
         >
-          Invalid Invitation
+          {t("auth.acceptInvite.invalidTitle")}
         </Text>
         <Text
           className="text-sm text-center leading-6 mb-8"
           style={{ color: colors.textSecondary }}
         >
-          This invitation link is missing required information. Please ask your
-          Head of Department to resend the invite.
+          {t("auth.acceptInvite.invalidMessage")}
         </Text>
         <TouchableOpacity
           className="rounded-xl px-8 py-4"
           style={{ backgroundColor: colors.primary }}
           onPress={() => router.replace("/(app)/(tabs)/home")}
         >
-          <Text className="text-white font-bold text-base">Go to Home</Text>
+          <Text className="text-white font-bold text-base">{t("auth.acceptInvite.goToHome")}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -144,11 +145,11 @@ export default function AcceptInvite() {
         if (newJwt && updatedUser) {
           await setUserAuth({ ...updatedUser, auth_token: newJwt, token: newJwt });
         }
-        Toast.show({ type: "success", text1: "Welcome to the team!", text2: `You're now a worker for ${department}` });
+        Toast.show({ type: "success", text1: t("auth.acceptInvite.toast.welcomeTitle"), text2: `${t("auth.acceptInvite.toast.welcomeMessage")} ${department}` });
         router.replace("/(app)/(tabs)/worker-home");
       } catch (err) {
-        const msg = err?.response?.data?.message || err?.message || "Failed to accept invitation";
-        Toast.show({ type: "error", text1: "Could not accept invite", text2: msg });
+        const msg = err?.response?.data?.message || err?.message || t("auth.acceptInvite.toast.acceptFailed");
+        Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.acceptFailedTitle"), text2: msg });
       } finally {
         setLoading(false);
       }
@@ -163,7 +164,7 @@ export default function AcceptInvite() {
             <TouchableOpacity onPress={() => router.back()} hitSlop={16} className="p-1">
               <ArrowLeft size={24} color={colors.textPrimary} />
             </TouchableOpacity>
-            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>Worker Invitation</Text>
+            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.workerInvitationTitle")}</Text>
           </View>
 
           {/* Hero */}
@@ -174,8 +175,8 @@ export default function AcceptInvite() {
             >
               <HardHat size={48} color={colors.primary} />
             </View>
-            <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>You're Invited!</Text>
-            <Text className="text-base font-semibold mb-3" style={{ color: colors.primary }}>{department} Department</Text>
+            <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.youreInvited")}</Text>
+            <Text className="text-base font-semibold mb-3" style={{ color: colors.primary }}>{department} {t("auth.acceptInvite.departmentLabel")}</Text>
             <View
               className="flex-row items-center gap-2 rounded-full px-4 py-2 max-w-xs"
               style={{ backgroundColor: colors.backgroundSecondary }}
@@ -193,16 +194,16 @@ export default function AcceptInvite() {
             style={{ backgroundColor: colors.backgroundSecondary, borderLeftWidth: 4, borderLeftColor: colors.primary }}
           >
             <Text className="text-sm leading-6" style={{ color: colors.textPrimary }}>
-              Your Head of Department has invited you to join as a Worker in the Sahayak system.
+              {t("auth.acceptInvite.hodInviteMessage")}
             </Text>
           </View>
 
           {/* Benefits */}
           <View className="rounded-xl p-4 mb-4" style={{ backgroundColor: colors.backgroundSecondary }}>
             <Text className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: colors.textSecondary }}>
-              As a worker, you can:
+              {t("auth.acceptInvite.benefitsTitle")}
             </Text>
-            {BENEFITS.map(({ Icon, text }, i) => (
+            {BENEFITS.map(({ Icon, key }, i) => (
               <View key={i} className="flex-row items-center gap-3 mb-3">
                 <View
                   className="w-9 h-9 rounded-lg justify-center items-center"
@@ -210,7 +211,7 @@ export default function AcceptInvite() {
                 >
                   <Icon size={18} color={colors.primary} />
                 </View>
-                <Text className="flex-1 text-sm leading-5" style={{ color: colors.textPrimary }}>{text}</Text>
+                <Text className="flex-1 text-sm leading-5" style={{ color: colors.textPrimary }}>{t(`auth.acceptInvite.benefits.${key}`)}</Text>
               </View>
             ))}
           </View>
@@ -222,7 +223,7 @@ export default function AcceptInvite() {
           >
             <Clock size={18} color={colors.warning} />
             <Text className="flex-1 text-sm leading-5" style={{ color: colors.warning }}>
-              This invitation expires in 7 days. Accept before then.
+              {t("auth.acceptInvite.expiryWarning")}
             </Text>
           </View>
 
@@ -239,13 +240,13 @@ export default function AcceptInvite() {
             ) : (
               <>
                 <CheckCircle2 size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text className="text-white text-base font-bold">Accept Invitation</Text>
+                <Text className="text-white text-base font-bold">{t("auth.acceptInvite.acceptButton")}</Text>
               </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity className="items-center py-3" onPress={() => router.replace("/(app)/(tabs)/home")}>
-            <Text className="text-sm" style={{ color: colors.textSecondary }}>Decline</Text>
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>{t("auth.acceptInvite.decline")}</Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -255,11 +256,11 @@ export default function AcceptInvite() {
 
   // ── NOT LOGGED IN FLOW — Register as Worker ───────────────────────────────
   const handleRegister = async () => {
-    if (!fullName.trim()) return Toast.show({ type: "error", text1: "Full name is required" });
-    if (!username.trim()) return Toast.show({ type: "error", text1: "Username is required" });
-    if (!phone.trim())    return Toast.show({ type: "error", text1: "Phone number is required" });
+    if (!fullName.trim()) return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.fullNameRequired") });
+    if (!username.trim()) return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.usernameRequired") });
+    if (!phone.trim())    return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.phoneRequired") });
     if (!password.trim() || password.length < 6)
-      return Toast.show({ type: "error", text1: "Password must be at least 6 characters" });
+      return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.passwordTooShort") });
 
     setLoading(true);
     try {
@@ -279,11 +280,11 @@ export default function AcceptInvite() {
       if (newJwt && userData) {
         await setUserAuth({ ...userData, auth_token: newJwt, token: newJwt });
       }
-      Toast.show({ type: "success", text1: "Account created!", text2: `Welcome to ${department} Department` });
+      Toast.show({ type: "success", text1: t("auth.acceptInvite.toast.accountCreatedTitle"), text2: `${t("auth.acceptInvite.toast.accountCreatedMessage")} ${department}` });
       router.replace("/(app)/(tabs)/worker-home");
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || "Registration failed";
-      Toast.show({ type: "error", text1: "Could not register", text2: msg });
+      const msg = err?.response?.data?.message || err?.message || t("auth.acceptInvite.toast.registerFailed");
+      Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.registerFailedTitle"), text2: msg });
     } finally {
       setLoading(false);
     }
@@ -303,7 +304,7 @@ export default function AcceptInvite() {
             <TouchableOpacity onPress={() => router.back()} hitSlop={16} className="p-1">
               <ArrowLeft size={24} color={colors.textPrimary} />
             </TouchableOpacity>
-            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>Worker Registration</Text>
+            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.workerRegistrationTitle")}</Text>
           </View>
 
           {/* Hero */}
@@ -314,20 +315,20 @@ export default function AcceptInvite() {
             >
               <HardHat size={48} color={colors.primary} />
             </View>
-            <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>Join as Worker</Text>
-            <Text className="text-base font-semibold" style={{ color: colors.primary }}>{department} Department</Text>
+            <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.joinAsWorker")}</Text>
+            <Text className="text-base font-semibold" style={{ color: colors.primary }}>{department} {t("auth.acceptInvite.departmentLabel")}</Text>
           </View>
 
           <Text className="text-sm text-center mb-6 leading-5" style={{ color: colors.textSecondary }}>
-            Create your account to join{" "}
+            {t("auth.acceptInvite.createAccountTo")}{" "}
             <Text className="font-bold" style={{ color: colors.primary }}>{department}</Text>
-            {" "}as a worker.
+            {" "}{t("auth.acceptInvite.asAWorker")}
           </Text>
 
           {/* Form */}
           <View className="gap-3 mb-6">
             <PaperTextInput
-              label="Full Name"
+              label={t("auth.acceptInvite.form.fullName")}
               value={fullName}
               onChangeText={setFullName}
               mode="outlined"
@@ -337,7 +338,7 @@ export default function AcceptInvite() {
               left={<PaperTextInput.Icon icon={() => <User size={18} color={colors.placeholder} />} />}
             />
             <PaperTextInput
-              label="Username"
+              label={t("auth.acceptInvite.form.username")}
               value={username}
               onChangeText={(v) => setUsername(v.replace(/\s/g, "").toLowerCase())}
               mode="outlined"
@@ -348,7 +349,7 @@ export default function AcceptInvite() {
               left={<PaperTextInput.Icon icon={() => <AtSign size={18} color={colors.placeholder} />} />}
             />
             <PaperTextInput
-              label="Email (from invitation)"
+              label={t("auth.acceptInvite.form.emailFromInvite")}
               value={invitedEmail}
               mode="outlined"
               style={{ backgroundColor: colors.backgroundSecondary }}
@@ -359,7 +360,7 @@ export default function AcceptInvite() {
               right={<PaperTextInput.Icon icon={() => <Lock size={18} color={colors.placeholder} />} />}
             />
             <PaperTextInput
-              label="Phone Number"
+              label={t("auth.acceptInvite.form.phone")}
               value={phone}
               onChangeText={setPhone}
               mode="outlined"
@@ -370,7 +371,7 @@ export default function AcceptInvite() {
               left={<PaperTextInput.Icon icon={() => <Phone size={18} color={colors.placeholder} />} />}
             />
             <PaperTextInput
-              label="Password"
+              label={t("auth.acceptInvite.form.password")}
               value={password}
               onChangeText={setPassword}
               mode="outlined"
@@ -401,14 +402,14 @@ export default function AcceptInvite() {
             ) : (
               <>
                 <HardHat size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text className="text-white text-base font-bold">Register as Worker</Text>
+                <Text className="text-white text-base font-bold">{t("auth.acceptInvite.registerButton")}</Text>
               </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity className="items-center py-3" onPress={() => router.replace("/(app)/(auth)/login")}>
             <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              Already have an account? Log in
+              {t("auth.acceptInvite.alreadyHaveAccount")}
             </Text>
           </TouchableOpacity>
 

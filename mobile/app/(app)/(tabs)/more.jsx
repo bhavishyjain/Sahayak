@@ -6,6 +6,7 @@ import {
   Bell,
   Brain,
   Globe,
+  ListChecks,
   LogOut,
   Moon,
   Pencil,
@@ -59,7 +60,7 @@ const getAvatarColor = (name) => {
 
 // Get initials from name
 const getInitials = (name) => {
-  if (!name) return "?";
+  if (!name) return "U";
   return name.charAt(0).toUpperCase();
 };
 
@@ -105,11 +106,11 @@ const ProfileHeader = React.memo(({ user, colors, t, loading }) => {
           className="text-lg font-bold mt-3"
           style={{ color: colors.textPrimary }}
         >
-          {user?.fullName || t("common.loading")}
+          {user?.fullName ?? t("common.loading")}
         </Text>
 
-        <Text style={{ color: colors.textSecondary }}>{user?.phone || ""}</Text>
-        <Text style={{ color: colors.textSecondary }}>{user?.email || ""}</Text>
+        <Text style={{ color: colors.textSecondary }}>{user?.phone ?? ""}</Text>
+        <Text style={{ color: colors.textSecondary }}>{user?.email ?? ""}</Text>
       </View>
     </AutoSkeleton>
   );
@@ -142,7 +143,7 @@ export default function More() {
         const authUser = await getUserAuth();
         setUser(authUser);
       } catch (error) {
-        console.error("Error loading user:", error);
+        console.error(error);
       } finally {
         setIsLoading(false);
       }
@@ -156,6 +157,22 @@ export default function More() {
   };
 
   const SETTINGS_ITEMS = [
+    ...(user?.role === "user"
+      ? [
+          {
+            icon: ListChecks,
+            title: "more.menu.myComplaints.title",
+            subtitle: "more.menu.myComplaints.description",
+            route: "/(app)/more/my-complaints",
+          },
+          {
+            icon: CheckCircle,
+            title: "more.menu.resolvedComplaints.title",
+            subtitle: "more.menu.resolvedComplaints.description",
+            route: "/(app)/more/resolved-complaints",
+          },
+        ]
+      : []),
     ...(user?.role === "head"
       ? [
           {
@@ -172,14 +189,14 @@ export default function More() {
           },
           {
             icon: UserPlus,
-            title: "Manage Invitations",
-            subtitle: "Invite workers and track invitation status",
+            title: "more.menu.manageInvitations.title",
+            subtitle: "more.menu.manageInvitations.subtitle",
             route: "/(app)/more/hod-manage-invitations",
           },
           {
             icon: Brain,
-            title: "AI Review Queue",
-            subtitle: "Review and apply AI-suggested classifications",
+            title: "more.menu.aiReviewQueue.title",
+            subtitle: "more.menu.aiReviewQueue.subtitle",
             route: "/(app)/hod/ai-review",
           },
         ]
@@ -195,16 +212,16 @@ export default function More() {
           },
           {
             icon: BarChart2,
-            title: "My Analytics",
-            subtitle: "Performance graphs & trends",
+            title: "more.menu.workerAnalytics.title",
+            subtitle: "more.menu.workerAnalytics.subtitle",
             route: "/(app)/more/worker-analytics",
           },
         ]
       : []),
     {
       icon: Bell,
-      title: "Notifications",
-      subtitle: "History & preferences",
+      title: "more.menu.notifications.title",
+      subtitle: "more.menu.notifications.subtitle",
       route: "/(app)/more/notifications",
     },
     {
@@ -272,18 +289,18 @@ export default function More() {
         visible={showDeleteAccountDialog}
         title={t("more.menu.deleteAccount.modalTitle")}
         message={t("more.menu.deleteAccount.modalMessage")}
-        confirmText="Delete Account"
+        confirmText={t("more.menu.deleteAccount.confirmText")}
         cancelText={t("common.cancel")}
         loading={deletingAccount}
         showInput
-        inputPlaceholder="Enter your password to confirm"
+        inputPlaceholder={t("more.menu.deleteAccount.passwordPlaceholder")}
         inputValue={deletePassword}
         onInputChange={setDeletePassword}
         onConfirm={async () => {
           if (!deletePassword.trim()) {
             Toast.show({
               type: "error",
-              text1: "Enter your password to confirm",
+              text1: t("more.menu.deleteAccount.passwordRequired"),
             });
             return;
           }
@@ -299,10 +316,14 @@ export default function More() {
             router.replace("/(app)/(auth)/login");
           } catch (err) {
             const msg =
-              err?.response?.data?.message ||
-              err?.message ||
-              "Failed to delete account";
-            Toast.show({ type: "error", text1: "Error", text2: msg });
+              err?.response?.data?.message ??
+              err?.message ??
+              t("more.menu.deleteAccount.deleteFailed");
+            Toast.show({
+              type: "error",
+              text1: t("toast.error.failed"),
+              text2: msg,
+            });
           } finally {
             setDeletingAccount(false);
             setDeletePassword("");

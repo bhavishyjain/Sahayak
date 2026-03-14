@@ -5,6 +5,7 @@ import {
   AlertCircle,
   TrendingUp,
   ClipboardList,
+  ListChecks,
   Star,
   Award,
   Target,
@@ -29,6 +30,10 @@ import apiCall from "../../../utils/api";
 import getUserAuth from "../../../utils/userAuth";
 import { WORKER_OVERVIEW_URL } from "../../../url";
 import { getPriorityColor } from "../../../utils/colorHelpers";
+import {
+  formatPriorityLabel,
+  formatStatusLabel,
+} from "../../../utils/complaintFormatters";
 
 export default function WorkerHome() {
   const { t } = useTranslation();
@@ -62,15 +67,22 @@ export default function WorkerHome() {
       const backendData = res?.data;
       if (backendData) {
         const transformed = {
-          activeCount: backendData.statistics?.activeComplaints || 0,
-          completedCount: backendData.statistics?.totalCompleted || 0,
-          weekCompleted: backendData.statistics?.weekCompleted || 0,
-          pendingApproval: backendData.statistics?.pendingApproval || 0,
-          activeComplaints: (backendData.assignedComplaints || []).map((c) => ({
+          activeCount: backendData.statistics?.activeComplaints,
+          completedCount: backendData.statistics?.totalCompleted,
+          weekCompleted: backendData.statistics?.weekCompleted,
+          pendingApproval: backendData.statistics?.pendingApproval,
+          activeComplaints: (backendData.assignedComplaints ?? []).map((c) => ({
             id: c._id,
             ticketId: c.ticketId,
-            title: c.title || c.rawText?.split(":")[0] || "Complaint",
-            description: c.description || c.refinedText || c.rawText,
+            title:
+              c.title ??
+              c.rawText?.split(":")?.[0] ??
+              t("worker.dashboard.complaintFallback"),
+            description:
+              c.description ??
+              c.refinedText ??
+              c.rawText ??
+              t("worker.dashboard.complaintFallback"),
             priority: c.priority,
             status: c.status,
           })),
@@ -81,7 +93,7 @@ export default function WorkerHome() {
       Toast.show({
         type: "error",
         text1: t("worker.dashboard.failed"),
-        text2: e?.response?.data?.message || t("worker.dashboard.loadingError"),
+        text2: e?.response?.data?.message ?? t("worker.dashboard.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -91,12 +103,29 @@ export default function WorkerHome() {
 
   useEffect(() => {
     load(false);
-    getUserAuth().then((userData) => {
-      if (userData) {
-        setUser(userData);
-      }
-    });
+    getUserAuth()
+      .then((userData) => {
+        if (userData) {
+          setUser(userData);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
   }, []);
+
+  const activeComplaints = dashboardData?.activeComplaints ?? [];
+  const completionPercent =
+    dashboardData?.activeCount > 0
+      ? Math.round(
+          (dashboardData.completedCount /
+            (dashboardData.completedCount + dashboardData.activeCount)) *
+            100,
+        )
+      : 100;
+  const ratingValue = Number(user?.rating ?? 0);
+  const hasRating = Number.isFinite(ratingValue) && ratingValue > 0;
+  const ratingPercent = Math.max(0, Math.min((ratingValue / 5) * 100, 100));
 
   if (loading) {
     return (
@@ -138,7 +167,7 @@ export default function WorkerHome() {
             className="text-3xl font-bold mt-1"
             style={{ color: colors.textPrimary }}
           >
-            {user?.fullName || "Worker"}
+            {user?.fullName ?? t("worker.dashboard.workerFallback")}
           </Text>
           <View className="flex-row items-center mt-2">
             <View
@@ -149,7 +178,9 @@ export default function WorkerHome() {
                 className="text-xs font-semibold"
                 style={{ color: colors.primary }}
               >
-                {user?.department || ""} {t("worker.dashboard.department")}
+                {user?.department
+                  ? `${user.department} ${t("worker.dashboard.department")}`
+                  : t("worker.dashboard.department")}
               </Text>
             </View>
           </View>
@@ -163,24 +194,24 @@ export default function WorkerHome() {
               <MetricCard
                 colors={colors}
                 Icon={Clock}
-                iconColor={colors.warning || "#F59E0B"}
-                iconBgColor={(colors.warning || "#F59E0B") + "20"}
+                iconColor={colors.warning}
+                iconBgColor={colors.warning + "20"}
                 title={t("worker.dashboard.stats.active")}
-                value={dashboardData.activeCount || 0}
+                value={dashboardData.activeCount ?? 0}
                 subtitle={t("worker.dashboard.stats.assigned")}
-                valueColor={colors.warning || "#F59E0B"}
+                valueColor={colors.warning}
                 style={{ marginRight: 6 }}
               />
 
               <MetricCard
                 colors={colors}
                 Icon={CheckCircle}
-                iconColor={colors.success || "#10B981"}
-                iconBgColor={(colors.success || "#10B981") + "20"}
+                iconColor={colors.success}
+                iconBgColor={colors.success + "20"}
                 title={t("worker.dashboard.stats.completed")}
-                value={dashboardData.completedCount || 0}
+                value={dashboardData.completedCount ?? 0}
                 subtitle={t("worker.dashboard.stats.total")}
-                valueColor={colors.success || "#10B981"}
+                valueColor={colors.success}
                 style={{ marginLeft: 6 }}
               />
             </View>
@@ -193,13 +224,10 @@ export default function WorkerHome() {
                     <View
                       className="w-10 h-10 rounded-full items-center justify-center"
                       style={{
-                        backgroundColor: colors.purple + "20" || "#8B5CF620",
+                        backgroundColor: colors.purple + "20",
                       }}
                     >
-                      <AlertCircle
-                        size={20}
-                        color={colors.purple || "#8B5CF6"}
-                      />
+                      <AlertCircle size={20} color={colors.purple} />
                     </View>
                     <View className="flex-1 ml-3">
                       <Text
@@ -218,7 +246,7 @@ export default function WorkerHome() {
                   </View>
                   <Text
                     className="text-3xl font-bold"
-                    style={{ color: colors.purple || "#8B5CF6" }}
+                    style={{ color: colors.purple }}
                   >
                     {dashboardData.pendingApproval}
                   </Text>
@@ -252,7 +280,11 @@ export default function WorkerHome() {
               <View className="mb-4">
                 <View className="flex-row items-center justify-between mb-2">
                   <View className="flex-row items-center">
-                    <Star size={16} color="#EAB308" fill="#EAB308" />
+                    <Star
+                      size={16}
+                      color={colors.warning}
+                      fill={colors.warning}
+                    />
                     <Text
                       className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
@@ -264,12 +296,14 @@ export default function WorkerHome() {
                     className="text-2xl font-bold"
                     style={{ color: colors.textPrimary }}
                   >
-                    {user?.rating != null ? user.rating.toFixed(1) : "—"}
+                    {hasRating
+                      ? ratingValue.toFixed(1)
+                      : t("worker.dashboard.notAvailable")}
                     <Text
                       className="text-sm font-normal"
                       style={{ color: colors.textSecondary }}
                     >
-                      /5.0
+                      {t("worker.dashboard.ratingOutOfFive")}
                     </Text>
                   </Text>
                 </View>
@@ -280,8 +314,8 @@ export default function WorkerHome() {
                   <View
                     className="h-full rounded-full"
                     style={{
-                      width: `${((user?.rating || 0) / 5) * 100}%`,
-                      backgroundColor: "#EAB308",
+                      width: `${ratingPercent}%`,
+                      backgroundColor: colors.warning,
                     }}
                   />
                 </View>
@@ -291,7 +325,7 @@ export default function WorkerHome() {
               <View className="mb-4">
                 <View className="flex-row items-center justify-between mb-2">
                   <View className="flex-row items-center">
-                    <Flame size={16} color={colors.info || "#3B82F6"} />
+                    <Flame size={16} color={colors.info} />
                     <Text
                       className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
@@ -303,7 +337,7 @@ export default function WorkerHome() {
                     className="text-2xl font-bold"
                     style={{ color: colors.textPrimary }}
                   >
-                    {dashboardData?.weekCompleted || 0}
+                    {dashboardData?.weekCompleted ?? 0}
                     <Text
                       className="text-sm font-normal"
                       style={{ color: colors.textSecondary }}
@@ -319,7 +353,7 @@ export default function WorkerHome() {
               <View>
                 <View className="flex-row items-center justify-between mb-2">
                   <View className="flex-row items-center">
-                    <Target size={16} color={colors.success || "#10B981"} />
+                    <Target size={16} color={colors.success} />
                     <Text
                       className="text-sm font-semibold ml-2"
                       style={{ color: colors.textSecondary }}
@@ -329,16 +363,9 @@ export default function WorkerHome() {
                   </View>
                   <Text
                     className="text-xl font-bold"
-                    style={{ color: colors.success || "#10B981" }}
+                    style={{ color: colors.success }}
                   >
-                    {dashboardData.activeCount > 0
-                      ? Math.round(
-                          (dashboardData.completedCount /
-                            (dashboardData.completedCount +
-                              dashboardData.activeCount)) *
-                            100,
-                        )
-                      : 100}
+                    {completionPercent}
                     %
                   </Text>
                 </View>
@@ -349,11 +376,8 @@ export default function WorkerHome() {
                   <View
                     className="h-full rounded-full"
                     style={{
-                      width:
-                        dashboardData.activeCount > 0
-                          ? `${Math.round((dashboardData.completedCount / (dashboardData.completedCount + dashboardData.activeCount)) * 100)}%`
-                          : "100%",
-                      backgroundColor: colors.success || "#10B981",
+                      width: `${completionPercent}%`,
+                      backgroundColor: colors.success,
                     }}
                   />
                 </View>
@@ -418,8 +442,7 @@ export default function WorkerHome() {
               >
                 {t("worker.dashboard.activeAssignments")}
               </Text>
-              {dashboardData.activeComplaints &&
-                dashboardData.activeComplaints.length > 3 && (
+              {activeComplaints.length > 3 && (
                   <PressableBlock
                     onPress={() => router.push("/worker-assigned")}
                   >
@@ -433,9 +456,8 @@ export default function WorkerHome() {
                 )}
             </View>
 
-            {dashboardData.activeComplaints &&
-            dashboardData.activeComplaints.length > 0 ? (
-              dashboardData.activeComplaints.slice(0, 3).map((complaint) => (
+            {activeComplaints.length > 0 ? (
+              activeComplaints.slice(0, 3).map((complaint) => (
                 <PressableBlock
                   key={complaint.id}
                   onPress={() =>
@@ -446,12 +468,19 @@ export default function WorkerHome() {
                 >
                   <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
                     <View className="flex-row items-start justify-between mb-2">
-                      <Text
-                        className="text-sm font-bold"
-                        style={{ color: colors.primary }}
-                      >
-                        #{complaint.ticketId}
-                      </Text>
+                      <View className="flex-row items-center">
+                        <ListChecks
+                          size={12}
+                          color={colors.primary}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text
+                          className="text-sm font-bold"
+                          style={{ color: colors.primary }}
+                        >
+                          {complaint.ticketId}
+                        </Text>
+                      </View>
                       <View
                         className="px-2 py-1 rounded"
                         style={{
@@ -465,7 +494,7 @@ export default function WorkerHome() {
                             color: getPriorityColor(complaint.priority, colors),
                           }}
                         >
-                          {complaint.priority}
+                          {formatPriorityLabel(t, complaint.priority)}
                         </Text>
                       </View>
                     </View>
@@ -491,7 +520,7 @@ export default function WorkerHome() {
                         className="text-xs ml-1 capitalize"
                         style={{ color: colors.textSecondary }}
                       >
-                        {complaint.status?.replace("-", " ")}
+                        {formatStatusLabel(t, complaint.status)}
                       </Text>
                     </View>
                   </Card>

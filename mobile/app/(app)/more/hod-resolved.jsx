@@ -2,9 +2,6 @@ import { useRouter } from "expo-router";
 import {
   AlertCircle,
   Calendar,
-  Clock,
-  MapPin,
-  ThumbsUp,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -17,14 +14,11 @@ import {
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
-import Card from "../../../components/Card";
+import ComplaintCard from "../../../components/ComplaintCard";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
-import PressableBlock from "../../../components/PressableBlock";
 import SearchBar from "../../../components/SearchBar";
-import StatusPill from "../../../components/StatusPill";
 import { HOD_OVERVIEW_URL } from "../../../url";
 import apiCall from "../../../utils/api";
-import { getPriorityColor } from "../../../utils/colorHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
@@ -47,8 +41,8 @@ export default function HodResolvedComplaints() {
       else setLoading(true);
 
       const res = await apiCall({ method: "GET", url: HOD_OVERVIEW_URL });
-      const resolvedOnly = (res?.data?.complaints || []).filter(
-        (c) => (c?.status || "").toLowerCase() === "resolved",
+      const resolvedOnly = res.data.complaints.filter(
+        (c) => c.status?.toLowerCase() === "resolved",
       );
       setComplaints(resolvedOnly);
     } catch (e) {
@@ -86,18 +80,18 @@ export default function HodResolvedComplaints() {
     if (startDate) {
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
-      list = list.filter((c) => new Date(c.updatedAt || c.createdAt) >= start);
+      list = list.filter((c) => new Date(c.updatedAt) >= start);
     }
 
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-      list = list.filter((c) => new Date(c.updatedAt || c.createdAt) <= end);
+      list = list.filter((c) => new Date(c.updatedAt) <= end);
     }
 
     list.sort((a, b) => {
-      const da = new Date(a.updatedAt || a.createdAt).getTime();
-      const db = new Date(b.updatedAt || b.createdAt).getTime();
+      const da = new Date(a.updatedAt).getTime();
+      const db = new Date(b.updatedAt).getTime();
       return (isNaN(db) ? 0 : db) - (isNaN(da) ? 0 : da);
     });
 
@@ -105,92 +99,12 @@ export default function HodResolvedComplaints() {
   }, [complaints, searchQuery, startDate, endDate]);
 
   const renderItem = ({ item }) => (
-    <PressableBlock
-      onPress={() =>
+    <ComplaintCard
+      complaint={item}
+      onOpen={() =>
         router.push(`/complaints/complaint-details?id=${item._id ?? item.id}`)
       }
-      style={{ marginBottom: 10 }}
-    >
-      <Card style={{ margin: 0, flex: 0 }}>
-        <View className="flex-row items-center justify-between mb-1.5">
-          <Text className="text-sm font-bold" style={{ color: colors.primary }}>
-            #{item.ticketId}
-          </Text>
-          <StatusPill status={item.status} />
-        </View>
-
-        <Text
-          className="text-base font-semibold mb-1.5"
-          style={{ color: colors.textPrimary }}
-        >
-          {item.title}
-        </Text>
-
-        <Text
-          className="text-xs mb-2"
-          style={{ color: colors.textSecondary }}
-          numberOfLines={2}
-        >
-          {item.description}
-        </Text>
-
-        <View className="flex-row items-center mb-2">
-          <MapPin size={13} color={colors.textSecondary} />
-          <Text
-            className="text-xs ml-1 flex-1"
-            style={{ color: colors.textSecondary }}
-            numberOfLines={1}
-          >
-            {item.locationName}
-          </Text>
-        </View>
-
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <View
-              className="px-2 py-0.5 rounded-md"
-              style={{
-                backgroundColor: getPriorityColor(item.priority, colors) + "22",
-              }}
-            >
-              <Text
-                className="text-xs font-semibold capitalize"
-                style={{ color: getPriorityColor(item.priority, colors) }}
-              >
-                {item.priority}
-              </Text>
-            </View>
-            <View className="flex-row items-center">
-              <ThumbsUp size={12} color={colors.textSecondary} />
-              <Text
-                className="text-xs ml-1"
-                style={{ color: colors.textSecondary }}
-              >
-                {item.upvoteCount || 0}
-              </Text>
-            </View>
-          </View>
-
-          <View className="flex-row items-center">
-            <Clock size={12} color={colors.textSecondary} />
-            <Text
-              className="text-xs ml-1"
-              style={{ color: colors.textSecondary }}
-            >
-              {new Date(item.updatedAt || item.createdAt).toLocaleString(
-                "en-US",
-                {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                },
-              )}
-            </Text>
-          </View>
-        </View>
-      </Card>
-    </PressableBlock>
+    />
   );
 
   return (

@@ -38,10 +38,19 @@ exports.createComplaint = asyncHandler(async (req, res) => {
       proofImages && proofImages.length > 0 ? proofImages[0] : null;
     const aiResult = await analyzeComplaintWithImage(description, imageUrl);
 
-    const VALID_DEPARTMENTS = ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"];
+    const VALID_DEPARTMENTS = [
+      "Road",
+      "Water",
+      "Electricity",
+      "Waste",
+      "Drainage",
+      "Other",
+    ];
     if (aiResult && !aiResult.error) {
       const rawDept = aiResult.department;
-      aiSuggestedDepartment = VALID_DEPARTMENTS.includes(rawDept) ? rawDept : (department || "Other");
+      aiSuggestedDepartment = VALID_DEPARTMENTS.includes(rawDept)
+        ? rawDept
+        : department || "Other";
       aiSuggestedPriority = aiResult.suggestedPriority || priority;
       aiConfidence = (aiResult.confidence || 50) / 100;
     }
@@ -86,29 +95,30 @@ exports.createComplaint = asyncHandler(async (req, res) => {
 
   let complaint;
   try {
-  complaint = await Complaint.create({
-    userId: req.user._id,
-    rawText: `${title}: ${description}`,
-    refinedText: description,
-    department: finalDepartment,
-    aiAnalysis,
-    locationName,
-    coordinates,
-    priority: finalPriority,
-    proofImage: proofImages,
-    status: "pending",
-    history: [
-      {
-        status: "pending",
-        updatedBy: req.user._id,
-        note: aiAutoApplied
-          ? `Created from app - AI auto-categorized (${Math.round(aiConfidence * 100)}% confidence)`
-          : "Created from app",
-      },
-    ],
-  });
+    complaint = await Complaint.create({
+      userId: req.user._id,
+      rawText: `${title}: ${description}`,
+      refinedText: description,
+      department: finalDepartment,
+      aiAnalysis,
+      locationName,
+      coordinates,
+      priority: finalPriority,
+      proofImage: proofImages,
+      status: "pending",
+      history: [
+        {
+          status: "pending",
+          updatedBy: req.user._id,
+          note: aiAutoApplied
+            ? `Created from app - AI auto-categorized (${Math.round(aiConfidence * 100)}% confidence)`
+            : "Created from app",
+        },
+      ],
+    });
   } catch (err) {
-    if (err.code === 11000) throw new AppError("Ticket ID conflict, please try again", 500);
+    if (err.code === 11000)
+      throw new AppError("Ticket ID conflict, please try again", 500);
     throw err;
   }
 
@@ -145,7 +155,10 @@ exports.createComplaint = asyncHandler(async (req, res) => {
 
 exports.myComplaints = asyncHandler(async (req, res) => {
   const {
+    scope = "mine",
     status,
+    excludeStatus,
+    department,
     priority,
     sort = "new-to-old",
     startDate,
@@ -158,9 +171,25 @@ exports.myComplaints = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Number(limit) || 10, 100);
   const safePage = Math.max(Number(page) || 1, 1);
 
-  const filter = { userId: new mongoose.Types.ObjectId(req.user._id) };
+  const filter = {};
+  if (scope !== "all") {
+    filter.userId = new mongoose.Types.ObjectId(req.user._id);
+  }
   if (status && status !== "all") filter.status = status;
-  if (priority && priority !== "all") filter.priority = new RegExp(`^${priority}$`, "i");
+  if (!status && excludeStatus) {
+    const excludedStatuses = String(excludeStatus)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (excludedStatuses.length > 0) {
+      filter.status = { $nin: excludedStatuses };
+    }
+  }
+  if (department && department !== "all") {
+    filter.department = new RegExp(`^${department}$`, "i");
+  }
+  if (priority && priority !== "all")
+    filter.priority = new RegExp(`^${priority}$`, "i");
   if (startDate || endDate) {
     filter.createdAt = {};
     if (startDate) filter.createdAt.$gte = new Date(startDate);
@@ -171,7 +200,10 @@ exports.myComplaints = asyncHandler(async (req, res) => {
     }
   }
   if (search && search.trim()) {
-    const re = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const re = new RegExp(
+      search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      "i",
+    );
     filter.$or = [
       { ticketId: re },
       { locationName: re },
@@ -209,7 +241,9 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
     throw new AppError("Complaint not found", 404);
   }
 
-  await assertCanAccessComplaint(req.user, complaint);
+  if (req.user?.role !== "user") {
+    await assertCanAccessComplaint(req.user, complaint);
+  }
   return sendSuccess(res, { complaint: buildComplaintView(complaint) });
 });
 

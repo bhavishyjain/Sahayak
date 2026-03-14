@@ -24,7 +24,6 @@ import {
   ScrollView,
   Text,
   View,
-  Dimensions,
 } from "react-native";
 import Svg, { Rect, Text as SvgText } from "react-native-svg";
 import Toast from "react-native-toast-message";
@@ -46,7 +45,14 @@ import {
   UPVOTE_COMPLAINT_URL,
 } from "../../../url";
 
-const { width } = Dimensions.get("window");
+const EMPTY_SUMMARY = {
+  stats: { total: 0, pending: 0, inProgress: 0, resolved: 0 },
+  avgResolutionTime: null,
+  mostActiveDepartment: null,
+  departmentBreakdown: [],
+  monthlyTrend: [],
+  recent: [],
+};
 
 export default function Home() {
   const { t } = useTranslation();
@@ -56,13 +62,7 @@ export default function Home() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [summary, setSummary] = useState({
-    stats: { total: 0, pending: 0, inProgress: 0, resolved: 0 },
-    avgResolutionTime: null,
-    mostActiveDepartment: null,
-    monthlyTrend: [],
-    recent: [],
-  });
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [spots, setSpots] = useState([]);
   const [user, setUser] = useState(null);
   const [nearbyComplaints, setNearbyComplaints] = useState([]);
@@ -88,14 +88,14 @@ export default function Home() {
 
       const summaryPayload = summaryRes?.data;
       const heatmapPayload = heatmapRes?.data;
-      setSummary(summaryPayload || { stats: {}, recent: [] });
-      setSpots(heatmapPayload?.spots || []);
+      setSummary(summaryPayload ?? EMPTY_SUMMARY);
+      setSpots(heatmapPayload?.spots ?? []);
     } catch (error) {
       Toast.show({
         type: "error",
         text1: t("toast.error.failed"),
         text2:
-          error?.response?.data?.message || t("toast.error.loadHomeFailed"),
+          error?.response?.data?.message ?? t("toast.error.loadHomeFailed"),
       });
     } finally {
       setLoading(false);
@@ -115,7 +115,7 @@ export default function Home() {
         method: "GET",
         url: `${GET_NEARBY_COMPLAINTS_URL}?lat=${loc.coords.latitude}&lng=${loc.coords.longitude}&radius=5`,
       });
-      setNearbyComplaints(res?.data?.complaints || []);
+      setNearbyComplaints(res?.data?.complaints ?? []);
     } catch (_) {
       // fail silently — nearby is optional
     } finally {
@@ -129,7 +129,7 @@ export default function Home() {
         method: "POST",
         url: UPVOTE_COMPLAINT_URL(complaintId),
       });
-      const { upvoteCount } = res?.data || {};
+      const { upvoteCount } = res?.data ?? {};
       setNearbyComplaints((prev) =>
         prev.map((c) =>
           c._id === complaintId
@@ -138,7 +138,7 @@ export default function Home() {
         ),
       );
     } catch (_) {
-      Toast.show({ type: "error", text1: "Failed to upvote" });
+      Toast.show({ type: "error", text1: t("home.nearby.upvoteFailed") });
     }
   };
 
@@ -154,14 +154,14 @@ export default function Home() {
         }
       })
       .catch((error) => {
-        console.error("Failed to load user:", error);
+        console.error(error);
       });
   }, []);
 
-  const topHotspots = useMemo(() => (spots || []).slice(0, 6), [spots]);
+  const topHotspots = useMemo(() => (spots ?? []).slice(0, 6), [spots]);
   const reminders = useMemo(() => {
-    const pending = Number(summary?.stats?.pending || 0);
-    const recent = summary?.recent || [];
+    const pending = Number(summary?.stats?.pending ?? 0);
+    const recent = summary?.recent ?? [];
     const latest = recent[0];
 
     let lastUpdatedText = t("home.noRecent");
@@ -203,13 +203,26 @@ export default function Home() {
     },
   ];
 
+  const totalComplaintCount = Number(summary?.stats?.total ?? 0);
+  const resolvedComplaintCount = Number(summary?.stats?.resolved ?? 0);
+  const openComplaintCount = Math.max(
+    totalComplaintCount - resolvedComplaintCount,
+    0,
+  );
+  const hasStatsSection = [
+    summary?.avgResolutionTime != null,
+    summary?.mostActiveDepartment != null,
+    (summary?.monthlyTrend ?? []).length > 0,
+  ].some(Boolean);
+  const showNearbySection = nearbyLoading ? true : nearbyComplaints.length > 0;
+
   return (
     <ScrollView
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
       contentContainerStyle={{
         paddingHorizontal: 16,
-        paddingTop: 70,
+        paddingTop: 32,
         paddingBottom: 120,
       }}
       refreshControl={
@@ -223,186 +236,258 @@ export default function Home() {
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
-      <View className="mb-8">
-        <Text
-          className="text-sm font-medium mb-1"
-          style={{ color: colors.textSecondary }}
-        >
-          {getGreeting()} 👋
-        </Text>
+      <View className="mb-6">
+        <View className="flex-row items-center mb-1">
+          <Text
+            className="text-sm font-medium"
+            style={{ color: colors.textSecondary }}
+          >
+            {getGreeting()}
+          </Text>
+          <TrendingUp
+            size={14}
+            color={colors.textSecondary}
+            style={{ marginLeft: 6 }}
+          />
+        </View>
         <Text
           className="text-3xl font-extrabold mb-3"
           style={{ color: colors.textPrimary }}
         >
-          {user?.fullName || "User"}
+          {user?.fullName ?? t("home.userFallback")}
         </Text>
-        {summary?.stats?.pending > 0 && (
+        {openComplaintCount > 0 && (
           <Text className="text-sm" style={{ color: colors.textSecondary }}>
-            {t("home.youHave") || "You have"}{" "}
+            {t("home.youHave")}{" "}
             <Text style={{ color: colors.danger, fontWeight: "700" }}>
-              {summary.stats.pending} {t("home.stats.pending").toLowerCase()}
+              {openComplaintCount} {t("home.openLabel")}
             </Text>{" "}
-            {summary.stats.pending === 1
-              ? t("home.stats.complaints").toLowerCase().slice(0, -1)
-              : t("home.stats.complaints").toLowerCase()}
+            {openComplaintCount === 1
+              ? t("home.complaintSingular")
+              : t("home.complaintPlural")}
           </Text>
         )}
       </View>
 
-      {/* Unified Stats Card */}
-      <View
-        className="rounded-3xl p-5 mb-6"
-        style={{
-          backgroundColor: colors.backgroundSecondary,
-          borderWidth: 1,
-          borderColor: colors.border,
-        }}
-      >
-        <View className="flex-row items-center justify-between mb-4">
-          <Text
-            className="text-lg font-extrabold"
-            style={{ color: colors.textPrimary }}
-          >
-            {t("home.overview")}
-          </Text>
-          <View className="flex-row items-center">
-            <TrendingUp size={14} color={colors.success} />
-            <Text
-              className="text-xs font-semibold ml-1"
-              style={{ color: colors.success }}
-            >
-              {t("home.active")}
-            </Text>
-          </View>
-        </View>
+      {/* Overview */}
+      {(() => {
+        const totalCount = Number(summary?.stats?.total ?? 0);
+        const pendingCount = Number(summary?.stats?.pending ?? 0);
+        const resolvedCount = Number(summary?.stats?.resolved ?? 0);
+        const resolvedPercent =
+          totalCount > 0
+            ? Math.min(100, Math.round((resolvedCount / totalCount) * 100))
+            : 0;
 
-        {/* Row 1: Total · Pending · Assigned */}
-        <View className="flex-row justify-between mb-4">
-          {[
-            {
-              key: "total",
-              value: summary?.stats?.total ?? 0,
-              Icon: ListChecks,
-              color: colors.primary,
-            },
-            {
-              key: "pending",
-              value: summary?.stats?.pending ?? 0,
-              Icon: AlertCircle,
-              color: colors.danger,
-            },
-            {
-              key: "assigned",
-              value: summary?.stats?.assigned ?? 0,
-              Icon: Clock3,
-              color: colors.info || "#3B82F6",
-            },
-          ].map(({ key, value, Icon, color }) => (
-            <View key={key} className="items-center" style={{ width: "30%" }}>
-              <View
-                className="w-11 h-11 rounded-2xl items-center justify-center mb-2"
-                style={{ backgroundColor: `${color}15` }}
-              >
-                <Icon size={20} color={color} />
-              </View>
+        const overviewItems = [
+          {
+            key: "pending",
+            value: pendingCount,
+            Icon: AlertCircle,
+            color: colors.danger,
+          },
+          {
+            key: "assigned",
+            value: Number(summary?.stats?.assigned ?? 0),
+            Icon: Clock3,
+            color: colors.info,
+          },
+          {
+            key: "inProgress",
+            value: Number(summary?.stats?.inProgress ?? 0),
+            Icon: Timer,
+            color: colors.warning,
+          },
+          {
+            key: "resolved",
+            value: Number(summary?.stats?.resolved ?? 0),
+            Icon: CheckCircle2,
+            color: colors.success,
+          },
+        ];
+
+        return (
+          <View
+            className="rounded-3xl p-5 mb-5"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <View className="flex-row items-center justify-between mb-3">
               <Text
-                className="text-2xl font-extrabold mb-1"
+                className="text-lg font-extrabold"
                 style={{ color: colors.textPrimary }}
               >
-                {value}
-              </Text>
-              <Text
-                className="text-[11px] font-medium text-center"
-                style={{ color: colors.textSecondary }}
-              >
-                {t(`home.stats.${key}`)}
+                {t("home.myComplaintsTitle")}
               </Text>
             </View>
-          ))}
-        </View>
 
-        {/* Row 2: In Progress · Resolved */}
-        <View className="flex-row" style={{ gap: 10 }}>
-          {[
-            {
-              key: "inProgress",
-              value: summary?.stats?.inProgress ?? 0,
-              Icon: Timer,
-              color: colors.warning,
-            },
-            {
-              key: "resolved",
-              value: summary?.stats?.resolved ?? 0,
-              Icon: CheckCircle2,
-              color: colors.success,
-            },
-          ].map(({ key, value, Icon, color }) => (
             <View
-              key={key}
-              className="flex-1 flex-row items-center rounded-2xl p-3"
-              style={{ backgroundColor: `${color}10` }}
+              className="rounded-2xl p-4 mb-3"
+              style={{
+                backgroundColor: colors.cardBackground,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
             >
-              <View
-                className="w-10 h-10 rounded-xl items-center justify-center mr-3"
-                style={{ backgroundColor: `${color}20` }}
-              >
-                <Icon size={18} color={color} />
+              <View className="flex-row items-end justify-between">
+                <View>
+                  <Text
+                    className="text-xs font-semibold mb-1"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("home.stats.total")}
+                  </Text>
+                  <Text
+                    className="text-3xl font-black"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {totalCount}
+                  </Text>
+                </View>
+                <View
+                  className="px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: `${colors.success}1A` }}
+                >
+                  <Text
+                    className="text-[11px] font-bold"
+                    style={{ color: colors.success }}
+                  >
+                    {resolvedCount} {t("home.stats.resolved").toLowerCase()}
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text
-                  className="text-2xl font-extrabold"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {value}
-                </Text>
-                <Text
-                  className="text-[11px] font-medium"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t(`home.stats.${key}`)}
-                </Text>
+
+              <View
+                className="h-2 rounded-full mt-3 overflow-hidden"
+                style={{ backgroundColor: colors.border }}
+              >
+                <View
+                  className="h-2 rounded-full"
+                  style={{
+                    width: `${resolvedPercent}%`,
+                    backgroundColor: colors.success,
+                  }}
+                />
               </View>
             </View>
-          ))}
-        </View>
-      </View>
 
-      {/* My Stats — analytics card */}
-      {(summary?.avgResolutionTime != null ||
-        summary?.mostActiveDepartment ||
-        (summary?.monthlyTrend || []).length > 0) &&
+            <View
+              className="flex-row flex-wrap justify-between"
+              style={{ gap: 8 }}
+            >
+              {overviewItems.map(({ key, value, Icon, color }) => (
+                <View
+                  key={key}
+                  className="rounded-2xl p-3"
+                  style={{
+                    width: "48.5%",
+                    backgroundColor: colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <View className="flex-row items-center justify-between mb-2">
+                    <View
+                      className="w-8 h-8 rounded-xl items-center justify-center"
+                      style={{ backgroundColor: `${color}20` }}
+                    >
+                      <Icon size={15} color={color} />
+                    </View>
+                    <Text
+                      className="text-xl font-extrabold"
+                      style={{ color: colors.textPrimary }}
+                    >
+                      {value}
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-[11px] font-semibold"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t(`home.stats.${key}`)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })()}
+
+      {/* My Stats */}
+      {hasStatsSection &&
         (() => {
-          const trend = summary.monthlyTrend || [];
-          const maxCount = Math.max(...trend.map((m) => m.count), 1);
+          const trend = summary.monthlyTrend ?? [];
+          const maxCount = Math.max(
+            ...trend.map((m) => Number(m.count ?? 0)),
+            1,
+          );
           const MONTH_LABELS = [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
+            t("home.months.jan"),
+            t("home.months.feb"),
+            t("home.months.mar"),
+            t("home.months.apr"),
+            t("home.months.may"),
+            t("home.months.jun"),
+            t("home.months.jul"),
+            t("home.months.aug"),
+            t("home.months.sep"),
+            t("home.months.oct"),
+            t("home.months.nov"),
+            t("home.months.dec"),
           ];
-          const barW = 18;
-          const barGap = 6;
-          const chartH = 48;
-          const chartW = trend.length * (barW + barGap) - barGap;
+          const monthLabelW = 20;
+          const monthBarAreaW = 108;
+          const monthRowH = 8;
+          const monthRowGap = 5;
+          const monthChartH = trend.length
+            ? trend.length * (monthRowH + monthRowGap) - monthRowGap + 2
+            : 0;
+          const monthChartW = 148;
+          const departmentDataRaw = Array.isArray(summary?.departmentBreakdown)
+            ? summary.departmentBreakdown
+            : [];
+          const departmentData = departmentDataRaw.length
+            ? departmentDataRaw
+                .filter((item) => item?.department)
+                .slice(0, 4)
+                .map((item) => ({
+                  department: item.department,
+                  count: Number(item.count ?? 0),
+                }))
+            : summary?.mostActiveDepartment
+              ? [
+                  {
+                    department: summary.mostActiveDepartment,
+                    count: Number(summary?.stats?.total ?? 0),
+                  },
+                ]
+              : [];
+          const departmentMax = Math.max(
+            ...departmentData.map((item) => item.count),
+            1,
+          );
+          const deptLabelW = 24;
+          const deptBarAreaW = 72;
+          const deptRowH = 8;
+          const deptRowGap = 6;
+          const deptChartH = departmentData.length
+            ? departmentData.length * (deptRowH + deptRowGap) - deptRowGap + 2
+            : 0;
+          const deptChartW = 120;
 
           const avgLabel = (() => {
             const h = summary.avgResolutionTime;
-            if (h == null) return "N/A";
-            if (h < 24) return `${h}h`;
-            return `${Math.floor(h / 24)}d ${h % 24}h`;
+            if (h == null) return t("home.notAvailable");
+            if (h < 24) return `${h}${t("home.time.hourShort")}`;
+            return `${Math.floor(h / 24)}${t("home.time.dayShort")} ${h % 24}${t("home.time.hourShort")}`;
           })();
 
           return (
             <View
-              className="rounded-3xl p-5 mb-6"
+              className="rounded-3xl p-5 mb-5"
               style={{
                 backgroundColor: colors.backgroundSecondary,
                 borderWidth: 1,
@@ -410,106 +495,214 @@ export default function Home() {
               }}
             >
               <View className="flex-row items-center mb-4">
-                <BarChart2 size={18} color={colors.primary} />
+                <View
+                  className="w-9 h-9 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: `${colors.primary}15` }}
+                >
+                  <BarChart2 size={18} color={colors.primary} />
+                </View>
                 <Text
-                  className="text-lg font-extrabold ml-2"
+                  className="text-lg font-extrabold ml-2.5"
                   style={{ color: colors.textPrimary }}
                 >
-                  My Stats
+                  {t("home.myStatsTitle")}
                 </Text>
               </View>
 
-              {/* Avg resolution + most active dept */}
-              <View className="flex-row mb-4" style={{ gap: 8 }}>
+              <View style={{ gap: 8 }}>
                 {summary.avgResolutionTime != null && (
                   <View
-                    className="flex-1 rounded-2xl p-3"
+                    className="rounded-2xl p-3.5 flex-row items-center"
                     style={{
-                      backgroundColor: (colors.info || "#3B82F6") + "15",
+                      backgroundColor: colors.cardBackground,
+                      borderWidth: 1,
+                      borderColor: colors.border,
                     }}
                   >
-                    <Timer size={16} color={colors.info || "#3B82F6"} />
-                    <Text
-                      className="text-base font-extrabold mt-1"
-                      style={{ color: colors.textPrimary }}
+                    <View
+                      className="w-9 h-9 rounded-xl items-center justify-center mr-3"
+                      style={{
+                        backgroundColor: `${colors.info}20`,
+                      }}
                     >
-                      {avgLabel}
-                    </Text>
-                    <Text
-                      className="text-[11px] mt-0.5"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Avg resolution
-                    </Text>
-                  </View>
-                )}
-                {summary.mostActiveDepartment && (
-                  <View
-                    className="flex-1 rounded-2xl p-3"
-                    style={{
-                      backgroundColor: (colors.warning || "#F59E0B") + "15",
-                    }}
-                  >
-                    <Building2 size={16} color={colors.warning || "#F59E0B"} />
-                    <Text
-                      className="text-base font-extrabold mt-1"
-                      style={{ color: colors.textPrimary }}
-                      numberOfLines={1}
-                    >
-                      {summary.mostActiveDepartment}
-                    </Text>
-                    <Text
-                      className="text-[11px] mt-0.5"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Most active dept
-                    </Text>
+                      <Timer size={16} color={colors.info} />
+                    </View>
+                    <View>
+                      <Text
+                        className="text-xs font-semibold"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("home.avgResolution")}
+                      </Text>
+                      <Text
+                        className="text-base font-extrabold"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {avgLabel}
+                      </Text>
+                    </View>
                   </View>
                 )}
               </View>
 
-              {/* Monthly sparkline */}
               {trend.length > 0 && (
-                <>
-                  <Text
-                    className="text-xs font-semibold mb-2"
-                    style={{ color: colors.textSecondary }}
+                <View className="flex-row mt-3" style={{ gap: 10 }}>
+                  <View
+                    className="rounded-2xl p-3.5 flex-1"
+                    style={{
+                      backgroundColor: colors.cardBackground,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
                   >
-                    Monthly complaints (last 6 months)
-                  </Text>
-                  <Svg width={chartW} height={chartH + 16}>
-                    {trend.map((m, i) => {
-                      const barH =
-                        maxCount > 0
-                          ? Math.max(3, (m.count / maxCount) * chartH)
-                          : 3;
-                      const x = i * (barW + barGap);
-                      const y = chartH - barH;
-                      return (
-                        <React.Fragment key={i}>
-                          <Rect
-                            x={x}
-                            y={y}
-                            width={barW}
-                            height={barH}
-                            rx={4}
-                            fill={m.count > 0 ? colors.primary : colors.border}
-                            opacity={m.count > 0 ? 1 : 0.4}
-                          />
-                          <SvgText
-                            x={x + barW / 2}
-                            y={chartH + 13}
-                            fontSize={9}
-                            textAnchor="middle"
-                            fill={colors.textSecondary}
-                          >
-                            {MONTH_LABELS[m.month - 1]}
-                          </SvgText>
-                        </React.Fragment>
-                      );
-                    })}
-                  </Svg>
-                </>
+                    <Text
+                      className="text-xs font-semibold mb-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {t("home.monthlyComplaints")}
+                    </Text>
+
+                    <Svg width={monthChartW} height={monthChartH + 10}>
+                      {trend.map((m, i) => {
+                        const monthCount = Number(m.count ?? 0);
+                        const barW =
+                          maxCount > 0
+                            ? Math.max(
+                                4,
+                                (monthCount / maxCount) * monthBarAreaW,
+                              )
+                            : 4;
+                        const y = i * (monthRowH + monthRowGap);
+                        const monthLabel = String(
+                          MONTH_LABELS[m.month - 1] ?? "",
+                        ).slice(0, 3);
+
+                        return (
+                          <React.Fragment key={i}>
+                            <SvgText
+                              x={monthLabelW - 2}
+                              y={y + monthRowH - 1}
+                              fontSize={8}
+                              textAnchor="end"
+                              fill={colors.textSecondary}
+                            >
+                              {monthLabel}
+                            </SvgText>
+                            <Rect
+                              x={monthLabelW}
+                              y={y}
+                              width={monthBarAreaW}
+                              height={monthRowH}
+                              rx={4}
+                              fill={colors.border}
+                              opacity={0.5}
+                            />
+                            <Rect
+                              x={monthLabelW}
+                              y={y}
+                              width={barW}
+                              height={monthRowH}
+                              rx={4}
+                              fill={colors.primary}
+                            />
+                            <SvgText
+                              x={monthLabelW + monthBarAreaW + 4}
+                              y={y + monthRowH - 1}
+                              fontSize={8}
+                              textAnchor="start"
+                              fill={colors.textPrimary}
+                            >
+                              {monthCount}
+                            </SvgText>
+                          </React.Fragment>
+                        );
+                      })}
+                    </Svg>
+                  </View>
+
+                  <View
+                    className="rounded-2xl p-3"
+                    style={{
+                      width: 140,
+                      backgroundColor: colors.cardBackground,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Text
+                      className="text-xs font-semibold mb-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {t("home.departmentComplaints")}
+                    </Text>
+
+                    {departmentData.length > 0 ? (
+                      <Svg width={deptChartW} height={deptChartH + 10}>
+                        {departmentData.map((item, index) => {
+                          const count = Number(item.count ?? 0);
+                          const barW =
+                            departmentMax > 0
+                              ? Math.max(
+                                  4,
+                                  (count / departmentMax) * deptBarAreaW,
+                                )
+                              : 4;
+                          const y = index * (deptRowH + deptRowGap);
+                          const shortLabel = String(
+                            item.department ?? "",
+                          ).slice(0, 3);
+
+                          return (
+                            <React.Fragment key={item.department}>
+                              <SvgText
+                                x={deptLabelW - 2}
+                                y={y + deptRowH - 1}
+                                fontSize={8}
+                                textAnchor="end"
+                                fill={colors.textSecondary}
+                              >
+                                {shortLabel}
+                              </SvgText>
+                              <Rect
+                                x={deptLabelW}
+                                y={y}
+                                width={deptBarAreaW}
+                                height={deptRowH}
+                                rx={4}
+                                fill={colors.border}
+                                opacity={0.5}
+                              />
+                              <Rect
+                                x={deptLabelW}
+                                y={y}
+                                width={barW}
+                                height={deptRowH}
+                                rx={4}
+                                fill={colors.primary}
+                              />
+                              <SvgText
+                                x={deptLabelW + deptBarAreaW + 4}
+                                y={y + deptRowH - 1}
+                                fontSize={8}
+                                textAnchor="start"
+                                fill={colors.textPrimary}
+                              >
+                                {count}
+                              </SvgText>
+                            </React.Fragment>
+                          );
+                        })}
+                      </Svg>
+                    ) : (
+                      <Text
+                        className="text-[11px]"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("home.noDepartmentData")}
+                      </Text>
+                    )}
+                  </View>
+                </View>
               )}
             </View>
           );
@@ -538,7 +731,7 @@ export default function Home() {
       </View>
 
       {/* Nearby Complaints Section */}
-      {(nearbyLoading || nearbyComplaints.length > 0) && (
+      {showNearbySection && (
         <View className="mb-6">
           <View className="flex-row items-center mb-3">
             <MapPin
@@ -550,7 +743,7 @@ export default function Home() {
               className="text-xl font-extrabold"
               style={{ color: colors.textPrimary }}
             >
-              Nearby Open Issues
+              {t("home.nearby.title")}
             </Text>
           </View>
           <View
@@ -585,12 +778,19 @@ export default function Home() {
                     className="flex-1"
                   >
                     <View className="flex-row items-center mb-1">
-                      <Text
-                        className="text-xs font-bold mr-2"
-                        style={{ color: colors.primary }}
-                      >
-                        #{item.ticketId}
-                      </Text>
+                      <View className="flex-row items-center mr-2">
+                        <ListChecks
+                          size={12}
+                          color={colors.primary}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text
+                          className="text-xs font-bold"
+                          style={{ color: colors.primary }}
+                        >
+                          {item.ticketId}
+                        </Text>
+                      </View>
                       <View
                         className="px-2 py-0.5 rounded-md mr-2"
                         style={{
@@ -610,7 +810,9 @@ export default function Home() {
                         className="text-[10px]"
                         style={{ color: colors.textSecondary }}
                       >
-                        {item.distance} km away
+                        {t("home.nearby.distanceAway", {
+                          distance: item.distance ?? 0,
+                        })}
                       </Text>
                     </View>
                     <Text
@@ -618,14 +820,36 @@ export default function Home() {
                       style={{ color: colors.textPrimary }}
                       numberOfLines={1}
                     >
-                      {item.refinedText || item.rawText || "Complaint"}
+                      {item.refinedText ??
+                        item.rawText ??
+                        t("home.nearby.complaintFallback")}
                     </Text>
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {item.department} • {item.locationName || "Nearby"}
-                    </Text>
+                    <View className="flex-row items-center">
+                      <Building2
+                        size={11}
+                        color={colors.textSecondary}
+                        style={{ marginRight: 4 }}
+                      />
+                      <Text
+                        className="text-xs mr-3"
+                        style={{ color: colors.textSecondary }}
+                        numberOfLines={1}
+                      >
+                        {item.department ?? t("home.nearby.departmentFallback")}
+                      </Text>
+                      <MapPin
+                        size={11}
+                        color={colors.textSecondary}
+                        style={{ marginRight: 4 }}
+                      />
+                      <Text
+                        className="text-xs flex-1"
+                        style={{ color: colors.textSecondary }}
+                        numberOfLines={1}
+                      >
+                        {item.locationName ?? t("home.nearby.locationFallback")}
+                      </Text>
+                    </View>
                   </Pressable>
                   <Pressable
                     onPress={() => handleNearbyUpvote(item._id)}
@@ -636,7 +860,7 @@ export default function Home() {
                       className="text-xs font-bold mt-0.5"
                       style={{ color: colors.primary }}
                     >
-                      {item.upvoteCount || 0}
+                      {item.upvoteCount ?? 0}
                     </Text>
                   </Pressable>
                 </View>
@@ -666,7 +890,7 @@ export default function Home() {
               className="text-sm font-semibold"
               style={{ color: colors.primary }}
             >
-              See Map
+              {t("home.seeMap")}
             </Text>
             <ChevronRight
               size={16}
@@ -695,7 +919,7 @@ export default function Home() {
                 className="text-sm font-medium mt-2"
                 style={{ color: colors.textSecondary }}
               >
-                No hotspot data
+                {t("home.noHotspotData")}
               </Text>
             </View>
           ) : (
@@ -750,7 +974,7 @@ export default function Home() {
                         >
                           {spot.totalComplaints}
                         </Text>{" "}
-                        total
+                        {t("home.metricLabels.total")}
                       </Text>
                       <Text
                         className="text-xs mr-3"
@@ -761,7 +985,7 @@ export default function Home() {
                         >
                           {spot.openComplaints}
                         </Text>{" "}
-                        open
+                        {t("home.metricLabels.open")}
                       </Text>
                       <Text
                         className="text-xs"
@@ -772,7 +996,7 @@ export default function Home() {
                         >
                           {spot.highPriorityComplaints}
                         </Text>{" "}
-                        high
+                        {t("home.metricLabels.high")}
                       </Text>
                     </View>
                   </View>

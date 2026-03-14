@@ -1,9 +1,13 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 require("dotenv").config();
 const User = require("./models/User");
 const Complaint = require("./models/Complaint");
 const WorkerInvitation = require("./models/WorkerInvitation");
+const Notification = require("./models/Notification");
+const ReportSchedule = require("./models/ReportSchedule");
+const FestivalEvent = require("./models/FestivalEvent");
 
 // Indore areas with accurate coordinates - Expanded list for better coverage
 const indoreAreas = [
@@ -89,6 +93,262 @@ function getLocationForArea(areaName) {
 function getRandomLocation() {
   const area = indoreAreas[Math.floor(Math.random() * indoreAreas.length)];
   return getLocationForArea(area.name);
+}
+
+const LAST_60_DAYS = 60;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+const TOTAL_COMPLAINTS = Math.max(
+  200,
+  Number.parseInt(process.env.SEED_COMPLAINTS || "800", 10) || 800,
+);
+
+const LANGUAGE_WEIGHTS = [
+  { value: "en", weight: 0.56 },
+  { value: "hi", weight: 0.34 },
+  { value: "mr", weight: 0.05 },
+  { value: "gu", weight: 0.03 },
+  { value: "ur", weight: 0.02 },
+];
+
+function pickWeighted(options = []) {
+  const totalWeight = options.reduce(
+    (sum, item) => sum + (item.weight || 0),
+    0,
+  );
+  if (totalWeight <= 0) return options[0]?.value;
+  const random = Math.random() * totalWeight;
+  let running = 0;
+  for (const option of options) {
+    running += option.weight || 0;
+    if (random <= running) return option.value;
+  }
+  return options[options.length - 1]?.value;
+}
+
+function getRandomPreferredLanguage() {
+  return pickWeighted(LANGUAGE_WEIGHTS) || "en";
+}
+
+function getRandomNotificationPreferences(role = "user") {
+  const base = {
+    complaintsUpdates: true,
+    assignments: role === "worker" || role === "head" || role === "admin",
+    escalations: role === "head" || role === "admin",
+    systemAlerts: true,
+  };
+
+  return {
+    complaintsUpdates:
+      Math.random() < 0.92 ? base.complaintsUpdates : !base.complaintsUpdates,
+    assignments: Math.random() < 0.94 ? base.assignments : !base.assignments,
+    escalations: Math.random() < 0.9 ? base.escalations : !base.escalations,
+    systemAlerts: Math.random() < 0.96 ? base.systemAlerts : !base.systemAlerts,
+  };
+}
+
+function toDateOnly(date) {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+function getCronExpressionForFrequency(frequency, hour = 9) {
+  const safeHour = Math.max(0, Math.min(23, Number(hour) || 9));
+  if (frequency === "daily") return `0 ${safeHour} * * *`;
+  if (frequency === "weekly") return `0 ${safeHour} * * 1`;
+  return `0 ${safeHour} 1 * *`;
+}
+
+function getRandomDateBetween(startDate, endDate) {
+  const startMs = new Date(startDate).getTime();
+  const endMs = new Date(endDate).getTime();
+
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return new Date();
+  }
+
+  if (endMs <= startMs) {
+    return new Date(startMs);
+  }
+
+  return new Date(startMs + Math.random() * (endMs - startMs));
+}
+
+function getDateWithinLastDays(minDaysAgo, maxDaysAgo, now = new Date()) {
+  const oldest = new Date(now.getTime() - maxDaysAgo * ONE_DAY_MS);
+  const newest = new Date(now.getTime() - minDaysAgo * ONE_DAY_MS);
+  return getRandomDateBetween(oldest, newest);
+}
+
+function getRequiredAgeHoursByStatus(status) {
+  if (status === "resolved") return 120;
+  if (status === "pending-approval") return 72;
+  if (status === "needs-rework") return 72;
+  if (status === "in-progress") return 48;
+  if (status === "assigned") return 30;
+  if (status === "cancelled") return 24;
+  return 0;
+}
+
+function getComplaintCreatedAt(status, now = new Date()) {
+  const bucket = Math.random();
+  let minDaysAgo = 0;
+  let maxDaysAgo = LAST_60_DAYS - 1;
+
+  if (bucket < 0.45) {
+    minDaysAgo = 0;
+    maxDaysAgo = 7;
+  } else if (bucket < 0.8) {
+    minDaysAgo = 8;
+    maxDaysAgo = 30;
+  } else {
+    minDaysAgo = 31;
+    maxDaysAgo = LAST_60_DAYS - 1;
+  }
+
+  const requiredMinDaysAgo = getRequiredAgeHoursByStatus(status) / 24;
+  if (minDaysAgo < requiredMinDaysAgo) {
+    minDaysAgo = requiredMinDaysAgo;
+    if (maxDaysAgo < minDaysAgo) {
+      maxDaysAgo = minDaysAgo;
+    }
+  }
+
+  const createdAt = getDateWithinLastDays(minDaysAgo, maxDaysAgo, now);
+  const ageInDays = Math.floor(
+    (now.getTime() - createdAt.getTime()) / ONE_DAY_MS,
+  );
+
+  return {
+    createdAt,
+    daysAgo: Math.max(ageInDays, 0),
+  };
+}
+
+function createStageTimestamp(
+  previousTimestamp,
+  minHours,
+  maxHours,
+  now = new Date(),
+) {
+  const earliest = new Date(
+    previousTimestamp.getTime() + minHours * ONE_HOUR_MS,
+  );
+  const latestCandidate = new Date(
+    previousTimestamp.getTime() + maxHours * ONE_HOUR_MS,
+  );
+  const latest = latestCandidate > now ? now : latestCandidate;
+
+  if (latest <= earliest) {
+    return now > earliest ? earliest : new Date(now);
+  }
+
+  return getRandomDateBetween(earliest, latest);
+}
+
+function getLatestComplaintTimestamp(complaint, now = new Date()) {
+  const values = [];
+  const addTimestamp = (value) => {
+    if (!value) return;
+    const ts = new Date(value);
+    if (!Number.isNaN(ts.getTime())) {
+      values.push(ts);
+    }
+  };
+
+  addTimestamp(complaint.createdAt);
+  addTimestamp(complaint.assignedAt);
+  addTimestamp(complaint.resolvedAt);
+
+  (complaint.history || []).forEach((entry) => addTimestamp(entry.timestamp));
+  (complaint.assignedWorkers || []).forEach((entry) => {
+    addTimestamp(entry.assignedAt);
+    addTimestamp(entry.completedAt);
+  });
+
+  if (complaint.feedback) {
+    addTimestamp(complaint.feedback.ratedAt);
+  }
+
+  if (complaint.sla && Array.isArray(complaint.sla.escalationHistory)) {
+    complaint.sla.escalationHistory.forEach((entry) =>
+      addTimestamp(entry.escalatedAt),
+    );
+  }
+
+  if (values.length === 0) {
+    return new Date(now);
+  }
+
+  const latest = values.reduce(
+    (max, value) => (value > max ? value : max),
+    values[0],
+  );
+  return latest > now ? new Date(now) : latest;
+}
+
+function syncComplaintTimestamps(complaint, now = new Date()) {
+  const resolvedEntry = (complaint.history || []).find(
+    (entry) => entry.status === "resolved",
+  );
+  complaint.resolvedAt = resolvedEntry ? resolvedEntry.timestamp : null;
+
+  if (complaint.sla && Array.isArray(complaint.sla.escalationHistory)) {
+    const lastEscalation = complaint.sla.escalationHistory
+      .map((entry) => entry.escalatedAt)
+      .filter(Boolean)
+      .sort((a, b) => new Date(a) - new Date(b))
+      .pop();
+    complaint.sla.lastEscalatedAt = lastEscalation || null;
+  }
+
+  complaint.updatedAt = getLatestComplaintTimestamp(complaint, now);
+  return complaint;
+}
+
+function getUserSeedTimestamps(now = new Date()) {
+  const createdAt = getDateWithinLastDays(0, LAST_60_DAYS - 1, now);
+  const updatedAt = getRandomDateBetween(createdAt, now);
+  const lastActive = getRandomDateBetween(updatedAt, now);
+
+  return {
+    createdAt,
+    updatedAt,
+    lastActive,
+    tokenValidFrom: createdAt,
+  };
+}
+
+function getInvitationSeedTimeline(status, now = new Date()) {
+  let sentAt;
+  let acceptedAt = null;
+  let revokedAt = null;
+
+  if (status === "pending") {
+    sentAt = getDateWithinLastDays(1, 6, now);
+  } else if (status === "accepted") {
+    sentAt = getDateWithinLastDays(10, 50, now);
+    acceptedAt = createStageTimestamp(sentAt, 12, 72, now);
+  } else if (status === "expired") {
+    sentAt = getDateWithinLastDays(15, LAST_60_DAYS - 1, now);
+  } else {
+    sentAt = getDateWithinLastDays(5, 40, now);
+    revokedAt = createStageTimestamp(sentAt, 12, 96, now);
+  }
+
+  let expiresAt = new Date(sentAt.getTime() + 7 * ONE_DAY_MS);
+  if (status === "expired" && expiresAt > now) {
+    expiresAt = new Date(now.getTime() - ONE_HOUR_MS);
+  }
+
+  const updatedAt = revokedAt || acceptedAt || sentAt;
+
+  return {
+    sentAt,
+    expiresAt,
+    acceptedAt,
+    revokedAt,
+    updatedAt,
+  };
 }
 
 // Department-specific task descriptions for assigned workers
@@ -689,15 +949,17 @@ function generateComplaint(userId, ticketNum, allUsers) {
   }
 
   // More realistic status distribution
-  // pending: 40%, assigned: 24%, in-progress: 18%, needs-rework: 3%, resolved: 12%, cancelled: 3%
+  // pending: 34%, assigned: 20%, in-progress: 17%, pending-approval: 10%, needs-rework: 4%, resolved: 12%, cancelled: 3%
   const statusRandom = Math.random();
   let status;
-  if (statusRandom < 0.4) {
+  if (statusRandom < 0.34) {
     status = "pending";
-  } else if (statusRandom < 0.64) {
+  } else if (statusRandom < 0.54) {
     status = "assigned";
-  } else if (statusRandom < 0.82) {
+  } else if (statusRandom < 0.71) {
     status = "in-progress";
+  } else if (statusRandom < 0.81) {
+    status = "pending-approval";
   } else if (statusRandom < 0.85) {
     status = "needs-rework";
   } else if (statusRandom < 0.97) {
@@ -706,22 +968,8 @@ function generateComplaint(userId, ticketNum, allUsers) {
     status = "cancelled";
   }
 
-  // More realistic temporal distribution (weighted towards recent)
-  // 40% in last week, 30% in last month, 30% older
-  const timeRandom = Math.random();
-  let daysAgo;
-  if (timeRandom < 0.4) {
-    // Last 7 days
-    daysAgo = Math.floor(Math.random() * 7);
-  } else if (timeRandom < 0.7) {
-    // 7-30 days ago
-    daysAgo = 7 + Math.floor(Math.random() * 23);
-  } else {
-    // 30-90 days ago
-    daysAgo = 30 + Math.floor(Math.random() * 60);
-  }
-  const createdAt = new Date();
-  createdAt.setDate(createdAt.getDate() - daysAgo);
+  const now = new Date();
+  const { createdAt, daysAgo } = getComplaintCreatedAt(status, now);
 
   // More realistic upvote distribution
   // Recent and high priority complaints get more upvotes
@@ -744,7 +992,6 @@ function generateComplaint(userId, ticketNum, allUsers) {
     userId: userId,
     rawText: `${template.title}: ${description}`,
     refinedText: description,
-    description: description,
     department: department,
     coordinates: { lat: locationData.lat, lng: locationData.lng },
     locationName: `${locationData.name}, Indore`,
@@ -753,7 +1000,7 @@ function generateComplaint(userId, ticketNum, allUsers) {
     upvotes: upvotesArray,
     upvoteCount: upvotesArray.length,
     createdAt: createdAt,
-    updatedAt: new Date(),
+    updatedAt: createdAt,
     proofImage: [], // Will be populated below
   };
 
@@ -903,12 +1150,15 @@ function generateComplaint(userId, ticketNum, allUsers) {
   ];
 
   if (
-    ["assigned", "in-progress", "needs-rework", "resolved"].includes(status)
+    [
+      "assigned",
+      "in-progress",
+      "pending-approval",
+      "needs-rework",
+      "resolved",
+    ].includes(status)
   ) {
-    const assignedDate = new Date(createdAt);
-    assignedDate.setHours(
-      assignedDate.getHours() + Math.floor(Math.random() * 24),
-    );
+    const assignedDate = createStageTimestamp(createdAt, 1, 24, now);
     complaint.history.push({
       status: "assigned",
       updatedBy: null, // patched in main loop with actual HOD/worker id
@@ -917,12 +1167,16 @@ function generateComplaint(userId, ticketNum, allUsers) {
     });
   }
 
-  if (["in-progress", "needs-rework", "resolved"].includes(status)) {
-    const inProgressDate = new Date(
+  if (
+    ["in-progress", "pending-approval", "needs-rework", "resolved"].includes(
+      status,
+    )
+  ) {
+    const inProgressDate = createStageTimestamp(
       complaint.history[complaint.history.length - 1].timestamp,
-    );
-    inProgressDate.setHours(
-      inProgressDate.getHours() + Math.floor(Math.random() * 12),
+      1,
+      12,
+      now,
     );
     complaint.history.push({
       status: "in-progress",
@@ -933,11 +1187,11 @@ function generateComplaint(userId, ticketNum, allUsers) {
   }
 
   if (status === "needs-rework") {
-    const approvalDate = new Date(
+    const approvalDate = createStageTimestamp(
       complaint.history[complaint.history.length - 1].timestamp,
-    );
-    approvalDate.setHours(
-      approvalDate.getHours() + Math.floor(Math.random() * 12),
+      1,
+      12,
+      now,
     );
     complaint.history.push({
       status: "pending-approval",
@@ -945,25 +1199,51 @@ function generateComplaint(userId, ticketNum, allUsers) {
       timestamp: approvalDate,
       note: "Worker submitted work for HOD approval",
     });
-
-    const reworkDate = new Date(approvalDate);
-    reworkDate.setHours(
-      reworkDate.getHours() + Math.floor(Math.random() * 12) + 1,
-    );
+    const reworkDate = createStageTimestamp(approvalDate, 1, 12, now);
     complaint.history.push({
       status: "needs-rework",
       updatedBy: null, // HOD rejected
       timestamp: reworkDate,
-      note: "Head of Depatment reviewed and sent back for rework",
+      note: "Head of Department reviewed and sent back for rework",
+    });
+  }
+
+  if (status === "pending-approval") {
+    const approvalDate = createStageTimestamp(
+      complaint.history[complaint.history.length - 1].timestamp,
+      1,
+      12,
+      now,
+    );
+    complaint.history.push({
+      status: "pending-approval",
+      updatedBy: null,
+      timestamp: approvalDate,
+      note: "Worker submitted work for HOD approval",
     });
   }
 
   if (status === "resolved") {
-    const resolvedDate = new Date(
+    if (Math.random() < 0.75) {
+      const approvalDate = createStageTimestamp(
+        complaint.history[complaint.history.length - 1].timestamp,
+        1,
+        12,
+        now,
+      );
+      complaint.history.push({
+        status: "pending-approval",
+        updatedBy: null,
+        timestamp: approvalDate,
+        note: "Worker submitted work for HOD approval",
+      });
+    }
+
+    const resolvedDate = createStageTimestamp(
       complaint.history[complaint.history.length - 1].timestamp,
-    );
-    resolvedDate.setHours(
-      resolvedDate.getHours() + Math.floor(Math.random() * 48),
+      1,
+      48,
+      now,
     );
     complaint.history.push({
       status: "resolved",
@@ -997,18 +1277,13 @@ function generateComplaint(userId, ticketNum, allUsers) {
         rating: rating,
         comment: randomComment,
         ratedBy: userId,
-        ratedAt: new Date(
-          resolvedDate.getTime() + 3600000 * (Math.random() * 24 + 1),
-        ), // 1-25 hours after resolution
+        ratedAt: createStageTimestamp(resolvedDate, 1, 25, now),
       };
     }
   }
 
   if (status === "cancelled") {
-    const cancelledDate = new Date(createdAt);
-    cancelledDate.setHours(
-      cancelledDate.getHours() + Math.floor(Math.random() * 12) + 1,
-    );
+    const cancelledDate = createStageTimestamp(createdAt, 1, 12, now);
     complaint.history.push({
       status: "cancelled",
       updatedBy: null,
@@ -1023,7 +1298,6 @@ function generateComplaint(userId, ticketNum, allUsers) {
   const slaDeadline = new Date(createdAt);
   slaDeadline.setHours(slaDeadline.getHours() + slaHours);
 
-  const now = new Date();
   const isTerminal = status === "resolved" || status === "cancelled";
   const isOverdue = !isTerminal && slaDeadline < now;
   // escalate overdue active complaints (not all at once — ~70% actually escalated)
@@ -1038,6 +1312,8 @@ function generateComplaint(userId, ticketNum, allUsers) {
     // escalationHistory is patched in main loop (needs HOD id)
     escalationHistory: [],
   };
+
+  syncComplaintTimestamps(complaint, now);
   // ─────────────────────────────────────────────────────────────────────
 
   return complaint;
@@ -1055,6 +1331,9 @@ async function seedDatabase() {
     await User.deleteMany({});
     await Complaint.deleteMany({});
     await WorkerInvitation.deleteMany({});
+    await Notification.deleteMany({});
+    await ReportSchedule.deleteMany({});
+    await FestivalEvent.deleteMany({});
     console.log("✅ Existing data cleared");
 
     // Create users
@@ -1072,6 +1351,10 @@ async function seedDatabase() {
         email: `admin${i}@indore.gov.in`,
         phone: `91${9000000000 + i}`,
         fullName: `Admin ${i}`,
+        emailVerified: true,
+        preferredLanguage: "en",
+        notificationPreferences: getRandomNotificationPreferences("admin"),
+        ...getUserSeedTimestamps(),
       });
     }
 
@@ -1079,21 +1362,26 @@ async function seedDatabase() {
     const departments = ["Road", "Water", "Electricity", "Waste", "Drainage"];
     departments.forEach((dept, idx) => {
       users.push({
-        username: `hod_${dept}`,
+        username: `hod_${dept.toLowerCase()}`,
         password: hashedPassword,
         role: "head",
         department: dept,
         email: `hod.${dept}@indore.gov.in`,
         phone: `91${9100000000 + idx}`,
         fullName: `HOD ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+        emailVerified: true,
+        preferredLanguage: Math.random() < 0.65 ? "hi" : "en",
+        notificationPreferences: getRandomNotificationPreferences("head"),
+        ...getUserSeedTimestamps(),
       });
     });
 
     // Worker users (30 - 6 per department for better load distribution)
     for (let dept of departments) {
       for (let i = 1; i <= 6; i++) {
+        const location = getRandomLocation();
         users.push({
-          username: `worker_${dept}_${i}`,
+          username: `worker_${dept.toLowerCase()}_${i}`,
           password: hashedPassword,
           role: "worker",
           department: dept,
@@ -1105,12 +1393,22 @@ async function seedDatabase() {
             totalCompleted: Math.floor(Math.random() * 50),
             averageCompletionTime: 12 + Math.random() * 24,
             currentWeekCompleted: Math.floor(Math.random() * 10),
+            customerRating: 3.8 + Math.random() * 1.2,
           },
+          workLocation: {
+            lat: location.lat,
+            lng: location.lng,
+            address: `${location.name}, Indore`,
+          },
+          emailVerified: true,
+          preferredLanguage: Math.random() < 0.7 ? "hi" : "en",
+          notificationPreferences: getRandomNotificationPreferences("worker"),
+          ...getUserSeedTimestamps(),
         });
       }
     }
 
-    // Regular user accounts (150 - more realistic for 2000 complaints)
+    // Regular user accounts (150 citizens for realistic complaint spread)
     const firstNames = [
       "Rahul",
       "Priya",
@@ -1214,7 +1512,10 @@ async function seedDatabase() {
         email: `user${i}@example.com`,
         phone: `91${8000000000 + i}`,
         fullName: `${firstName} ${lastName}`,
-        emailVerified: true,
+        emailVerified: Math.random() < 0.9,
+        preferredLanguage: getRandomPreferredLanguage(),
+        notificationPreferences: getRandomNotificationPreferences("user"),
+        ...getUserSeedTimestamps(),
       });
     }
 
@@ -1240,18 +1541,22 @@ async function seedDatabase() {
     const workers = createdUsers.filter((u) => u.role === "worker");
     const hods = createdUsers.filter((u) => u.role === "head");
 
-    // Generate 2000 complaints with realistic distribution
+    // Generate complaints with realistic distribution
     let multiWorkerCount = 0;
-    for (let i = 1; i <= 2000; i++) {
+    for (let i = 1; i <= TOTAL_COMPLAINTS; i++) {
       const randomUser =
         regularUsers[Math.floor(Math.random() * regularUsers.length)];
       const complaint = generateComplaint(randomUser._id, i, regularUsers);
 
       // Assign worker if status is assigned or beyond
       if (
-        ["assigned", "in-progress", "needs-rework", "resolved"].includes(
-          complaint.status,
-        )
+        [
+          "assigned",
+          "in-progress",
+          "pending-approval",
+          "needs-rework",
+          "resolved",
+        ].includes(complaint.status)
       ) {
         const deptWorkers = workers.filter(
           (w) => w.department === complaint.department,
@@ -1289,20 +1594,30 @@ async function seedDatabase() {
           const primaryTaskStatus =
             complaint.status === "resolved"
               ? "completed"
-              : complaint.status === "in-progress"
-                ? "in-progress"
-                : "assigned";
+              : complaint.status === "pending-approval"
+                ? "completed"
+                : complaint.status === "needs-rework"
+                  ? "needs-rework"
+                  : complaint.status === "in-progress"
+                    ? "in-progress"
+                    : "assigned";
+
+          const completedAtTimestamp = [
+            "resolved",
+            "pending-approval",
+          ].includes(complaint.status)
+            ? complaint.history.find((h) => h.status === "pending-approval")
+                ?.timestamp ||
+              complaint.history.find((h) => h.status === "resolved")?.timestamp
+            : null;
+
           complaint.assignedWorkers = [
             {
               workerId: assignedWorker._id,
               assignedAt: complaint.assignedAt,
               taskDescription: getTaskDescription(complaint.department),
               status: primaryTaskStatus,
-              completedAt:
-                complaint.status === "resolved"
-                  ? complaint.history.find((h) => h.status === "resolved")
-                      ?.timestamp
-                  : null,
+              completedAt: completedAtTimestamp,
               notes: getWorkerNotes(primaryTaskStatus),
             },
           ];
@@ -1321,19 +1636,19 @@ async function seedDatabase() {
               const secondTaskStatus =
                 complaint.status === "resolved"
                   ? "completed"
-                  : complaint.status === "in-progress"
-                    ? "in-progress"
-                    : "assigned";
+                  : complaint.status === "pending-approval"
+                    ? "completed"
+                    : complaint.status === "needs-rework"
+                      ? "needs-rework"
+                      : complaint.status === "in-progress"
+                        ? "in-progress"
+                        : "assigned";
               complaint.assignedWorkers.push({
                 workerId: secondWorker._id,
                 assignedAt: complaint.assignedAt,
                 taskDescription: getTaskDescription(complaint.department),
                 status: secondTaskStatus,
-                completedAt:
-                  complaint.status === "resolved"
-                    ? complaint.history.find((h) => h.status === "resolved")
-                        ?.timestamp
-                    : null,
+                completedAt: completedAtTimestamp,
                 notes: getWorkerNotes(secondTaskStatus),
               });
 
@@ -1370,7 +1685,7 @@ async function seedDatabase() {
             );
             complaint.sla.escalationHistory.push({
               level: lvl,
-              escalatedAt,
+              escalatedAt: escalatedAt > new Date() ? new Date() : escalatedAt,
               escalatedTo: deptHod._id,
             });
           }
@@ -1400,8 +1715,6 @@ async function seedDatabase() {
         complaint.satisfactionVotes = {
           thumbsUp: [],
           thumbsDown: [],
-          thumbsUpCount: 0,
-          thumbsDownCount: 0,
         };
 
         // Add random votes (more thumbs up than down for realistic data)
@@ -1417,10 +1730,8 @@ async function seedDatabase() {
 
           if (isPositive) {
             complaint.satisfactionVotes.thumbsUp.push(voter._id);
-            complaint.satisfactionVotes.thumbsUpCount++;
           } else {
             complaint.satisfactionVotes.thumbsDown.push(voter._id);
-            complaint.satisfactionVotes.thumbsDownCount++;
           }
 
           // Remove voter from available voters to avoid duplicate votes
@@ -1428,10 +1739,12 @@ async function seedDatabase() {
         }
       }
 
+      syncComplaintTimestamps(complaint);
+
       complaints.push(complaint);
 
-      if (i % 250 === 0) {
-        console.log(`   Generated ${i}/2000 complaints...`);
+      if (i % 200 === 0) {
+        console.log(`   Generated ${i}/${TOTAL_COMPLAINTS} complaints...`);
       }
     }
 
@@ -1468,56 +1781,30 @@ async function seedDatabase() {
       `   - ${createdComplaints.filter((c) => c.completionPhotos && c.completionPhotos.length > 0).length} With completion photos`,
     );
     console.log(
-      `   - ${createdComplaints.filter((c) => c.satisfactionVotes && (c.satisfactionVotes.thumbsUpCount > 0 || c.satisfactionVotes.thumbsDownCount > 0)).length} With satisfaction votes`,
+      `   - ${createdComplaints.filter((c) => c.satisfactionVotes && ((c.satisfactionVotes.thumbsUp || []).length > 0 || (c.satisfactionVotes.thumbsDown || []).length > 0)).length} With satisfaction votes`,
     );
-
-    // Update worker assigned complaints
-    console.log("\n🔄 Updating worker assignments...");
-    for (const worker of workers) {
-      const assignedComplaints = createdComplaints.filter((c) => {
-        // Check assignedWorkers array
-        const isInAssignedWorkers = c.assignedWorkers?.some(
-          (w) => w.workerId.toString() === worker._id.toString(),
-        );
-        return isInAssignedWorkers;
-      });
-
-      worker.assignedComplaints = assignedComplaints
-        .filter((c) =>
-          ["assigned", "in-progress", "needs-rework"].includes(c.status),
-        )
-        .map((c) => c._id);
-
-      worker.completedComplaints = assignedComplaints
-        .filter((c) => c.status === "resolved")
-        .map((c) => c._id);
-
-      await worker.save();
-    }
-    console.log("✅ Worker assignments updated");
 
     // ── Seed Worker Invitations ────────────────────────────────────────
     console.log("\n📧 Seeding worker invitations...");
-    const crypto = require("crypto");
     const now = new Date();
 
     const invitationTemplates = [
       // pending
-      { offsetDays: 5, status: "pending", emailPrefix: "priya.sharma" },
-      { offsetDays: 3, status: "pending", emailPrefix: "rahul.verma" },
-      { offsetDays: 6, status: "pending", emailPrefix: "amit.joshi" },
-      { offsetDays: 2, status: "pending", emailPrefix: "neha.gupta" },
-      { offsetDays: 7, status: "pending", emailPrefix: "suresh.patel" },
+      { status: "pending", emailPrefix: "priya.sharma" },
+      { status: "pending", emailPrefix: "rahul.verma" },
+      { status: "pending", emailPrefix: "amit.joshi" },
+      { status: "pending", emailPrefix: "neha.gupta" },
+      { status: "pending", emailPrefix: "suresh.patel" },
       // accepted
-      { offsetDays: -3, status: "accepted", emailPrefix: "kavita.singh" },
-      { offsetDays: -5, status: "accepted", emailPrefix: "manish.tiwari" },
-      { offsetDays: -2, status: "accepted", emailPrefix: "pooja.mishra" },
+      { status: "accepted", emailPrefix: "kavita.singh" },
+      { status: "accepted", emailPrefix: "manish.tiwari" },
+      { status: "accepted", emailPrefix: "pooja.mishra" },
       // expired
-      { offsetDays: -8, status: "expired", emailPrefix: "dinesh.yadav" },
-      { offsetDays: -9, status: "expired", emailPrefix: "sunita.pandey" },
+      { status: "expired", emailPrefix: "dinesh.yadav" },
+      { status: "expired", emailPrefix: "sunita.pandey" },
       // revoked
-      { offsetDays: 4, status: "revoked", emailPrefix: "vikas.rawat" },
-      { offsetDays: 3, status: "revoked", emailPrefix: "anita.chauhan" },
+      { status: "revoked", emailPrefix: "vikas.rawat" },
+      { status: "revoked", emailPrefix: "anita.chauhan" },
     ];
 
     const invitations = [];
@@ -1527,17 +1814,7 @@ async function seedDatabase() {
         (_, i) => i % hods.length === hodIdx,
       );
       for (const tpl of slice) {
-        const sentAt = new Date(now);
-        sentAt.setDate(
-          sentAt.getDate() -
-            (tpl.status === "pending" ? 1 : Math.abs(tpl.offsetDays) + 1),
-        );
-
-        const expiresAt = new Date(sentAt);
-        expiresAt.setDate(expiresAt.getDate() + 7);
-        if (tpl.status === "expired") {
-          expiresAt.setDate(sentAt.getDate() - 1); // already past
-        }
+        const timeline = getInvitationSeedTimeline(tpl.status, now);
 
         const inv = {
           email: `${tpl.emailPrefix}.${hod.department.toLowerCase()}@gmail.com`,
@@ -1547,22 +1824,12 @@ async function seedDatabase() {
             .createHash("sha256")
             .update(`${hod._id}-${tpl.emailPrefix}-${hodIdx}-${Math.random()}`)
             .digest("hex"),
-          expiresAt,
-          createdAt: sentAt,
-          updatedAt: sentAt,
-          acceptedAt: null,
-          revokedAt: null,
+          expiresAt: timeline.expiresAt,
+          createdAt: timeline.sentAt,
+          updatedAt: timeline.updatedAt,
+          acceptedAt: timeline.acceptedAt,
+          revokedAt: timeline.revokedAt,
         };
-
-        if (tpl.status === "accepted") {
-          const acceptedAt = new Date(sentAt);
-          acceptedAt.setDate(acceptedAt.getDate() + 2);
-          inv.acceptedAt = acceptedAt;
-        } else if (tpl.status === "revoked") {
-          const revokedAt = new Date(now);
-          revokedAt.setDate(revokedAt.getDate() - 1);
-          inv.revokedAt = revokedAt;
-        }
 
         invitations.push(inv);
       }
@@ -1581,12 +1848,191 @@ async function seedDatabase() {
       `✅ Created ${invitations.length} worker invitations (${pendingCount} pending, ${acceptedCount} accepted, ${revokedCount} revoked, ${expiredCount} expired)`,
     );
 
+    // ── Seed Festival Events ───────────────────────────────────────────
+    console.log("\n🎊 Seeding festival events...");
+    const currentYear = new Date().getFullYear();
+    const festivalEvents = [
+      {
+        name: "Holi Celebration",
+        startDate: `${currentYear}-03-12`,
+        endDate: `${currentYear}-03-16`,
+        highPriorityLocations: ["Rajwada", "Sarafa Bazaar", "Bhawarkua"],
+        priority: "High",
+        isActive: true,
+      },
+      {
+        name: "Rang Panchami Procession",
+        startDate: `${currentYear}-03-19`,
+        endDate: `${currentYear}-03-20`,
+        highPriorityLocations: ["Rajwada", "Chhoti Gwaltoli"],
+        priority: "Critical",
+        isActive: true,
+      },
+      {
+        name: "Navratri Garba",
+        startDate: `${currentYear}-10-01`,
+        endDate: `${currentYear}-10-10`,
+        highPriorityLocations: ["Vijay Nagar", "Scheme No. 54", "Tilak Nagar"],
+        priority: "High",
+        isActive: true,
+      },
+      {
+        name: "Diwali Festival Week",
+        startDate: `${currentYear}-10-28`,
+        endDate: `${currentYear}-11-03`,
+        highPriorityLocations: ["Rajwada", "Sarafa Bazaar", "Treasure Island"],
+        priority: "Critical",
+        isActive: true,
+      },
+      {
+        name: "Ganesh Visarjan",
+        startDate: `${currentYear}-09-08`,
+        endDate: `${currentYear}-09-12`,
+        highPriorityLocations: ["Annapurna Road", "Palasia", "Bengali Square"],
+        priority: "High",
+        isActive: true,
+      },
+      {
+        name: "City Marathon",
+        startDate: `${currentYear}-12-07`,
+        endDate: `${currentYear}-12-08`,
+        highPriorityLocations: ["Race Course Road", "AB Road", "Vijay Nagar"],
+        priority: "Medium",
+        isActive: true,
+      },
+      {
+        name: "Monsoon Preparedness Drive",
+        startDate: `${currentYear}-06-01`,
+        endDate: `${currentYear}-06-30`,
+        highPriorityLocations: ["South Tukoganj", "LIG Colony", "Khandwa Road"],
+        priority: "High",
+        isActive: true,
+      },
+      {
+        name: "Republic Day Parade",
+        startDate: `${currentYear}-01-24`,
+        endDate: `${currentYear}-01-27`,
+        highPriorityLocations: ["Rajwada", "Geeta Bhawan"],
+        priority: "Medium",
+        isActive: false,
+      },
+    ];
+    await FestivalEvent.insertMany(festivalEvents);
+    console.log(`✅ Created ${festivalEvents.length} festival events`);
+
+    // ── Seed Report Schedules ──────────────────────────────────────────
+    console.log("\n📈 Seeding report schedules...");
+    const scheduleRows = [];
+    for (const hod of hods) {
+      const frequency = Math.random() < 0.6 ? "weekly" : "daily";
+      const format = Math.random() < 0.5 ? "pdf" : "excel";
+      const hour = 8 + Math.floor(Math.random() * 3);
+      const createdAt = getDateWithinLastDays(4, 40, now);
+      scheduleRows.push({
+        userId: hod._id,
+        email: hod.email,
+        frequency,
+        format,
+        cronExpression: getCronExpressionForFrequency(frequency, hour),
+        department: hod.department,
+        filters: { department: hod.department },
+        timezone: process.env.REPORT_SCHEDULE_TIMEZONE || "Asia/Kolkata",
+        hour,
+        isActive: true,
+        lastSentAt: getRandomDateBetween(createdAt, now),
+        createdAt,
+        updatedAt: now,
+      });
+    }
+    await ReportSchedule.insertMany(scheduleRows);
+    console.log(`✅ Created ${scheduleRows.length} report schedules`);
+
+    // ── Seed Notification History ──────────────────────────────────────
+    console.log("\n🔔 Seeding notifications...");
+    const notificationRows = [];
+
+    for (const complaint of createdComplaints) {
+      const owner = regularUsers.find(
+        (user) => String(user._id) === String(complaint.userId),
+      );
+
+      if (owner && Math.random() < 0.8) {
+        notificationRows.push({
+          userId: owner._id,
+          title: `Update on ${complaint.ticketId}`,
+          body:
+            complaint.status === "resolved"
+              ? "Your complaint has been resolved. Please add feedback."
+              : `Complaint is currently ${complaint.status}.`,
+          type: "complaint-update",
+          data: {
+            complaintId: String(complaint._id),
+            ticketId: complaint.ticketId,
+            status: complaint.status,
+            type: "complaint-update",
+          },
+          readAt:
+            Math.random() < 0.55 ? getDateWithinLastDays(0, 14, now) : null,
+          createdAt: getDateWithinLastDays(0, 20, now),
+          updatedAt: now,
+        });
+      }
+
+      (complaint.assignedWorkers || []).forEach((assignment) => {
+        if (Math.random() < 0.75) {
+          notificationRows.push({
+            userId: assignment.workerId,
+            title: `Assignment: ${complaint.ticketId}`,
+            body: `You were assigned a ${complaint.department} complaint in ${complaint.locationName || "Indore"}.`,
+            type: "assignment",
+            data: {
+              complaintId: String(complaint._id),
+              ticketId: complaint.ticketId,
+              department: complaint.department,
+              type: "assignment",
+            },
+            readAt:
+              Math.random() < 0.7 ? getDateWithinLastDays(0, 10, now) : null,
+            createdAt: getDateWithinLastDays(0, 25, now),
+            updatedAt: now,
+          });
+        }
+      });
+
+      if (complaint.sla?.escalated) {
+        const deptHod = hods.find((h) => h.department === complaint.department);
+        if (deptHod && Math.random() < 0.9) {
+          notificationRows.push({
+            userId: deptHod._id,
+            title: `SLA escalation: ${complaint.ticketId}`,
+            body: "Complaint crossed SLA threshold and needs urgent action.",
+            type: "escalation",
+            data: {
+              complaintId: String(complaint._id),
+              ticketId: complaint.ticketId,
+              escalationLevel: complaint.sla.escalationLevel,
+              type: "escalation",
+            },
+            readAt:
+              Math.random() < 0.45 ? getDateWithinLastDays(0, 10, now) : null,
+            createdAt: getDateWithinLastDays(0, 15, now),
+            updatedAt: now,
+          });
+        }
+      }
+    }
+
+    if (notificationRows.length > 0) {
+      await Notification.insertMany(notificationRows);
+    }
+    console.log(`✅ Created ${notificationRows.length} notifications`);
+
     console.log("\n🎉 Database seeded successfully!");
     console.log("\n📝 Sample Login Credentials:");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("Admin:    username: admin1         password: password123");
-    console.log("HOD:      username: hod_Road       password: password123");
-    console.log("Worker:   username: worker_Road_1  password: password123");
+    console.log("HOD:      username: hod_road       password: password123");
+    console.log("Worker:   username: worker_road_1  password: password123");
     console.log("Citizen:  username: user1          password: password123");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   } catch (error) {

@@ -22,6 +22,12 @@ export const GET_ME_URL = API_BASE + "/auth/me";
 export const UPDATE_USER_PROFILE_URL = API_BASE + "/auth/update-profile";
 export const ACCEPT_INVITE_URL = API_BASE + "/auth/accept-invite";
 export const DELETE_ACCOUNT_URL = API_BASE + "/auth/me";
+export const FORGOT_PASSWORD_URL = API_BASE + "/auth/forgot-password";
+export const RESET_PASSWORD_URL = (token) =>
+  API_BASE + `/auth/reset-password/${token}`;
+export const VERIFY_EMAIL_URL = (token) =>
+  API_BASE + `/auth/verify-email/${token}`;
+export const RESEND_VERIFICATION_URL = API_BASE + "/auth/resend-verification";
 
 // ============================================================================
 // COMPLAINT URLs

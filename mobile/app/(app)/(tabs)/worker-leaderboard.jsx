@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import {
   Trophy,
   Medal,
@@ -32,7 +31,6 @@ import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
 export default function WorkerLeaderboard() {
   const { t } = useTranslation();
-  const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
@@ -49,51 +47,53 @@ export default function WorkerLeaderboard() {
   const ALL_BADGES = [
     {
       id: "speed-demon",
-      name: "Speed Demon",
-      description: "Completes tasks in under 24 hours on average",
-      icon: "⚡",
-      color: "#F59E0B",
-      requirement: "10+ resolves, avg time ≤ 24h",
+      name: t("worker.leaderboard.badges.speedDemon.name"),
+      description: t("worker.leaderboard.badges.speedDemon.description"),
+      Icon: Clock,
+      color: colors.warning,
+      requirement: t("worker.leaderboard.badges.speedDemon.requirement"),
     },
     {
       id: "quality-master",
-      name: "Quality Master",
-      description: "Maintains a 4.5+ star citizen rating",
-      icon: "⭐",
-      color: "#EAB308",
-      requirement: "10+ resolves, rating ≥ 4.5",
+      name: t("worker.leaderboard.badges.qualityMaster.name"),
+      description: t("worker.leaderboard.badges.qualityMaster.description"),
+      Icon: Star,
+      color: colors.warning,
+      requirement: t("worker.leaderboard.badges.qualityMaster.requirement"),
     },
     {
       id: "community-hero",
-      name: "Community Hero",
-      description: "Resolved 50+ complaints",
-      icon: "🏆",
-      color: "#10B981",
-      requirement: "50+ total resolves",
+      name: t("worker.leaderboard.badges.communityHero.name"),
+      description: t("worker.leaderboard.badges.communityHero.description"),
+      Icon: Trophy,
+      color: colors.success,
+      requirement: t("worker.leaderboard.badges.communityHero.requirement"),
     },
     {
       id: "century-club",
-      name: "Century Club",
-      description: "Resolved 100+ complaints",
-      icon: "💯",
-      color: "#8B5CF6",
-      requirement: "100+ total resolves",
+      name: t("worker.leaderboard.badges.centuryClub.name"),
+      description: t("worker.leaderboard.badges.centuryClub.description"),
+      Icon: Award,
+      color: colors.purple,
+      requirement: t("worker.leaderboard.badges.centuryClub.requirement"),
     },
     {
       id: "consistent-performer",
-      name: "Consistent Performer",
-      description: "Maintained a 7+ day completion streak",
-      icon: "🔥",
-      color: "#EF4444",
-      requirement: "7+ day streak",
+      name: t("worker.leaderboard.badges.consistentPerformer.name"),
+      description: t(
+        "worker.leaderboard.badges.consistentPerformer.description",
+      ),
+      Icon: Flame,
+      color: colors.danger,
+      requirement: t("worker.leaderboard.badges.consistentPerformer.requirement"),
     },
     {
       id: "rising-star",
-      name: "Rising Star",
-      description: "20+ completions in a single month",
-      icon: "🌟",
-      color: "#06B6D4",
-      requirement: "20+ monthly completions",
+      name: t("worker.leaderboard.badges.risingStar.name"),
+      description: t("worker.leaderboard.badges.risingStar.description"),
+      Icon: TrendingUp,
+      color: colors.info,
+      requirement: t("worker.leaderboard.badges.risingStar.requirement"),
     },
   ];
 
@@ -105,6 +105,7 @@ export default function WorkerLeaderboard() {
     { value: "monthly", label: t("worker.leaderboard.periods.monthly") },
     { value: "yearly", label: t("worker.leaderboard.periods.yearly") },
   ];
+  const SelectedBadgeIcon = selectedBadge?.Icon ?? Award;
 
   const load = async (isRefresh = false) => {
     try {
@@ -117,14 +118,14 @@ export default function WorkerLeaderboard() {
       });
 
       const payload = res?.data;
-      setLeaderboard(payload?.leaderboard || []);
-      setCurrentUser(payload?.currentUser || null);
+      setLeaderboard(payload?.leaderboard ?? []);
+      setCurrentUser(payload?.currentUser ?? null);
     } catch (e) {
       Toast.show({
         type: "error",
         text1: t("worker.leaderboard.failed"),
         text2:
-          e?.response?.data?.message || t("worker.leaderboard.loadingError"),
+          e?.response?.data?.message ?? t("worker.leaderboard.loadingError"),
       });
     } finally {
       setLoading(false);
@@ -143,25 +144,48 @@ export default function WorkerLeaderboard() {
     return { icon: Award, color: colors.textSecondary, size: 20 };
   };
 
-  const BadgeItem = ({ badge }) => (
-    <TouchableOpacity
-      onPress={() => setSelectedBadge(badge)}
-      className="flex-row items-center px-3 py-2 rounded-xl mr-2 mb-2"
-      style={{
-        backgroundColor: badge.color + "20",
-        borderWidth: 1,
-        borderColor: badge.color + "40",
-      }}
-      activeOpacity={0.7}
-    >
-      <Text className="text-lg mr-1.5">{badge.icon}</Text>
-      <Text className="text-xs font-bold" style={{ color: badge.color }}>
-        {badge.name}
-      </Text>
-    </TouchableOpacity>
-  );
+  const getBadgeData = (badge) => {
+    const matchedBadge = ALL_BADGES.find((item) => item.id === badge?.id);
+    if (matchedBadge) return matchedBadge;
 
-  const LeaderboardCard = ({ worker, index }) => {
+    return {
+      id: badge?.id ?? "unknown",
+      name: badge?.name ?? t("worker.leaderboard.badges.unknown.name"),
+      description:
+        badge?.description ??
+        t("worker.leaderboard.badges.unknown.description"),
+      Icon: Award,
+      color: colors.primary,
+      requirement:
+        badge?.requirement ??
+        t("worker.leaderboard.badges.unknown.requirement"),
+    };
+  };
+
+  const BadgeItem = ({ badge }) => {
+    const BadgeIcon = badge.Icon ?? Award;
+    const badgeColor = badge.color ?? colors.primary;
+
+    return (
+      <TouchableOpacity
+        onPress={() => setSelectedBadge(badge)}
+        className="flex-row items-center px-3 py-2 rounded-xl mr-2 mb-2"
+        style={{
+          backgroundColor: badgeColor + "20",
+          borderWidth: 1,
+          borderColor: badgeColor + "40",
+        }}
+        activeOpacity={0.7}
+      >
+        <BadgeIcon size={16} color={badgeColor} style={{ marginRight: 6 }} />
+        <Text className="text-xs font-bold" style={{ color: badgeColor }}>
+          {badge.name}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const LeaderboardCard = ({ worker }) => {
     const rankInfo = getRankIcon(worker.rank);
     const RankIcon = rankInfo.icon;
     const isTopThree = worker.rank <= 3;
@@ -219,7 +243,7 @@ export default function WorkerLeaderboard() {
                 className="text-xs mt-0.5 capitalize"
                 style={{ color: colors.textSecondary }}
               >
-                {worker.department} Department
+                {worker.department} {t("worker.leaderboard.departmentLabel")}
               </Text>
             </View>
           </View>
@@ -244,7 +268,7 @@ export default function WorkerLeaderboard() {
           style={{ borderTopWidth: 1, borderTopColor: colors.border }}
         >
           <View className="flex-row items-center">
-            <Star size={14} color="#EAB308" />
+            <Star size={14} color={colors.warning} />
             <Text
               className="text-sm font-semibold ml-1"
               style={{ color: colors.textPrimary }}
@@ -254,27 +278,32 @@ export default function WorkerLeaderboard() {
           </View>
 
           <View className="flex-row items-center">
-            <Clock size={14} color={colors.info || "#3B82F6"} />
+            <Clock size={14} color={colors.info} />
             <Text
               className="text-sm font-semibold ml-1"
               style={{ color: colors.textPrimary }}
             >
               {worker.averageCompletionTime > 0
-                ? `${Math.round(worker.averageCompletionTime)}h`
-                : "N/A"}
+                ? `${Math.round(worker.averageCompletionTime)}${t("worker.leaderboard.hoursShort")}`
+                : t("worker.leaderboard.notAvailable")}
             </Text>
           </View>
 
           <View className="flex-row items-center">
-            <Flame size={14} color="#EF4444" />
+            <Flame size={14} color={colors.danger} />
             <Text
               className="text-sm font-bold ml-1"
               style={{
                 color:
-                  worker.currentStreak > 0 ? "#EF4444" : colors.textSecondary,
+                  worker.currentStreak > 0
+                    ? colors.danger
+                    : colors.textSecondary,
               }}
             >
-              {worker.currentStreak} day{worker.currentStreak !== 1 ? "s" : ""}
+              {t("worker.leaderboard.currentStreakShort", {
+                count: worker.currentStreak,
+                plural: worker.currentStreak !== 1 ? "s" : "",
+              })}
             </Text>
           </View>
 
@@ -293,7 +322,10 @@ export default function WorkerLeaderboard() {
         {worker.badges && worker.badges.length > 0 && (
           <View className="flex-row flex-wrap">
             {worker.badges.map((badge, idx) => (
-              <BadgeItem key={idx} badge={badge} />
+              <BadgeItem
+                key={badge?.id ?? idx}
+                badge={getBadgeData(badge)}
+              />
             ))}
           </View>
         )}
@@ -350,7 +382,7 @@ export default function WorkerLeaderboard() {
               className="text-sm font-bold mb-2"
               style={{ color: colors.primary }}
             >
-              {t("worker.leaderboard.yourRank")}: #{currentUser.rank}
+              {t("worker.leaderboard.yourRank")}: {currentUser.rank}
             </Text>
             <View className="flex-row items-center justify-between">
               <Text className="text-xs" style={{ color: colors.textSecondary }}>
@@ -364,13 +396,15 @@ export default function WorkerLeaderboard() {
               </Text>
               {currentUser.currentStreak > 0 && (
                 <View className="flex-row items-center">
-                  <Flame size={16} color="#EF4444" />
+                  <Flame size={16} color={colors.danger} />
                   <Text
                     className="text-sm font-bold ml-1"
-                    style={{ color: "#EF4444" }}
+                    style={{ color: colors.danger }}
                   >
-                    {currentUser.currentStreak}{" "}
-                    {t("worker.leaderboard.dayStreak")}!
+                    {t("worker.leaderboard.currentStreak", {
+                      count: currentUser.currentStreak,
+                      plural: currentUser.currentStreak !== 1 ? "s" : "",
+                    })}
                   </Text>
                 </View>
               )}
@@ -488,7 +522,7 @@ export default function WorkerLeaderboard() {
             </View>
 
             {leaderboard.map((worker, index) => (
-              <LeaderboardCard key={worker.id} worker={worker} index={index} />
+              <LeaderboardCard key={worker.id} worker={worker} />
             ))}
           </View>
         )}
@@ -526,7 +560,7 @@ export default function WorkerLeaderboard() {
       >
         <View
           className="flex-1 justify-center items-center px-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+          style={{ backgroundColor: `${colors.dark}99` }}
         >
           <View
             className="w-full rounded-3xl overflow-hidden"
@@ -544,7 +578,7 @@ export default function WorkerLeaderboard() {
               >
                 {infoPage === 0
                   ? t("worker.leaderboard.metricsInfo.title")
-                  : "All Achievement Badges"}
+                  : t("worker.leaderboard.allAchievementBadges")}
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -587,7 +621,7 @@ export default function WorkerLeaderboard() {
                     {/* Rating */}
                     <View className="mb-4">
                       <View className="flex-row items-center mb-2">
-                        <Star size={18} color="#EAB308" />
+                        <Star size={18} color={colors.warning} />
                         <Text
                           className="text-base font-bold ml-2"
                           style={{ color: colors.textPrimary }}
@@ -606,7 +640,7 @@ export default function WorkerLeaderboard() {
                     {/* Average Time */}
                     <View className="mb-4">
                       <View className="flex-row items-center mb-2">
-                        <Clock size={18} color={colors.info || "#3B82F6"} />
+                        <Clock size={18} color={colors.info} />
                         <Text
                           className="text-base font-bold ml-2"
                           style={{ color: colors.textPrimary }}
@@ -625,7 +659,7 @@ export default function WorkerLeaderboard() {
                     {/* Streak */}
                     <View className="mb-4">
                       <View className="flex-row items-center mb-2">
-                        <Flame size={18} color="#EF4444" />
+                        <Flame size={18} color={colors.danger} />
                         <Text
                           className="text-base font-bold ml-2"
                           style={{ color: colors.textPrimary }}
@@ -710,7 +744,11 @@ export default function WorkerLeaderboard() {
                           }}
                         >
                           <View className="flex-row items-center mb-1.5">
-                            <Text className="text-2xl mr-3">{badge.icon}</Text>
+                            <badge.Icon
+                              size={22}
+                              color={badge.color}
+                              style={{ marginRight: 10 }}
+                            />
                             <View className="flex-1">
                               <View className="flex-row items-center flex-wrap">
                                 <Text
@@ -734,7 +772,7 @@ export default function WorkerLeaderboard() {
                                       className="text-xs font-bold"
                                       style={{ color: badge.color }}
                                     >
-                                      Earned
+                                      {t("worker.leaderboard.earned")}
                                     </Text>
                                   </View>
                                 )}
@@ -755,7 +793,7 @@ export default function WorkerLeaderboard() {
                                 : colors.textSecondary,
                             }}
                           >
-                            Req: {badge.requirement}
+                            {t("worker.leaderboard.requirementPrefix")}: {badge.requirement}
                           </Text>
                         </View>
                       );
@@ -803,7 +841,7 @@ export default function WorkerLeaderboard() {
       >
         <View
           className="flex-1 justify-end"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          style={{ backgroundColor: `${colors.dark}80` }}
         >
           <View
             className="rounded-t-3xl p-6"
@@ -813,12 +851,16 @@ export default function WorkerLeaderboard() {
           >
             <View className="flex-row items-center justify-between mb-4">
               <View className="flex-row items-center">
-                <Text className="text-4xl mr-3">{selectedBadge?.icon}</Text>
+                <SelectedBadgeIcon
+                  size={34}
+                  color={selectedBadge?.color ?? colors.primary}
+                  style={{ marginRight: 12 }}
+                />
                 <View>
                   <Text
                     className="text-xl font-bold"
                     style={{
-                      color: selectedBadge?.color || colors.textPrimary,
+                      color: selectedBadge?.color ?? colors.textPrimary,
                     }}
                   >
                     {selectedBadge?.name}
@@ -863,7 +905,7 @@ export default function WorkerLeaderboard() {
             >
               <Text
                 className="text-center text-base font-bold"
-                style={{ color: "#fff" }}
+                style={{ color: colors.light }}
               >
                 {t("worker.leaderboard.gotIt")}
               </Text>

@@ -1,8 +1,8 @@
 import { useRouter } from "expo-router";
 import {
   Plus,
-  Clock,
-  MapPin,
+  ChevronUp,
+  ChevronDown,
   Camera,
   X,
   Navigation,
@@ -22,23 +22,16 @@ import Toast from "react-native-toast-message";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { darkColors, lightColors } from "../../../colors";
-import AutoSkeleton from "../../../components/AutoSkeleton";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
+import ComplaintCard from "../../../components/ComplaintCard";
 import FilterPanel from "../../../components/FilterPanel";
 import SearchBar from "../../../components/SearchBar";
-import SlaStatusBadge from "../../../components/SlaStatusBadge";
 import CustomPicker from "../../../components/CustomPicker";
 import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
-import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
-import {
-  formatDateShort,
-  formatEtaFromHours,
-  formatPriorityLabel,
-  formatStatusLabel,
-} from "../../../utils/complaintFormatters";
+import { formatPriorityLabel } from "../../../utils/complaintFormatters";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { API_BASE } from "../../../url";
@@ -48,11 +41,7 @@ import {
   cacheComplaints,
   getCachedComplaints,
 } from "../../../utils/complaintsCache";
-import {
-  enqueue,
-  getQueue,
-  dequeue,
-} from "../../../utils/offlineQueue";
+import { enqueue, getQueue, dequeue } from "../../../utils/offlineQueue";
 
 export default function Complaints() {
   const { t } = useTranslation();
@@ -65,6 +54,7 @@ export default function Complaints() {
   const [refreshing, setRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("new-to-old");
   const [startDate, setStartDate] = useState("");
@@ -105,10 +95,21 @@ export default function Complaints() {
   ];
 
   const LIMIT = 10;
+  const STATUS_OPTIONS = [
+    "pending",
+    "assigned",
+    "in-progress",
+    "pending-approval",
+    "needs-rework",
+    "cancelled",
+  ];
 
   const buildQuery = (currentPage) => {
     const params = new URLSearchParams();
+    params.set("scope", "all");
+    params.set("excludeStatus", "resolved");
     if (statusFilter !== "all") params.set("status", statusFilter);
+    if (departmentFilter !== "all") params.set("department", departmentFilter);
     if (priorityFilter !== "all") params.set("priority", priorityFilter);
     params.set("sort", sortOrder);
     if (startDate) params.set("startDate", startDate);
@@ -119,8 +120,8 @@ export default function Complaints() {
     return params.toString();
   };
 
-  const load = async (pull = false, reset = false) => {
-    const currentPage = reset || pull ? 1 : page;
+  const load = async (pull = false, reset = false, requestedPage = null) => {
+    const currentPage = requestedPage ?? (reset || pull ? 1 : page);
     try {
       if (pull) setRefreshing(true);
       else if (reset) setLoading(true);
@@ -144,7 +145,18 @@ export default function Complaints() {
         setComplaints(fetched);
         setPage(1);
       } else {
-        setComplaints((prev) => [...prev, ...fetched]);
+        setComplaints((prev) => {
+          const merged = [...prev, ...fetched];
+          const seen = new Set();
+          return merged.filter((item) => {
+            const key = item?.id || item?._id || item?.ticketId;
+            if (!key) return true;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        });
+        setPage(currentPage);
       }
       setTotalCount(payload?.total ?? 0);
       setHasMore(currentPage < pages);
@@ -182,8 +194,8 @@ export default function Complaints() {
             await dequeue(entry.localId);
             Toast.show({
               type: "success",
-              text1: "Queued complaint submitted",
-              text2: `"${entry.title}" was submitted automatically.`,
+              text1: t("complaints.queuedSubmittedTitle"),
+              text2: `"${entry.title}" ${t("complaints.queuedSubmittedMessage")}`,
             });
           } catch {
             // leave in queue for next retry
@@ -220,19 +232,27 @@ export default function Complaints() {
   };
 
   const loadMore = () => {
-    if (!hasMore || loadingMore) return;
+    if (!hasMore || loadingMore || loading || refreshing) return;
     const nextPage = page + 1;
-    setPage(nextPage);
-    load(false, false);
+    load(false, false, nextPage);
   };
 
   useEffect(() => {
     load(false, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, priorityFilter, sortOrder, startDate, endDate, searchQuery]);
+  }, [
+    statusFilter,
+    departmentFilter,
+    priorityFilter,
+    sortOrder,
+    startDate,
+    endDate,
+    searchQuery,
+  ]);
 
   const hasActiveFilters =
     statusFilter !== "all" ||
+    departmentFilter !== "all" ||
     priorityFilter !== "all" ||
     sortOrder !== "new-to-old" ||
     !!startDate ||
@@ -240,6 +260,7 @@ export default function Complaints() {
 
   const clearFilters = () => {
     setStatusFilter("all");
+    setDepartmentFilter("all");
     setPriorityFilter("all");
     setSortOrder("new-to-old");
     setStartDate("");
@@ -398,8 +419,8 @@ export default function Complaints() {
       });
       Toast.show({
         type: "info",
-        text1: "Saved offline",
-        text2: "Your complaint will be submitted automatically when you reconnect.",
+        text1: t("complaints.offlineSavedTitle"),
+        text2: t("complaints.offlineSavedMessage"),
       });
       setTitle("");
       setDescription("");
@@ -467,7 +488,7 @@ export default function Complaints() {
       setModalVisible(false);
 
       // Reload complaints
-      load(false);
+      load(false, true);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -529,10 +550,7 @@ export default function Complaints() {
             {t("complaints.newComplaint")}
           </Text>
         </PressableBlock>
-        <View
-          className="flex-row items-center mb-3"
-          style={{ gap: 8 }}
-        >
+        <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
           <View className="flex-1">
             <SearchBar
               value={searchQuery}
@@ -542,8 +560,11 @@ export default function Complaints() {
           </View>
           <FilterPanel
             variant="icon"
+            statusOptions={STATUS_OPTIONS}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
+            departmentFilter={departmentFilter}
+            setDepartmentFilter={setDepartmentFilter}
             priorityFilter={priorityFilter}
             setPriorityFilter={setPriorityFilter}
             sortOrder={sortOrder}
@@ -559,211 +580,27 @@ export default function Complaints() {
           />
         </View>
 
-        <AutoSkeleton isLoading={loading}>
-          {complaints.length === 0 && !loading ? (
-            <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
-              <Text style={{ color: colors.textSecondary }}>
-                {t("complaints.noComplaints")}
-              </Text>
-            </Card>
-          ) : (
-            complaints.map((c) => {
-              const eta = formatEtaFromHours(
-                c.estimatedCompletionTime,
-                c.assignedAt,
-                t("complaints.overdue"),
-              );
-
-              return (
-                <Card key={c.id} style={{ margin: 0, marginTop: 10, flex: 0 }}>
-                  {/* Top Row: Ticket and Date */}
-                  <View className="flex-row justify-between mb-3">
-                    <View className="flex-1 mr-2">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("complaints.ticket")}
-                      </Text>
-                      <Text
-                        className="text-base font-semibold mt-1"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        #{c.ticketId || "-"}
-                      </Text>
-                    </View>
-                    <View className="flex-1 ml-2 items-end">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("complaints.date")}
-                      </Text>
-                      <Text
-                        className="text-base font-semibold mt-1"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {formatDateShort(c.createdAt)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* SLA Badge row (shown when SLA data present) */}
-                  {c.sla && (
-                    <SlaStatusBadge sla={c.sla} style={{ marginBottom: 10 }} />
-                  )}
-
-                  {/* Second Row: Department and Status */}
-                  <View className="flex-row justify-between mb-3">
-                    <View className="flex-1 mr-2">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("complaints.details.department")}
-                      </Text>
-                      <Text
-                        className="text-base font-semibold mt-1 capitalize"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {c.department || "-"}
-                      </Text>
-                    </View>
-                    <View className="flex-1 ml-2 items-end">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("complaints.details.status")}
-                      </Text>
-                      <Text
-                        className="text-base font-semibold mt-1 capitalize"
-                        style={{ color: getStatusColor(c.status, colors) }}
-                      >
-                        {formatStatusLabel(t, c.status)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Third Row: Location and Priority */}
-                  <View className="flex-row justify-between mb-3">
-                    <View className="flex-1 mr-2">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("complaints.location")}
-                      </Text>
-                      <Text
-                        className="text-base font-semibold mt-1"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {c.locationName || t("complaints.locationNotSet")}
-                      </Text>
-                    </View>
-                    <View className="flex-1 ml-2 items-end">
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("complaints.details.priority")}
-                      </Text>
-                      <Text
-                        className="text-base font-semibold mt-1"
-                        style={{ color: getPriorityColor(c.priority, colors) }}
-                      >
-                        {formatPriorityLabel(t, c.priority)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* ETA Display - Prominent Badge */}
-                  {c.estimatedCompletionTime && (
-                    <View
-                      className="mb-3 px-3 py-2.5 rounded-xl flex-row items-center justify-center"
-                      style={{
-                        backgroundColor:
-                          eta === t("complaints.overdue")
-                            ? "#FEE2E2"
-                            : colors.info
-                              ? colors.info + "20"
-                              : "#DBEAFE",
-                      }}
-                    >
-                      <Clock
-                        size={18}
-                        color={
-                          eta === t("complaints.overdue")
-                            ? "#EF4444"
-                            : colors.info || "#3B82F6"
-                        }
-                      />
-                      <Text
-                        className="text-base font-bold ml-2"
-                        style={{
-                          color:
-                            eta === t("complaints.overdue")
-                              ? "#EF4444"
-                              : colors.info || "#3B82F6",
-                        }}
-                      >
-                        {t("complaints.expectedResolution")}: {eta}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Full Width: Description/Title */}
-                  <View className="mb-3">
-                    <Text
-                      className="text-sm"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("complaints.description")}
-                    </Text>
-                    <Text
-                      className="text-base mt-1"
-                      style={{ color: colors.textPrimary }}
-                    >
-                      {c.title || t("complaints.complaint")}
-                    </Text>
-                  </View>
-
-                  {/* Tags */}
-                  {c.tags && c.tags.length > 0 && (
-                    <View className="flex-row flex-wrap gap-1 mb-3">
-                      {c.tags.map((tag, i) => (
-                        <View
-                          key={i}
-                          className="px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: colors.primary + "18" }}
-                        >
-                          <Text
-                            className="text-xs font-medium"
-                            style={{ color: colors.primary }}
-                          >
-                            {tag}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  <PressableBlock
-                    onPress={() =>
-                      router.push(`/complaints/complaint-details?id=${c.id}`)
-                    }
-                    className="mt-1 rounded-lg items-center justify-center py-2.5"
-                    style={{ backgroundColor: colors.primary }}
-                  >
-                    <Text className="font-bold" style={{ color: colors.dark }}>
-                      {t("complaints.open")}
-                    </Text>
-                  </PressableBlock>
-                </Card>
-              );
-            })
-          )}
-        </AutoSkeleton>
+        {loading ? (
+          <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </Card>
+        ) : complaints.length === 0 ? (
+          <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
+            <Text style={{ color: colors.textSecondary }}>
+              {t("complaints.noComplaints")}
+            </Text>
+          </Card>
+        ) : (
+          complaints.map((c, index) => (
+            <ComplaintCard
+              key={`${c.id || c._id || c.ticketId || "complaint"}-${index}`}
+              complaint={c}
+              onOpen={() =>
+                router.push(`/complaints/complaint-details?id=${c.id || c._id}`)
+              }
+            />
+          ))
+        )}
 
         {/* Load More */}
         {hasMore && (
@@ -785,7 +622,10 @@ export default function Complaints() {
                 className="text-sm font-semibold"
                 style={{ color: colors.textSecondary }}
               >
-                Load more ({complaints.length} of {totalCount})
+                {t("complaints.loadMoreCount", {
+                  current: complaints.length,
+                  total: totalCount,
+                })}
               </Text>
             )}
           </PressableBlock>
@@ -820,12 +660,7 @@ export default function Complaints() {
                 onPress={() => setModalVisible(false)}
                 className="px-3 py-1"
               >
-                <Text
-                  className="text-base font-bold"
-                  style={{ color: colors.textSecondary }}
-                >
-                  ✕
-                </Text>
+                <X size={20} color={colors.textSecondary} />
               </PressableBlock>
             </View>
 
@@ -839,7 +674,7 @@ export default function Complaints() {
                   className="text-base font-bold mb-1.5"
                   style={{ color: colors.textPrimary }}
                 >
-                  Quick Templates
+                  {t("complaints.templates.sectionTitle")}
                 </Text>
                 <PressableBlock
                   onPress={() =>
@@ -864,8 +699,13 @@ export default function Complaints() {
                     }}
                   >
                     {templatePickerVisible
-                      ? "▲  Choose a template or fill manually"
-                      : "▼  Use a quick template (optional)"}
+                      ? t("complaints.templates.collapse")
+                      : t("complaints.templates.expand")}
+                    {templatePickerVisible ? (
+                      <ChevronUp size={16} color={colors.primary} />
+                    ) : (
+                      <ChevronDown size={16} color={colors.textSecondary} />
+                    )}
                   </Text>
                 </PressableBlock>
 
@@ -922,7 +762,9 @@ export default function Complaints() {
                                       : colors.success,
                               }}
                             >
-                              {tpl.priority}
+                              {t(
+                                `complaints.priority.${tpl.priority.toLowerCase()}`,
+                              )}
                             </Text>
                           </View>
                         </View>

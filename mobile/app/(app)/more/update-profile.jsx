@@ -66,9 +66,9 @@ export default function UpdateProfile() {
   useEffect(() => {
     if (userData) {
       setFormData({
-        fullName: userData.fullName || "",
-        email: userData.email || "",
-        phone: userData.phone || "",
+        fullName: userData.fullName ?? "",
+        email: userData.email ?? "",
+        phone: userData.phone ?? "",
         password: "",
       });
     }
@@ -104,21 +104,35 @@ export default function UpdateProfile() {
         };
         await setUserAuth(updatedUser);
 
-        showToast("success", "Success", "Profile updated successfully");
+        showToast(
+          "success",
+          t("toast.success.title"),
+          t("toast.success.profileUpdated"),
+        );
         queryClient.invalidateQueries({ queryKey: ["user-profile"] });
         router.back();
       } else if (data.email_phone_already_used) {
-        showToast("error", "Error", "Email or phone already in use");
+        showToast(
+          "error",
+          t("toast.error.title"),
+          t("settings.profile.emailPhoneInUse"),
+        );
       } else {
-        showToast("error", "Error", response.message || "Update failed");
+        showToast(
+          "error",
+          t("toast.error.title"),
+          response.message ?? t("settings.profile.updateFailed"),
+        );
       }
     },
     onError: (error) => {
       console.error("Update profile error:", error);
       showToast(
         "error",
-        "Error",
-        error?.response?.data?.message || error?.message || "Update failed",
+        t("toast.error.title"),
+        error?.response?.data?.message ??
+          error?.message ??
+          t("settings.profile.updateFailed"),
       );
     },
     onSettled: () => updateUiState({ loading: false }),
@@ -126,15 +140,23 @@ export default function UpdateProfile() {
 
   const handleUpdateProfile = useCallback(() => {
     if (!formData.fullName.trim()) {
-      showToast("error", "Error", "Name is required");
+      showToast(
+        "error",
+        t("toast.error.title"),
+        t("settings.profile.nameRequired"),
+      );
       return;
     }
     if (!formData.phone.trim()) {
-      showToast("error", "Error", "Phone number is required");
+      showToast(
+        "error",
+        t("toast.error.title"),
+        t("settings.profile.phoneRequired"),
+      );
       return;
     }
     updateProfileMutation.mutate();
-  }, [formData, updateProfileMutation]);
+  }, [formData, t, updateProfileMutation]);
 
   // UI EVENT HANDLERS
 
@@ -283,9 +305,9 @@ export default function UpdateProfile() {
           disabled={uiState.loading}
         >
           {uiState.loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.light} />
           ) : (
-            <Text className="text-base font-bold" style={{ color: "#FFFFFF" }}>
+            <Text className="text-base font-bold" style={{ color: colors.light }}>
               {t("settings.profile.updateProfile")}
             </Text>
           )}

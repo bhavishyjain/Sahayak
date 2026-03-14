@@ -1,10 +1,7 @@
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
-  MapPin,
   CheckCircle,
-  ThumbsUp,
-  Clock,
   CheckSquare,
   Square,
   Users,
@@ -26,22 +23,16 @@ import {
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
-import Card from "../../../components/Card";
+import ComplaintCard from "../../../components/ComplaintCard";
 import SearchBar from "../../../components/SearchBar";
 import FilterPanel from "../../../components/FilterPanel";
-import PressableBlock from "../../../components/PressableBlock";
-import SlaStatusBadge from "../../../components/SlaStatusBadge";
-import StatusPill from "../../../components/StatusPill";
 import {
   HOD_OVERVIEW_URL,
   HOD_ASSIGN_MULTIPLE_WORKERS_URL,
   HOD_WORKERS_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
-import { getPriorityColor } from "../../../utils/colorHelpers";
 import {
-  formatDateShort,
-  formatEtaFromHours,
   formatPriorityLabel,
   isComplaintAssigned,
   normalizeStatus,
@@ -97,7 +88,7 @@ export default function HodComplaints() {
     const matchesPriority =
       priorityFilter === "all"
         ? true
-        : (complaint.priority || "").toLowerCase() === priorityFilter;
+        : String(complaint.priority ?? "").toLowerCase() === priorityFilter;
 
     const complaintDate = new Date(complaint.createdAt);
     const hasValidDate = !Number.isNaN(complaintDate.getTime());
@@ -182,7 +173,7 @@ export default function HodComplaints() {
       const payload = res?.data;
       setWorkers(payload?.workers || []);
     } catch (e) {
-      console.error("Error loading workers:", e);
+      console.error(e);
       Toast.show({
         type: "error",
         text1: t("toast.error.failed"),
@@ -263,7 +254,7 @@ export default function HodComplaints() {
       Toast.show({
         type: "error",
         text1: t("toast.error.failed"),
-        text2: e?.response?.data?.message || t("hod.complaints.couldNotAssign"),
+        text2: t("hod.complaints.couldNotAssign"),
       });
     } finally {
       setBulkAssigning(false);
@@ -278,11 +269,6 @@ export default function HodComplaints() {
     const isSelected = selectedComplaints.includes(item.id);
     const isAssigned = isComplaintAssigned(item);
     const canSelect = selectMode && !isAssigned;
-    const eta = formatEtaFromHours(
-      item.estimatedCompletionTime,
-      item.assignedAt,
-      t("hod.complaints.overdue"),
-    );
 
     return (
       <View className="flex-row items-center mb-3">
@@ -304,142 +290,15 @@ export default function HodComplaints() {
           </TouchableOpacity>
         )}
 
-        <PressableBlock
-          onPress={() =>
-            router.push(`/complaints/complaint-details?id=${item.id}`)
-          }
-          style={{ flex: 1 }}
-        >
-          <Card style={{ margin: 0, flex: 0 }}>
-            <View className="flex-row items-start justify-between mb-2">
-              <Text
-                className="text-base font-bold"
-                style={{ color: colors.primary }}
-              >
-                #{item.ticketId}
-              </Text>
-              <View style={{ alignItems: "flex-end", gap: 4 }}>
-                <StatusPill status={item.status} />
-                {item.sla && <SlaStatusBadge sla={item.sla} />}
-              </View>
-            </View>
-
-            <Text
-              className="text-base font-semibold mb-2"
-              style={{ color: colors.textPrimary }}
-            >
-              {item.title}
-            </Text>
-
-            <Text
-              className="text-sm mb-3"
-              style={{ color: colors.textSecondary }}
-              numberOfLines={2}
-            >
-              {item.description}
-            </Text>
-
-            <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-row items-center flex-1">
-                <MapPin size={14} color={colors.textSecondary} />
-                <Text
-                  className="text-xs ml-1 flex-1"
-                  style={{ color: colors.textSecondary }}
-                  numberOfLines={1}
-                >
-                  {item.locationName}
-                </Text>
-              </View>
-
-              <View className="flex-row items-center ml-3">
-                {isAssigned ? (
-                  <>
-                    <CheckCircle
-                      size={14}
-                      color={colors.success || "#10B981"}
-                    />
-                    <Text
-                      className="text-xs ml-1 font-semibold"
-                      style={{ color: colors.success || "#10B981" }}
-                    >
-                      {t("status.assigned")}
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle
-                      size={14}
-                      color={colors.warning || "#F59E0B"}
-                    />
-                    <Text
-                      className="text-xs ml-1 font-semibold"
-                      style={{ color: colors.warning || "#F59E0B" }}
-                    >
-                      {t("hod.complaints.unassigned")}
-                    </Text>
-                  </>
-                )}
-              </View>
-            </View>
-
-            <View className="flex-row items-center justify-between mt-2">
-              <View className="flex-row items-center">
-                <View
-                  className="px-2 py-1 rounded"
-                  style={{
-                    backgroundColor:
-                      getPriorityColor(item.priority, colors) + "20",
-                  }}
-                >
-                  <Text
-                    className="text-xs font-semibold"
-                    style={{
-                      color: getPriorityColor(item.priority, colors),
-                    }}
-                  >
-                    {formatPriorityLabel(t, item.priority)}
-                  </Text>
-                </View>
-                <View className="flex-row items-center ml-2">
-                  <ThumbsUp size={12} color={colors.textSecondary} />
-                  <Text
-                    className="text-xs ml-1 font-medium"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {item.upvoteCount || 0}
-                  </Text>
-                </View>
-                {eta && (
-                  <View className="flex-row items-center ml-2">
-                    <Clock
-                      size={12}
-                      color={
-                        eta === t("hod.complaints.overdue")
-                          ? "#EF4444"
-                          : colors.info || "#3B82F6"
-                      }
-                    />
-                    <Text
-                      className="text-xs ml-1 font-semibold"
-                      style={{
-                        color:
-                          eta === t("hod.complaints.overdue")
-                            ? "#EF4444"
-                            : colors.info || "#3B82F6",
-                      }}
-                    >
-                      {t("worker.assigned.eta")}: {eta}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                {formatDateShort(item.createdAt)}
-              </Text>
-            </View>
-          </Card>
-        </PressableBlock>
+        <View style={{ flex: 1 }}>
+          <ComplaintCard
+            complaint={item}
+            showAssignmentStatus
+            onOpen={() =>
+              router.push(`/complaints/complaint-details?id=${item.id}`)
+            }
+          />
+        </View>
       </View>
     );
   };
@@ -737,12 +596,12 @@ export default function HodComplaints() {
               ) : (
                 workers
                   .filter((w) =>
-                    (w.fullName || w.username || "")
+                    String(w.fullName ?? w.username ?? "")
                       ?.toLowerCase()
                       .includes(workerSearchQuery.toLowerCase()),
                   )
                   .map((worker) => {
-                    const workerId = String(worker.id || worker._id || "");
+                    const workerId = String(worker.id ?? worker._id ?? "");
                     if (!workerId) return null;
                     return (
                       <TouchableOpacity
@@ -774,14 +633,18 @@ export default function HodComplaints() {
                                     : colors.textPrimary,
                               }}
                             >
-                              {worker.fullName || worker.username}
+                              {worker.fullName ??
+                                worker.username ??
+                                t("complaints.details.notAvailable")}
                             </Text>
                             <Text
                               className="text-xs"
                               style={{ color: colors.textSecondary }}
                             >
-                              {worker.specializations?.join(", ") ||
-                                t("hod.complaints.generalWorker")}
+                              {worker.specializations &&
+                              worker.specializations.length > 0
+                                ? worker.specializations.join(", ")
+                                : t("hod.complaints.generalWorker")}
                             </Text>
                           </View>
 

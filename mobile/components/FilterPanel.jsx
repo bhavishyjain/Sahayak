@@ -12,7 +12,10 @@ import { darkColors, lightColors } from "../colors";
 import DateTimePickerModal from "./DateTimePickerModal";
 import { useTheme } from "../utils/context/theme";
 import { useState } from "react";
-import { formatStatusLabel, ALL_STATUS_OPTIONS } from "../utils/complaintFormatters";
+import {
+  formatStatusLabel,
+  ALL_STATUS_OPTIONS,
+} from "../utils/complaintFormatters";
 
 function FilterChip({ label, isActive, onPress, colors }) {
   return (
@@ -38,8 +41,11 @@ export default function FilterPanel({
   // variant: "icon" (circular button) | "bar" (full-width row)
   variant = "icon",
   summary = "",
+  statusOptions = ALL_STATUS_OPTIONS,
   statusFilter,
   setStatusFilter,
+  departmentFilter,
+  setDepartmentFilter,
   priorityFilter,
   setPriorityFilter,
   sortOrder,
@@ -61,6 +67,9 @@ export default function FilterPanel({
 
   // Draft state — local until Apply is pressed
   const [draftStatus, setDraftStatus] = useState(statusFilter);
+  const [draftDepartment, setDraftDepartment] = useState(
+    departmentFilter || "all",
+  );
   const [draftPriority, setDraftPriority] = useState(priorityFilter);
   const [draftSort, setDraftSort] = useState(sortOrder);
   const [draftStart, setDraftStart] = useState(startDate);
@@ -68,6 +77,7 @@ export default function FilterPanel({
 
   const openPanel = () => {
     setDraftStatus(statusFilter);
+    setDraftDepartment(departmentFilter || "all");
     setDraftPriority(priorityFilter);
     setDraftSort(sortOrder);
     setDraftStart(startDate);
@@ -77,6 +87,7 @@ export default function FilterPanel({
 
   const handleReset = () => {
     setDraftStatus("all");
+    setDraftDepartment("all");
     setDraftPriority("all");
     setDraftSort("new-to-old");
     setDraftStart("");
@@ -87,6 +98,7 @@ export default function FilterPanel({
     setApplying(true);
     setTimeout(() => {
       setStatusFilter(draftStatus);
+      if (setDepartmentFilter) setDepartmentFilter(draftDepartment);
       if (setPriorityFilter) setPriorityFilter(draftPriority);
       if (setSortOrder) setSortOrder(draftSort);
       setStartDate(draftStart);
@@ -197,7 +209,7 @@ export default function FilterPanel({
                 />
 
                 {/* Status */}
-                {ALL_STATUS_OPTIONS.length > 0 && (
+                {statusOptions.length > 0 && (
                   <>
                     <Text
                       className="text-xs font-semibold mb-2"
@@ -209,7 +221,7 @@ export default function FilterPanel({
                       className="flex-row flex-wrap mb-3"
                       style={{ gap: 6 }}
                     >
-                      {["all", ...ALL_STATUS_OPTIONS].map((s) => (
+                      {["all", ...statusOptions].map((s) => (
                         <FilterChip
                           key={s}
                           label={
@@ -219,6 +231,58 @@ export default function FilterPanel({
                           }
                           isActive={draftStatus === s}
                           onPress={() => setDraftStatus(s)}
+                          colors={colors}
+                        />
+                      ))}
+                    </View>
+                  </>
+                )}
+
+                {/* Department — only shown when setter provided */}
+                {setDepartmentFilter && (
+                  <>
+                    <Text
+                      className="text-xs font-semibold mb-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {t("complaints.details.department")}
+                    </Text>
+                    <View
+                      className="flex-row flex-wrap mb-3"
+                      style={{ gap: 6 }}
+                    >
+                      {[
+                        { value: "all", label: t("common.all") },
+                        {
+                          value: "Road",
+                          label: t("complaints.departments.road"),
+                        },
+                        {
+                          value: "Water",
+                          label: t("complaints.departments.water"),
+                        },
+                        {
+                          value: "Electricity",
+                          label: t("complaints.departments.electricity"),
+                        },
+                        {
+                          value: "Waste",
+                          label: t("complaints.departments.waste"),
+                        },
+                        {
+                          value: "Drainage",
+                          label: t("complaints.departments.drainage"),
+                        },
+                        {
+                          value: "Other",
+                          label: t("complaints.departments.other"),
+                        },
+                      ].map((department) => (
+                        <FilterChip
+                          key={department.value}
+                          label={department.label}
+                          isActive={draftDepartment === department.value}
+                          onPress={() => setDraftDepartment(department.value)}
                           colors={colors}
                         />
                       ))}
