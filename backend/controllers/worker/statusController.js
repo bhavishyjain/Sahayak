@@ -18,7 +18,7 @@ const { notifyUser } = require("../notificationController");
 
 exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
-  const { status, workerNotes } = req.body;
+  const { status } = req.body;
   const workerId = getRequestUserId(req);
   const complaint = await getComplaintOrThrow(complaintId);
 
@@ -44,7 +44,6 @@ exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   await appendCompletionPhotos(complaint, req.files || []);
 
   complaint.status = status;
-  if (workerNotes) complaint.workerNotes = workerNotes;
 
   if (status === "pending-approval") {
     if (
@@ -71,7 +70,7 @@ exports.updateComplaintStatus = asyncHandler(async (req, res) => {
     status,
     updatedBy: workerId,
     timestamp: new Date(),
-    note: workerNotes || `Status updated to ${status}`,
+    note: `Status updated to ${status}`,
   });
 
   await complaint.save();

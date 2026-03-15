@@ -34,9 +34,9 @@ import {
 import apiCall from "../../../utils/api";
 import {
   formatPriorityLabel,
-  isComplaintAssigned,
   normalizeStatus,
-} from "../../../utils/complaintFormatters";
+} from "../../../data/complaintStatus";
+import { isComplaintAssigned } from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 

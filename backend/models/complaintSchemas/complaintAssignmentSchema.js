@@ -15,7 +15,6 @@ const complaintAssignmentSchema = new mongoose.Schema(
       default: "assigned",
     },
     completedAt: { type: Date, default: null },
-    notes: { type: String, default: null },
   },
   { _id: false },
 );

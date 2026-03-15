@@ -145,6 +145,8 @@ exports.markNeedsRework = asyncHandler(async (req, res) => {
   }
 
   complaint.status = "needs-rework";
+  complaint.completionPhotos = [];
+  complaint.note = reason;
   complaint.history.push({
     status: "needs-rework",
     updatedBy: hodId,
@@ -171,6 +173,10 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   const hod = await getHodOrThrow(req);
   const hodId = getRequestUserId(req);
+  const hodDisplayName =
+    hod?.fullName ||
+    hod?.username ||
+    `HOD (${hod?.department || "Department"})`;
   const complaint = await getComplaintOrThrow(complaintId, {
     department: hod.department,
   });
@@ -193,7 +199,9 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
     status: "cancelled",
     updatedBy: hodId,
     timestamp: new Date(),
-    note: reason || "Cancelled by HOD",
+    note: reason
+      ? `Cancelled by ${hodDisplayName}: ${reason}`
+      : `Cancelled by ${hodDisplayName}`,
   });
 
   await complaint.save();
@@ -212,7 +220,7 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
 
 exports.updateWorkerTask = asyncHandler(async (req, res) => {
   const { complaintId, workerId } = req.params;
-  const { status, notes } = req.body;
+  const { status, taskDescription } = req.body;
   const hod = await getHodOrThrow(req);
 
   const complaint = await getComplaintOrThrow(complaintId, {
@@ -220,17 +228,15 @@ exports.updateWorkerTask = asyncHandler(async (req, res) => {
     departmentErrorMessage: "This complaint is not in your department",
   });
 
-  const allowedTaskStatuses = [
-    "assigned",
-    "in-progress",
-    "completed",
-    "needs-rework",
-  ];
-  if (status && !allowedTaskStatuses.includes(status)) {
+  if (status !== undefined) {
     throw new AppError(
-      "Invalid task status. Allowed: assigned, in-progress, completed, needs-rework",
+      "HOD cannot update worker status from this endpoint",
       400,
     );
+  }
+
+  if (taskDescription === undefined) {
+    throw new AppError("taskDescription is required", 400);
   }
 
   const workerTask = complaint.assignedWorkers.find(
@@ -241,46 +247,16 @@ exports.updateWorkerTask = asyncHandler(async (req, res) => {
     throw new AppError("Worker not assigned to this complaint", 404);
   }
 
-  workerTask.status = status || workerTask.status;
-  workerTask.notes = notes || workerTask.notes;
-
-  if (status === "completed") {
-    workerTask.completedAt = new Date();
-  }
-
-  const allCompleted = complaint.assignedWorkers.every(
-    (item) => item.status === "completed",
-  );
-
-  let complaintStatusChanged = false;
-
-  if (allCompleted && complaint.status !== "pending-approval") {
-    complaint.status = "pending-approval";
-    complaintStatusChanged = true;
-    complaint.history.push({
-      status: "pending-approval",
-      timestamp: new Date(),
-      note: "All assigned workers completed their tasks. Pending HOD approval.",
-    });
-  }
+  const normalizedTaskDescription = String(taskDescription || "").trim();
+  workerTask.taskDescription = normalizedTaskDescription || null;
 
   await complaint.save();
-
-  if (complaintStatusChanged) {
-    notifyComplaintParticipants(
-      complaint,
-      req.user._id,
-      "pending-approval",
-      `Complaint #${complaint.ticketId} is now pending HOD approval.`,
-    );
-  }
 
   return sendSuccess(
     res,
     {
       workerTask,
       complaintStatus: complaint.status,
-      allWorkersCompleted: allCompleted,
     },
     "Worker task updated successfully",
   );

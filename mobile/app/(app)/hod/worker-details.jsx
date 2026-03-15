@@ -41,8 +41,10 @@ import {
   HOD_WORKER_COMPLAINTS_URL,
   HOD_REMOVE_WORKER_URL,
 } from "../../../url";
-import { getPriorityColor } from "../../../utils/colorHelpers";
-import { formatPriorityLabel } from "../../../utils/complaintFormatters";
+import {
+  formatPriorityLabel,
+  getPriorityColor,
+} from "../../../data/complaintStatus";
 
 export default function WorkerDetails() {
   const { t, locale } = useTranslation();
@@ -204,7 +206,8 @@ export default function WorkerDetails() {
   }
 
   const workerName = getWorkerName(worker);
-  const workerUsername = worker.username ?? t("hod.workers.details.notAvailable");
+  const workerUsername =
+    worker.username ?? t("hod.workers.details.notAvailable");
   const activeCount =
     worker.activeComplaints ??
     worker.metrics?.activeComplaints ??
@@ -416,83 +419,90 @@ export default function WorkerDetails() {
                 </View>
               </Card>
             ) : (
-              activeComplaints.map((complaint) => (
+              activeComplaints.map((complaint) =>
                 (() => {
-                  const complaintId = complaint.id ?? complaint._id ?? complaint.ticketId;
+                  const complaintId =
+                    complaint.id ?? complaint._id ?? complaint.ticketId;
                   return (
-                <PressableBlock
-                  key={String(complaintId)}
-                  onPress={() =>
-                    router.push(
-                      `/complaints/complaint-details?id=${complaintId}`,
-                    )
-                  }
-                >
-                  <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-                    <View className="flex-row items-start justify-between mb-2">
-                      <View className="flex-row items-center">
-                        <Hash size={15} color={colors.primary} />
+                    <PressableBlock
+                      key={String(complaintId)}
+                      onPress={() =>
+                        router.push(
+                          `/complaints/complaint-details?id=${complaintId}`,
+                        )
+                      }
+                    >
+                      <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+                        <View className="flex-row items-start justify-between mb-2">
+                          <View className="flex-row items-center">
+                            <Hash size={15} color={colors.primary} />
+                            <Text
+                              className="text-base font-bold ml-1"
+                              style={{ color: colors.primary }}
+                            >
+                              {complaint.ticketId ??
+                                t("hod.workers.details.notAvailable")}
+                            </Text>
+                          </View>
+                          <StatusPill status={complaint.status} />
+                        </View>
+
                         <Text
-                          className="text-base font-bold ml-1"
-                          style={{ color: colors.primary }}
+                          className="text-base font-semibold mb-2"
+                          style={{ color: colors.textPrimary }}
                         >
-                          {complaint.ticketId ?? t("hod.workers.details.notAvailable")}
+                          {complaint.title ??
+                            t("hod.workers.details.complaintFallback")}
                         </Text>
-                      </View>
-                      <StatusPill status={complaint.status} />
-                    </View>
 
-                    <Text
-                      className="text-base font-semibold mb-2"
-                      style={{ color: colors.textPrimary }}
-                    >
-                      {complaint.title ?? t("hod.workers.details.complaintFallback")}
-                    </Text>
-
-                    <Text
-                      className="text-sm mb-3"
-                      style={{ color: colors.textSecondary }}
-                      numberOfLines={2}
-                    >
-                      {complaint.description ??
-                        t("hod.workers.details.descriptionUnavailable")}
-                    </Text>
-
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center flex-1">
-                        <MapPin size={14} color={colors.textSecondary} />
                         <Text
-                          className="text-xs ml-1 flex-1"
+                          className="text-sm mb-3"
                           style={{ color: colors.textSecondary }}
-                          numberOfLines={1}
+                          numberOfLines={2}
                         >
-                          {complaint.locationName ??
-                            t("hod.workers.details.locationUnavailable")}
+                          {complaint.description ??
+                            t("hod.workers.details.descriptionUnavailable")}
                         </Text>
-                      </View>
 
-                      <View
-                        className="px-2 py-1 rounded ml-2"
-                        style={{
-                          backgroundColor:
-                            getPriorityColor(complaint.priority, colors) + "20",
-                        }}
-                      >
-                        <Text
-                          className="text-xs font-semibold"
-                          style={{
-                            color: getPriorityColor(complaint.priority, colors),
-                          }}
-                        >
-                          {formatPriorityLabel(t, complaint.priority)}
-                        </Text>
-                      </View>
-                    </View>
-                  </Card>
-                </PressableBlock>
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-row items-center flex-1">
+                            <MapPin size={14} color={colors.textSecondary} />
+                            <Text
+                              className="text-xs ml-1 flex-1"
+                              style={{ color: colors.textSecondary }}
+                              numberOfLines={1}
+                            >
+                              {complaint.locationName ??
+                                t("hod.workers.details.locationUnavailable")}
+                            </Text>
+                          </View>
+
+                          <View
+                            className="px-2 py-1 rounded ml-2"
+                            style={{
+                              backgroundColor:
+                                getPriorityColor(complaint.priority, colors) +
+                                "20",
+                            }}
+                          >
+                            <Text
+                              className="text-xs font-semibold"
+                              style={{
+                                color: getPriorityColor(
+                                  complaint.priority,
+                                  colors,
+                                ),
+                              }}
+                            >
+                              {formatPriorityLabel(t, complaint.priority)}
+                            </Text>
+                          </View>
+                        </View>
+                      </Card>
+                    </PressableBlock>
                   );
-                })()
-              ))
+                })(),
+              )
             )}
           </>
         )}
@@ -530,72 +540,79 @@ export default function WorkerDetails() {
                 </View>
               </Card>
             ) : (
-              completedComplaints.map((complaint) => (
+              completedComplaints.map((complaint) =>
                 (() => {
-                  const complaintId = complaint.id ?? complaint._id ?? complaint.ticketId;
+                  const complaintId =
+                    complaint.id ?? complaint._id ?? complaint.ticketId;
                   return (
-                <PressableBlock
-                  key={String(complaintId)}
-                  onPress={() =>
-                    router.push(
-                      `/complaints/complaint-details?id=${complaintId}`,
-                    )
-                  }
-                >
-                  <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-                    <View className="flex-row items-start justify-between mb-2">
-                      <View className="flex-row items-center">
-                        <Hash size={15} color={colors.success} />
-                        <Text
-                          className="text-base font-bold ml-1"
-                          style={{ color: colors.success }}
-                        >
-                          {complaint.ticketId ?? t("hod.workers.details.notAvailable")}
-                        </Text>
-                      </View>
-                      <StatusPill status={complaint.status} />
-                    </View>
-
-                    <Text
-                      className="text-base font-semibold mb-2"
-                      style={{ color: colors.textPrimary }}
+                    <PressableBlock
+                      key={String(complaintId)}
+                      onPress={() =>
+                        router.push(
+                          `/complaints/complaint-details?id=${complaintId}`,
+                        )
+                      }
                     >
-                      {complaint.title ?? t("hod.workers.details.complaintFallback")}
-                    </Text>
+                      <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+                        <View className="flex-row items-start justify-between mb-2">
+                          <View className="flex-row items-center">
+                            <Hash size={15} color={colors.success} />
+                            <Text
+                              className="text-base font-bold ml-1"
+                              style={{ color: colors.success }}
+                            >
+                              {complaint.ticketId ??
+                                t("hod.workers.details.notAvailable")}
+                            </Text>
+                          </View>
+                          <StatusPill status={complaint.status} />
+                        </View>
 
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center">
-                        <Calendar size={14} color={colors.textSecondary} />
                         <Text
-                          className="text-xs ml-1"
-                          style={{ color: colors.textSecondary }}
+                          className="text-base font-semibold mb-2"
+                          style={{ color: colors.textPrimary }}
                         >
-                          {formatCompletedDate(complaint.updatedAt)}
+                          {complaint.title ??
+                            t("hod.workers.details.complaintFallback")}
                         </Text>
-                      </View>
 
-                      <View
-                        className="px-2 py-1 rounded"
-                        style={{
-                          backgroundColor:
-                            getPriorityColor(complaint.priority, colors) + "20",
-                        }}
-                      >
-                        <Text
-                          className="text-xs font-semibold"
-                          style={{
-                            color: getPriorityColor(complaint.priority, colors),
-                          }}
-                        >
-                          {formatPriorityLabel(t, complaint.priority)}
-                        </Text>
-                      </View>
-                    </View>
-                  </Card>
-                </PressableBlock>
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-row items-center">
+                            <Calendar size={14} color={colors.textSecondary} />
+                            <Text
+                              className="text-xs ml-1"
+                              style={{ color: colors.textSecondary }}
+                            >
+                              {formatCompletedDate(complaint.updatedAt)}
+                            </Text>
+                          </View>
+
+                          <View
+                            className="px-2 py-1 rounded"
+                            style={{
+                              backgroundColor:
+                                getPriorityColor(complaint.priority, colors) +
+                                "20",
+                            }}
+                          >
+                            <Text
+                              className="text-xs font-semibold"
+                              style={{
+                                color: getPriorityColor(
+                                  complaint.priority,
+                                  colors,
+                                ),
+                              }}
+                            >
+                              {formatPriorityLabel(t, complaint.priority)}
+                            </Text>
+                          </View>
+                        </View>
+                      </Card>
+                    </PressableBlock>
                   );
-                })()
-              ))
+                })(),
+              )
             )}
           </>
         )}

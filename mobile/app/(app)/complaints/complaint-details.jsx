@@ -7,7 +7,7 @@ import * as Sharing from "expo-sharing";
 import {
   AlertCircle,
   AlertTriangle,
-  Camera,
+  CheckCircle,
   ChevronUp,
   Clock,
   FileDown,
@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Share2,
   ShieldAlert,
+  RotateCcw,
   Star,
   Tag,
   ThumbsDown,
@@ -48,6 +49,7 @@ import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import ComplaintTimeline from "../../../components/ComplaintTimeline";
+import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import {
   GET_COMPLAINT_BY_ID_URL,
@@ -57,14 +59,21 @@ import {
   HOD_NEEDS_REWORK_URL,
   HOD_CANCEL_COMPLAINT_URL,
   UPDATE_COMPLAINT_STATUS_URL,
-  UPLOAD_COMPLETION_PHOTOS_URL,
   SATISFACTION_VOTE_URL,
   GET_SATISFACTION_URL,
   APPLY_AI_SUGGESTION_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
-import { getStatusColor, getPriorityColor } from "../../../utils/colorHelpers";
-import { getSlaCountdown } from "../../../utils/complaintFormatters";
+import {
+  CANONICAL_COMPLAINT_STATUSES,
+  formatStatusLabel,
+  getPriorityColor,
+  getStatusColor,
+  HEAD_MANAGE_BLOCKED_STATUSES,
+  normalizeStatus,
+  WORKER_ACTIONABLE_STATUSES,
+} from "../../../data/complaintStatus";
+import { getSlaCountdown } from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
@@ -73,10 +82,15 @@ import {
   getCachedComplaintDetail,
 } from "../../../utils/complaintsCache";
 import ErrorBoundary from "../../../components/ErrorBoundary";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 function ComplaintDetailsInner() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colorScheme } = useTheme();
   const { t } = useTranslation();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -101,15 +115,14 @@ function ComplaintDetailsInner() {
   const [approving, setApproving] = useState(false);
   const [sendingRework, setSendingRework] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   // Worker-specific states
-  const [statusModalVisible, setStatusModalVisible] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
-  const [workerNotes, setWorkerNotes] = useState("");
-  const [updating, setUpdating] = useState(false);
   const [photoUploadModalVisible, setPhotoUploadModalVisible] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [startingWork, setStartingWork] = useState(false);
 
   // Satisfaction voting states
   const [satisfactionVotes, setSatisfactionVotes] = useState(null);
@@ -117,8 +130,21 @@ function ComplaintDetailsInner() {
 
   // Common states
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [previewImageUri, setPreviewImageUri] = useState("");
   const [upvoteInfoModalVisible, setUpvoteInfoModalVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const openImagePreview = (uri) => {
+    const sourceUri = String(uri || "").trim();
+    if (!sourceUri) return;
+    setPreviewImageUri(sourceUri);
+    setImageModalVisible(true);
+  };
+
+  const closeImagePreview = () => {
+    setImageModalVisible(false);
+    setPreviewImageUri("");
+  };
 
   // SLA live countdown — recomputed every 60 s
   const [slaCountdown, setSlaCountdown] = useState(null);
@@ -154,7 +180,6 @@ function ComplaintDetailsInner() {
       // Persist for offline fallback
       if (complaintData) await cacheComplaintDetail(id, complaintData);
       setUserRole(user?.role);
-      setNewStatus(complaintData?.status || "");
 
       const userIdString = String(user?.id || user?._id);
       setCurrentUserId(userIdString);
@@ -382,12 +407,29 @@ function ComplaintDetailsInner() {
   };
 
   // HOD: Cancel complaint
-  const handleCancelComplaint = async () => {
+  const closeCancelModal = () => {
+    if (cancelling) return;
+    setCancelModalVisible(false);
+    setCancelReason("");
+  };
+
+  const handleCancelComplaint = async (reasonValue) => {
+    const reason = String(reasonValue ?? cancelReason).trim();
+    if (!reason) {
+      Toast.show({
+        type: "error",
+        text1: t("complaints.details.reasonRequired"),
+        text2: t("complaints.details.cancelReasonPlaceholder"),
+      });
+      return;
+    }
+
     try {
       setCancelling(true);
       await apiCall({
         method: "POST",
         url: HOD_CANCEL_COMPLAINT_URL(id),
+        data: { reason },
       });
 
       Toast.show({
@@ -397,6 +439,7 @@ function ComplaintDetailsInner() {
       });
 
       await load(true);
+      closeCancelModal();
     } catch (e) {
       Toast.show({
         type: "error",
@@ -435,61 +478,54 @@ function ComplaintDetailsInner() {
     }
   };
 
-  // Worker: Update status
-  const handleUpdateStatus = async () => {
-    if (!newStatus) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.statusRequired"),
-        text2: t("complaints.details.pleaseSelectStatus"),
-      });
-      return;
-    }
+  const handleStartWork = async () => {
+    if (startingWork) return;
 
     try {
-      setUpdating(true);
+      setStartingWork(true);
 
       await apiCall({
         method: "PUT",
         url: UPDATE_COMPLAINT_STATUS_URL(id),
         data: {
-          status: newStatus,
-          workerNotes: workerNotes,
+          status: "in-progress",
         },
       });
 
       Toast.show({
         type: "success",
         text1: t("complaints.details.statusUpdated"),
-        text2: `${t("complaints.details.markedAs", { status: newStatus })}`,
+        text2: t("complaints.details.markedAs", {
+          status: t("complaints.status.inProgress"),
+        }),
       });
 
-      setStatusModalVisible(false);
-      setWorkerNotes("");
       await load(true);
-    } catch (e) {
+    } catch (err) {
       Toast.show({
         type: "error",
         text1: t("complaints.details.updateFailed"),
         text2:
-          e?.response?.data?.message ||
+          err?.response?.data?.message ||
           t("complaints.details.couldNotUpdateStatus"),
       });
     } finally {
-      setUpdating(false);
+      setStartingWork(false);
     }
   };
 
   // Worker: Take photo with camera
   const takePhoto = async () => {
+    if (selectedPhotos.length >= 5) return;
+
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
       if (status !== "granted") {
         Toast.show({
           type: "error",
-          text1: t("complaints.permissionRequired"),
-          text2: t("complaints.cameraPermissionDenied"),
+          text1: t("complaints.details.permissionRequired"),
+          text2: t("complaints.details.cameraPermissionDenied"),
         });
         return;
       }
@@ -501,20 +537,28 @@ function ComplaintDetailsInner() {
       });
 
       if (!result.canceled && result.assets) {
-        setSelectedPhotos(result.assets);
-        setPhotoUploadModalVisible(false);
-        await uploadCompletionPhotos(result.assets);
+        setSelectedPhotos((prev) => {
+          const remainingSlots = 5 - prev.length;
+          const nextAssets = result.assets.slice(0, remainingSlots);
+          return [...prev, ...nextAssets];
+        });
       }
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: t("complaints.takePhotoFailed"),
+        text1: t("complaints.details.takePhotoFailed"),
         text2: err.message,
       });
     }
   };
 
-  // Worker: Upload completion photos (after photos)
+  const removeSelectedPhoto = (indexToRemove) => {
+    setSelectedPhotos((prev) =>
+      prev.filter((_, index) => index !== indexToRemove),
+    );
+  };
+
+  // Worker: Upload completion photos and submit for HOD approval
   const uploadCompletionPhotos = async (photos) => {
     if (!photos || photos.length === 0) return;
 
@@ -530,10 +574,11 @@ function ComplaintDetailsInner() {
           name: `completion_${Date.now()}_${index}.${fileExtension}`,
         });
       });
+      formData.append("status", "pending-approval");
 
       await apiCall({
-        method: "POST",
-        url: UPLOAD_COMPLETION_PHOTOS_URL(id),
+        method: "PUT",
+        url: UPDATE_COMPLAINT_STATUS_URL(id),
         data: formData,
         headers: {
           "Content-Type": "multipart/form-data",
@@ -542,8 +587,10 @@ function ComplaintDetailsInner() {
 
       Toast.show({
         type: "success",
-        text1: t("complaints.uploadSuccess"),
-        text2: t("complaints.afterPhotosUploaded"),
+        text1: t("complaints.details.statusUpdated"),
+        text2: t("complaints.details.markedAs", {
+          status: t("complaints.status.pendingApproval"),
+        }),
       });
 
       setSelectedPhotos([]);
@@ -551,13 +598,20 @@ function ComplaintDetailsInner() {
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: t("complaints.uploadFailed"),
+        text1: t("complaints.details.updateFailed"),
         text2:
-          err?.response?.data?.message || t("complaints.couldNotUploadPhotos"),
+          err?.response?.data?.message ||
+          t("complaints.details.couldNotUpdateStatus"),
       });
     } finally {
       setUploadingPhotos(false);
     }
+  };
+
+  const handleUploadFromModal = async () => {
+    if (!selectedPhotos?.length) return;
+    await uploadCompletionPhotos(selectedPhotos);
+    setPhotoUploadModalVisible(false);
   };
 
   // Fetch satisfaction votes
@@ -594,11 +648,11 @@ function ComplaintDetailsInner() {
 
       Toast.show({
         type: "success",
-        text1: t("complaints.voteRecorded"),
+        text1: t("complaints.details.voteRecorded"),
         text2:
           voteType === "up"
-            ? t("complaints.thanksForPositiveFeedback")
-            : t("complaints.feedbackReceived"),
+            ? t("complaints.details.thanksForPositiveFeedback")
+            : t("complaints.details.feedbackReceived"),
       });
 
       // Update satisfaction votes from response
@@ -611,9 +665,10 @@ function ComplaintDetailsInner() {
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: t("complaints.voteFailed"),
+        text1: t("complaints.details.voteFailed"),
         text2:
-          err?.response?.data?.message || t("complaints.couldNotRecordVote"),
+          err?.response?.data?.message ||
+          t("complaints.details.couldNotRecordVote"),
       });
     } finally {
       setVotingInProgress(false);
@@ -641,18 +696,6 @@ function ComplaintDetailsInner() {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
-
-  const formatStatusLabel = (status) => {
-    const s = String(status || "").toLowerCase();
-    if (s === "needs-rework") return t("complaints.status.needsRework");
-    if (s === "in-progress") return t("complaints.status.inProgress");
-    if (s === "pending-approval") return t("complaints.status.pendingApproval");
-    if (s === "assigned") return t("complaints.status.assigned");
-    if (s === "resolved") return t("complaints.status.resolved");
-    if (s === "cancelled") return t("complaints.status.cancelled");
-    if (s === "pending") return t("complaints.status.pending");
-    return String(status || "-").replace("-", " ");
   };
 
   const handleShare = async () => {
@@ -803,15 +846,6 @@ function ComplaintDetailsInner() {
     );
   }
 
-  const statusOptions = [
-    { value: "assigned", label: t("complaints.status.assigned") },
-    { value: "in-progress", label: t("complaints.status.inProgress") },
-    {
-      value: "pending-approval",
-      label: t("complaints.status.pendingApproval"),
-    },
-  ];
-
   const latitude = Number(complaint?.coordinates?.lat);
   const longitude = Number(complaint?.coordinates?.lng);
   const hasCoordinates =
@@ -839,6 +873,58 @@ function ComplaintDetailsInner() {
     userRole === "user"
       ? isComplaintOwner
       : userRole === "head" || userRole === "worker" || userRole === "admin";
+
+  const assignedWorkerCount = complaint.assignedWorkers?.length ?? 0;
+  const hasAssignedWorkers = assignedWorkerCount > 0;
+  const latestHistoryStatus = normalizeStatus(
+    complaint.history?.[complaint.history.length - 1]?.status,
+  );
+  const complaintStatus = normalizeStatus(complaint.status);
+  const effectiveActionStatus = CANONICAL_COMPLAINT_STATUSES.includes(
+    latestHistoryStatus,
+  )
+    ? latestHistoryStatus
+    : complaintStatus;
+  const workerActionStatus = WORKER_ACTIONABLE_STATUSES.includes(
+    effectiveActionStatus,
+  )
+    ? effectiveActionStatus
+    : complaintStatus;
+  const isCurrentWorkerAssigned =
+    userRole === "worker" &&
+    (assignedWorkerCount === 0 ||
+      (complaint.assignedWorkers || []).some((assignment) => {
+        const workerId =
+          assignment?.workerId?._id ||
+          assignment?.workerId?.id ||
+          assignment?.workerId;
+        return String(workerId || "") === String(currentUserId || "");
+      }));
+
+  const showHeadReviewAction =
+    userRole === "head" && effectiveActionStatus === "pending-approval";
+  const showHeadManageWorkersAction =
+    userRole === "head" &&
+    !HEAD_MANAGE_BLOCKED_STATUSES.includes(effectiveActionStatus);
+  const showHeadCancelAction =
+    showHeadManageWorkersAction && !hasAssignedWorkers;
+  const headActionFooterHeight = showHeadReviewAction
+    ? 170
+    : showHeadManageWorkersAction
+      ? showHeadCancelAction
+        ? 170
+        : 100
+      : 0;
+  const showWorkerStartWorkAction =
+    isCurrentWorkerAssigned &&
+    (workerActionStatus === "assigned" ||
+      workerActionStatus === "needs-rework");
+  const showWorkerUploadAction =
+    isCurrentWorkerAssigned && workerActionStatus === "in-progress";
+  const workerActionFooterHeight =
+    showWorkerStartWorkAction || showWorkerUploadAction ? 100 : 0;
+  const detailBottomPadding =
+    120 + headActionFooterHeight + workerActionFooterHeight;
 
   const upvoteCount = complaint.upvoteCount || 0;
   const upvoteImpactLabel =
@@ -911,7 +997,10 @@ function ComplaintDetailsInner() {
       />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingBottom: detailBottomPadding,
+        }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -950,7 +1039,7 @@ function ComplaintDetailsInner() {
               className="text-lg font-bold mt-1 capitalize"
               style={{ color: getStatusColor(complaint.status, colors) }}
             >
-              {formatStatusLabel(complaint.status)}
+              {formatStatusLabel(t, complaint.status)}
             </Text>
           </Card>
           <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
@@ -965,348 +1054,6 @@ function ComplaintDetailsInner() {
             </Text>
           </Card>
         </View>
-
-        {/* Discussion Thread - Moved up for quicker access */}
-        {showDiscussionThread && (
-          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center flex-1 pr-2">
-                <View
-                  className="w-9 h-9 rounded-xl items-center justify-center"
-                  style={{ backgroundColor: colors.primary + "18" }}
-                >
-                  <MessageSquare size={16} color={colors.primary} />
-                </View>
-                <View className="ml-2.5 flex-1">
-                  <Text
-                    className="text-base font-semibold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {t("complaints.details.complaintChat")}
-                  </Text>
-                  <Text
-                    className="text-xs mt-0.5"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("complaints.details.complaintChatSubtitle")}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/complaints/complaint-chat",
-                    params: { id, ticketId: complaint.ticketId },
-                  })
-                }
-                className="h-10 flex-row items-center justify-center px-3.5 rounded-xl"
-                style={{
-                  backgroundColor: colors.primary,
-                  borderWidth: 1,
-                  borderColor: `${colors.backgroundPrimary}CC`,
-                }}
-              >
-                <MessageSquare size={14} color={colors.light} />
-                <Text
-                  className="text-sm font-semibold ml-1.5"
-                  style={{ color: colors.light }}
-                >
-                  {t("complaints.details.openChat")}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-        )}
-
-        {/* SLA Status Card */}
-        {complaint.sla && complaint.sla.dueDate && (
-          <Card
-            style={{
-              margin: 0,
-              marginBottom: 12,
-              flex: 0,
-              borderWidth: 1.5,
-              borderColor:
-                complaint.sla.isOverdue || slaCountdown?.isOverdue
-                  ? colors.error
-                  : slaCountdown?.isCritical
-                    ? colors.error
-                    : slaCountdown?.isUrgent
-                      ? colors.warning
-                      : colors.border,
-            }}
-          >
-            {/* Header */}
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="flex-row items-center">
-                <ShieldAlert
-                  size={18}
-                  color={
-                    complaint.sla.isOverdue || slaCountdown?.isOverdue
-                      ? colors.error
-                      : slaCountdown?.isCritical
-                        ? colors.error
-                        : slaCountdown?.isUrgent
-                          ? colors.warning
-                          : colors.success
-                  }
-                />
-                <Text
-                  className="text-base font-semibold ml-2"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {t("complaints.details.sla.title")}
-                </Text>
-              </View>
-
-              {/* Escalation level badge */}
-              {(complaint.sla.escalationLevel || 0) > 0 && (
-                <View
-                  className="flex-row items-center px-2 py-1 rounded-lg"
-                  style={{ backgroundColor: colors.warning + "22" }}
-                >
-                  <ChevronUp size={12} color={colors.warning} />
-                  <Text
-                    className="text-xs font-bold ml-1"
-                    style={{ color: colors.warning }}
-                  >
-                    {t("complaints.details.sla.level")}{" "}
-                    {complaint.sla.escalationLevel}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Due Date row */}
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                {t("complaints.details.sla.dueDate")}
-              </Text>
-              <Text
-                className="text-sm font-semibold"
-                style={{ color: colors.textPrimary }}
-              >
-                {new Date(complaint.sla.dueDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </Text>
-            </View>
-
-            <View
-              className="h-[1px] mb-2"
-              style={{ backgroundColor: colors.border }}
-            />
-
-            {/* Overdue / Countdown row */}
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                {complaint.sla.isOverdue || slaCountdown?.isOverdue
-                  ? t("complaints.details.sla.status")
-                  : t("complaints.details.sla.timeLeft")}
-              </Text>
-
-              {complaint.sla.isOverdue || slaCountdown?.isOverdue ? (
-                <View
-                  className="flex-row items-center px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: colors.error + "22" }}
-                >
-                  <AlertTriangle size={14} color={colors.error} />
-                  <Text
-                    className="text-sm font-bold ml-1.5"
-                    style={{ color: colors.error }}
-                  >
-                    {t("complaints.details.sla.overdue")}
-                  </Text>
-                </View>
-              ) : slaCountdown ? (
-                <View
-                  className="flex-row items-center px-3 py-1 rounded-lg"
-                  style={{
-                    backgroundColor: slaCountdown.isCritical
-                      ? colors.error + "22"
-                      : slaCountdown.isUrgent
-                        ? colors.warning + "22"
-                        : colors.success + "22",
-                  }}
-                >
-                  <Clock
-                    size={14}
-                    color={
-                      slaCountdown.isCritical
-                        ? colors.error
-                        : slaCountdown.isUrgent
-                          ? colors.warning
-                          : colors.success
-                    }
-                  />
-                  <Text
-                    className="text-sm font-bold ml-1.5"
-                    style={{
-                      color: slaCountdown.isCritical
-                        ? colors.error
-                        : slaCountdown.isUrgent
-                          ? colors.warning
-                          : colors.success,
-                    }}
-                  >
-                    {slaCountdown.text}
-                  </Text>
-                </View>
-              ) : (
-                <View
-                  className="px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: colors.success + "22" }}
-                >
-                  <Text
-                    className="text-sm font-bold"
-                    style={{ color: colors.success }}
-                  >
-                    {t("complaints.details.sla.onTime")}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Card>
-        )}
-
-        {/* ETA Card — next to SLA, for assigned/in-progress */}
-        {complaint.estimatedCompletionTime &&
-          (complaint.status === "assigned" ||
-            complaint.status === "in-progress") && (
-            <Card
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                flex: 0,
-                borderWidth: 1.5,
-                borderColor: colors.info + "60",
-              }}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center">
-                  <Clock size={18} color={colors.info} />
-                  <Text
-                    className="text-base font-semibold ml-2"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {t("complaints.details.estimatedCompletion")}
-                  </Text>
-                </View>
-                <View
-                  className="px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: colors.info + "18" }}
-                >
-                  <Text
-                    className="text-sm font-bold"
-                    style={{ color: colors.info }}
-                  >
-                    {complaint.estimatedCompletionTime < 24
-                      ? `${complaint.estimatedCompletionTime}h`
-                      : `${Math.round(complaint.estimatedCompletionTime / 24)}d`}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          )}
-
-        {/* Citizen: Upvote Button (Interactive) */}
-        {userRole === "user" && (
-          <PressableBlock onPress={handleUpvote} disabled={upvoting}>
-            <Card
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                flex: 0,
-                backgroundColor: hasUpvoted
-                  ? colors.primary + "20"
-                  : colors.backgroundSecondary,
-              }}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center flex-1">
-                  <ThumbsUp
-                    size={24}
-                    color={hasUpvoted ? colors.primary : colors.textSecondary}
-                    fill={hasUpvoted ? colors.primary : "transparent"}
-                  />
-                  <View className="ml-3 flex-1">
-                    <Text
-                      className="text-base font-semibold"
-                      style={{
-                        color: hasUpvoted ? colors.primary : colors.textPrimary,
-                      }}
-                    >
-                      {hasUpvoted
-                        ? t("complaints.details.upvoted")
-                        : t("complaints.details.upvote")}
-                    </Text>
-                    <Text
-                      className="text-sm mt-0.5"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {upvoteCount}{" "}
-                      {(complaint.upvoteCount || 0) === 1
-                        ? t("complaints.details.personAffected")
-                        : t("complaints.details.peopleAffected")}
-                    </Text>
-                  </View>
-                </View>
-                <View className="flex-row items-center">
-                  {upvoting && (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  )}
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      setUpvoteInfoModalVisible(true);
-                    }}
-                    className="w-8 h-8 rounded-full items-center justify-center ml-2"
-                    style={{ backgroundColor: colors.backgroundSecondary }}
-                  >
-                    <Info size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Card>
-          </PressableBlock>
-        )}
-
-        {/* HOD/Worker: Upvote Count (Read-only) */}
-        {(userRole === "head" || userRole === "worker") && (
-          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center">
-                <ThumbsUp size={20} color={colors.primary} />
-                <Text
-                  className="text-base font-semibold ml-2"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {t("complaints.details.communityUpvotes")}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setUpvoteInfoModalVisible(true)}
-                className="w-8 h-8 rounded-full items-center justify-center"
-                style={{ backgroundColor: colors.backgroundPrimary }}
-              >
-                <Info size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <Text
-              className="text-sm mt-2"
-              style={{ color: colors.textSecondary }}
-            >
-              {upvoteCount}{" "}
-              {(complaint.upvoteCount || 0) === 1
-                ? t("complaints.details.personAffected")
-                : t("complaints.details.peopleAffected")}
-            </Text>
-          </Card>
-        )}
 
         {/* HOD: AI Suggestion Review */}
         {userRole === "head" &&
@@ -1586,235 +1333,26 @@ function ComplaintDetailsInner() {
             </Card>
           )}
 
-        {/* HOD: Current Assigned Workers */}
-        {userRole === "head" && complaint.isAssigned && (
-          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <View className="flex-row items-center mb-2">
-              <Users size={18} color={colors.primary} />
-              <Text
-                className="text-sm ml-2 font-semibold"
-                style={{ color: colors.textPrimary }}
-              >
-                {complaint.assignedWorkers?.length === 1
-                  ? t("complaints.details.currentlyAssigned")
-                  : t("complaints.details.assignedWorkersCount", {
-                      count: complaint.assignedWorkers?.length ?? 0,
-                    })}
-              </Text>
-            </View>
-            {(complaint.assignedWorkers ?? []).slice(0, 4).map((w, i) => (
-              <View
-                key={i}
-                className="flex-row items-center justify-between mt-1"
-              >
+        {userRole === "worker" &&
+          complaint.status === "needs-rework" &&
+          complaint.reworkReason && (
+            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+              <View className="flex-row items-center mb-2">
+                <AlertCircle size={18} color={colors.warning} />
                 <Text
-                  className="text-sm font-semibold flex-1"
+                  className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
-                  numberOfLines={1}
                 >
-                  {w.workerName ?? t("complaints.details.assignedWorker")}
+                  {t("complaints.details.reworkInstructions")}
                 </Text>
-                <View
-                  className="ml-2 px-2 py-0.5 rounded-full"
-                  style={{
-                    backgroundColor:
-                      w.status === "completed"
-                        ? colors.success + "22"
-                        : w.status === "in-progress"
-                          ? colors.warning + "22"
-                          : w.status === "needs-rework"
-                            ? colors.error + "22"
-                            : colors.info + "22",
-                  }}
-                >
-                  <Text
-                    className="text-xs font-semibold capitalize"
-                    style={{
-                      color:
-                        w.status === "completed"
-                          ? colors.success
-                          : w.status === "in-progress"
-                            ? colors.warning
-                            : w.status === "needs-rework"
-                              ? colors.error
-                              : colors.info,
-                    }}
-                  >
-                    {(w.status ?? "assigned").replace("-", " ")}
-                  </Text>
-                </View>
               </View>
-            ))}
-          </Card>
-        )}
-
-        {/* HOD: Manage Workers Button */}
-        {userRole === "head" &&
-          complaint.status !== "resolved" &&
-          complaint.status !== "cancelled" && (
-            <PressableBlock
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/hod/worker-assignment",
-                  params: { complaintId: id },
-                })
-              }
-            >
-              <Card
-                style={{
-                  margin: 0,
-                  marginBottom: 12,
-                  flex: 0,
-                  backgroundColor: colors.primary,
-                }}
-              >
-                <View className="flex-row items-center justify-center">
-                  <Users size={20} color={colors.light} />
-                  <Text
-                    className="text-base font-semibold ml-2"
-                    style={{ color: colors.light }}
-                  >
-                    {complaint.isAssigned
-                      ? t("complaints.details.manageWorkers")
-                      : t("complaints.details.assignToWorker")}
-                  </Text>
-                </View>
-              </Card>
-            </PressableBlock>
-          )}
-
-        {userRole === "head" &&
-          complaint.status !== "resolved" &&
-          complaint.status !== "cancelled" &&
-          !complaint.isAssigned && (
-            <PressableBlock
-              onPress={handleCancelComplaint}
-              disabled={cancelling}
-            >
-              <Card
-                style={{
-                  margin: 0,
-                  marginBottom: 12,
-                  flex: 0,
-                  backgroundColor: colors.error,
-                }}
-              >
-                <View className="flex-row items-center justify-center">
-                  {cancelling ? (
-                    <ActivityIndicator size="small" color={colors.light} />
-                  ) : (
-                    <Text
-                      className="text-base font-semibold"
-                      style={{ color: colors.light }}
-                    >
-                      {t("complaints.details.cancelComplaint")}
-                    </Text>
-                  )}
-                </View>
-              </Card>
-            </PressableBlock>
-          )}
-
-        {/* HOD: Review Pending Approval */}
-        {userRole === "head" && complaint.status === "pending-approval" && (
-          <View className="mb-3">
-            <Card
-              style={{
-                margin: 0,
-                marginBottom: 8,
-                flex: 0,
-                backgroundColor: colors.success,
-              }}
-            >
-              <PressableBlock
-                onPress={handleApproveCompletion}
-                disabled={approving}
-              >
-                <View className="flex-row items-center justify-center py-1">
-                  {approving ? (
-                    <ActivityIndicator size="small" color={colors.light} />
-                  ) : (
-                    <>
-                      <Text
-                        className="text-base font-semibold"
-                        style={{ color: colors.light }}
-                      >
-                        {t("complaints.details.approveCompletion")}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              </PressableBlock>
+              <Text className="text-sm" style={{ color: colors.textPrimary }}>
+                {String(complaint.reworkReason || "").replace(
+                  /^Marked as needs-rework by HOD:\s*/,
+                  "",
+                )}
+              </Text>
             </Card>
-
-            <Card
-              style={{
-                margin: 0,
-                flex: 0,
-                backgroundColor: colors.error,
-              }}
-            >
-              <PressableBlock onPress={() => setApprovalModalVisible(true)}>
-                <View className="flex-row items-center justify-center py-1">
-                  <Text
-                    className="text-base font-semibold"
-                    style={{ color: colors.light }}
-                  >
-                    {t("complaints.details.requestRework")}
-                  </Text>
-                </View>
-              </PressableBlock>
-            </Card>
-          </View>
-        )}
-
-        {/* Worker: Update Status Button */}
-        {userRole === "worker" &&
-          complaint.status !== "resolved" &&
-          complaint.status !== "cancelled" && (
-            <PressableBlock onPress={() => setStatusModalVisible(true)}>
-              <Card
-                style={{
-                  margin: 0,
-                  marginBottom: 12,
-                  flex: 0,
-                  backgroundColor: colors.primary,
-                }}
-              >
-                <Text
-                  className="text-base font-semibold text-center"
-                  style={{ color: colors.light }}
-                >
-                  {t("complaints.details.updateStatus")}
-                </Text>
-              </Card>
-            </PressableBlock>
-          )}
-
-        {/* Worker: Upload After Photos Button */}
-        {userRole === "worker" &&
-          complaint.status !== "resolved" &&
-          complaint.status !== "cancelled" && (
-            <PressableBlock onPress={() => setPhotoUploadModalVisible(true)}>
-              <Card
-                style={{
-                  margin: 0,
-                  marginBottom: 12,
-                  flex: 0,
-                  backgroundColor: colors.success,
-                }}
-              >
-                <View className="flex-row items-center justify-center py-1">
-                  <Upload size={20} color={colors.light} />
-                  <Text
-                    className="text-base font-semibold ml-2"
-                    style={{ color: colors.light }}
-                  >
-                    {t("complaints.details.uploadAfterPhotos")}
-                  </Text>
-                </View>
-              </Card>
-            </PressableBlock>
           )}
 
         {/* Title and Description */}
@@ -1889,6 +1427,186 @@ function ComplaintDetailsInner() {
             </>
           )}
         </Card>
+
+        {/* Community Upvote + Chat (side by side) */}
+        {userRole === "user" && (
+          <View className={showDiscussionThread ? "flex-row mb-3" : "mb-3"}>
+            <View
+              style={{ flex: 1, marginRight: showDiscussionThread ? 6 : 0 }}
+            >
+              <PressableBlock onPress={handleUpvote} disabled={upvoting}>
+                <Card
+                  style={{
+                    margin: 0,
+                    flex: 0,
+                    backgroundColor: hasUpvoted
+                      ? colors.primary + "20"
+                      : colors.backgroundSecondary,
+                  }}
+                >
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center flex-1">
+                      <ThumbsUp
+                        size={24}
+                        color={
+                          hasUpvoted ? colors.primary : colors.textSecondary
+                        }
+                        fill={hasUpvoted ? colors.primary : "transparent"}
+                      />
+                      <View className="ml-3 flex-1">
+                        <Text
+                          className="text-base font-semibold"
+                          style={{
+                            color: hasUpvoted
+                              ? colors.primary
+                              : colors.textPrimary,
+                          }}
+                        >
+                          {hasUpvoted
+                            ? t("complaints.details.upvoted")
+                            : t("complaints.details.upvote")}
+                        </Text>
+                        <Text
+                          className="text-sm mt-0.5"
+                          style={{ color: colors.textSecondary }}
+                        >
+                          {upvoteCount}{" "}
+                          {(complaint.upvoteCount || 0) === 1
+                            ? t("complaints.details.personAffected")
+                            : t("complaints.details.peopleAffected")}
+                        </Text>
+                      </View>
+                    </View>
+                    <View className="flex-row items-center">
+                      {upvoting && (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.primary}
+                        />
+                      )}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          setUpvoteInfoModalVisible(true);
+                        }}
+                        className="w-8 h-8 items-center justify-center ml-2"
+                      >
+                        <Info size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Card>
+              </PressableBlock>
+            </View>
+
+            {showDiscussionThread && (
+              <Card
+                style={{
+                  margin: 0,
+                  marginLeft: 6,
+                  flex: 0,
+                  flexGrow: 0,
+                  flexBasis: "auto",
+                  width: 104,
+                  backgroundColor: colors.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: "/complaints/complaint-chat",
+                      params: { id, ticketId: complaint.ticketId },
+                    })
+                  }
+                  className="py-3 px-2 items-center justify-center"
+                >
+                  <MessageSquare size={18} color={colors.primary} />
+                  <Text
+                    className="text-sm font-semibold mt-1"
+                    style={{ color: colors.primary }}
+                  >
+                    {t("complaints.details.openChat")}
+                  </Text>
+                </TouchableOpacity>
+              </Card>
+            )}
+          </View>
+        )}
+
+        {(userRole === "head" || userRole === "worker") && (
+          <View className={showDiscussionThread ? "flex-row mb-3" : "mb-3"}>
+            <Card
+              style={{
+                margin: 0,
+                marginRight: showDiscussionThread ? 6 : 0,
+                flex: 1,
+              }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <ThumbsUp size={20} color={colors.primary} />
+                  <Text
+                    className="text-base font-semibold ml-2"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {t("complaints.details.communityUpvotes")}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setUpvoteInfoModalVisible(true)}
+                  className="w-8 h-8 items-center justify-center"
+                >
+                  <Info size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text
+                className="text-sm mt-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {upvoteCount}{" "}
+                {(complaint.upvoteCount || 0) === 1
+                  ? t("complaints.details.personAffected")
+                  : t("complaints.details.peopleAffected")}
+              </Text>
+            </Card>
+
+            {showDiscussionThread && (
+              <Card
+                style={{
+                  margin: 0,
+                  marginLeft: 6,
+                  flex: 0,
+                  flexGrow: 0,
+                  flexBasis: "auto",
+                  width: 104,
+                  backgroundColor: colors.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: "/complaints/complaint-chat",
+                      params: { id, ticketId: complaint.ticketId },
+                    })
+                  }
+                  className="py-3 px-2 items-center justify-center"
+                >
+                  <MessageSquare size={18} color={colors.primary} />
+                  <Text
+                    className="text-sm font-semibold mt-1"
+                    style={{ color: colors.primary }}
+                  >
+                    {t("complaints.details.openChat")}
+                  </Text>
+                </TouchableOpacity>
+              </Card>
+            )}
+          </View>
+        )}
 
         {/* Department and Location */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -2013,6 +1731,161 @@ function ComplaintDetailsInner() {
           </View>
         </Card>
 
+        {/* SLA Status Card */}
+        {complaint.sla && complaint.sla.dueDate && (
+          <Card
+            style={{
+              margin: 0,
+              marginBottom: 12,
+              flex: 0,
+              borderWidth: 1.5,
+              borderColor:
+                complaint.sla.isOverdue || slaCountdown?.isOverdue
+                  ? colors.error
+                  : slaCountdown?.isCritical
+                    ? colors.error
+                    : slaCountdown?.isUrgent
+                      ? colors.warning
+                      : colors.border,
+            }}
+          >
+            {/* Header */}
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <ShieldAlert
+                  size={18}
+                  color={
+                    complaint.sla.isOverdue || slaCountdown?.isOverdue
+                      ? colors.error
+                      : slaCountdown?.isCritical
+                        ? colors.error
+                        : slaCountdown?.isUrgent
+                          ? colors.warning
+                          : colors.success
+                  }
+                />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("complaints.details.sla.title")}
+                </Text>
+              </View>
+
+              {/* Escalation level badge */}
+              {(complaint.sla.escalationLevel || 0) > 0 && (
+                <View
+                  className="flex-row items-center px-2 py-1 rounded-lg"
+                  style={{ backgroundColor: colors.warning + "22" }}
+                >
+                  <ChevronUp size={12} color={colors.warning} />
+                  <Text
+                    className="text-xs font-bold ml-1"
+                    style={{ color: colors.warning }}
+                  >
+                    {t("complaints.details.sla.level")}{" "}
+                    {complaint.sla.escalationLevel}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Due Date row */}
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                {t("complaints.details.sla.dueDate")}
+              </Text>
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: colors.textPrimary }}
+              >
+                {new Date(complaint.sla.dueDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+            </View>
+
+            <View
+              className="h-[1px] mb-2"
+              style={{ backgroundColor: colors.border }}
+            />
+
+            {/* Overdue / Countdown row */}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                {complaint.sla.isOverdue || slaCountdown?.isOverdue
+                  ? t("complaints.details.sla.status")
+                  : t("complaints.details.sla.timeLeft")}
+              </Text>
+
+              {complaint.sla.isOverdue || slaCountdown?.isOverdue ? (
+                <View
+                  className="flex-row items-center px-3 py-1 rounded-lg"
+                  style={{ backgroundColor: colors.error + "22" }}
+                >
+                  <AlertTriangle size={14} color={colors.error} />
+                  <Text
+                    className="text-sm font-bold ml-1.5"
+                    style={{ color: colors.error }}
+                  >
+                    {t("complaints.details.sla.overdue")}
+                  </Text>
+                </View>
+              ) : slaCountdown ? (
+                <View
+                  className="flex-row items-center px-3 py-1 rounded-lg"
+                  style={{
+                    backgroundColor: slaCountdown.isCritical
+                      ? colors.error + "22"
+                      : slaCountdown.isUrgent
+                        ? colors.warning + "22"
+                        : colors.success + "22",
+                  }}
+                >
+                  <Clock
+                    size={14}
+                    color={
+                      slaCountdown.isCritical
+                        ? colors.error
+                        : slaCountdown.isUrgent
+                          ? colors.warning
+                          : colors.success
+                    }
+                  />
+                  <Text
+                    className="text-sm font-bold ml-1.5"
+                    style={{
+                      color: slaCountdown.isCritical
+                        ? colors.error
+                        : slaCountdown.isUrgent
+                          ? colors.warning
+                          : colors.success,
+                    }}
+                  >
+                    {slaCountdown.text}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  className="px-3 py-1 rounded-lg"
+                  style={{ backgroundColor: colors.success + "22" }}
+                >
+                  <Text
+                    className="text-sm font-bold"
+                    style={{ color: colors.success }}
+                  >
+                    {t("complaints.details.sla.onTime")}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Card>
+        )}
+
         {/* Proof Image */}
         {complaint.proofImage &&
           (Array.isArray(complaint.proofImage)
@@ -2034,20 +1907,23 @@ function ComplaintDetailsInner() {
               {Array.isArray(complaint.proofImage) ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {complaint.proofImage.map((img, idx) => (
-                    <PressableBlock
-                      key={idx}
-                      onPress={() => setImageModalVisible(true)}
+                    <Pressable
+                      key={`${idx}-${img}`}
+                      onPress={() => openImagePreview(img)}
+                      style={{ marginRight: 8 }}
                     >
                       <Image
                         source={{ uri: img }}
-                        className="w-32 h-32 rounded-xl mr-2"
+                        className="w-32 h-32 rounded-xl"
                         resizeMode="cover"
                       />
-                    </PressableBlock>
+                    </Pressable>
                   ))}
                 </ScrollView>
               ) : (
-                <PressableBlock onPress={() => setImageModalVisible(true)}>
+                <Pressable
+                  onPress={() => openImagePreview(complaint.proofImage)}
+                >
                   <Image
                     source={{ uri: complaint.proofImage }}
                     className="w-full h-48 rounded-xl"
@@ -2066,7 +1942,7 @@ function ComplaintDetailsInner() {
                       </Text>
                     </View>
                   </View>
-                </PressableBlock>
+                </Pressable>
               )}
             </Card>
           )}
@@ -2086,16 +1962,17 @@ function ComplaintDetailsInner() {
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {complaint.completionPhotos.map((img, idx) => (
-                  <PressableBlock
-                    key={idx}
-                    onPress={() => setImageModalVisible(true)}
+                  <Pressable
+                    key={`${idx}-${img}`}
+                    onPress={() => openImagePreview(img)}
+                    style={{ marginRight: 8 }}
                   >
                     <Image
                       source={{ uri: img }}
-                      className="w-32 h-32 rounded-xl mr-2"
+                      className="w-32 h-32 rounded-xl"
                       resizeMode="cover"
                     />
-                  </PressableBlock>
+                  </Pressable>
                 ))}
               </ScrollView>
             </Card>
@@ -2109,10 +1986,10 @@ function ComplaintDetailsInner() {
                 className="text-base font-semibold mb-2"
                 style={{ color: colors.textPrimary }}
               >
-                {t("complaints.satisfactionVote")}
+                {t("complaints.details.satisfactionVote")}
               </Text>
               <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                {t("complaints.satisfactionVoteDesc")}
+                {t("complaints.details.satisfactionVoteDesc")}
               </Text>
             </View>
 
@@ -2157,7 +2034,7 @@ function ComplaintDetailsInner() {
                         : colors.textSecondary,
                   }}
                 >
-                  {t("complaints.satisfied")}
+                  {t("complaints.details.satisfied")}
                 </Text>
               </Pressable>
 
@@ -2168,7 +2045,7 @@ function ComplaintDetailsInner() {
                 style={{
                   backgroundColor:
                     satisfactionVotes.userVote === "down"
-                      ? colors.error
+                      ? colors.danger
                       : colors.backgroundSecondary,
                   opacity: votingInProgress ? 0.5 : 1,
                 }}
@@ -2201,7 +2078,7 @@ function ComplaintDetailsInner() {
                         : colors.textSecondary,
                   }}
                 >
-                  {t("complaints.notSatisfied")}
+                  {t("complaints.details.notSatisfied")}
                 </Text>
               </Pressable>
             </View>
@@ -2241,7 +2118,7 @@ function ComplaintDetailsInner() {
                     </View>
                     <Text
                       className="text-xs font-bold w-10"
-                      style={{ color: colors.error }}
+                      style={{ color: colors.danger }}
                     >
                       {downPct}%
                     </Text>
@@ -2265,104 +2142,10 @@ function ComplaintDetailsInner() {
                   className="text-xs text-center"
                   style={{ color: colors.textSecondary }}
                 >
-                  {t("complaints.yourVoteRecorded")}
+                  {t("complaints.details.yourVoteRecorded")}
                 </Text>
               </View>
             )}
-          </Card>
-        )}
-
-        {/* Timeline */}
-        <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-          <View className="flex-row items-center mb-3">
-            <Clock size={20} color={colors.primary} />
-            <Text
-              className="text-base font-semibold ml-2"
-              style={{ color: colors.textPrimary }}
-            >
-              {t("complaints.details.timeline")}
-            </Text>
-          </View>
-
-          <View className="mb-3">
-            <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              {t("complaints.details.created")}
-            </Text>
-            <Text
-              className="text-base font-semibold mt-1"
-              style={{ color: colors.textPrimary }}
-            >
-              {formatDate(complaint.createdAt)}
-            </Text>
-          </View>
-
-          <View
-            className="h-[1px] mb-3"
-            style={{ backgroundColor: colors.border }}
-          />
-
-          <View className="mb-3">
-            <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              {t("complaints.details.lastUpdated")}
-            </Text>
-            <Text
-              className="text-base font-semibold mt-1"
-              style={{ color: colors.textPrimary }}
-            >
-              {formatDate(complaint.updatedAt)}
-            </Text>
-          </View>
-
-          {/* Show ETA for assigned/in-progress complaints */}
-          {complaint.estimatedCompletionTime &&
-            (complaint.status === "assigned" ||
-              complaint.status === "in-progress") && (
-              <>
-                <View
-                  className="h-[1px] mb-3"
-                  style={{ backgroundColor: colors.border }}
-                />
-                <View>
-                  <Text
-                    className="text-sm"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("complaints.details.estimatedCompletion")}
-                  </Text>
-                  <Text
-                    className="text-base font-semibold mt-1"
-                    style={{ color: colors.warning }}
-                  >
-                    {complaint.estimatedCompletionTime < 24
-                      ? `${complaint.estimatedCompletionTime} ${t("complaints.details.hours")}`
-                      : `${Math.round(complaint.estimatedCompletionTime / 24)} ${t("complaints.details.days")}`}
-                  </Text>
-                  {userRole === "head" && (
-                    <Text
-                      className="text-xs mt-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {t("complaints.details.etaExplanation")}
-                    </Text>
-                  )}
-                </View>
-              </>
-            )}
-        </Card>
-
-        {/* Complaint Timeline */}
-        {complaint.history && complaint.history.length > 0 && (
-          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-            <Text
-              className="text-base font-semibold mb-4"
-              style={{ color: colors.textPrimary }}
-            >
-              {t("complaints.details.complaintTimeline")}
-            </Text>
-            <ComplaintTimeline
-              history={complaintTimelineHistory}
-              colors={colors}
-            />
           </Card>
         )}
 
@@ -2425,14 +2208,6 @@ function ComplaintDetailsInner() {
                       >
                         {formatHistoryDate(entry.escalatedAt)}
                       </Text>
-                      {entry.escalatedTo && (
-                        <Text
-                          className="text-xs mt-0.5"
-                          style={{ color: colors.muted }}
-                        >
-                          → {entry.escalatedTo}
-                        </Text>
-                      )}
                     </View>
                   </View>
                 </View>
@@ -2585,14 +2360,311 @@ function ComplaintDetailsInner() {
             )}
           </Card>
         )}
+
+        {/* Complaint Timeline */}
+        {complaint.history && complaint.history.length > 0 && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <Text
+              className="text-base font-semibold mb-4"
+              style={{ color: colors.textPrimary }}
+            >
+              {t("complaints.details.complaintTimeline")}
+            </Text>
+            <ComplaintTimeline
+              history={complaintTimelineHistory}
+              colors={colors}
+              t={t}
+            />
+          </Card>
+        )}
+
+        {/* Timeline */}
+        <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+          <View className="flex-row items-center mb-3">
+            <Clock size={20} color={colors.primary} />
+            <Text
+              className="text-base font-semibold ml-2"
+              style={{ color: colors.textPrimary }}
+            >
+              {t("complaints.details.timeline")}
+            </Text>
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>
+              {t("complaints.details.created")}
+            </Text>
+            <Text
+              className="text-base font-semibold mt-1"
+              style={{ color: colors.textPrimary }}
+            >
+              {formatDate(complaint.createdAt)}
+            </Text>
+          </View>
+
+          <View
+            className="h-[1px] mb-3"
+            style={{ backgroundColor: colors.border }}
+          />
+
+          <View className="mb-3">
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>
+              {t("complaints.details.lastUpdated")}
+            </Text>
+            <Text
+              className="text-base font-semibold mt-1"
+              style={{ color: colors.textPrimary }}
+            >
+              {formatDate(complaint.updatedAt)}
+            </Text>
+          </View>
+
+          {complaint.estimatedCompletionTime &&
+            (complaint.status === "assigned" ||
+              complaint.status === "in-progress") && (
+              <>
+                <View
+                  className="h-[1px] mb-3"
+                  style={{ backgroundColor: colors.border }}
+                />
+                <View>
+                  <Text
+                    className="text-sm"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("complaints.details.estimatedCompletion")}
+                  </Text>
+                  <Text
+                    className="text-base font-semibold mt-1"
+                    style={{ color: colors.warning }}
+                  >
+                    {complaint.estimatedCompletionTime < 24
+                      ? `${complaint.estimatedCompletionTime} ${t("complaints.details.hours")}`
+                      : `${Math.round(complaint.estimatedCompletionTime / 24)} ${t("complaints.details.days")}`}
+                  </Text>
+                  {userRole === "head" && (
+                    <Text
+                      className="text-xs mt-1"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {t("complaints.details.etaExplanation")}
+                    </Text>
+                  )}
+                </View>
+              </>
+            )}
+        </Card>
       </ScrollView>
+
+      {showHeadReviewAction && (
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.backgroundPrimary,
+            paddingHorizontal: 16,
+            paddingTop: 10,
+            paddingBottom: Math.max(insets.bottom, 10),
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <PressableBlock
+            onPress={() => setApprovalModalVisible(true)}
+            disabled={approving}
+          >
+            <Card
+              style={{
+                margin: 0,
+                marginBottom: 10,
+                flex: 0,
+                backgroundColor: colors.error,
+              }}
+            >
+              <View className="flex-row items-center justify-center">
+                <RotateCcw size={20} color={colors.light} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.light }}
+                >
+                  {t("complaints.details.requestRework")}
+                </Text>
+              </View>
+            </Card>
+          </PressableBlock>
+
+          <PressableBlock
+            onPress={handleApproveCompletion}
+            disabled={approving}
+          >
+            <Card
+              style={{
+                margin: 0,
+                flex: 0,
+                backgroundColor: colors.success,
+              }}
+            >
+              <View className="flex-row items-center justify-center">
+                {approving ? (
+                  <ActivityIndicator size="small" color={colors.light} />
+                ) : (
+                  <>
+                    <CheckCircle size={20} color={colors.light} />
+                    <Text
+                      className="text-base font-semibold ml-2"
+                      style={{ color: colors.light }}
+                    >
+                      {t("complaints.details.closeComplaint")}
+                    </Text>
+                  </>
+                )}
+              </View>
+            </Card>
+          </PressableBlock>
+        </View>
+      )}
+
+      {showHeadManageWorkersAction && (
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.backgroundPrimary,
+            paddingHorizontal: 16,
+            paddingTop: 10,
+            paddingBottom: Math.max(insets.bottom, 10),
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <PressableBlock
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/hod/worker-assignment",
+                params: { complaintId: id },
+              })
+            }
+          >
+            <Card
+              style={{
+                margin: 0,
+                marginBottom: showHeadCancelAction ? 10 : 0,
+                flex: 0,
+                backgroundColor: colors.primary,
+              }}
+            >
+              <View className="flex-row items-center justify-center">
+                <Users size={20} color={colors.light} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.light }}
+                >
+                  {hasAssignedWorkers
+                    ? t("complaints.details.manageWorkers")
+                    : t("complaints.details.assignToWorker")}
+                </Text>
+              </View>
+            </Card>
+          </PressableBlock>
+
+          {showHeadCancelAction && (
+            <PressableBlock
+              onPress={() => setCancelModalVisible(true)}
+              disabled={cancelling}
+            >
+              <Card
+                style={{
+                  margin: 0,
+                  flex: 0,
+                  backgroundColor: colors.error,
+                }}
+              >
+                <View className="flex-row items-center justify-center">
+                  {cancelling ? (
+                    <ActivityIndicator size="small" color={colors.light} />
+                  ) : (
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: colors.light }}
+                    >
+                      {t("complaints.details.cancelComplaint")}
+                    </Text>
+                  )}
+                </View>
+              </Card>
+            </PressableBlock>
+          )}
+        </View>
+      )}
+
+      {(showWorkerStartWorkAction || showWorkerUploadAction) && (
+        <SafeAreaView
+          edges={["bottom"]}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.backgroundPrimary,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <View
+            style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 }}
+          >
+            <PressableBlock
+              onPress={
+                showWorkerStartWorkAction
+                  ? handleStartWork
+                  : () => setPhotoUploadModalVisible(true)
+              }
+              disabled={showWorkerStartWorkAction ? startingWork : false}
+            >
+              <Card
+                style={{
+                  margin: 0,
+                  flex: 0,
+                  backgroundColor: showWorkerStartWorkAction
+                    ? colors.primary
+                    : colors.success,
+                }}
+              >
+                <View className="flex-row items-center justify-center">
+                  {showWorkerStartWorkAction ? (
+                    startingWork ? (
+                      <ActivityIndicator size="small" color={colors.light} />
+                    ) : (
+                      <Clock size={20} color={colors.light} />
+                    )
+                  ) : (
+                    <Upload size={20} color={colors.light} />
+                  )}
+                  <Text
+                    className="text-base font-semibold ml-2"
+                    style={{ color: colors.light }}
+                  >
+                    {showWorkerStartWorkAction
+                      ? t("complaints.details.startWork")
+                      : t("complaints.details.uploadTaskCompletionPhoto")}
+                  </Text>
+                </View>
+              </Card>
+            </PressableBlock>
+          </View>
+        </SafeAreaView>
+      )}
 
       {/* Image Modal */}
       <Modal
         visible={imageModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setImageModalVisible(false)}
+        onRequestClose={closeImagePreview}
       >
         <View
           className="flex-1"
@@ -2600,20 +2672,19 @@ function ComplaintDetailsInner() {
         >
           <View className="flex-1 justify-center items-center">
             <Pressable
-              onPress={() => setImageModalVisible(false)}
+              onPress={closeImagePreview}
               className="absolute top-12 right-4 z-10 w-10 h-10 bg-white/20 rounded-full items-center justify-center"
             >
               <X size={22} color={colors.light} />
             </Pressable>
-            <Image
-              source={{
-                uri: Array.isArray(complaint.proofImage)
-                  ? complaint.proofImage[0]
-                  : complaint.proofImage,
-              }}
-              className="w-full h-full"
-              resizeMode="contain"
-            />
+            {!!previewImageUri && (
+              <Image
+                key={previewImageUri}
+                source={{ uri: previewImageUri }}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -2809,96 +2880,150 @@ function ComplaintDetailsInner() {
         </Modal>
       )}
 
-      {/* HOD: Assign Worker → navigate to dedicated page */}
-
-      {/* Worker: Status Update Modal */}
+      {/* Worker: Photo Upload Modal */}
       {userRole === "worker" && (
         <Modal
-          visible={statusModalVisible}
+          visible={photoUploadModalVisible}
           transparent
           animationType="slide"
-          onRequestClose={() => setStatusModalVisible(false)}
+          onRequestClose={() => {
+            setPhotoUploadModalVisible(false);
+            setSelectedPhotos([]);
+          }}
         >
           <View
             className="flex-1 justify-end"
             style={{ backgroundColor: colors.dark + "80" }}
           >
-            <View
-              className="rounded-t-3xl p-6"
+            <SafeAreaView
+              edges={["bottom"]}
+              className="rounded-t-3xl"
               style={{ backgroundColor: colors.backgroundPrimary }}
             >
-              <Text
-                className="text-xl font-bold mb-4 text-center"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("complaints.details.updateComplaintStatus")}
-              </Text>
+              <View className="p-6">
+                <Text
+                  className="text-xl font-bold mb-4 text-center"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("complaints.details.uploadTaskCompletionPhoto")}
+                </Text>
 
-              <View className="mb-4">
-                {statusOptions.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setNewStatus(option.value)}
-                    className="mb-2"
+                <Text
+                  className="text-sm mb-6 text-center"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("complaints.details.uploadAfterPhotosDesc")}
+                </Text>
+
+                <View className="mb-5">
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingRight: 4 }}
                   >
-                    <Card
-                      style={{
-                        margin: 0,
-                        backgroundColor:
-                          newStatus === option.value
-                            ? colors.primary + "20"
-                            : colors.backgroundSecondary,
-                        borderWidth: newStatus === option.value ? 2 : 0,
-                        borderColor: colors.primary,
-                      }}
-                    >
-                      <Text
-                        className="text-base font-semibold"
+                    {selectedPhotos.map((photo, index) => (
+                      <View
+                        key={`${photo?.uri || "photo"}-${index}`}
+                        style={{ marginRight: 12 }}
+                      >
+                        <View
+                          style={{
+                            width: 120,
+                            height: 120,
+                            borderWidth: 2,
+                            borderColor: colors.primary,
+                            borderRadius: 12,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <Image
+                            source={{ uri: photo?.uri }}
+                            style={{ width: "100%", height: "100%" }}
+                            resizeMode="cover"
+                          />
+                          <Pressable
+                            onPress={() => removeSelectedPhoto(index)}
+                            disabled={uploadingPhotos}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full items-center justify-center"
+                            style={{ backgroundColor: colors.dark + "B3" }}
+                          >
+                            <X size={14} color={colors.light} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+
+                    {selectedPhotos.length < 5 && (
+                      <Pressable
+                        onPress={takePhoto}
+                        disabled={uploadingPhotos}
                         style={{
-                          color:
-                            newStatus === option.value
-                              ? colors.primary
-                              : colors.textPrimary,
+                          width: 120,
+                          height: 120,
+                          borderWidth: 2,
+                          borderStyle: "dashed",
+                          borderColor: colors.primary,
+                          borderRadius: 12,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: "transparent",
+                          opacity: uploadingPhotos ? 0.7 : 1,
                         }}
                       >
-                        {option.label}
-                      </Text>
-                    </Card>
+                        <Text style={{ fontSize: 34, color: colors.primary }}>
+                          +
+                        </Text>
+                      </Pressable>
+                    )}
+                  </ScrollView>
+                </View>
+
+                <View className="mb-4">
+                  <Pressable
+                    onPress={handleUploadFromModal}
+                    disabled={uploadingPhotos || !selectedPhotos?.length}
+                    className="flex-row items-center justify-center py-4 rounded-xl"
+                    style={{
+                      backgroundColor: colors.primary,
+                      opacity:
+                        uploadingPhotos || !selectedPhotos?.length ? 0.5 : 1,
+                    }}
+                  >
+                    {uploadingPhotos ? (
+                      <>
+                        <ActivityIndicator size="small" color={colors.light} />
+                        <Text
+                          className="text-base font-semibold ml-2"
+                          style={{ color: colors.light }}
+                        >
+                          {t("complaints.details.uploading")}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={24} color={colors.light} />
+                        <Text
+                          className="text-base font-semibold ml-2"
+                          style={{ color: colors.light }}
+                        >
+                          {t("complaints.details.upload")}
+                        </Text>
+                      </>
+                    )}
                   </Pressable>
-                ))}
-              </View>
+                </View>
 
-              <Text
-                className="text-sm mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("complaints.details.notesOptional")}
-              </Text>
-              <TextInput
-                value={workerNotes}
-                onChangeText={setWorkerNotes}
-                placeholder={t("complaints.details.addWorkNotes")}
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                numberOfLines={3}
-                className="rounded-xl p-4 mb-6"
-                style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  color: colors.textPrimary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  textAlignVertical: "top",
-                }}
-              />
-
-              <View className="flex-row">
                 <Pressable
                   onPress={() => {
-                    setStatusModalVisible(false);
-                    setWorkerNotes("");
+                    setPhotoUploadModalVisible(false);
+                    setSelectedPhotos([]);
                   }}
-                  className="flex-1 mr-2 py-3 rounded-xl items-center"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
+                  disabled={uploadingPhotos}
+                  className="py-3 rounded-xl items-center"
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    opacity: uploadingPhotos ? 0.5 : 1,
+                  }}
                 >
                   <Text
                     className="text-base font-semibold"
@@ -2907,117 +3032,35 @@ function ComplaintDetailsInner() {
                     {t("common.cancel")}
                   </Text>
                 </Pressable>
-
-                <Pressable
-                  onPress={handleUpdateStatus}
-                  disabled={updating}
-                  className="flex-1 ml-2 py-3 rounded-xl items-center"
-                  style={{
-                    backgroundColor: colors.primary,
-                    opacity: updating ? 0.5 : 1,
-                  }}
-                >
-                  {updating ? (
-                    <ActivityIndicator size="small" color={colors.light} />
-                  ) : (
-                    <Text
-                      className="text-base font-semibold"
-                      style={{ color: colors.light }}
-                    >
-                      {t("common.update")}
-                    </Text>
-                  )}
-                </Pressable>
               </View>
-            </View>
+            </SafeAreaView>
           </View>
         </Modal>
       )}
 
-      {/* Worker: Photo Upload Modal */}
-      {userRole === "worker" && (
-        <Modal
-          visible={photoUploadModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setPhotoUploadModalVisible(false)}
-        >
-          <View
-            className="flex-1 justify-end"
-            style={{ backgroundColor: colors.dark + "80" }}
-          >
-            <View
-              className="rounded-t-3xl p-6"
-              style={{ backgroundColor: colors.backgroundPrimary }}
-            >
-              <Text
-                className="text-xl font-bold mb-4 text-center"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("complaints.uploadAfterPhotos")}
-              </Text>
-
-              <Text
-                className="text-sm mb-6 text-center"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("complaints.uploadAfterPhotosDesc")}
-              </Text>
-
-              <View className="mb-4">
-                <Pressable
-                  onPress={takePhoto}
-                  disabled={uploadingPhotos}
-                  className="flex-row items-center justify-center py-4 rounded-xl"
-                  style={{
-                    backgroundColor: colors.primary,
-                    opacity: uploadingPhotos ? 0.5 : 1,
-                  }}
-                >
-                  <Camera size={24} color={colors.light} />
-                  <Text
-                    className="text-base font-semibold ml-2"
-                    style={{ color: colors.light }}
-                  >
-                    {t("complaints.takePhoto")}
-                  </Text>
-                </Pressable>
-              </View>
-
-              {uploadingPhotos && (
-                <View className="items-center mb-4">
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text
-                    className="text-sm mt-2"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("complaints.uploading")}
-                  </Text>
-                </View>
-              )}
-
-              <Pressable
-                onPress={() => setPhotoUploadModalVisible(false)}
-                disabled={uploadingPhotos}
-                className="py-3 rounded-xl items-center"
-                style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  opacity: uploadingPhotos ? 0.5 : 1,
-                }}
-              >
-                <Text
-                  className="text-base font-semibold"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {t("common.cancel")}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
+      {/* HOD: Cancel Confirmation Modal */}
+      {userRole === "head" && (
+        <DialogBox
+          visible={cancelModalVisible}
+          onClose={closeCancelModal}
+          onCancel={closeCancelModal}
+          onConfirm={handleCancelComplaint}
+          title={t("complaints.details.cancelConfirmationTitle")}
+          message={`${t("complaints.details.cancelConfirmationMessage")}\n\n${t("complaints.details.cancelReasonLabel")}`}
+          showInput
+          inputPlaceholder={t("complaints.details.cancelReasonPlaceholder")}
+          inputValue={cancelReason}
+          onInputChange={setCancelReason}
+          confirmText={t("complaints.details.confirmCancel")}
+          cancelText={t("common.cancel")}
+          loading={cancelling}
+          titleAlign="center"
+          messageAlign="left"
+          confirmButtonStyle={{ backgroundColor: colors.error }}
+          confirmTextStyle={{ color: colors.light }}
+        />
       )}
 
-      {/* HOD: Rework Reason Modal */}
       {userRole === "head" && (
         <Modal
           visible={approvalModalVisible}

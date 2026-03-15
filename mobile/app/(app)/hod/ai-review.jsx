@@ -47,6 +47,67 @@ const getSentimentConfig = (colors) => ({
   },
 });
 
+const normalizeTicketId = (value, fallback) => {
+  const compact = String(value ?? "")
+    .replace(/\s+/g, "")
+    .trim();
+
+  if (!compact) return fallback;
+
+  const cleaned = compact.replace(/[^A-Za-z0-9#_-]/g, "");
+  if (cleaned.length < 4 || cleaned.length > 24) return fallback;
+
+  return cleaned.toUpperCase();
+};
+
+const normalizeText = (value, fallback = "") => {
+  const raw = String(value ?? "")
+    .replace(/\r/g, "\n")
+    .replace(/[\u0000-\u001F\u007F]/g, " ");
+
+  const flattened = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  const cleaned = flattened
+    .replace(/[-_=~•·|]{3,}/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return cleaned || fallback;
+};
+
+const isMostlyLineArt = (value) => {
+  const compact = String(value ?? "").replace(/\s+/g, "");
+  if (!compact) return true;
+
+  const alphaNum = (compact.match(/[A-Za-z0-9]/g) || []).length;
+  const symbolRatio = (compact.length - alphaNum) / compact.length;
+
+  return compact.length > 80 && alphaNum < 8 && symbolRatio > 0.85;
+};
+
+const pickDisplayDescription = (item, fallback) => {
+  const candidates = [
+    item?.description,
+    item?.refinedText,
+    item?.rawText,
+    item?.title,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (isMostlyLineArt(candidate)) continue;
+
+    const normalized = normalizeText(candidate, "");
+    if (normalized) return normalized;
+  }
+
+  return fallback;
+};
+
 function ConfidenceBadge({ value, colors, t }) {
   const confidence = Number(value ?? 0);
   const pct = Math.round(confidence * 100);
@@ -130,11 +191,19 @@ export default function AiReview() {
           const id = item?._id ?? item?.id;
           if (!id) return null;
 
-          const description =
-            item?.description ?? item?.refinedText ?? item?.rawText ?? item?.title;
+          const fallbackText = t("hod.aiReview.notAvailable");
+          const description = pickDisplayDescription(item, fallbackText);
+          const normalizedTicketId = normalizeTicketId(
+            item?.ticketId,
+            fallbackText,
+          );
+          const looksCorrupt =
+            isMostlyLineArt(item?.description) &&
+            isMostlyLineArt(item?.refinedText) &&
+            isMostlyLineArt(item?.rawText);
 
           if (
-            !description &&
+            (!description || description === fallbackText || looksCorrupt) &&
             !item?.aiSuggestion?.department &&
             !item?.aiSuggestion?.priority
           ) {
@@ -144,8 +213,12 @@ export default function AiReview() {
           return {
             ...item,
             _id: id,
-            ticketId: item?.ticketId ?? t("hod.aiReview.notAvailable"),
-            description: description ?? t("hod.aiReview.notAvailable"),
+            ticketId: normalizedTicketId,
+            description,
+            aiSuggestion: {
+              ...item?.aiSuggestion,
+              reasoning: normalizeText(item?.aiSuggestion?.reasoning, ""),
+            },
           };
         })
         .filter(Boolean);
@@ -303,6 +376,8 @@ export default function AiReview() {
                 <Text
                   className="text-xs font-mono"
                   style={{ color: colors.textSecondary }}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
                 >
                   {c.ticketId}
                 </Text>
@@ -334,7 +409,10 @@ export default function AiReview() {
             )}
             {ai.affectedCount != null && (
               <View className="flex-row items-center ml-2">
-                <Text className="text-xs" style={{ color: colors.textSecondary }}>
+                <Text
+                  className="text-xs"
+                  style={{ color: colors.textSecondary }}
+                >
                   {t("hod.aiReview.affected", { count: ai.affectedCount })}
                 </Text>
               </View>
@@ -480,7 +558,10 @@ export default function AiReview() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
+    >
       <BackButtonHeader
         title={
           complaints.length
@@ -524,7 +605,10 @@ export default function AiReview() {
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text className="text-sm mt-3" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-sm mt-3"
+            style={{ color: colors.textSecondary }}
+          >
             {t("hod.aiReview.loading")}
           </Text>
         </View>
@@ -581,7 +665,10 @@ export default function AiReview() {
             elevation: 8,
           }}
         >
-          <Text className="text-sm font-semibold" style={{ color: colors.light }}>
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: colors.light }}
+          >
             {t("hod.aiReview.bulk.selectedCount", { count: selected.size })}
           </Text>
           <TouchableOpacity
@@ -658,7 +745,9 @@ export default function AiReview() {
               },
               {
                 id: "both",
-                label: t("hod.aiReview.bulk.options.departmentAndPriority.label"),
+                label: t(
+                  "hod.aiReview.bulk.options.departmentAndPriority.label",
+                ),
                 sub: t("hod.aiReview.bulk.options.departmentAndPriority.sub"),
                 icon: CheckCircle,
                 color: colors.primary,
@@ -669,7 +758,11 @@ export default function AiReview() {
                 key={id}
                 onPress={action}
                 className="flex-row items-center p-4 rounded-xl mb-3"
-                style={{ backgroundColor: color + "15", borderWidth: 1, borderColor: color + "40" }}
+                style={{
+                  backgroundColor: color + "15",
+                  borderWidth: 1,
+                  borderColor: color + "40",
+                }}
               >
                 <View
                   className="w-10 h-10 rounded-full items-center justify-center mr-3"

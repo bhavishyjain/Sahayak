@@ -60,12 +60,12 @@ export async function registerPushToken() {
 
     if (missingAndroidFcmSetup) {
       skipPushRegistrationForSession = true;
-      if (!hasLoggedPushSetupWarning) {
+      if (!hasLoggedPushSetupWarning && !__DEV__) {
         console.warn(
           "Push token registration disabled for this session: Android push requires Firebase/FCM setup (google-services.json + FCM credentials in Expo).",
         );
-        hasLoggedPushSetupWarning = true;
       }
+      hasLoggedPushSetupWarning = true;
       return;
     }
 

@@ -1,6 +1,6 @@
 import { AlertTriangle, ChevronUp, Clock } from "lucide-react-native";
 import { Text, View } from "react-native";
-import { getSlaCountdown } from "../utils/complaintFormatters";
+import { getSlaCountdown } from "../utils/complaintHelpers";
 
 /**
  * A compact badge row showing SLA countdown/overdue status and escalation level.

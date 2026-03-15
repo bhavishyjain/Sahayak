@@ -30,11 +30,14 @@ import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import getUserAuth from "../../../utils/userAuth";
 import { WORKER_OVERVIEW_URL } from "../../../url";
-import { getPriorityColor } from "../../../utils/colorHelpers";
 import {
+  getPriorityBackgroundColor,
   formatPriorityLabel,
   formatStatusLabel,
-} from "../../../utils/complaintFormatters";
+  getPriorityColor,
+  getStatusBackgroundColor,
+  getStatusColor,
+} from "../../../data/complaintStatus";
 
 export default function WorkerHome() {
   const { t } = useTranslation();
@@ -127,6 +130,11 @@ export default function WorkerHome() {
   const ratingValue = Number(user?.rating ?? 0);
   const hasRating = Number.isFinite(ratingValue) && ratingValue > 0;
   const ratingPercent = Math.max(0, Math.min((ratingValue / 5) * 100, 100));
+  const pendingApprovalColor =
+    getStatusColor("pending-approval", colors) ?? colors.warning;
+  const pendingApprovalBackground =
+    getStatusBackgroundColor("pending-approval", colors, "20") ??
+    `${colors.warning}20`;
 
   if (loading) {
     return (
@@ -228,10 +236,10 @@ export default function WorkerHome() {
                     <View
                       className="w-10 h-10 rounded-full items-center justify-center"
                       style={{
-                        backgroundColor: colors.purple + "20",
+                        backgroundColor: pendingApprovalBackground,
                       }}
                     >
-                      <AlertCircle size={20} color={colors.purple} />
+                      <AlertCircle size={20} color={pendingApprovalColor} />
                     </View>
                     <View className="flex-1 ml-3">
                       <Text
@@ -250,7 +258,7 @@ export default function WorkerHome() {
                   </View>
                   <Text
                     className="text-3xl font-bold"
-                    style={{ color: colors.purple }}
+                    style={{ color: pendingApprovalColor }}
                   >
                     {dashboardData.pendingApproval}
                   </Text>
@@ -458,75 +466,86 @@ export default function WorkerHome() {
             </View>
 
             {activeComplaints.length > 0 ? (
-              activeComplaints.slice(0, 3).map((complaint) => (
-                <PressableBlock
-                  key={complaint.id}
-                  onPress={() =>
-                    router.push(
-                      `/complaints/complaint-details?id=${complaint.id}`,
-                    )
-                  }
-                >
-                  <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-                    <View className="flex-row items-start justify-between mb-2">
-                      <View className="flex-row items-center">
-                        <ListChecks
-                          size={12}
-                          color={colors.primary}
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text
-                          className="text-sm font-bold"
-                          style={{ color: colors.primary }}
-                        >
-                          {complaint.ticketId}
-                        </Text>
-                      </View>
-                      <View
-                        className="px-2 py-1 rounded"
-                        style={{
-                          backgroundColor:
-                            getPriorityColor(complaint.priority, colors) + "20",
-                        }}
-                      >
-                        <Text
-                          className="text-xs font-semibold"
+              activeComplaints.slice(0, 3).map((complaint) => {
+                const priorityColor =
+                  getPriorityColor(complaint.priority, colors) ??
+                  colors.textSecondary;
+                const priorityBackgroundColor =
+                  getPriorityBackgroundColor(
+                    complaint.priority,
+                    colors,
+                    "20",
+                  ) ?? `${colors.textSecondary}20`;
+
+                return (
+                  <PressableBlock
+                    key={complaint.id}
+                    onPress={() =>
+                      router.push(
+                        `/complaints/complaint-details?id=${complaint.id}`,
+                      )
+                    }
+                  >
+                    <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+                      <View className="flex-row items-start justify-between mb-2">
+                        <View className="flex-row items-center">
+                          <ListChecks
+                            size={12}
+                            color={colors.primary}
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text
+                            className="text-sm font-bold"
+                            style={{ color: colors.primary }}
+                          >
+                            {complaint.ticketId}
+                          </Text>
+                        </View>
+                        <View
+                          className="px-2 py-1 rounded"
                           style={{
-                            color: getPriorityColor(complaint.priority, colors),
+                            backgroundColor: priorityBackgroundColor,
                           }}
                         >
-                          {formatPriorityLabel(t, complaint.priority)}
+                          <Text
+                            className="text-xs font-semibold"
+                            style={{
+                              color: priorityColor,
+                            }}
+                          >
+                            {formatPriorityLabel(t, complaint.priority)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text
+                        className="text-base font-semibold mb-2"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {complaint.title}
+                      </Text>
+
+                      <Text
+                        className="text-sm mb-2"
+                        style={{ color: colors.textSecondary }}
+                        numberOfLines={2}
+                      >
+                        {complaint.description}
+                      </Text>
+
+                      <View className="flex-row items-center">
+                        <ClipboardList size={12} color={colors.textSecondary} />
+                        <Text
+                          className="text-xs ml-1 capitalize"
+                          style={{ color: colors.textSecondary }}
+                        >
+                          {formatStatusLabel(t, complaint.status)}
                         </Text>
                       </View>
-                    </View>
-
-                    <Text
-                      className="text-base font-semibold mb-2"
-                      style={{ color: colors.textPrimary }}
-                    >
-                      {complaint.title}
-                    </Text>
-
-                    <Text
-                      className="text-sm mb-2"
-                      style={{ color: colors.textSecondary }}
-                      numberOfLines={2}
-                    >
-                      {complaint.description}
-                    </Text>
-
-                    <View className="flex-row items-center">
-                      <ClipboardList size={12} color={colors.textSecondary} />
-                      <Text
-                        className="text-xs ml-1 capitalize"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {formatStatusLabel(t, complaint.status)}
-                      </Text>
-                    </View>
-                  </Card>
-                </PressableBlock>
-              ))
+                    </Card>
+                  </PressableBlock>
+                );
+              })
             ) : (
               <Card style={{ margin: 0, marginBottom: 16 }}>
                 <View className="items-center py-6">

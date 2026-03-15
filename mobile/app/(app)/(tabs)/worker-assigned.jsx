@@ -21,7 +21,7 @@ import {
   formatPriorityLabel,
   normalizePriority,
   normalizeStatus,
-} from "../../../utils/complaintFormatters";
+} from "../../../data/complaintStatus";
 import { WORKER_ASSIGNED_URL } from "../../../url";
 
 export default function WorkerAssigned() {
@@ -89,11 +89,10 @@ export default function WorkerAssigned() {
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          [c.ticketId, c.title, c.description, c.location].some((value) =>
-            value?.toLowerCase().includes(query),
-          ),
+      filtered = filtered.filter((c) =>
+        [c.ticketId, c.title, c.description, c.location].some((value) =>
+          value?.toLowerCase().includes(query),
+        ),
       );
     }
 
@@ -199,7 +198,7 @@ export default function WorkerAssigned() {
       >
         {/* Search + Filter row */}
         {complaints.length > 0 && (
-          <View className="mt-4 mb-4 flex-row items-center" style={{ gap: 10 }}>
+          <View className="mt-4 flex-row items-center" style={{ gap: 10 }}>
             <View className="flex-1">
               <SearchBar
                 value={searchQuery}
@@ -243,7 +242,7 @@ export default function WorkerAssigned() {
         )}
 
         {filteredComplaints.length === 0 && complaints.length > 0 ? (
-          <Card style={{ margin: 0, marginTop: 12 }}>
+          <Card style={{ margin: 0, marginTop: 8 }}>
             <View className="items-center py-6">
               <Text
                 className="text-base font-semibold"

@@ -215,52 +215,33 @@
       "trackComplaint": "Track Complaint",
       "viewAll": "View All"
     },
-    "pendingText": "You have %{count} pending complaint%{plural}.",
-    "noPending": "No pending complaints right now.",
     "lastUpdate": "Last complaint was filed %{hours}h ago (%{ticketId}).",
     "noRecent": "No recent complaint updates yet.",
     "userFallback": "User",
     "openLabel": "open",
     "complaintSingular": "complaint",
     "complaintPlural": "complaints",
-    "myComplaintsTitle": "My Complaints",
-    "myStatsTitle": "My Stats",
-    "avgResolution": "Avg resolution",
-    "monthlyComplaints": "Monthly complaints",
-    "departmentComplaints": "Department complaints",
-    "noDepartmentData": "No department data",
-    "notAvailable": "N/A",
+    "snapshotTitle": "Complaint Snapshot",
+    "summaryCards": {
+      "total": "Total",
+      "open": "Open",
+      "resolved": "Resolved"
+    },
     "seeMap": "See Map",
     "noHotspotData": "No hotspot data",
-    "time": {
-      "hourShort": "h",
-      "dayShort": "d"
-    },
     "metricLabels": {
       "total": "total",
       "open": "open",
       "high": "high"
     },
-    "months": {
-      "jan": "Jan",
-      "feb": "Feb",
-      "mar": "Mar",
-      "apr": "Apr",
-      "may": "May",
-      "jun": "Jun",
-      "jul": "Jul",
-      "aug": "Aug",
-      "sep": "Sep",
-      "oct": "Oct",
-      "nov": "Nov",
-      "dec": "Dec"
-    },
     "nearby": {
       "title": "Nearby Open Issues",
+      "reload": "Reload",
       "distanceAway": "%{distance} km away",
       "complaintFallback": "Complaint",
       "departmentFallback": "Unknown department",
       "locationFallback": "Nearby",
+      "empty": "No nearby complaints found.",
       "upvoteFailed": "Failed to upvote"
     }
   },
@@ -400,8 +381,11 @@
       "manageWorkers": "Manage Workers",
       "reassignWorker": "Reassign Worker",
       "cancelComplaint": "Cancel Complaint",
-      "approveCompletion": "? Approve Completion",
-      "requestRework": "? Request Rework",
+      "approveCompletion": "Approve Completion",
+      "requestRework": "Request Rework",
+      "closeComplaint": "Close Complaint",
+      "startWork": "Start Work",
+      "reworkInstructions": "Rework Instructions",
       "updateStatus": "Update Status",
       "complaintTitle": "Title",
       "complaintDescription": "Description",
@@ -411,7 +395,7 @@
       "proofImage": "Proof Image",
       "proofImages": "Proof Images",
       "tapToViewFullSize": "Tap to view full size",
-      "completionPhotos": "Completion Photos (After)",
+      "completionPhotos": "Completion Photos",
       "created": "Created",
       "estimatedCompletion": "Estimated Completion",
       "hours": "hours",
@@ -451,6 +435,11 @@
       "complaintCancelled": "Complaint has been cancelled",
       "cancelFailed": "Cancel Failed",
       "couldNotCancel": "Could not cancel complaint",
+      "cancelConfirmationTitle": "Cancel Complaint",
+      "cancelConfirmationMessage": "Are you sure you want to cancel this complaint?",
+      "cancelReasonLabel": "Cancellation reason *",
+      "cancelReasonPlaceholder": "Explain why this complaint is being cancelled...",
+      "confirmCancel": "Confirm Cancel",
       "statusRequired": "Status Required",
       "pleaseSelectStatus": "Please select a status",
       "statusUpdated": "Status Updated",
@@ -492,6 +481,8 @@
       "afterPhotos": "After Photos",
       "beforeAfterComparison": "Before / After Comparison",
       "uploadAfterPhotos": "Upload After Photos",
+      "uploadTaskCompletionPhoto": "Upload Task Completion Photo",
+      "upload": "Upload",
       "uploadAfterPhotosDesc": "Upload photos showing the work completed",
       "takePhotoAfter": "Take Photo",
       "chooseFromGallery": "Choose from Gallery",
@@ -822,7 +813,7 @@
       }
     },
     "workerAssignment": {
-      "title": "Manage Workers",
+      "title": "Assign Worker",
       "searchPlaceholder": "Search workers...",
       "assignedWorkersTitle": "Assigned Workers (%{count})",
       "taskDescriptionPlaceholder": "Task description for %{name} (optional)",
@@ -1494,7 +1485,7 @@
       },
       "notifications": {
         "title": "Notifications",
-        "subtitle": "History & preferences"
+        "subtitle": "Notification preferences"
       },
       "reports": {
         "title": "Reports",

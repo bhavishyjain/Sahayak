@@ -215,52 +215,33 @@
       "trackComplaint": "शिकायत ट्रैक करें",
       "viewAll": "सभी देखें"
     },
-    "pendingText": "आपके पास %{count} लंबित शिकायत%{plural} हैं।",
-    "noPending": "अभी कोई लंबित शिकायत नहीं है।",
     "lastUpdate": "आखिरी शिकायत %{hours} घंटे पहले दर्ज की गई (%{ticketId})।",
     "noRecent": "अभी तक कोई हालिया शिकायत अपडेट नहीं है।",
     "userFallback": "उपयोगकर्ता",
     "openLabel": "खुली",
     "complaintSingular": "शिकायत",
     "complaintPlural": "शिकायतें",
-    "myComplaintsTitle": "मेरी शिकायतें",
-    "myStatsTitle": "मेरे आँकड़े",
-    "avgResolution": "औसत समाधान",
-    "monthlyComplaints": "मासिक शिकायतें",
-    "departmentComplaints": "विभागीय शिकायतें",
-    "noDepartmentData": "कोई विभागीय डेटा नहीं",
-    "notAvailable": "उपलब्ध नहीं",
+    "snapshotTitle": "शिकायत सारांश",
+    "summaryCards": {
+      "total": "कुल",
+      "open": "खुली",
+      "resolved": "पूर्ण"
+    },
     "seeMap": "मानचित्र देखें",
     "noHotspotData": "कोई हॉटस्पॉट डेटा नहीं",
-    "time": {
-      "hourShort": "घं",
-      "dayShort": "दि"
-    },
     "metricLabels": {
       "total": "कुल",
       "open": "खुली",
       "high": "उच्च"
     },
-    "months": {
-      "jan": "जन",
-      "feb": "फ़र",
-      "mar": "मार्च",
-      "apr": "अप्रै",
-      "may": "मई",
-      "jun": "जून",
-      "jul": "जुल",
-      "aug": "अग",
-      "sep": "सित",
-      "oct": "अक्टू",
-      "nov": "नव",
-      "dec": "दिस"
-    },
     "nearby": {
       "title": "आस-पास के खुले मुद्दे",
+      "reload": "रीलोड",
       "distanceAway": "%{distance} किमी दूर",
       "complaintFallback": "शिकायत",
       "departmentFallback": "अज्ञात विभाग",
       "locationFallback": "आस-पास",
+      "empty": "आस-पास कोई शिकायत नहीं मिली।",
       "upvoteFailed": "अपवोट करने में विफल"
     }
   },
@@ -400,8 +381,11 @@
       "manageWorkers": "कर्मी प्रबंधित करें",
       "reassignWorker": "कार्यकर्ता पुनः सौंपें",
       "cancelComplaint": "शिकायत रद्द करें",
-      "approveCompletion": "✓ पूर्णता स्वीकृत करें",
-      "requestRework": "✗ पुनः कार्य का अनुरोध करें",
+      "approveCompletion": "पूर्णता स्वीकृत करें",
+      "requestRework": "पुनः कार्य का अनुरोध करें",
+      "closeComplaint": "शिकायत बंद करें",
+      "startWork": "काम शुरू करें",
+      "reworkInstructions": "पुनः कार्य निर्देश",
       "updateStatus": "स्थिति अपडेट करें",
       "complaintTitle": "शीर्षक",
       "complaintDescription": "विवरण",
@@ -411,7 +395,7 @@
       "proofImage": "प्रमाण छवि",
       "proofImages": "प्रमाण छवियां",
       "tapToViewFullSize": "पूर्ण आकार देखने के लिए टैप करें",
-      "completionPhotos": "पूर्णता फोटो (बाद में)",
+      "completionPhotos": "पूर्णता फोटो",
       "created": "बनाया गया",
       "estimatedCompletion": "अनुमानित पूर्णता",
       "hours": "घंटे",
@@ -451,6 +435,11 @@
       "complaintCancelled": "शिकायत रद्द कर दी गई है",
       "cancelFailed": "रद्द करना विफल",
       "couldNotCancel": "शिकायत रद्द नहीं हो सकी",
+      "cancelConfirmationTitle": "शिकायत रद्द करें",
+      "cancelConfirmationMessage": "क्या आप वाकई इस शिकायत को रद्द करना चाहते हैं?",
+      "cancelReasonLabel": "रद्द करने का कारण *",
+      "cancelReasonPlaceholder": "बताएं कि यह शिकायत क्यों रद्द की जा रही है...",
+      "confirmCancel": "रद्द करने की पुष्टि करें",
       "statusRequired": "स्थिति आवश्यक",
       "pleaseSelectStatus": "कृपया एक स्थिति चुनें",
       "statusUpdated": "स्थिति अपडेट की गई",
@@ -492,6 +481,8 @@
       "afterPhotos": "बाद की तस्वीरें",
       "beforeAfterComparison": "पहले / बाद की तुलना",
       "uploadAfterPhotos": "बाद की तस्वीरें अपलोड करें",
+      "uploadTaskCompletionPhoto": "कार्य पूर्णता फोटो अपलोड करें",
+      "upload": "अपलोड करें",
       "uploadAfterPhotosDesc": "पूरा हुआ काम दिखाने वाली तस्वीरें अपलोड करें",
       "takePhotoAfter": "फोटो लें",
       "chooseFromGallery": "गैलरी से चुनें",
@@ -822,7 +813,7 @@
       }
     },
     "workerAssignment": {
-      "title": "कर्मी प्रबंधन",
+      "title": "कर्मी नियुक्त करें",
       "searchPlaceholder": "कर्मियों को खोजें...",
       "assignedWorkersTitle": "नियुक्त कर्मी (%{count})",
       "taskDescriptionPlaceholder": "%{name} के लिए कार्य विवरण (वैकल्पिक)",
@@ -1494,7 +1485,7 @@
       },
       "notifications": {
         "title": "सूचनाएँ",
-        "subtitle": "इतिहास और प्राथमिकताएँ"
+        "subtitle": "सूचना प्राथमिकताएँ"
       },
       "reports": {
         "title": "रिपोर्ट",

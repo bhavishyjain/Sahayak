@@ -7,14 +7,17 @@ import {
 } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../colors";
-import { getPriorityColor, getStatusColor } from "../utils/colorHelpers";
+import {
+  formatPriorityLabel,
+  formatStatusLabel,
+  getPriorityColor,
+  getStatusColor,
+} from "../data/complaintStatus";
 import {
   formatDateShort,
   formatEtaFromHours,
-  formatPriorityLabel,
-  formatStatusLabel,
   isComplaintAssigned,
-} from "../utils/complaintFormatters";
+} from "../utils/complaintHelpers";
 import { useTheme } from "../utils/context/theme";
 import { useTranslation } from "../utils/i18n/LanguageProvider";
 import Card from "./Card";
@@ -213,24 +216,21 @@ export default function ComplaintCard({
           <View
             className="flex-row items-center px-2 py-1 rounded-md"
             style={{
-              backgroundColor: complaint?.hasUpvoted
-                ? (colors.success || "#10B981") + "20"
-                : colors.backgroundSecondary,
+              backgroundColor: colors.backgroundSecondary,
             }}
           >
             <ThumbsUp
               size={12}
               color={
-                complaint?.hasUpvoted
-                  ? colors.success || "#10B981"
-                  : colors.textSecondary
+                complaint?.hasUpvoted ? colors.primary : colors.textSecondary
               }
+              fill={complaint?.hasUpvoted ? colors.primary : "transparent"}
             />
             <Text
               className="text-xs ml-1 font-semibold"
               style={{
                 color: complaint?.hasUpvoted
-                  ? colors.success || "#10B981"
+                  ? colors.primary
                   : colors.textSecondary,
               }}
             >

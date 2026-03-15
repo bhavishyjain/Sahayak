@@ -29,6 +29,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import NotificationBellButton from "../../../components/NotificationBellButton";
+import {
+  getPriorityColor,
+  getStatusColor,
+} from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
@@ -98,6 +102,18 @@ export default function HodOverview() {
     stats?.total > 0
       ? Math.round(100 - (stats.pending / stats.total) * 30)
       : 100;
+  const pendingColor = getStatusColor("pending", colors) ?? colors.warning;
+  const assignedColor = getStatusColor("assigned", colors) ?? colors.info;
+  const inProgressColor =
+    getStatusColor("in-progress", colors) ?? colors.info;
+  const pendingApprovalColor =
+    getStatusColor("pending-approval", colors) ?? colors.warning;
+  const resolvedColor = getStatusColor("resolved", colors) ?? colors.success;
+  const cancelledColor = getStatusColor("cancelled", colors) ?? colors.danger;
+  const highPriorityColor = getPriorityColor("High", colors) ?? colors.danger;
+  const mediumPriorityColor =
+    getPriorityColor("Medium", colors) ?? colors.warning;
+  const lowPriorityColor = getPriorityColor("Low", colors) ?? colors.success;
   const perfColor =
     (stats?.performanceScore ?? 0) >= 80
       ? colors.success
@@ -226,17 +242,17 @@ export default function HodOverview() {
                     {
                       label: t("hod.dashboard.complaints.pending"),
                       value: stats.pending ?? 0,
-                      color: colors.warning,
+                      color: pendingColor,
                     },
                     {
                       label: t("hod.dashboard.complaints.assigned"),
                       value: stats.assigned ?? 0,
-                      color: colors.info,
+                      color: assignedColor,
                     },
                     {
                       label: t("hod.dashboard.complaints.inProgress"),
                       value: stats.inProgress ?? 0,
-                      color: colors.info,
+                      color: inProgressColor,
                     },
                   ].map((col, i, arr) => (
                     <View
@@ -278,7 +294,7 @@ export default function HodOverview() {
                       <View className="w-10 h-10 items-center justify-center">
                         <View
                           className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: "#F97316" }}
+                          style={{ backgroundColor: pendingApprovalColor }}
                         />
                       </View>
                       <Text
@@ -289,7 +305,7 @@ export default function HodOverview() {
                       </Text>
                       <Text
                         className="text-base font-semibold"
-                        style={{ color: "#F97316" }}
+                        style={{ color: pendingApprovalColor }}
                       >
                         {stats.pendingApproval}
                       </Text>
@@ -312,7 +328,7 @@ export default function HodOverview() {
                   >
                     <Text
                       className="text-2xl font-bold"
-                      style={{ color: colors.success }}
+                      style={{ color: resolvedColor }}
                     >
                       {stats.resolved ?? 0}
                     </Text>
@@ -326,13 +342,13 @@ export default function HodOverview() {
                   <View className="flex-1 items-center">
                     <Text
                       className="text-2xl font-bold"
-                      style={{ color: colors.danger }}
+                      style={{ color: cancelledColor }}
                     >
                       {stats.cancelled ?? 0}
                     </Text>
                     <Text
                       className="text-xs mt-1"
-                      style={{ color: colors.danger }}
+                      style={{ color: cancelledColor }}
                     >
                       {t("hod.dashboard.complaints.cancelled")}
                     </Text>
@@ -376,17 +392,17 @@ export default function HodOverview() {
                     {
                       label: t("complaints.priority.high"),
                       value: stats.highPriority ?? 0,
-                      color: colors.danger,
+                      color: highPriorityColor,
                     },
                     {
                       label: t("complaints.priority.medium"),
                       value: stats.mediumPriority ?? 0,
-                      color: colors.warning,
+                      color: mediumPriorityColor,
                     },
                     {
                       label: t("complaints.priority.low"),
                       value: stats.lowPriority ?? 0,
-                      color: colors.success,
+                      color: lowPriorityColor,
                     },
                   ].map((p, i) => (
                     <View key={i} className="flex-1 items-center">
@@ -1043,7 +1059,7 @@ export default function HodOverview() {
                 >
                   <Text
                     className="text-center font-semibold text-base"
-                    style={{ color: "#FFFFFF" }}
+                    style={{ color: colors.light }}
                   >
                     {t("hod.dashboard.performance.gotIt")}
                   </Text>

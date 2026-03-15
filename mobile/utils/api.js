@@ -21,7 +21,9 @@ export function clearApiCache() {
   lastCacheTime = 0;
   isLoggingOut = true;
   // Reset flag after a short delay so the cache is usable again on next login
-  setTimeout(() => { isLoggingOut = false; }, 3000);
+  setTimeout(() => {
+    isLoggingOut = false;
+  }, 3000);
 }
 
 async function attemptTokenRefresh() {
@@ -38,7 +40,8 @@ async function attemptTokenRefresh() {
         { headers: { "User-Agent": USER_AGENT_STRING }, timeout: 10000 },
       );
       const newToken = resp.data?.token ?? resp.data?.data?.token;
-      const newRefresh = resp.data?.refreshToken ?? resp.data?.data?.refreshToken;
+      const newRefresh =
+        resp.data?.refreshToken ?? resp.data?.data?.refreshToken;
       if (!newToken) return null;
 
       const updated = { ...user, auth_token: newToken, token: newToken };
@@ -125,6 +128,15 @@ const getAuthPayload = async (data = null) => {
   }
 };
 
+const isNativeFormData = (value) => {
+  if (!value || typeof value !== "object") return false;
+  if (typeof FormData !== "undefined" && value instanceof FormData) return true;
+  return (
+    typeof value.append === "function" &&
+    (typeof value.getParts === "function" || Array.isArray(value._parts))
+  );
+};
+
 // flatten stays the same
 export const flatten = (obj, prefix = "") => {
   const result = {};
@@ -167,35 +179,41 @@ const apiCall = async ({
   try {
     const authHeaders = auth
       ? {
-        ...headers,
-        Authorization: `Bearer ${auth.token}`,
-        "User-Agent": USER_AGENT_STRING,
-      }
+          ...headers,
+          Authorization: `Bearer ${auth.token}`,
+          "User-Agent": USER_AGENT_STRING,
+        }
       : await getAuthHeaders(headers);
 
-    const isMultipart = authHeaders?.["Content-Type"]?.includes(
-      "multipart/form-data",
-    );
+    const contentType =
+      authHeaders?.["Content-Type"] || authHeaders?.["content-type"] || "";
+    const isMultipart =
+      typeof contentType === "string" &&
+      contentType.includes("multipart/form-data");
 
     let payload;
 
     if (isMultipart) {
-      const formData = new FormData();
-      const flatData = flatten(data);
+      if (isNativeFormData(data)) {
+        payload = data;
+      } else {
+        const formData = new FormData();
+        const flatData = flatten(data);
 
-      Object.entries(flatData).forEach(([key, value]) => {
-        if (value && typeof value === "object" && value.uri) {
-          formData.append(key, {
-            uri: value.uri,
-            name: value.name || "image.webp",
-            type: value.type || "image/webp",
-          });
-        } else {
-          formData.append(key, String(value ?? ""));
-        }
-      });
+        Object.entries(flatData).forEach(([key, value]) => {
+          if (value && typeof value === "object" && value.uri) {
+            formData.append(key, {
+              uri: value.uri,
+              name: value.name || "image.webp",
+              type: value.type || "image/webp",
+            });
+          } else {
+            formData.append(key, String(value ?? ""));
+          }
+        });
 
-      payload = formData;
+        payload = formData;
+      }
     } else {
       payload = data;
     }
@@ -221,7 +239,10 @@ const apiCall = async ({
           ...authHeaders,
           Authorization: `Bearer ${newToken}`,
         };
-        const retryResponse = await axios({ ...axiosConfig, headers: retryHeaders });
+        const retryResponse = await axios({
+          ...axiosConfig,
+          headers: retryHeaders,
+        });
         if (retryResponse.status === 401) {
           // Refresh didn't help — force logout
           cachedUser = null;
@@ -233,14 +254,19 @@ const apiCall = async ({
           throw e;
         }
         if (retryResponse.status >= 400) {
-          const e = new Error(retryResponse.data?.message || `API Error: ${retryResponse.status}`);
+          const e = new Error(
+            retryResponse.data?.message || `API Error: ${retryResponse.status}`,
+          );
           e.response = retryResponse;
           throw e;
         }
         const retryRaw = retryResponse.data;
         return {
           ...retryResponse,
-          data: retryRaw && typeof retryRaw === "object" && "data" in retryRaw ? retryRaw.data : retryRaw,
+          data:
+            retryRaw && typeof retryRaw === "object" && "data" in retryRaw
+              ? retryRaw.data
+              : retryRaw,
           rawData: retryRaw,
           success: retryRaw?.success ?? true,
           message: retryRaw?.message,

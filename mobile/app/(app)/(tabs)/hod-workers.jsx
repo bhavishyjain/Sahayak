@@ -1,26 +1,19 @@
 import { useRouter } from "expo-router";
-import {
-  User,
-  CheckCircle,
-  Clock,
-  Star,
-  Search,
-} from "lucide-react-native";
+import { User, CheckCircle, Clock, Star } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   Text,
-  TextInput,
   View,
-  TouchableOpacity,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import PressableBlock from "../../../components/PressableBlock";
+import SearchBar from "../../../components/SearchBar";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
@@ -86,29 +79,12 @@ export default function HodWorkersTab() {
         />
 
         {/* Search Bar */}
-        <View className="px-4 py-4">
-          <View
-            className="flex-row items-center px-4 py-1 rounded-2xl"
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              borderWidth: 1.5,
-              borderColor: colors.border,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 4,
-              elevation: 2,
-            }}
-          >
-            <Search size={20} color={colors.textSecondary} />
-            <TextInput
-              className="flex-1 ml-3 text-base"
-              style={{ color: colors.textPrimary }}
-              placeholder={t("hod.workers.searchPlaceholder")}
-              placeholderTextColor={colors.textSecondary}
-              editable={false}
-            />
-          </View>
+        <View className="px-4 py-4" pointerEvents="none">
+          <SearchBar
+            value={searchQuery}
+            onChangeText={() => {}}
+            placeholder={t("hod.workers.searchPlaceholder")}
+          />
         </View>
 
         <View className="flex-1 justify-center items-center">
@@ -133,29 +109,11 @@ export default function HodWorkersTab() {
 
       {/* Search Bar */}
       <View className="px-4 py-4">
-        <View
-          className="flex-row items-center px-4 py-1 rounded-2xl"
-          style={{
-            backgroundColor: colors.backgroundSecondary,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 4,
-            elevation: 2,
-          }}
-        >
-          <Search size={20} color={colors.textSecondary} />
-          <TextInput
-            className="flex-1 ml-3 text-base"
-            style={{ color: colors.textPrimary }}
-            placeholder={t("hod.workers.searchPlaceholder")}
-            placeholderTextColor={colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t("hod.workers.searchPlaceholder")}
+        />
       </View>
 
       <ScrollView
@@ -205,7 +163,9 @@ export default function HodWorkersTab() {
                         className="text-base font-bold"
                         style={{ color: colors.textPrimary }}
                       >
-                        {worker.fullName ?? worker.username ?? t("hod.workers.notAvailable")}
+                        {worker.fullName ??
+                          worker.username ??
+                          t("hod.workers.notAvailable")}
                       </Text>
                       <Text
                         className="text-xs mt-0.5"

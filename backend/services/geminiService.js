@@ -218,9 +218,7 @@ async function analyzeComplaintWithImage(description, imageUrl = null) {
   if (!genAI) return { department: "Other", priority: "Medium", refinedText: description };
 
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: imageUrl ? "gemini-2.0-flash-exp" : GEMINI_PRIMARY_MODEL 
-    });
+    const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
 
     const safeDesc = sanitizeInput(description);
     let prompt = `Analyze this complaint and categorize it:

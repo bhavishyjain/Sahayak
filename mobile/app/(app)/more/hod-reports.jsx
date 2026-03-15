@@ -33,7 +33,7 @@ import FilterPanel from "../../../components/FilterPanel";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useDownloadReport } from "../../../utils/hooks/useReports";
-import { formatStatusLabel } from "../../../utils/complaintFormatters";
+import { formatStatusLabel } from "../../../data/complaintStatus";
 import getUserAuth from "../../../utils/userAuth";
 import apiCall from "../../../utils/api";
 import {

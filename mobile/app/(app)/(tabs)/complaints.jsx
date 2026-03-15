@@ -17,7 +17,10 @@ import FilterPanel from "../../../components/FilterPanel";
 import SearchBar from "../../../components/SearchBar";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
-import { formatPriorityLabel } from "../../../utils/complaintFormatters";
+import {
+  ALL_STATUS_OPTIONS,
+  formatPriorityLabel,
+} from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { API_BASE } from "../../../url";
@@ -53,14 +56,7 @@ export default function Complaints() {
   const baseUrl = API_BASE;
   const LIMIT = 10;
 
-  const STATUS_OPTIONS = [
-    "pending",
-    "assigned",
-    "in-progress",
-    "pending-approval",
-    "needs-rework",
-    "cancelled",
-  ];
+  const STATUS_OPTIONS = ALL_STATUS_OPTIONS.filter((s) => s !== "resolved");
 
   const buildQuery = (currentPage) => {
     const params = new URLSearchParams();

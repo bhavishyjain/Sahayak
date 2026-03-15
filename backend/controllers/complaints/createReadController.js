@@ -22,6 +22,18 @@ const {
 const { assertCanAccessComplaint } = require("../../policies/complaintPolicy");
 
 exports.createComplaint = asyncHandler(async (req, res) => {
+  const withTimeout = (promise, timeoutMs, fallbackValue) => {
+    let timeoutId;
+    const timeoutPromise = new Promise((resolve) => {
+      timeoutId = setTimeout(() => resolve(fallbackValue), timeoutMs);
+    });
+
+    return Promise.race([
+      Promise.resolve(promise).catch(() => fallbackValue),
+      timeoutPromise,
+    ]).finally(() => clearTimeout(timeoutId));
+  };
+
   const coordinates = parseCoordinates(req.body.coordinates);
   validateCreateComplaint({
     body: req.body,
@@ -40,7 +52,14 @@ exports.createComplaint = asyncHandler(async (req, res) => {
   try {
     const imageUrl =
       proofImages && proofImages.length > 0 ? proofImages[0] : null;
-    const aiResult = await analyzeComplaintWithImage(description, imageUrl);
+    const [aiResult, sentimentResult] = await Promise.all([
+      withTimeout(
+        analyzeComplaintWithImage(description, imageUrl),
+        4500,
+        null,
+      ),
+      withTimeout(analyzeSentiment(description), 3500, null),
+    ]);
 
     const VALID_DEPARTMENTS = [
       "Road",
@@ -59,7 +78,6 @@ exports.createComplaint = asyncHandler(async (req, res) => {
       aiConfidence = (aiResult.confidence || 50) / 100;
     }
 
-    const sentimentResult = await analyzeSentiment(description);
     if (sentimentResult && !sentimentResult.error) {
       aiAnalysis = {
         sentiment: sentimentResult.sentiment || "unknown",
@@ -98,6 +116,8 @@ exports.createComplaint = asyncHandler(async (req, res) => {
   }
 
   let complaint;
+  const createdByName =
+    req.user?.username || req.user?.fullName || String(req.user?._id || "user");
   try {
     complaint = await Complaint.create({
       userId: req.user._id,
@@ -115,8 +135,8 @@ exports.createComplaint = asyncHandler(async (req, res) => {
           status: "pending",
           updatedBy: req.user._id,
           note: aiAutoApplied
-            ? `Created from app - AI auto-categorized (${Math.round(aiConfidence * 100)}% confidence)`
-            : "Created from app",
+            ? `Created by ${createdByName} - AI auto-categorized (${Math.round(aiConfidence * 100)}% confidence)`
+            : `Created by ${createdByName}`,
         },
       ],
     });
@@ -126,14 +146,16 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  await notifyUser(req.user._id, {
+  void notifyUser(req.user._id, {
     title: "Complaint Received",
     body: `Ticket ${complaint.ticketId} has been created.`,
-    data: { type: "complaint_created", complaintId: String(complaint._id) },
+    data: { type: "complaint-update", complaintId: String(complaint._id) },
+  }).catch((notificationError) => {
+    console.error("Failed to send complaint notification:", notificationError);
   });
 
-  try {
-    await sendComplaintRegistered(
+  if (req.user?.email) {
+    void sendComplaintRegistered(
       req.user.email,
       req.user.fullName || req.user.username,
       {
@@ -145,8 +167,6 @@ exports.createComplaint = asyncHandler(async (req, res) => {
         locationName,
       },
     );
-  } catch (emailError) {
-    console.error("Failed to send registration email:", emailError);
   }
 
   return sendSuccess(
@@ -230,7 +250,9 @@ exports.myComplaints = asyncHandler(async (req, res) => {
     page: safePage,
     pages: Math.ceil(total / safeLimit),
     limit: safeLimit,
-    complaints: complaints.map(buildComplaintView),
+    complaints: complaints.map((complaint) =>
+      buildComplaintView(complaint, { currentUserId: req.user._id }),
+    ),
   });
 });
 
@@ -248,7 +270,9 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
   if (req.user?.role !== "user") {
     await assertCanAccessComplaint(req.user, complaint);
   }
-  return sendSuccess(res, { complaint: buildComplaintView(complaint) });
+  return sendSuccess(res, {
+    complaint: buildComplaintView(complaint, { currentUserId: req.user._id }),
+  });
 });
 
 exports.upvoteComplaint = asyncHandler(async (req, res) => {
@@ -344,7 +368,7 @@ exports.getNearbyComplaints = asyncHandler(async (req, res) => {
     status: { $nin: ["resolved", "cancelled"] },
   })
     .select(
-      "ticketId refinedText rawText department status priority locationName coordinates upvoteCount createdAt",
+      "ticketId refinedText rawText department status priority locationName coordinates upvoteCount upvotes createdAt",
     )
     .sort({ upvoteCount: -1, createdAt: -1 })
     .limit(50)
@@ -362,10 +386,15 @@ exports.getNearbyComplaints = asyncHandler(async (req, res) => {
     return R * 2 * Math.asin(Math.sqrt(a));
   };
 
+  const currentUserId = String(req.user?._id || "");
+
   const nearby = candidates
     .filter((c) => c.coordinates?.lat != null && c.coordinates?.lng != null)
     .map((c) => ({
       ...c,
+      hasUpvoted: (c.upvotes || []).some(
+        (id) => String(id) === currentUserId,
+      ),
       distance:
         Math.round(
           haversine(lat, lng, c.coordinates.lat, c.coordinates.lng) * 10,

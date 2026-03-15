@@ -25,7 +25,7 @@ router.get("/ai-review/pending", authorize("head", "admin"), getComplaintsNeedin
 router.post("/:complaintId([0-9a-fA-F]{24})/apply-ai-suggestion", authorize("head", "admin"), applyAISuggestion);
 
 // Completion Photos (Worker only)
-router.post("/:id([0-9a-fA-F]{24})/completion-photos", upload.array("completionPhotos", 10), uploadCompletionPhotos);
+router.post("/:id([0-9a-fA-F]{24})/completion-photos", upload.array("completionPhotos", 5), uploadCompletionPhotos);
 
 // Satisfaction Voting (All authenticated users)
 router.post("/:id([0-9a-fA-F]{24})/satisfaction-vote", voteSatisfaction);

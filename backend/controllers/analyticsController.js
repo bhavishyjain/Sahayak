@@ -6,9 +6,9 @@ const { sendSuccess } = require("../core/response");
 const { buildComplaintView } = require("../utils/complaintView");
 
 function severityFromIntensity(intensity) {
-  if (intensity >= 12) return "very-high";
-  if (intensity >= 8) return "high";
-  if (intensity >= 4) return "medium";
+  if (intensity >= 100) return "critical";
+  if (intensity >= 50) return "high";
+  if (intensity >= 25) return "medium";
   return "low";
 }
 
@@ -281,6 +281,7 @@ exports.heatmap = asyncHandler(async (req, res) => {
             : null,
         totalComplaints: spot.totalComplaints,
         openComplaints: spot.openComplaints,
+        unresolvedComplaints: spot.openComplaints,
         highPriorityComplaints: spot.highPriorityComplaints,
         topDepartment,
         intensity,

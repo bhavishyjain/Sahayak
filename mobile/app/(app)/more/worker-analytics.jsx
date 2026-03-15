@@ -24,9 +24,12 @@ import Card from "../../../components/Card";
 import MetricCard from "../../../components/MetricCard";
 import { useTheme } from "../../../utils/context/theme";
 import {
+  ALL_STATUS_OPTIONS,
   formatPriorityLabel,
   formatStatusLabel,
-} from "../../../utils/complaintFormatters";
+  getPriorityColor,
+  getStatusColor,
+} from "../../../data/complaintStatus";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import { WORKER_ANALYTICS_URL } from "../../../url";
@@ -209,61 +212,30 @@ export default function WorkerAnalytics() {
     () => [
       {
         key: "Low",
-        label: formatPriorityLabel(t, "low"),
-        color: colors.success,
+        label: formatPriorityLabel(t, "Low"),
+        color: getPriorityColor("Low", colors) ?? colors.textSecondary,
       },
       {
         key: "Medium",
-        label: formatPriorityLabel(t, "medium"),
-        color: colors.warning,
+        label: formatPriorityLabel(t, "Medium"),
+        color: getPriorityColor("Medium", colors) ?? colors.textSecondary,
       },
       {
         key: "High",
-        label: formatPriorityLabel(t, "high"),
-        color: colors.error,
+        label: formatPriorityLabel(t, "High"),
+        color: getPriorityColor("High", colors) ?? colors.textSecondary,
       },
     ],
     [colors, t],
   );
 
   const statusConfig = useMemo(
-    () => [
-      {
-        key: "resolved",
-        label: formatStatusLabel(t, "resolved"),
-        color: colors.success,
-      },
-      {
-        key: "in-progress",
-        label: formatStatusLabel(t, "in-progress"),
-        color: colors.info,
-      },
-      {
-        key: "assigned",
-        label: formatStatusLabel(t, "assigned"),
-        color: colors.primary,
-      },
-      {
-        key: "pending-approval",
-        label: formatStatusLabel(t, "pending-approval"),
-        color: colors.warning,
-      },
-      {
-        key: "needs-rework",
-        label: formatStatusLabel(t, "needs-rework"),
-        color: colors.error,
-      },
-      {
-        key: "pending",
-        label: formatStatusLabel(t, "pending"),
-        color: colors.warning + "40",
-      },
-      {
-        key: "cancelled",
-        label: formatStatusLabel(t, "cancelled"),
-        color: colors.danger,
-      },
-    ],
+    () =>
+      ALL_STATUS_OPTIONS.map((key) => ({
+        key,
+        label: formatStatusLabel(t, key),
+        color: getStatusColor(key, colors) ?? colors.textSecondary,
+      })),
     [colors, t],
   );
 

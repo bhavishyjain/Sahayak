@@ -20,7 +20,10 @@ exports.assignMultipleWorkers = asyncHandler(async (req, res) => {
   const { workers } = req.body; // [{ workerId, taskDescription }]
 
   if (!Array.isArray(workers) || workers.length === 0) {
-    throw new AppError("Workers array is required with at least one worker", 400);
+    throw new AppError(
+      "Workers array is required with at least one worker",
+      400,
+    );
   }
 
   const hod = await getHodOrThrow(req);
@@ -43,6 +46,11 @@ exports.assignMultipleWorkers = asyncHandler(async (req, res) => {
   const estimatedCompletionTime = validWorkers[0]
     ? await calculateETA(complaint, validWorkers[0])
     : undefined;
+  const hodDisplayName =
+    hod?.fullName || hod?.username || `HOD (${hod?.department || "Department"})`;
+  const assignedWorkerNames = validWorkers
+    .map((worker) => worker.fullName || worker.username)
+    .join(", ");
   const taskDescriptions = workers.reduce((acc, item) => {
     const id = String(item.workerId || "");
     if (id) acc[id] = item.taskDescription || null;
@@ -55,7 +63,7 @@ exports.assignMultipleWorkers = asyncHandler(async (req, res) => {
     assignedBy: hodId,
     estimatedCompletionTime,
     taskDescriptions,
-    note: `Assigned to ${validWorkers.length} worker(s) by HOD: ${validWorkers.map((w) => w.fullName || w.username).join(", ")}`,
+    note: `Assigned to ${validWorkers.length} worker(s) by ${hodDisplayName}: ${assignedWorkerNames}`,
   });
 
   return sendSuccess(
@@ -118,11 +126,19 @@ exports.getComplaintWorkers = asyncHandler(async (req, res) => {
     "fullName username email phone performanceMetrics",
   );
 
+  const workers = (complaint.assignedWorkers || []).map((item) => ({
+    workerId: item.workerId,
+    taskDescription: item.taskDescription || null,
+    status: item.status,
+    assignedAt: item.assignedAt,
+    completedAt: item.completedAt,
+  }));
+
   return sendSuccess(
     res,
     {
-      workers: complaint.assignedWorkers,
-      totalWorkers: complaint.assignedWorkers.length,
+      workers,
+      totalWorkers: workers.length,
     },
     "Workers retrieved successfully",
   );

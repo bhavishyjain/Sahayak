@@ -8,6 +8,7 @@ import { darkColors, lightColors } from "../colors";
 import { useTheme } from "@/utils/context/theme";
 import { useEffect, useRef } from "react";
 import { registerPushToken } from "../utils/pushToken";
+import { StatusBar } from "expo-status-bar";
 import "../global.css";
 import "../utils/i18n/config";
 
@@ -43,6 +44,11 @@ function RootNavigator() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
+      <StatusBar
+        style={colorScheme === "dark" ? "light" : "dark"}
+        backgroundColor={colors.backgroundPrimary}
+        translucent={false}
+      />
       <Stack screenOptions={{ headerShown: false }} />
       <Toast position="bottom" />
     </View>

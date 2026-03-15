@@ -1,6 +1,10 @@
 import { Circle, Pause, Plane, Power } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../colors";
+import {
+  getComplaintStatusMeta,
+  getStatusColor,
+} from "../data/complaintStatus";
 import { useTheme } from "../utils/context/theme";
 
 export default function StatusPill({ user, status }) {
@@ -16,42 +20,11 @@ export default function StatusPill({ user, status }) {
   // If status prop is provided (for complaints), use complaint status logic
   if (status) {
     pulse = false; // No pulse animation for complaint statuses
-    switch (status.toLowerCase()) {
-      case "pending":
-        label = "Pending";
-        dotColorHex = "#F59E0B"; // amber-500
-        backgroundColor = "#F59E0B22";
-        break;
-      case "assigned":
-        label = "Assigned";
-        dotColorHex = "#3B82F6"; // blue-500
-        backgroundColor = "#3B82F622";
-        break;
-      case "in-progress":
-        label = "In Progress";
-        dotColorHex = "#8B5CF6"; // purple-500
-        backgroundColor = "#8B5CF622";
-        break;
-      case "resolved":
-        label = "Resolved";
-        dotColorHex = "#22C55E"; // green-500
-        backgroundColor = "#22C55E22";
-        break;
-      case "cancelled":
-        label = "Cancelled";
-        dotColorHex = "#6B7280"; // gray-500
-        backgroundColor = "#6B728022";
-        break;
-      case "needs-rework":
-        label = "Rework Required";
-        dotColorHex = "#F97316"; // orange-500
-        backgroundColor = "#F9731622";
-        break;
-      default:
-        label = status;
-        dotColorHex = "#6B7280"; // gray-500
-        backgroundColor = colors.backgroundSecondary;
-    }
+    const statusMeta = getComplaintStatusMeta(status);
+    const statusColor = getStatusColor(status, colors) ?? colors.muted;
+    label = statusMeta?.fallbackLabel ?? String(status);
+    dotColorHex = statusColor;
+    backgroundColor = `${statusColor}22`;
   } else if (user) {
     // Original user online/offline status logic
     const schedule = user?.data?.schedule_data;

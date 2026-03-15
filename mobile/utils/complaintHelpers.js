@@ -1,15 +1,3 @@
-export function normalizeStatus(status) {
-  return String(status || "")
-    .toLowerCase()
-    .replace(/\s+/g, "-");
-}
-
-export function normalizePriority(priority) {
-  return String(priority || "")
-    .trim()
-    .toLowerCase();
-}
-
 export function isComplaintAssigned(complaint) {
   if (!complaint || typeof complaint !== "object") return false;
   if (Array.isArray(complaint.assignedWorkers)) {
@@ -51,44 +39,6 @@ export function formatDateShort(dateString, locale = "en-US") {
   });
 }
 
-const STATUS_TRANSLATION_KEYS = {
-  unassigned: "hod.complaints.unassigned",
-  pending: "status.pending",
-  assigned: "status.assigned",
-  "in-progress": "status.inProgress",
-  "pending-approval": "complaints.status.pendingApproval",
-  "needs-rework": "status.needsRework",
-  resolved: "status.resolved",
-  cancelled: "status.cancelled",
-};
-
-export const ALL_STATUS_OPTIONS = Object.keys(STATUS_TRANSLATION_KEYS);
-
-export function formatStatusLabel(t, status) {
-  const key = STATUS_TRANSLATION_KEYS[normalizeStatus(status)];
-  if (!key) return status || "-";
-  return t(key);
-}
-
-const PRIORITY_TRANSLATION_KEYS = {
-  low: "complaints.priority.low",
-  medium: "complaints.priority.medium",
-  high: "complaints.priority.high",
-};
-
-export function formatPriorityLabel(t, priority) {
-  const normalized = normalizePriority(priority);
-  const key = PRIORITY_TRANSLATION_KEYS[normalized];
-  if (!key) return priority || "-";
-  return t(key);
-}
-
-/**
- * Compute the SLA countdown from a due date string.
- * Returns null if no due date.
- * @param {string|Date} dueDateStr
- * @returns {{ text: string|null, isOverdue: boolean, isCritical: boolean, isUrgent: boolean }|null}
- */
 export function getSlaCountdown(dueDateStr) {
   if (!dueDateStr) return null;
   const due = new Date(dueDateStr);
@@ -117,6 +67,7 @@ export function getSlaCountdown(dueDateStr) {
       isUrgent,
     };
   }
+
   if (diffHours >= 1) {
     const hours = Math.floor(diffHours);
     const mins = diffMins % 60;
@@ -127,10 +78,43 @@ export function getSlaCountdown(dueDateStr) {
       isUrgent,
     };
   }
+
   return {
     text: `${diffMins}m`,
     isOverdue: false,
     isCritical: true,
     isUrgent: true,
   };
+}
+
+export function normalizeSeverity(severity) {
+  const normalized = String(severity || "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "critical") return "critical";
+  if (normalized === "high") return "high";
+  if (normalized === "medium") return "medium";
+  if (normalized === "low") return "low";
+  return "low";
+}
+
+export function getSeverityName(t, severity) {
+  const normalized = normalizeSeverity(severity);
+
+  if (typeof t !== "function") return normalized;
+
+  if (normalized === "critical") return t("heatmap.severity.critical");
+  if (normalized === "high") return t("heatmap.severity.high");
+  if (normalized === "medium") return t("heatmap.severity.medium");
+  return t("heatmap.severity.low");
+}
+
+export function getSeverityColor(severity, colors) {
+  const normalized = normalizeSeverity(severity);
+
+  if (normalized === "critical") return colors?.danger;
+  if (normalized === "high") return colors?.warning;
+  if (normalized === "medium") return colors?.primary;
+  return colors?.success;
 }

@@ -12,6 +12,7 @@ function normalizeComplaintStatus(status) {
 function buildComplaintView(complaint, options = {}) {
   const includeAssignment =
     options.includeAssignment === undefined ? true : options.includeAssignment;
+  const viewerId = options.currentUserId ? String(options.currentUserId) : null;
 
   const history = (complaint.history || []).map((item) => {
     const source =
@@ -29,6 +30,12 @@ function buildComplaintView(complaint, options = {}) {
     };
   });
 
+  const latestNeedsReworkEntry = [...history]
+    .reverse()
+    .find((item) => item.status === "needs-rework" && item.note);
+
+  const upvotes = (complaint.upvotes || []).map((id) => String(id));
+
   const base = {
     id: complaint._id,
     userId: complaint.userId?._id || complaint.userId || null,
@@ -43,13 +50,16 @@ function buildComplaintView(complaint, options = {}) {
     coordinates: complaint.coordinates,
     proofImage: complaint.proofImage,
     completionPhotos: complaint.completionPhotos || [],
+    note: complaint.note || "",
+    reworkReason: complaint.note || latestNeedsReworkEntry?.note || "",
     createdAt: complaint.createdAt,
     updatedAt: complaint.updatedAt,
     assignedAt: complaint.assignedAt,
     estimatedCompletionTime: complaint.estimatedCompletionTime,
     history,
     upvoteCount: complaint.upvoteCount || 0,
-    upvotes: (complaint.upvotes || []).map((id) => String(id)),
+    upvotes,
+    hasUpvoted: viewerId ? upvotes.includes(viewerId) : false,
     feedback: complaint.feedback,
     sla: complaint.sla,
   };
@@ -65,7 +75,6 @@ function buildComplaintView(complaint, options = {}) {
     status: w.status,
     assignedAt: w.assignedAt,
     completedAt: w.completedAt,
-    notes: w.notes,
   }));
 
   return {

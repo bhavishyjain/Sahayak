@@ -1,70 +1,20 @@
-import {
-  CheckCircle,
-  Clock,
-  UserCheck,
-  Wrench,
-  ClipboardCheck,
-  RotateCcw,
-  XCircle,
-  AlertCircle,
-} from "lucide-react-native";
 import { useMemo } from "react";
 import { Text, View } from "react-native";
+import {
+  formatStatusLabel,
+  getStatusBackgroundColor,
+  getStatusColor,
+  getStatusIcon,
+} from "../data/complaintStatus";
 
-const STATUS_CONFIG = {
-  pending: {
-    Icon: Clock,
-    color: "#F59E0B",
-    bg: "#F59E0B22",
-    label: "Pending",
-  },
-  assigned: {
-    Icon: UserCheck,
-    color: "#3B82F6",
-    bg: "#3B82F622",
-    label: "Assigned",
-  },
-  "in-progress": {
-    Icon: Wrench,
-    color: "#8B5CF6",
-    bg: "#8B5CF622",
-    label: "In Progress",
-  },
-  "pending-approval": {
-    Icon: ClipboardCheck,
-    color: "#06B6D4",
-    bg: "#06B6D422",
-    label: "Pending Approval",
-  },
-  "needs-rework": {
-    Icon: RotateCcw,
-    color: "#F97316",
-    bg: "#F9731622",
-    label: "Needs Rework",
-  },
-  resolved: {
-    Icon: CheckCircle,
-    color: "#10B981",
-    bg: "#10B98122",
-    label: "Resolved",
-  },
-  cancelled: {
-    Icon: XCircle,
-    color: "#6B7280",
-    bg: "#6B728022",
-    label: "Cancelled",
-  },
-};
-
-function getStatusConfig(status) {
-  return (
-    STATUS_CONFIG[status?.toLowerCase()] ?? {
-      Icon: AlertCircle,
-      color: "#6B7280",
-      bg: "#6B728022",
-      label: status ?? "Unknown",
-    }
-  );
+function getStatusConfig(status, colors, t) {
+  const color = getStatusColor(status, colors) ?? colors.muted;
+  return {
+    Icon: getStatusIcon(status),
+    color,
+    bg: getStatusBackgroundColor(status, colors) ?? colors.backgroundSecondary,
+    label: formatStatusLabel(t, status),
+  };
 }
 
 function resolveActor(updatedBy) {
@@ -112,7 +62,7 @@ function toMinuteKey(timestamp) {
   return `${y}-${m}-${day} ${hh}:${mm}`;
 }
 
-export default function ComplaintTimeline({ history, colors }) {
+export default function ComplaintTimeline({ history, colors, t }) {
   if (!history || history.length === 0) return null;
 
   const timelineItems = useMemo(() => {
@@ -152,7 +102,7 @@ export default function ComplaintTimeline({ history, colors }) {
     <View>
       {timelineItems.map((item, index) => {
         const isLast = index === timelineItems.length - 1;
-        const cfg = getStatusConfig(item.status);
+        const cfg = getStatusConfig(item.status, colors, t);
         const { Icon } = cfg;
         const actor = resolveActor(item.updatedBy);
         const timestamp = item.__timestamp;

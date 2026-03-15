@@ -8,6 +8,7 @@ const WorkerInvitation = require("./models/WorkerInvitation");
 const Notification = require("./models/Notification");
 const ReportSchedule = require("./models/ReportSchedule");
 const FestivalEvent = require("./models/FestivalEvent");
+const generateTicketId = require("./utils/generateTicketId");
 
 // Indore areas with accurate coordinates - Expanded list for better coverage
 const indoreAreas = [
@@ -409,31 +410,6 @@ const taskDescriptionsByDept = {
   ],
 };
 
-// Worker progress notes for in-progress / completed tasks
-const workerNotesByStatus = {
-  "in-progress": [
-    "Work started. Material arranged, team on site.",
-    "50% complete. Facing minor delays due to heavy traffic diversion.",
-    "Inspection done. Waiting for equipment to arrive.",
-    "Materials procured. Repair work underway.",
-    "Partially resolved. Remaining section requires specialist tools.",
-    "Coordinating with contractor for heavy machinery deployment.",
-  ],
-  completed: [
-    "Work completed successfully. Site cleaned.",
-    "Repair done and tested. Surface restored to original condition.",
-    "Issue resolved. Photographs uploaded for record.",
-    "Task finished. Follow-up inspection scheduled in 7 days.",
-    "All residents notified. Service restored.",
-    "Completed ahead of schedule. Quality check passed.",
-  ],
-  "needs-rework": [
-    "Materials used were insufficient. Requires second round of patching.",
-    "HOD noted surface not leveled properly. Re-doing.",
-    "Initial repair washed away due to rain. Resuming with waterproof mix.",
-  ],
-};
-
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -441,13 +417,6 @@ function pickRandom(arr) {
 function getTaskDescription(dept) {
   const arr = taskDescriptionsByDept[dept] || taskDescriptionsByDept.Other;
   return pickRandom(arr);
-}
-
-function getWorkerNotes(taskStatus) {
-  const arr = workerNotesByStatus[taskStatus];
-  if (!arr) return null;
-  // ~70% chance of having notes
-  return Math.random() < 0.7 ? pickRandom(arr) : null;
 }
 
 // Sample complaint titles and descriptions by department
@@ -912,8 +881,16 @@ const feedbackComments = {
   ],
 };
 
+const reworkReasonTemplates = [
+  "Before/after quality is insufficient. Please repair the remaining damaged portion and re-upload clear completion photos.",
+  "Work is incomplete near the complaint location. Complete the pending section and submit fresh completion photos.",
+  "Resolution does not match complaint scope. Fix the unresolved part and upload updated completion photos.",
+  "Photo evidence is unclear/inadequate. Rework the task properly and submit new completion photos.",
+  "Final finish quality is below standard. Rework and upload proper completion photos for review.",
+];
+
 // Generate random complaint
-function generateComplaint(userId, ticketNum, allUsers) {
+function generateComplaint(userId, allUsers) {
   const departments = [
     "Road",
     "Water",
@@ -985,7 +962,7 @@ function generateComplaint(userId, ticketNum, allUsers) {
   }
 
   const complaint = {
-    ticketId: `INDORE${String(ticketNum).padStart(4, "0")}`,
+    ticketId: generateTicketId(),
     userId: userId,
     rawText: `${template.title}: ${description}`,
     refinedText: description,
@@ -1184,6 +1161,9 @@ function generateComplaint(userId, ticketNum, allUsers) {
   }
 
   if (status === "needs-rework") {
+    const reworkReason = pickRandom(reworkReasonTemplates);
+    complaint.note = reworkReason;
+
     const approvalDate = createStageTimestamp(
       complaint.history[complaint.history.length - 1].timestamp,
       1,
@@ -1201,7 +1181,7 @@ function generateComplaint(userId, ticketNum, allUsers) {
       status: "needs-rework",
       updatedBy: null, // HOD rejected
       timestamp: reworkDate,
-      note: "Head of Department reviewed and sent back for rework",
+      note: `Marked as needs-rework by HOD: ${reworkReason}`,
     });
   }
 
@@ -1216,25 +1196,23 @@ function generateComplaint(userId, ticketNum, allUsers) {
       status: "pending-approval",
       updatedBy: null,
       timestamp: approvalDate,
-      note: "Worker submitted work for HOD approval",
+      note: "Worker submitted completion photos for HOD approval",
     });
   }
 
   if (status === "resolved") {
-    if (Math.random() < 0.75) {
-      const approvalDate = createStageTimestamp(
-        complaint.history[complaint.history.length - 1].timestamp,
-        1,
-        12,
-        now,
-      );
-      complaint.history.push({
-        status: "pending-approval",
-        updatedBy: null,
-        timestamp: approvalDate,
-        note: "Worker submitted work for HOD approval",
-      });
-    }
+    const approvalDate = createStageTimestamp(
+      complaint.history[complaint.history.length - 1].timestamp,
+      1,
+      12,
+      now,
+    );
+    complaint.history.push({
+      status: "pending-approval",
+      updatedBy: null,
+      timestamp: approvalDate,
+      note: "Worker submitted completion photos for HOD approval",
+    });
 
     const resolvedDate = createStageTimestamp(
       complaint.history[complaint.history.length - 1].timestamp,
@@ -1543,7 +1521,7 @@ async function seedDatabase() {
     for (let i = 1; i <= TOTAL_COMPLAINTS; i++) {
       const randomUser =
         regularUsers[Math.floor(Math.random() * regularUsers.length)];
-      const complaint = generateComplaint(randomUser._id, i, regularUsers);
+      const complaint = generateComplaint(randomUser._id, regularUsers);
 
       // Assign worker if status is assigned or beyond
       if (
@@ -1615,7 +1593,6 @@ async function seedDatabase() {
               taskDescription: getTaskDescription(complaint.department),
               status: primaryTaskStatus,
               completedAt: completedAtTimestamp,
-              notes: getWorkerNotes(primaryTaskStatus),
             },
           ];
 
@@ -1646,7 +1623,6 @@ async function seedDatabase() {
                 taskDescription: getTaskDescription(complaint.department),
                 status: secondTaskStatus,
                 completedAt: completedAtTimestamp,
-                notes: getWorkerNotes(secondTaskStatus),
               });
 
               multiWorkerCount++;
@@ -1689,8 +1665,8 @@ async function seedDatabase() {
         }
       }
 
-      // Add completion photos for resolved complaints (80% chance)
-      if (complaint.status === "resolved" && Math.random() < 0.8) {
+      // Add completion photos for pending-approval and resolved complaints
+      if (["pending-approval", "resolved"].includes(complaint.status)) {
         const photoCount = Math.floor(Math.random() * 3) + 1; // 1-3 photos
         complaint.completionPhotos = [];
         const samplePhotos = [
@@ -1705,6 +1681,9 @@ async function seedDatabase() {
             samplePhotos[Math.floor(Math.random() * samplePhotos.length)],
           );
         }
+      } else if (complaint.status === "needs-rework") {
+        // Rework flow clears old completion photos; worker must upload fresh photos again
+        complaint.completionPhotos = [];
       }
 
       // Add satisfaction votes for resolved complaints (60% chance)

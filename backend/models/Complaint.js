@@ -73,7 +73,6 @@ const complaintSchema = new mongoose.Schema(
     resolvedAt: { type: Date, default: null },
     estimatedCompletionTime: { type: Number }, // in hours
     actualCompletionTime: { type: Number }, // in hours
-    workerNotes: { type: String },
     completionPhotos: [{ type: String }], // URLs to after/completion photos
     proofImage: [{ type: String }], // Before photos (from citizen)
     note: { type: String },

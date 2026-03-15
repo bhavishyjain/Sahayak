@@ -17,7 +17,7 @@ import FilterPanel from "../../../components/FilterPanel";
 import PressableBlock from "../../../components/PressableBlock";
 import SearchBar from "../../../components/SearchBar";
 import apiCall from "../../../utils/api";
-import { formatPriorityLabel } from "../../../utils/complaintFormatters";
+import { formatPriorityLabel } from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { API_BASE } from "../../../url";

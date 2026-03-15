@@ -77,23 +77,23 @@ function NotificationItem({ item, colors, onRead, t, typeConfig }) {
       onPress={() => isUnread && onRead(item._id)}
     >
       <View
-        className="flex-row items-start px-4 py-3.5"
+        className="flex-row items-start px-4 py-4"
         style={{
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
-          backgroundColor: isUnread ? cfg.color + "10" : "transparent",
+          backgroundColor: isUnread ? cfg.color + "14" : "transparent",
         }}
       >
         <View
-          className="w-8 h-8 rounded-full items-center justify-center mr-3 mt-0.5"
+          className="w-9 h-9 rounded-full items-center justify-center mr-3 mt-0.5"
           style={{ backgroundColor: cfg.color + "20" }}
         >
-          <Icon size={15} color={cfg.color} />
+          <Icon size={16} color={cfg.color} />
         </View>
         <View className="flex-1">
-          <View className="flex-row items-start justify-between mb-0.5">
+          <View className="flex-row items-start justify-between mb-1">
             <Text
-              className="text-sm font-semibold flex-1 mr-3"
+              className="text-base font-bold flex-1 mr-3"
               style={{ color: colors.textPrimary }}
               numberOfLines={1}
             >
@@ -104,7 +104,7 @@ function NotificationItem({ item, colors, onRead, t, typeConfig }) {
             </Text>
           </View>
           <Text
-            className="text-xs leading-5"
+            className="text-sm leading-5"
             style={{ color: colors.textSecondary }}
             numberOfLines={3}
           >
@@ -231,7 +231,15 @@ export default function NotificationHistoryScreen() {
   const ListHeader = useMemo(
     () => (
       <View>
-        <View className="flex-row items-center justify-between mb-3">
+        <View
+          className="flex-row items-center justify-between px-4 py-3"
+          style={{
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.backgroundPrimary,
+          }}
+        >
           <View className="flex-row items-center">
             <Text
               className="text-xs font-semibold uppercase"
@@ -272,21 +280,9 @@ export default function NotificationHistoryScreen() {
             </TouchableOpacity>
           )}
         </View>
-
-        {notifications.length > 0 && (
-          <View
-            className="rounded-t-2xl overflow-hidden"
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderBottomWidth: 0,
-            }}
-          />
-        )}
       </View>
     ),
-    [colors, unreadCount, notifications.length, handleMarkAllRead, t],
+    [colors, unreadCount, handleMarkAllRead, t],
   );
 
   return (
@@ -304,6 +300,7 @@ export default function NotificationHistoryScreen() {
         <FlatList
           data={notifications}
           keyExtractor={(item) => item._id}
+          style={{ flex: 1 }}
           renderItem={({ item }) => (
             <NotificationItem
               item={item}
@@ -316,11 +313,10 @@ export default function NotificationHistoryScreen() {
           ListHeaderComponent={ListHeader}
           ListEmptyComponent={
             <View
-              className="rounded-2xl items-center py-12"
+              className="items-center justify-center px-8"
               style={{
-                backgroundColor: colors.backgroundSecondary,
-                borderWidth: 1,
-                borderColor: colors.border,
+                flex: 1,
+                minHeight: 320,
               }}
             >
               <BellOff size={32} color={colors.textSecondary} />
@@ -336,19 +332,13 @@ export default function NotificationHistoryScreen() {
             notifications.length > 0 ? (
               <View
                 style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderTopWidth: 0,
-                  borderBottomLeftRadius: 16,
-                  borderBottomRightRadius: 16,
-                  height: 8,
-                  marginBottom: 16,
+                  height: 14,
+                  backgroundColor: colors.backgroundPrimary,
                 }}
               />
             ) : null
           }
-          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 56 }}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
           refreshControl={

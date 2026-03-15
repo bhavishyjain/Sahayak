@@ -16,6 +16,11 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import CustomPicker from "../../../components/CustomPicker";
 import { GET_HEATMAP_URL } from "../../../url";
 import apiCall from "../../../utils/api";
+import {
+  getSeverityColor,
+  getSeverityName,
+  normalizeSeverity,
+} from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useNetworkStatus } from "../../../utils/useNetworkStatus";
@@ -252,13 +257,12 @@ export default function HeatMap() {
       medium: t("heatmap.severity.medium"),
       low: t("heatmap.severity.low"),
     };
-    const severityLabelMap = JSON.stringify({
-      "very-high": t("heatmap.severity.critical"),
-      high: t("heatmap.severity.high"),
-      medium: t("heatmap.severity.medium"),
-      low: t("heatmap.severity.low"),
-      default: t("heatmap.severity.normal"),
-    });
+    const severityColorMap = {
+      critical: getSeverityColor("critical", colors) ?? colors.textSecondary,
+      high: getSeverityColor("high", colors) ?? colors.textSecondary,
+      medium: getSeverityColor("medium", colors) ?? colors.textSecondary,
+      low: getSeverityColor("low", colors) ?? colors.textSecondary,
+    };
     const userLocationLabel = JSON.stringify(t("heatmap.userLocation"));
     const mapCenter = userLocation
       ? [userLocation.lat, userLocation.lng]
@@ -287,10 +291,14 @@ export default function HeatMap() {
         const totalCount = Number(spot.totalComplaints || 0);
         const unresolvedCount = getUnresolvedCount(spot);
         const resolvedCount = Math.max(totalCount - unresolvedCount, 0);
+        const spotSeverity = normalizeSeverity(spot.severity);
+        const spotSeverityColor =
+          getSeverityColor(spotSeverity, colors) ?? colors.textSecondary;
+        const spotSeverityLabel = getSeverityName(t, spotSeverity);
         return `
         L.circleMarker([${spot.coordinates?.lat || 0}, ${spot.coordinates?.lng || 0}], {
-          color: '${getSeverityColor(spot.severity)}',
-          fillColor: '${getSeverityColor(spot.severity)}',
+          color: '${spotSeverityColor}',
+          fillColor: '${spotSeverityColor}',
           fillOpacity: 0.6,
           radius: Math.min(${unresolvedCount} * 2 + 6, 22),
           unresolvedCount: ${unresolvedCount}
@@ -304,7 +312,7 @@ export default function HeatMap() {
               <div><strong>${popupLabels.total}:</strong> ${totalCount}</div>
               <div><strong>${popupLabels.resolved}:</strong> ${resolvedCount}</div>
               <div><strong>${popupLabels.department}:</strong> <span style="color: ${getDepartmentColor(spot.topDepartment)}; font-weight: 600;">${spot.topDepartment}</span></div>
-              <div><strong>${popupLabels.severity}:</strong> <span style="color: ${getSeverityColor(spot.severity)}; font-weight: 600;">${getSeverityLabel(spot.severity)}</span></div>
+              <div><strong>${popupLabels.severity}:</strong> <span style="color: ${spotSeverityColor}; font-weight: 600;">${spotSeverityLabel}</span></div>
             </div>
           </div>
         \`);
@@ -442,39 +450,24 @@ export default function HeatMap() {
           <div class="legend-section">
             <div class="legend-section-title">${legendLabels.severity}</div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: #DC2626;"></div>
+              <div class="legend-color" style="background-color: ${severityColorMap.critical};"></div>
               <span>${legendLabels.critical}</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: #F59E0B;"></div>
+              <div class="legend-color" style="background-color: ${severityColorMap.high};"></div>
               <span>${legendLabels.high}</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: #10B981;"></div>
+              <div class="legend-color" style="background-color: ${severityColorMap.medium};"></div>
               <span>${legendLabels.medium}</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: #3B82F6;"></div>
+              <div class="legend-color" style="background-color: ${severityColorMap.low};"></div>
               <span>${legendLabels.low}</span>
             </div>
           </div>
         </div>
         <script>
-          const severityLabelMap = ${severityLabelMap};
-
-          function getSeverityColor(severity) {
-            switch (severity) {
-              case 'very-high': return '#DC2626';
-              case 'high':     return '#F59E0B';
-              case 'medium':   return '#10B981';
-              case 'low':      return '#3B82F6';
-              default:         return '#6B7280';
-            }
-          }
-          function getSeverityLabel(severity) {
-            return severityLabelMap[severity] || severityLabelMap.default;
-          }
-
           function formatCompactCount(value) {
             const number = Number(value || 0);
             if (number < 1000) return String(number);
@@ -566,37 +559,6 @@ export default function HeatMap() {
       </body>
       </html>
     `;
-  };
-
-  // Get severity color
-  const getSeverityColor = (severity) => {
-    switch (severity) {
-      case "very-high":
-        return "#DC2626";
-      case "high":
-        return "#F59E0B";
-      case "medium":
-        return "#10B981";
-      case "low":
-        return "#3B82F6";
-      default:
-        return "#6B7280";
-    }
-  };
-
-  const getSeverityLabel = (severity) => {
-    switch (severity) {
-      case "very-high":
-        return t("heatmap.severity.critical");
-      case "high":
-        return t("heatmap.severity.high");
-      case "medium":
-        return t("heatmap.severity.medium");
-      case "low":
-        return t("heatmap.severity.low");
-      default:
-        return t("heatmap.severity.normal");
-    }
   };
 
   const updateFilter = useCallback((key, value) => {

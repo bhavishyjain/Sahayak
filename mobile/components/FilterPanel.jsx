@@ -12,10 +12,7 @@ import { darkColors, lightColors } from "../colors";
 import DateTimePickerModal from "./DateTimePickerModal";
 import { useTheme } from "../utils/context/theme";
 import { useState } from "react";
-import {
-  formatStatusLabel,
-  ALL_STATUS_OPTIONS,
-} from "../utils/complaintFormatters";
+import { formatStatusLabel, ALL_STATUS_OPTIONS } from "../data/complaintStatus";
 
 function FilterChip({ label, isActive, onPress, colors }) {
   return (
