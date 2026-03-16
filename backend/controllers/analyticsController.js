@@ -4,6 +4,16 @@ const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
 const { buildComplaintView } = require("../utils/complaintView");
+const {
+  ANALYTICS_STATUS_BUCKETS,
+  getTimeframeWindowStart,
+  monthsAgoStart,
+} = require("../services/analyticsMetricsService");
+const {
+  normalizeAnalyticsFilters,
+  applyAnalyticsComplaintFilters,
+} = require("../services/filterContractService");
+const { buildSummaryPayload } = require("../services/responseViewService");
 
 function severityFromIntensity(intensity) {
   if (intensity >= 100) return "critical";
@@ -14,44 +24,46 @@ function severityFromIntensity(intensity) {
 
 exports.summary = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-  sixMonthsAgo.setDate(1);
-  sixMonthsAgo.setHours(0, 0, 0, 0);
+  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
+    allowDepartment: false,
+    defaultTimeframe: null,
+  });
+  const summaryQuery = { userId };
+  applyAnalyticsComplaintFilters(summaryQuery, analyticsFilters, "createdAt");
+  const trendStart =
+    summaryQuery.createdAt?.$gte ?? monthsAgoStart(5);
 
   const [
-    total,
-    pending,
-    assigned,
-    inProgress,
-    resolved,
+    statusRows,
     recentComplaints,
     resolvedComplaints,
     departmentBreakdownRaw,
     monthlyData,
   ] = await Promise.all([
-    Complaint.countDocuments({ userId }),
-    Complaint.countDocuments({ userId, status: "pending" }),
-    Complaint.countDocuments({ userId, status: "assigned" }),
-    Complaint.countDocuments({ userId, status: "in-progress" }),
-    Complaint.countDocuments({ userId, status: "resolved" }),
-    Complaint.find({ userId })
+    Complaint.aggregate([
+      { $match: summaryQuery },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    Complaint.find(summaryQuery)
       .sort({ createdAt: -1 })
       .limit(5)
       .select(
         "ticketId rawText refinedText department priority status locationName createdAt",
       ),
-    Complaint.find({ userId, status: "resolved", resolvedAt: { $ne: null } })
+    Complaint.find({
+      ...summaryQuery,
+      status: "resolved",
+      resolvedAt: { $ne: null },
+    })
       .select("createdAt resolvedAt")
       .lean(),
     Complaint.aggregate([
-      { $match: { userId } },
+      { $match: summaryQuery },
       { $group: { _id: "$department", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]),
     Complaint.aggregate([
-      { $match: { userId, createdAt: { $gte: sixMonthsAgo } } },
+      { $match: { ...summaryQuery, createdAt: { $gte: trendStart } } },
       {
         $group: {
           _id: {
@@ -93,50 +105,41 @@ exports.summary = asyncHandler(async (req, res) => {
     monthlyTrend.push({ year, month, count: found?.count || 0 });
   }
 
-  return sendSuccess(res, {
+  const summary = {
     stats: {
-      total,
-      pending,
-      assigned,
-      inProgress,
-      resolved,
+      total: statusRows.reduce((sum, row) => sum + Number(row.count || 0), 0),
+      pending: statusRows.find((row) => row._id === "pending")?.count || 0,
+      assigned: statusRows.find((row) => row._id === "assigned")?.count || 0,
+      inProgress:
+        statusRows.find((row) => row._id === "in-progress")?.count || 0,
+      resolved: statusRows.find((row) => row._id === "resolved")?.count || 0,
     },
     avgResolutionTime,
     mostActiveDepartment,
     departmentBreakdown,
     monthlyTrend,
     recent: recentComplaints.map((item) => buildComplaintView(item)),
-  });
+  };
+
+  return sendSuccess(res, buildSummaryPayload(summary, "summary", summary));
 });
 
 exports.heatmap = asyncHandler(async (req, res) => {
-  // Parse filters from query params
-  const { department, priority, timeframe, granularity } = req.query;
+  const {
+    timeframe,
+    granularity,
+    ...analyticsFilters
+  } = normalizeAnalyticsFilters(req.query, {
+    allowDepartment: req.user?.role !== "head" && req.user?.role !== "worker",
+  });
   const role = req.user?.role;
   const complaintLevel = granularity === "complaint";
 
   // Calculate time window based on timeframe filter
-  const windowStart = new Date();
-  switch (timeframe) {
-    case "7days":
-      windowStart.setDate(windowStart.getDate() - 7);
-      break;
-    case "3months":
-      windowStart.setMonth(windowStart.getMonth() - 3);
-      break;
-    case "6months":
-      windowStart.setMonth(windowStart.getMonth() - 6);
-      break;
-    case "30days":
-    default:
-      windowStart.setDate(windowStart.getDate() - 30);
-      break;
-  }
+  const windowStart = getTimeframeWindowStart(timeframe);
 
   // Build query filters
-  const query = {
-    createdAt: { $gte: windowStart },
-  };
+  const query = {};
 
   if (role === "head" || role === "worker") {
     const actor = await User.findById(req.user._id).select("role department");
@@ -144,13 +147,8 @@ exports.heatmap = asyncHandler(async (req, res) => {
       throw new AppError("Forbidden", 403);
     }
     query.department = actor.department;
-  } else if (department && department !== "all") {
-    query.department = department;
   }
-
-  if (priority && priority !== "all") {
-    query.priority = priority;
-  }
+  applyAnalyticsComplaintFilters(query, { ...analyticsFilters, timeframe }, "createdAt");
 
   const complaints = await Complaint.find(query).select(
     "locationName coordinates status priority department createdAt",
@@ -165,9 +163,7 @@ exports.heatmap = asyncHandler(async (req, res) => {
 
         if (!hasCoords) return null;
 
-        const isOpen = ["pending", "assigned", "in-progress"].includes(
-          complaint.status,
-        );
+        const isOpen = ANALYTICS_STATUS_BUCKETS.backlog.includes(complaint.status);
         const isHighPriority = complaint.priority === "High";
         const intensity = (isOpen ? 8 : 2) + (isHighPriority ? 4 : 0);
 
@@ -194,7 +190,7 @@ exports.heatmap = asyncHandler(async (req, res) => {
 
     return sendSuccess(res, {
       updatedAt: new Date().toISOString(),
-      windowDays: timeframe || "30days",
+      windowDays: timeframe,
       totalSpots: spots.length,
       granularity: "complaint",
       spots,
@@ -219,9 +215,7 @@ exports.heatmap = asyncHandler(async (req, res) => {
 
     if (!key) continue;
 
-    const isOpen = ["pending", "assigned", "in-progress"].includes(
-      complaint.status,
-    );
+    const isOpen = ANALYTICS_STATUS_BUCKETS.backlog.includes(complaint.status);
     const isHighPriority = complaint.priority === "High";
 
     if (!spotsByKey.has(key)) {
@@ -294,7 +288,7 @@ exports.heatmap = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, {
     updatedAt: new Date().toISOString(),
-    windowDays: timeframe || "30days",
+    windowDays: timeframe,
     totalSpots: spots.length,
     granularity: "cluster",
     spots,

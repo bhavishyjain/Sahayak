@@ -7,6 +7,10 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
+import {
+  getPasswordStrengthMessage,
+  isStrongPassword,
+} from "../../../utils/passwordStrength";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { RESET_PASSWORD_URL } from "../../../url";
@@ -34,11 +38,11 @@ export default function ResetPassword() {
       return;
     }
 
-    if (password.length < 8) {
+    if (!isStrongPassword(password)) {
       Toast.show({
         type: "error",
         text1: t("auth.resetPassword.weakPasswordTitle"),
-        text2: t("auth.resetPassword.weakPasswordMessage"),
+        text2: getPasswordStrengthMessage(t),
       });
       return;
     }
@@ -128,6 +132,13 @@ export default function ResetPassword() {
             theme={{ colors: { text: colors.textPrimary } }}
           />
         </View>
+
+        <Text
+          className="text-xs mb-4 -mt-2"
+          style={{ color: colors.textSecondary }}
+        >
+          {getPasswordStrengthMessage(t)}
+        </Text>
 
         <View
           className="flex-row items-center rounded-lg px-4 mb-5 h-[50px]"

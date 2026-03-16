@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { CalendarDays, Inbox, SearchX } from "lucide-react-native";
+import { CalendarDays, Inbox, ChevronDown } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +15,7 @@ import Card from "../../../components/Card";
 import ComplaintCard from "../../../components/ComplaintCard";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import SearchBar from "../../../components/SearchBar";
+import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
@@ -29,25 +30,37 @@ export default function WorkerCompleted() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
-  const [filteredComplaints, setFilteredComplaints] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 20;
 
-  const load = async (isRefresh = false) => {
+  const load = async (isRefresh = false, requestedPage = 1) => {
     try {
       if (isRefresh) setRefreshing(true);
+      else if (requestedPage > 1) setLoadingMore(true);
       else setLoading(true);
 
       const res = await apiCall({
         method: "GET",
         url: WORKER_COMPLETED_URL,
+        params: {
+          page: requestedPage,
+          limit: LIMIT,
+          search: searchQuery.trim() || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        },
       });
 
       const payload = res.data;
-      const data = payload.complaints;
-      setComplaints(data);
-      setFilteredComplaints(data);
+      const data = payload.complaints ?? [];
+      setComplaints((prev) => (requestedPage === 1 ? data : [...prev, ...data]));
+      setPage(requestedPage);
+      setHasMore(requestedPage < Number(payload.pages ?? 1));
     } catch (e) {
       Toast.show({
         type: "error",
@@ -58,44 +71,14 @@ export default function WorkerCompleted() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
     load(false);
-  }, []);
-
-  useEffect(() => {
-    let filtered = [...complaints];
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (complaint) =>
-          complaint.ticketId?.toLowerCase().includes(query) ||
-          complaint.title?.toLowerCase().includes(query) ||
-          complaint.description?.toLowerCase().includes(query),
-      );
-    }
-
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(
-        (complaint) => new Date(complaint.updatedAt) >= start,
-      );
-    }
-
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(
-        (complaint) => new Date(complaint.updatedAt) <= end,
-      );
-    }
-
-    setFilteredComplaints(filtered);
-  }, [complaints, searchQuery, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, startDate, endDate]);
 
   const hasActiveFilters = !!startDate || !!endDate || !!searchQuery.trim();
 
@@ -174,47 +157,28 @@ export default function WorkerCompleted() {
 
         {complaints.length > 0 && (
           <View className="flex-row items-center mb-2" style={{ gap: 8 }}>
-            {hasActiveFilters &&
-              filteredComplaints.length !== complaints.length && (
-                <View
-                  className="flex-row items-center px-3 py-1.5 rounded-full"
-                  style={{
-                    backgroundColor: colors.warning + "20",
-                  }}
+            {hasActiveFilters && (
+              <View
+                className="flex-row items-center px-3 py-1.5 rounded-full"
+                style={{
+                  backgroundColor: colors.warning + "20",
+                }}
+              >
+                <Text
+                  className="text-xs font-bold"
+                  style={{ color: colors.warning }}
                 >
-                  <Text
-                    className="text-xs font-bold"
-                    style={{ color: colors.warning }}
-                  >
-                    {t("worker.completedWork.showing", {
-                      filtered: filteredComplaints.length,
-                      total: complaints.length,
-                    })}
-                  </Text>
-                </View>
-              )}
+                  {t("worker.completedWork.showing", {
+                    filtered: complaints.length,
+                    total: complaints.length,
+                  })}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
-        {filteredComplaints.length === 0 && complaints.length > 0 ? (
-          <Card style={{ margin: 0, marginTop: 12 }}>
-            <View className="items-center py-6">
-              <SearchX size={20} color={colors.textSecondary} />
-              <Text
-                className="text-base font-semibold mt-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.completedWork.noTasksFound")}
-              </Text>
-              <Text
-                className="text-sm mt-2 text-center"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.completedWork.tryAdjustingFilters")}
-              </Text>
-            </View>
-          </Card>
-        ) : complaints.length === 0 ? (
+        {complaints.length === 0 ? (
           <Card style={{ margin: 0, marginTop: 12 }}>
             <View className="items-center py-6">
               <Inbox size={20} color={colors.textSecondary} />
@@ -233,7 +197,7 @@ export default function WorkerCompleted() {
             </View>
           </Card>
         ) : (
-          filteredComplaints.map((complaint, index) => (
+          complaints.map((complaint, index) => (
             <ComplaintCard
               key={`${complaint._id ?? complaint.id ?? index}`}
               complaint={complaint}
@@ -244,6 +208,33 @@ export default function WorkerCompleted() {
               }
             />
           ))
+        )}
+        {hasMore && (
+          <PressableBlock
+            onPress={() => load(false, page + 1)}
+            disabled={loadingMore}
+            className="mt-2 mb-4 rounded-xl items-center justify-center py-3"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              opacity: loadingMore ? 0.6 : 1,
+            }}
+          >
+            {loadingMore ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <ChevronDown size={14} color={colors.textSecondary} />
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("common.loadMore")}
+                </Text>
+              </View>
+            )}
+          </PressableBlock>
         )}
       </ScrollView>
     </View>

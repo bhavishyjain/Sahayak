@@ -27,9 +27,8 @@ import NotificationBellButton from "../../../components/NotificationBellButton";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
+import { useWorkerDashboard } from "../../../utils/hooks/useDashboardData";
 import getUserAuth from "../../../utils/userAuth";
-import { WORKER_OVERVIEW_URL } from "../../../url";
 import {
   getPriorityBackgroundColor,
   formatPriorityLabel,
@@ -45,9 +44,6 @@ export default function WorkerHome() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [dashboardData, setDashboardData] = useState(null);
   const [user, setUser] = useState(null);
 
   const getGreeting = () => {
@@ -58,55 +54,15 @@ export default function WorkerHome() {
     return t("greetings.night");
   };
 
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: WORKER_OVERVIEW_URL,
-      });
-
-      const backendData = res?.data;
-      if (backendData) {
-        const transformed = {
-          activeCount: backendData.statistics?.activeComplaints,
-          completedCount: backendData.statistics?.totalCompleted,
-          weekCompleted: backendData.statistics?.weekCompleted,
-          pendingApproval: backendData.statistics?.pendingApproval,
-          activeComplaints: (backendData.assignedComplaints ?? []).map((c) => ({
-            id: c._id,
-            ticketId: c.ticketId,
-            title:
-              c.title ??
-              c.rawText?.split(":")?.[0] ??
-              t("worker.dashboard.complaintFallback"),
-            description:
-              c.description ??
-              c.refinedText ??
-              c.rawText ??
-              t("worker.dashboard.complaintFallback"),
-            priority: c.priority,
-            status: c.status,
-          })),
-        };
-        setDashboardData(transformed);
-      }
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("worker.dashboard.failed"),
-        text2: e?.response?.data?.message ?? t("worker.dashboard.loadingError"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const {
+    data: dashboardData,
+    isLoading: loading,
+    isRefetching: refreshing,
+    refetch,
+    error,
+  } = useWorkerDashboard(t);
 
   useEffect(() => {
-    load(false);
     getUserAuth()
       .then((userData) => {
         if (userData) {
@@ -117,6 +73,15 @@ export default function WorkerHome() {
         console.error(error);
       });
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("worker.dashboard.failed"),
+      text2: error?.response?.data?.message ?? t("worker.dashboard.loadingError"),
+    });
+  }, [error, t]);
 
   const activeComplaints = dashboardData?.activeComplaints ?? [];
   const completionPercent =
@@ -159,12 +124,12 @@ export default function WorkerHome() {
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => load(true)}
-            colors={[colors.primary]}
-            tintColor={colors.primary}
-          />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => refetch()}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
         }
       >
         {/* Header with Gradient Effect */}

@@ -1,4 +1,3 @@
-const User = require("../../models/User");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
@@ -13,8 +12,11 @@ const {
 const {
   appendCompletionPhotos,
 } = require("../../services/completionPhotoService");
-const { WORKER_STATUS_TRANSITIONS } = require("./helpers");
-const { notifyUser } = require("../notificationController");
+const {
+  applyComplaintTransition,
+  broadcastComplaintStatusChange,
+} = require("../../services/complaintWorkflowService");
+const { ROLES } = require("../../domain/constants");
 
 exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
@@ -31,19 +33,7 @@ exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   }
   const oldStatus = complaint.status;
 
-  if (req.user.role === "worker") {
-    const allowedStatuses = WORKER_STATUS_TRANSITIONS[oldStatus] || [];
-    if (!allowedStatuses.includes(status)) {
-      throw new AppError(
-        `Invalid status transition from ${oldStatus} to ${status}`,
-        400,
-      );
-    }
-  }
-
   await appendCompletionPhotos(complaint, req.files || []);
-
-  complaint.status = status;
 
   if (status === "pending-approval") {
     if (
@@ -66,51 +56,22 @@ exports.updateComplaintStatus = asyncHandler(async (req, res) => {
     complaint.resolvedAt = null;
   }
 
-  complaint.history.push({
-    status,
-    updatedBy: workerId,
-    timestamp: new Date(),
-    note: `Status updated to ${status}`,
+  applyComplaintTransition(complaint, {
+    actorRole: ROLES.WORKER,
+    actorId: workerId,
+    actorLabel: req.user?.fullName || req.user?.username || "Worker",
+    nextStatus: status,
   });
 
   await complaint.save();
 
-  const complaintEntityId = String(complaint._id);
   const ticketId = complaint.ticketId;
   const statusLabel = String(status).replace(/-/g, " ");
-  const recipientIds = new Set();
-
-  if (complaint.userId) {
-    recipientIds.add(String(complaint.userId));
-  }
-
-  (complaint.assignedWorkers || []).forEach((assignment) => {
-    if (assignment?.workerId) {
-      recipientIds.add(String(assignment.workerId));
-    }
-  });
-
-  if (complaint.department) {
-    const heads = await User.find({
-      role: "head",
-      department: complaint.department,
-    }).select("_id");
-    heads.forEach((head) => recipientIds.add(String(head._id)));
-  }
-
-  recipientIds.delete(String(workerId));
-
-  recipientIds.forEach((recipientId) => {
-    notifyUser(recipientId, {
-      title: "Complaint Status Updated",
-      body: `Complaint #${ticketId} is now ${statusLabel}.`,
-      data: {
-        type: "complaint-update",
-        complaintId: complaintEntityId,
-        ticketId,
-        status,
-      },
-    });
+  await broadcastComplaintStatusChange(complaint, {
+    actorId: workerId,
+    status,
+    body: `Complaint #${ticketId} is now ${statusLabel}.`,
+    includeHeads: true,
   });
 
   return sendSuccess(

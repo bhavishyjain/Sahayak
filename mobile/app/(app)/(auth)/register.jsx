@@ -10,6 +10,10 @@ import { darkColors, lightColors } from "../../../colors";
 import LanguagePicker from "../../../components/LanguagePicker";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
+import {
+  getPasswordStrengthMessage,
+  isStrongPassword,
+} from "../../../utils/passwordStrength";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { setUserAuth } from "../../../utils/userAuth";
@@ -46,6 +50,15 @@ export default function Register() {
         type: "error",
         text1: t("toast.registerError.missingFields"),
         text2: t("toast.registerError.fillAllFields"),
+      });
+      return;
+    }
+
+    if (!isStrongPassword(password)) {
+      Toast.show({
+        type: "error",
+        text1: t("auth.passwordStrength.title"),
+        text2: getPasswordStrengthMessage(t),
       });
       return;
     }
@@ -243,6 +256,13 @@ export default function Register() {
             }
           />
         </View>
+
+        <Text
+          className="w-full text-xs mb-5 -mt-2"
+          style={{ color: colors.textSecondary }}
+        >
+          {getPasswordStrengthMessage(t)}
+        </Text>
 
         <PressableBlock
           className="w-full py-4 rounded-lg items-center mb-4"

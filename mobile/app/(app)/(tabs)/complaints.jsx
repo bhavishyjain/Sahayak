@@ -60,7 +60,7 @@ export default function Complaints() {
 
   const buildQuery = (currentPage) => {
     const params = new URLSearchParams();
-    params.set("scope", "all");
+    params.set("scope", "mine");
     params.set("excludeStatus", "resolved");
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (departmentFilter !== "all") params.set("department", departmentFilter);

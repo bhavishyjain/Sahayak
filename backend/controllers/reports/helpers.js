@@ -1,35 +1,13 @@
 const User = require("../../models/User");
 const AppError = require("../../core/AppError");
 const { normalizeStatus, getResolvedAt } = require("../../utils/normalize");
-
-function normalizeString(value) {
-  return String(value || "").trim();
-}
-
-function parseDateOrThrow(value, fieldName) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new AppError(`Invalid ${fieldName}`, 400);
-  }
-  return parsed;
-}
-
-function appendDateRangeFilter(filters, startDate, endDate) {
-  const start = parseDateOrThrow(startDate, "startDate");
-  const end = parseDateOrThrow(endDate, "endDate");
-
-  if (!start && !end) return;
-
-  filters.createdAt = {};
-  if (start) {
-    filters.createdAt.$gte = start;
-  }
-  if (end) {
-    end.setHours(23, 59, 59, 999);
-    filters.createdAt.$lte = end;
-  }
-}
+const {
+  normalizeString,
+  normalizeReportFilters,
+  applyNormalizedDateRange,
+  normalizeAnalyticsFilters,
+  applyAnalyticsDateFilter,
+} = require("../../services/filterContractService");
 
 async function buildFilters(req, source = "query") {
   const input = req[source] || {};
@@ -42,23 +20,44 @@ async function buildFilters(req, source = "query") {
     }
     filters.department = user.department;
   } else {
-    const department = normalizeString(input.department);
-    if (department && department !== "all") {
-      filters.department = department;
+    const normalizedFilters = normalizeReportFilters(input);
+    const analyticsFilters = normalizeAnalyticsFilters(input, {
+      allowDepartment: false,
+      defaultTimeframe: null,
+    });
+    if (normalizedFilters.department) {
+      filters.department = normalizedFilters.department;
     }
+    if (normalizedFilters.status) {
+      filters.status = normalizedFilters.status;
+    }
+    if (normalizedFilters.priority) {
+      filters.priority = normalizedFilters.priority;
+    }
+    applyNormalizedDateRange(filters, normalizedFilters, "createdAt");
+    if (!filters.createdAt) {
+      applyAnalyticsDateFilter(filters, analyticsFilters, "createdAt");
+    }
+    return filters;
   }
 
-  const status = normalizeString(input.status);
-  if (status && status !== "all") {
-    filters.status = status;
+  const normalizedFilters = normalizeReportFilters(input, {
+    allowDepartment: false,
+  });
+  const analyticsFilters = normalizeAnalyticsFilters(input, {
+    allowDepartment: false,
+    defaultTimeframe: null,
+  });
+  if (normalizedFilters.status) {
+    filters.status = normalizedFilters.status;
   }
-
-  const priority = normalizeString(input.priority);
-  if (priority && priority !== "all") {
-    filters.priority = priority;
+  if (normalizedFilters.priority) {
+    filters.priority = normalizedFilters.priority;
   }
-
-  appendDateRangeFilter(filters, input.startDate, input.endDate);
+  applyNormalizedDateRange(filters, normalizedFilters, "createdAt");
+  if (!filters.createdAt) {
+    applyAnalyticsDateFilter(filters, analyticsFilters, "createdAt");
+  }
   return filters;
 }
 

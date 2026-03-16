@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { User, CheckCircle, Clock, Star } from "lucide-react-native";
+import { User, CheckCircle, Clock, Star, ChevronDown } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,8 +16,7 @@ import PressableBlock from "../../../components/PressableBlock";
 import SearchBar from "../../../components/SearchBar";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
-import { HOD_WORKERS_URL } from "../../../url";
+import { useHodWorkersList } from "../../../utils/hooks/useHodWorkersList";
 
 export default function HodWorkersTab() {
   const { t } = useTranslation();
@@ -25,47 +24,26 @@ export default function HodWorkersTab() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [workers, setWorkers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredWorkers = workers.filter((worker) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      worker.fullName?.toLowerCase().includes(query) ||
-      worker.username?.toLowerCase().includes(query) ||
-      worker.email?.toLowerCase().includes(query)
-    );
-  });
-
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: HOD_WORKERS_URL,
-      });
-
-      const payload = res?.data;
-      setWorkers(payload?.workers ?? []);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.failed"),
-        text2: t("hod.workers.couldNotLoadWorkers"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const {
+    workers,
+    isLoading: loading,
+    isRefetching: refreshing,
+    isFetchingNextPage: loadingMore,
+    hasMore,
+    loadMore,
+    refresh,
+    error,
+  } = useHodWorkersList({ search: searchQuery, limit: 20 });
 
   useEffect(() => {
-    load(false);
-  }, []);
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.failed"),
+      text2: t("hod.workers.couldNotLoadWorkers"),
+    });
+  }, [error, t]);
 
   if (loading) {
     return (
@@ -122,14 +100,14 @@ export default function HodWorkersTab() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refresh()}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />
         }
         contentContainerStyle={{ paddingBottom: 120 }}
       >
-        {filteredWorkers.length === 0 ? (
+        {workers.length === 0 ? (
           <Card style={{ margin: 0, marginTop: 12 }}>
             <View className="items-center py-6">
               <Text
@@ -143,7 +121,7 @@ export default function HodWorkersTab() {
             </View>
           </Card>
         ) : (
-          filteredWorkers.map((worker, index) => (
+          workers.map((worker, index) => (
             <PressableBlock
               key={worker.id ?? String(index)}
               onPress={() => router.push(`/hod/worker-details?id=${worker.id}`)}
@@ -248,6 +226,33 @@ export default function HodWorkersTab() {
               </Card>
             </PressableBlock>
           ))
+        )}
+        {hasMore && (
+          <PressableBlock
+            onPress={() => loadMore()}
+            disabled={loadingMore}
+            className="mt-2 mb-4 rounded-xl items-center justify-center py-3"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              opacity: loadingMore ? 0.6 : 1,
+            }}
+          >
+            {loadingMore ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <ChevronDown size={14} color={colors.textSecondary} />
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("common.loadMore")}
+                </Text>
+              </View>
+            )}
+          </PressableBlock>
         )}
       </ScrollView>
     </View>

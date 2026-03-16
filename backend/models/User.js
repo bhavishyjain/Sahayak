@@ -87,4 +87,6 @@ userSchema.pre("save", function (next) {
   next();
 });
 
+userSchema.index({ role: 1, department: 1, isActive: 1 });
+
 module.exports = mongoose.model("User", userSchema);

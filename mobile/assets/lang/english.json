@@ -128,6 +128,10 @@
       "failedTitle": "Reset failed",
       "failedMessage": "Reset link is invalid or expired."
     },
+    "passwordStrength": {
+      "title": "Weak password",
+      "requirements": "Use at least 8 characters with an uppercase letter, a lowercase letter, and a number."
+    },
     "verifyEmail": {
       "title": "Verify Email",
       "verifying": "Verifying your email...",
@@ -717,7 +721,6 @@
       "selectAll": "Select All",
       "deselectAll": "Deselect All",
       "selected": "selected",
-      "unassigned": "Unassigned",
       "generalWorker": "General worker",
       "assignAll": "Assign All",
       "noComplaintsFound": "No complaints found",
@@ -1389,9 +1392,18 @@
       "schedule": "Schedule Reports"
     },
     "sections": {
+      "analytics": "Analytics",
       "download": "Download",
       "email": "Email",
       "automated": "Automated Reports"
+    },
+    "breakdown": {
+      "description": "Compare complaint volume and resolution progress across departments.",
+      "empty": "No department data matches the selected filters.",
+      "totalLabel": "%{count} total",
+      "resolvedLabel": "%{count} resolved",
+      "pendingLabel": "%{count} active",
+      "highPriorityLabel": "%{count} high priority"
     },
     "filterSummary": {
       "status": "Status: %{value}",
@@ -1451,7 +1463,27 @@
       "scheduledMessage": "You'll receive %{frequency} reports at %{email}",
       "scheduleFailed": "Failed to schedule report",
       "cancelledTitle": "Schedule Cancelled",
-      "cancelFailed": "Failed to cancel schedule"
+      "cancelFailed": "Failed to cancel schedule",
+      "runNow": "Run now",
+      "runNowSuccessTitle": "Schedule executed",
+      "runNowSuccessMessage": "Report generation was triggered successfully",
+      "runNowFailed": "Failed to run schedule now",
+      "health": {
+        "nextRun": "Next run: %{value}",
+        "lastSuccess": "Last success: %{value}",
+        "lastFailure": "Last failure: %{value}",
+        "error": "Last %{stage} error: %{value}",
+        "status": {
+          "idle": "Idle",
+          "pending": "Pending",
+          "success": "Healthy",
+          "failed": "Failed"
+        },
+        "stages": {
+          "generation": "generation",
+          "delivery": "delivery"
+        }
+      }
     },
     "email": {
       "cardTitle": "Send via Email",

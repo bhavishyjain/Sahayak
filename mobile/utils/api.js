@@ -47,6 +47,11 @@ async function attemptTokenRefresh() {
       const updated = { ...user, auth_token: newToken, token: newToken };
       if (newRefresh) updated.refresh_token = newRefresh;
       await setUserAuth(updated);
+      try {
+        const { reconnectRealtime } = require("./realtime/socket");
+        await reconnectRealtime();
+      } catch (_error) {
+      }
       // Bust the cache so next apiCall picks up the new token
       cachedUser = updated;
       lastCacheTime = Date.now();
@@ -105,26 +110,11 @@ const getAuthHeaders = async (headers = {}) => {
       ...headers,
       "User-Agent": USER_AGENT_STRING,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       ...headers,
       "User-Agent": USER_AGENT_STRING,
     };
-  }
-};
-
-const getAuthPayload = async (data = null) => {
-  try {
-    const user = await getCachedUser();
-    if (user?.auth_token) {
-      return {
-        ...data,
-        token: user.auth_token,
-      };
-    }
-    return data;
-  } catch (error) {
-    return data;
   }
 };
 

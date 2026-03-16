@@ -1,5 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -13,11 +12,10 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import PressableBlock from "../../../components/PressableBlock";
-import { UPDATE_USER_PROFILE_URL } from "../../../url";
-import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
+import { useUpdateProfile } from "../../../utils/hooks/useProfileActions";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import getUserAuth, { setUserAuth } from "../../../utils/userAuth";
+import getUserAuth from "../../../utils/userAuth";
 
 // Pure helper functions
 const showToast = (type, text1, text2) => Toast.show({ type, text1, text2 });
@@ -29,8 +27,6 @@ export default function UpdateProfile() {
     () => (colorScheme === "dark" ? darkColors : lightColors),
     [colorScheme],
   );
-  const queryClient = useQueryClient();
-
   // Form fields consolidated into single object
   const [formData, setFormData] = useState({
     fullName: "",
@@ -76,67 +72,7 @@ export default function UpdateProfile() {
 
   // API HANDLERS
 
-  // Update profile mutation
-  const updateProfileMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiCall({
-        method: "POST",
-        url: UPDATE_USER_PROFILE_URL,
-        data: {
-          fullName: formData.fullName.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim(),
-          password: formData.password.trim(),
-        },
-      });
-      return response;
-    },
-    onMutate: () => updateUiState({ loading: true }),
-    onSuccess: async (response) => {
-      const data = response.data;
-      if (response.success) {
-        // Update local user data with auth_token preserved
-        const currentUser = await getUserAuth();
-        const updatedUser = {
-          ...currentUser,
-          ...data.user,
-          auth_token: currentUser?.auth_token, // Preserve token
-        };
-        await setUserAuth(updatedUser);
-
-        showToast(
-          "success",
-          t("toast.success.title"),
-          t("toast.success.profileUpdated"),
-        );
-        queryClient.invalidateQueries({ queryKey: ["user-profile"] });
-        router.back();
-      } else if (data.email_phone_already_used) {
-        showToast(
-          "error",
-          t("toast.error.title"),
-          t("settings.profile.emailPhoneInUse"),
-        );
-      } else {
-        showToast(
-          "error",
-          t("toast.error.title"),
-          response.message ?? t("settings.profile.updateFailed"),
-        );
-      }
-    },
-    onError: (error) => {
-      console.error("Update profile error:", error);
-      showToast(
-        "error",
-        t("toast.error.title"),
-        error?.response?.data?.message ??
-          error?.message ??
-          t("settings.profile.updateFailed"),
-      );
-    },
-    onSettled: () => updateUiState({ loading: false }),
-  });
+  const { updateProfile } = useUpdateProfile(t);
 
   const handleUpdateProfile = useCallback(() => {
     if (!formData.fullName.trim()) {
@@ -155,8 +91,18 @@ export default function UpdateProfile() {
       );
       return;
     }
-    updateProfileMutation.mutate();
-  }, [formData, t, updateProfileMutation]);
+    updateUiState({ loading: true });
+    updateProfile(formData).catch((error) => {
+      console.error("Update profile error:", error);
+      showToast(
+        "error",
+        t("toast.error.title"),
+        error?.response?.data?.message ??
+          error?.message ??
+          t("settings.profile.updateFailed"),
+      );
+    }).finally(() => updateUiState({ loading: false }));
+  }, [formData, t, updateProfile, updateUiState]);
 
   // UI EVENT HANDLERS
 

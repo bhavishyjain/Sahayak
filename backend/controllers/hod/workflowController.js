@@ -13,38 +13,11 @@ const {
   getComplaintOrThrow,
 } = require("../../services/accessService");
 const { sendComplaintCompleted } = require("../../services/emailService");
-const { notifyUser } = require("../notificationController");
-
-function notifyComplaintParticipants(complaint, actorId, status, body) {
-  const complaintId = String(complaint._id);
-  const ticketId = complaint.ticketId;
-  const recipientIds = new Set();
-
-  if (complaint.userId) {
-    recipientIds.add(String(complaint.userId));
-  }
-
-  (complaint.assignedWorkers || []).forEach((assignment) => {
-    if (assignment?.workerId) {
-      recipientIds.add(String(assignment.workerId));
-    }
-  });
-
-  recipientIds.delete(String(actorId));
-
-  recipientIds.forEach((recipientId) => {
-    notifyUser(recipientId, {
-      title: "Complaint Status Updated",
-      body,
-      data: {
-        type: "complaint-update",
-        complaintId,
-        ticketId,
-        status,
-      },
-    });
-  });
-}
+const {
+  applyComplaintTransition,
+  broadcastComplaintStatusChange,
+} = require("../../services/complaintWorkflowService");
+const { ROLES } = require("../../domain/constants");
 
 exports.approveCompletion = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
@@ -59,8 +32,8 @@ exports.approveCompletion = asyncHandler(async (req, res) => {
     throw new AppError("Complaint is not pending approval", 400);
   }
 
-  complaint.status = "resolved";
-  complaint.resolvedAt = new Date();
+  const resolvedAt = new Date();
+  complaint.resolvedAt = resolvedAt;
 
   if (
     complaint.assignedWorkers &&
@@ -86,21 +59,23 @@ exports.approveCompletion = asyncHandler(async (req, res) => {
     }
   }
 
-  complaint.history.push({
-    status: "resolved",
-    updatedBy: hodId,
-    timestamp: new Date(),
+  applyComplaintTransition(complaint, {
+    actorRole: ROLES.HEAD,
+    actorId: hodId,
+    actorLabel: hod.fullName || hod.username || "HOD",
+    nextStatus: "resolved",
     note: hodNotes || "Approved by HOD",
+    timestamp: resolvedAt,
   });
 
   await complaint.save();
 
-  notifyComplaintParticipants(
-    complaint,
-    hodId,
-    "resolved",
-    `Complaint #${complaint.ticketId} has been marked as resolved.`,
-  );
+  await broadcastComplaintStatusChange(complaint, {
+    actorId: hodId,
+    status: "resolved",
+    body: `Complaint #${complaint.ticketId} has been marked as resolved.`,
+    includeHeads: false,
+  });
 
   try {
     const user = await User.findById(complaint.userId).select(
@@ -144,23 +119,23 @@ exports.markNeedsRework = asyncHandler(async (req, res) => {
     throw new AppError("Complaint is not pending approval", 400);
   }
 
-  complaint.status = "needs-rework";
   complaint.completionPhotos = [];
   complaint.note = reason;
-  complaint.history.push({
-    status: "needs-rework",
-    updatedBy: hodId,
-    timestamp: new Date(),
-    note: `Marked as needs-rework by HOD: ${reason}`,
+  applyComplaintTransition(complaint, {
+    actorRole: ROLES.HEAD,
+    actorId: hodId,
+    actorLabel: hod.fullName || hod.username || "HOD",
+    nextStatus: "needs-rework",
+    reason,
   });
 
   await complaint.save();
-  notifyComplaintParticipants(
-    complaint,
-    hodId,
-    "needs-rework",
-    `Complaint #${complaint.ticketId} needs rework: ${reason}`,
-  );
+  await broadcastComplaintStatusChange(complaint, {
+    actorId: hodId,
+    status: "needs-rework",
+    body: `Complaint #${complaint.ticketId} needs rework: ${reason}`,
+    includeHeads: false,
+  });
   return sendSuccess(
     res,
     { data: complaint },
@@ -194,23 +169,21 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
     );
   }
 
-  complaint.status = "cancelled";
-  complaint.history.push({
-    status: "cancelled",
-    updatedBy: hodId,
-    timestamp: new Date(),
-    note: reason
-      ? `Cancelled by ${hodDisplayName}: ${reason}`
-      : `Cancelled by ${hodDisplayName}`,
+  applyComplaintTransition(complaint, {
+    actorRole: ROLES.HEAD,
+    actorId: hodId,
+    actorLabel: hodDisplayName,
+    nextStatus: "cancelled",
+    reason,
   });
 
   await complaint.save();
-  notifyComplaintParticipants(
-    complaint,
-    hodId,
-    "cancelled",
-    `Complaint #${complaint.ticketId} has been cancelled.`,
-  );
+  await broadcastComplaintStatusChange(complaint, {
+    actorId: hodId,
+    status: "cancelled",
+    body: `Complaint #${complaint.ticketId} has been cancelled.`,
+    includeHeads: false,
+  });
   return sendSuccess(
     res,
     { data: complaint },
@@ -251,6 +224,13 @@ exports.updateWorkerTask = asyncHandler(async (req, res) => {
   workerTask.taskDescription = normalizedTaskDescription || null;
 
   await complaint.save();
+  await broadcastComplaintStatusChange(complaint, {
+    actorId: req.user._id,
+    status: complaint.status,
+    body: `Task details for complaint #${complaint.ticketId} were updated.`,
+    includeHeads: false,
+    event: "task-updated",
+  });
 
   return sendSuccess(
     res,

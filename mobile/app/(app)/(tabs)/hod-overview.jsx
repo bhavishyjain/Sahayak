@@ -35,9 +35,8 @@ import {
 } from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
+import { useHodDashboardSummary } from "../../../utils/hooks/useDashboardData";
 import getUserAuth from "../../../utils/userAuth";
-import { HOD_OVERVIEW_URL } from "../../../url";
 
 export default function HodOverview() {
   const { t } = useTranslation();
@@ -45,9 +44,6 @@ export default function HodOverview() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const insets = useSafeAreaInsets();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [user, setUser] = useState(null);
 
@@ -59,30 +55,28 @@ export default function HodOverview() {
     return t("greetings.night");
   };
 
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      const res = await apiCall({ method: "GET", url: HOD_OVERVIEW_URL });
-      setStats(res?.data?.stats ?? null);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.failed"),
-        text2: t("toast.error.loadFailed"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const {
+    data: stats,
+    isLoading: loading,
+    isRefetching: refreshing,
+    refetch,
+    error,
+  } = useHodDashboardSummary();
 
   useEffect(() => {
-    load(false);
     getUserAuth().then((userData) => {
       if (userData) setUser(userData);
     });
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.failed"),
+      text2: t("toast.error.loadFailed"),
+    });
+  }, [error, t]);
 
   // Derived values
   const completionRate =
@@ -189,7 +183,7 @@ export default function HodOverview() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => load(true)}
+              onRefresh={() => refetch()}
               colors={[colors.primary]}
               tintColor={colors.primary}
             />

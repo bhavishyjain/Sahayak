@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Camera, X, Navigation } from "lucide-react-native";
 import { useState } from "react";
@@ -20,6 +21,7 @@ import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { CREATE_COMPLAINT_URL } from "../../../url";
+import { invalidateComplaintQueries } from "../../../utils/invalidateComplaintQueries";
 import { useNetworkStatus } from "../../../utils/useNetworkStatus";
 import { enqueue } from "../../../utils/offlineQueue";
 
@@ -56,6 +58,7 @@ export default function NewComplaintPage() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const { isOnline } = useNetworkStatus();
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -260,6 +263,9 @@ export default function NewComplaintPage() {
           : t("complaints.savedSuccessfully"),
       });
 
+      await invalidateComplaintQueries(queryClient, {
+        complaintId: payload?.complaint?._id ?? payload?.complaint?.id,
+      });
       router.replace("/(app)/(tabs)/complaints");
     } catch (e) {
       Toast.show({

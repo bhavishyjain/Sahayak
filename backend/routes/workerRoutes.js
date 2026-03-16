@@ -4,7 +4,14 @@ const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 const authorize = require("../middlewares/authorize");
 const upload = require("../middlewares/multer");
 const { createWorker, updateWorker, getAllWorkers, getAvailableWorkers } = require("../controllers/worker/assignmentController");
-const { getWorkerOverview, getAssignedComplaints, getCompletedComplaints, getLeaderboard, getWorkerAnalytics } = require("../controllers/worker/analyticsController");
+const {
+  getWorkerDashboardSummary,
+  getWorkerActivePreview,
+  getAssignedComplaints,
+  getCompletedComplaints,
+  getLeaderboard,
+  getWorkerAnalytics,
+} = require("../controllers/worker/analyticsController");
 const { updateComplaintStatus } = require("../controllers/worker/statusController");
 
 router.use(attachAuth, requireAuth);
@@ -16,7 +23,16 @@ router.get("/", authorize("admin", "head"), getAllWorkers);
 router.get("/available/:department", authorize("admin", "head"), getAvailableWorkers);
 
 // Worker routes
-router.get("/overview", authorize("worker", "admin"), getWorkerOverview);
+router.get(
+  "/dashboard-summary",
+  authorize("worker", "admin"),
+  getWorkerDashboardSummary,
+);
+router.get(
+  "/active-preview",
+  authorize("worker", "admin"),
+  getWorkerActivePreview,
+);
 router.get("/assigned-complaints", authorize("worker", "admin"), getAssignedComplaints);
 router.get("/completed-complaints", authorize("worker", "admin"), getCompletedComplaints);
 router.get("/leaderboard", authorize("worker", "admin", "head"), getLeaderboard);

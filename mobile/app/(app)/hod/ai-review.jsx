@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   CheckCircle,
   ChevronRight,
@@ -9,7 +9,7 @@ import {
   Square,
   X,
 } from "lucide-react-native";
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -25,10 +25,10 @@ import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import { useTheme } from "../../../utils/context/theme";
+import { useAiReviewActions } from "../../../utils/hooks/useAiReviewActions";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
-import { AI_REVIEW_URL, APPLY_AI_SUGGESTION_URL } from "../../../url";
-import { useFocusEffect } from "expo-router";
+import { AI_REVIEW_URL } from "../../../url";
 
 const getSentimentConfig = (colors) => ({
   calm: { labelKey: "hod.aiReview.sentiments.calm", color: colors.success },
@@ -171,6 +171,7 @@ export default function AiReview() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const router = useRouter();
+  const { applySuggestion } = useAiReviewActions(t);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -241,6 +242,7 @@ export default function AiReview() {
   useFocusEffect(
     useCallback(() => {
       load(false);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [t]),
   );
 
@@ -252,17 +254,12 @@ export default function AiReview() {
   ) => {
     setApplying((prev) => new Set(prev).add(complaintId));
     try {
-      await apiCall({
-        method: "POST",
-        url: APPLY_AI_SUGGESTION_URL(complaintId),
-        data: { applyDepartment, applyPriority },
+      await applySuggestion({
+        complaintId,
+        applyDepartment,
+        applyPriority,
+        silentSuccess: !showSuccessToast,
       });
-      if (showSuccessToast) {
-        Toast.show({
-          type: "success",
-          text1: t("hod.aiReview.toasts.applySuccessTitle"),
-        });
-      }
       setComplaints((prev) => prev.filter((c) => c._id !== complaintId));
       return true;
     } catch (e) {

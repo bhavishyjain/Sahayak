@@ -2,6 +2,7 @@ const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 const Complaint = require("../models/Complaint");
 const { normalizeStatus, getResolvedAt } = require("../utils/normalize");
+const { COMPLAINT_DEPARTMENTS } = require("../domain/constants");
 
 const REPORT_MAX_ROWS = Math.max(
   100,
@@ -19,6 +20,54 @@ const CSV_MAX_ROWS = Math.min(
   REPORT_MAX_ROWS,
   Number(process.env.CSV_REPORT_MAX_ROWS || 5000),
 );
+const REPORT_CACHE_TTL_MS = Math.max(
+  5 * 1000,
+  Number(process.env.REPORT_CACHE_TTL_MS || 60 * 1000),
+);
+const reportCache = new Map();
+
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function getCachedReportValue(cacheKey) {
+  const entry = reportCache.get(cacheKey);
+  if (!entry) return null;
+  if (Date.now() - entry.createdAt > REPORT_CACHE_TTL_MS) {
+    reportCache.delete(cacheKey);
+    return null;
+  }
+  return entry.value;
+}
+
+function setCachedReportValue(cacheKey, value) {
+  reportCache.set(cacheKey, {
+    value,
+    createdAt: Date.now(),
+  });
+  return value;
+}
+
+async function withCachedReportMetric(metricName, filters, factory) {
+  const cacheKey = `${metricName}:${stableStringify(filters || {})}`;
+  const cached = getCachedReportValue(cacheKey);
+  if (cached) return cached;
+
+  const startedAt = Date.now();
+  const value = await factory();
+  const durationMs = Date.now() - startedAt;
+  console.info(`[reports] ${metricName} generated in ${durationMs}ms`);
+  return setCachedReportValue(cacheKey, value);
+}
 
 function toCsvCell(value) {
   const normalized = value === null || value === undefined ? "" : String(value);
@@ -36,6 +85,142 @@ async function fetchComplaintsForReport(filters, limit) {
 }
 
 class ReportService {
+  async getDashboardStats(filters = {}) {
+    return withCachedReportMetric("dashboard-stats", filters, async () => {
+      const [statusRows, priorityRows, departmentRows, resolutionRows, total] =
+        await Promise.all([
+          Complaint.aggregate([
+            { $match: filters },
+            { $group: { _id: "$status", count: { $sum: 1 } } },
+          ]),
+          Complaint.aggregate([
+            { $match: filters },
+            { $group: { _id: "$priority", count: { $sum: 1 } } },
+          ]),
+          Complaint.aggregate([
+            { $match: filters },
+            { $group: { _id: "$department", count: { $sum: 1 } } },
+          ]),
+          Complaint.aggregate([
+            {
+              $match: {
+                ...filters,
+                resolvedAt: { $ne: null },
+                createdAt: { $ne: null },
+              },
+            },
+            {
+              $project: {
+                resolutionHours: {
+                  $divide: [
+                    { $subtract: ["$resolvedAt", "$createdAt"] },
+                    1000 * 60 * 60,
+                  ],
+                },
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                avgResolutionTime: { $avg: "$resolutionHours" },
+              },
+            },
+          ]),
+          Complaint.countDocuments(filters),
+        ]);
+
+      return {
+        total,
+        byStatus: statusRows.reduce((acc, row) => {
+          acc[row._id || "unknown"] = row.count;
+          return acc;
+        }, {}),
+        byPriority: priorityRows.reduce((acc, row) => {
+          acc[row._id || "unknown"] = row.count;
+          return acc;
+        }, {}),
+        byDepartment: departmentRows.reduce((acc, row) => {
+          acc[row._id || "Other"] = row.count;
+          return acc;
+        }, {}),
+        avgResolutionTime: Math.round(
+          resolutionRows[0]?.avgResolutionTime || 0,
+        ),
+      };
+    });
+  }
+
+  async getDepartmentBreakdown(filters = {}) {
+    return withCachedReportMetric(
+      "department-breakdown",
+      filters,
+      async () => {
+        const rows = await Complaint.aggregate([
+          { $match: filters },
+          {
+            $group: {
+              _id: { $ifNull: ["$department", "Other"] },
+              total: { $sum: 1 },
+              pending: {
+                $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
+              },
+              inProgress: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "in-progress"] }, 1, 0],
+                },
+              },
+              resolved: {
+                $sum: { $cond: [{ $eq: ["$status", "resolved"] }, 1, 0] },
+              },
+              cancelled: {
+                $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
+              },
+              highPriority: {
+                $sum: { $cond: [{ $eq: ["$priority", "High"] }, 1, 0] },
+              },
+              mediumPriority: {
+                $sum: { $cond: [{ $eq: ["$priority", "Medium"] }, 1, 0] },
+              },
+              lowPriority: {
+                $sum: { $cond: [{ $eq: ["$priority", "Low"] }, 1, 0] },
+              },
+            },
+          },
+          { $sort: { total: -1, _id: 1 } },
+        ]);
+
+        const seededBreakdown = COMPLAINT_DEPARTMENTS.reduce((acc, department) => {
+          acc[department] = {
+            total: 0,
+            pending: 0,
+            inProgress: 0,
+            resolved: 0,
+            cancelled: 0,
+            highPriority: 0,
+            mediumPriority: 0,
+            lowPriority: 0,
+          };
+          return acc;
+        }, {});
+
+        rows.forEach((row) => {
+          seededBreakdown[row._id || "Other"] = {
+            total: row.total || 0,
+            pending: row.pending || 0,
+            inProgress: row.inProgress || 0,
+            resolved: row.resolved || 0,
+            cancelled: row.cancelled || 0,
+            highPriority: row.highPriority || 0,
+            mediumPriority: row.mediumPriority || 0,
+            lowPriority: row.lowPriority || 0,
+          };
+        });
+
+        return seededBreakdown;
+      },
+    );
+  }
+
   // Generate Excel Report
   async generateExcelReport(filters = {}, userId) {
     try {

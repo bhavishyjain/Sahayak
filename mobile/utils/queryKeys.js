@@ -1,0 +1,45 @@
+export const queryKeys = {
+  complaintLists: ["complaint-lists"],
+  complaintList: (scope, filters = {}) => [
+    ...queryKeys.complaintLists,
+    scope,
+    filters,
+  ],
+  complaintDetail: (complaintId) => [
+    "complaint-detail",
+    String(complaintId || ""),
+  ],
+  analyticsSummary: ["analytics-summary"],
+  heatmap: (filters = {}) => ["heatmap", filters],
+  workerOverview: ["worker-overview"],
+  workerDashboardSummary: ["worker-dashboard-summary"],
+  workerActivePreview: ["worker-active-preview"],
+  workerLeaderboard: (period = "weekly") => ["worker-leaderboard", period],
+  workerAnalytics: (workerId = "") => ["worker-analytics", String(workerId || "")],
+  hodDashboardSummary: ["hod-dashboard-summary"],
+  hodInvitations: ["hod-invitations"],
+  hodWorkerAssignment: (complaintId = "") => [
+    "hod-worker-assignment",
+    String(complaintId || ""),
+  ],
+  notifications: ["notifications"],
+  notificationPreferences: ["notification-preferences"],
+  notificationHistory: (params = {}) => ["notification-history", params],
+  notificationHistoryInfinite: (params = {}) => [
+    "notification-history-infinite",
+    params,
+  ],
+  reportStats: (filters = {}) => ["report-stats", filters],
+  reportDepartmentBreakdown: (filters = {}) => [
+    "report-department-breakdown",
+    filters,
+  ],
+  reportSchedules: (filters = {}) => ["report-schedules", filters],
+  complaintMessages: (complaintId = "", limit = 50) => [
+    "complaint-messages",
+    String(complaintId || ""),
+    { limit },
+  ],
+  userProfile: ["user-profile"],
+  aiReview: ["ai-review"],
+};

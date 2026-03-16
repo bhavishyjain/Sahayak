@@ -1,5 +1,4 @@
 import {
-  AlertCircle,
   CheckCircle,
   Clock,
   MapPin,
@@ -144,17 +143,7 @@ export default function ComplaintCard({
                   {t("status.assigned")}
                 </Text>
               </>
-            ) : (
-              <>
-                <AlertCircle size={13} color={colors.warning || "#F59E0B"} />
-                <Text
-                  className="text-xs ml-1 font-semibold"
-                  style={{ color: colors.warning || "#F59E0B" }}
-                >
-                  {t("hod.complaints.unassigned")}
-                </Text>
-              </>
-            )}
+            ) : null}
           </View>
         )}
 

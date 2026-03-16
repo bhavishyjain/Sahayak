@@ -9,37 +9,51 @@ const {
   getHodOrThrow,
 } = require("../../services/accessService");
 const { atStartOfToday, atStartOfWeek } = require("./helpers");
+const {
+  ANALYTICS_STATUS_BUCKETS,
+} = require("../../services/analyticsMetricsService");
+const {
+  normalizeEnum,
+  normalizeAnalyticsFilters,
+  applyAnalyticsComplaintFilters,
+} = require("../../services/filterContractService");
+const {
+  applyCommonComplaintFilters,
+  parsePagination,
+} = require("../../services/complaintQueryService");
+const {
+  buildListPayload,
+  buildSummaryPayload,
+} = require("../../services/responseViewService");
 
 exports.getWorkerOverview = asyncHandler(async (req, res) => {
   const workerId = getRequestUserId(req);
-  const assignedComplaints = await Complaint.find({
-    "assignedWorkers.workerId": workerId,
-    status: {
-      $in: ["assigned", "in-progress", "needs-rework", "pending-approval"],
-    },
-  })
-    .populate({
-      path: "userId",
-      select: "fullName email phone username",
-      model: "User",
-    })
-    .sort({ priority: -1, createdAt: -1 });
+  const [statistics, activePreview] = await Promise.all([
+    buildWorkerDashboardSummary(workerId),
+    buildWorkerActivePreview(workerId),
+  ]);
 
+  return sendSuccess(res, {
+    data: {
+      assignedComplaints: activePreview,
+      completedToday: [],
+      statistics,
+    },
+  });
+});
+
+async function buildWorkerDashboardSummary(workerId) {
   const todayStart = atStartOfToday();
   const weekStart = atStartOfWeek();
 
   const [
-    completedToday,
     totalCompleted,
     totalAssigned,
     weekCompleted,
     pendingApproval,
+    activeComplaints,
+    completedToday,
   ] = await Promise.all([
-    Complaint.find({
-      "assignedWorkers.workerId": workerId,
-      status: "resolved",
-      updatedAt: { $gte: todayStart },
-    }),
     Complaint.countDocuments({
       "assignedWorkers.workerId": workerId,
       status: "resolved",
@@ -54,52 +68,142 @@ exports.getWorkerOverview = asyncHandler(async (req, res) => {
       "assignedWorkers.workerId": workerId,
       status: "pending-approval",
     }),
+    Complaint.countDocuments({
+      "assignedWorkers.workerId": workerId,
+      status: {
+        $in: ANALYTICS_STATUS_BUCKETS.workerActionable,
+      },
+    }),
+    Complaint.countDocuments({
+      "assignedWorkers.workerId": workerId,
+      status: "resolved",
+      updatedAt: { $gte: todayStart },
+    }),
   ]);
 
-  return sendSuccess(res, {
-    data: {
-      assignedComplaints,
-      completedToday,
-      statistics: {
-        totalCompleted,
-        totalAssigned,
-        completedToday: completedToday.length,
-        weekCompleted,
-        activeComplaints: assignedComplaints.length,
-        pendingApproval,
-      },
+  return {
+    totalCompleted,
+    totalAssigned,
+    completedToday,
+    weekCompleted,
+    activeComplaints,
+    pendingApproval,
+  };
+}
+
+async function buildWorkerActivePreview(workerId, limit = 5) {
+  return Complaint.find({
+    "assignedWorkers.workerId": workerId,
+    status: {
+      $in: ANALYTICS_STATUS_BUCKETS.workerActionable,
     },
-  });
+  })
+    .populate({
+      path: "userId",
+      select: "fullName email phone username",
+      model: "User",
+    })
+    .sort({ priority: -1, createdAt: -1 })
+    .limit(limit);
+}
+
+exports.getWorkerDashboardSummary = asyncHandler(async (req, res) => {
+  const workerId = getRequestUserId(req);
+  const statistics = await buildWorkerDashboardSummary(workerId);
+  return sendSuccess(res, buildSummaryPayload(statistics, "statistics", { statistics }));
+});
+
+exports.getWorkerActivePreview = asyncHandler(async (req, res) => {
+  const workerId = getRequestUserId(req);
+  const limit = Math.min(10, Math.max(1, parseInt(req.query.limit, 10) || 5));
+  const complaints = await buildWorkerActivePreview(workerId, limit);
+  return sendSuccess(
+    res,
+    buildListPayload({
+      items: complaints.map(buildComplaintView),
+      itemKey: "complaints",
+      page: 1,
+      limit,
+      total: complaints.length,
+      legacy: { hasMore: false },
+    }),
+  );
 });
 
 exports.getAssignedComplaints = asyncHandler(async (req, res) => {
   const workerId = getRequestUserId(req);
-  const complaints = await Complaint.find({
+  const { page, limit, skip } = parsePagination(req);
+  const query = {
     "assignedWorkers.workerId": workerId,
-    status: { $in: ["assigned", "in-progress", "needs-rework"] },
-  })
-    .populate("userId", "fullName email phone")
-    .sort({ assignedAt: -1 });
+    status: { $in: ANALYTICS_STATUS_BUCKETS.workerOpen },
+  };
+  applyCommonComplaintFilters(query, {
+    ...req.query,
+    dateField: "assignedAt",
+  });
 
-  return sendSuccess(res, { complaints: complaints.map(buildComplaintView) });
+  const [complaints, total] = await Promise.all([
+    Complaint.find(query)
+      .populate("userId", "fullName email phone")
+      .sort({ assignedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Complaint.countDocuments(query),
+  ]);
+
+  return sendSuccess(
+    res,
+    buildListPayload({
+      items: complaints.map(buildComplaintView),
+      itemKey: "complaints",
+      page,
+      limit,
+      total,
+    }),
+  );
 });
 
 exports.getCompletedComplaints = asyncHandler(async (req, res) => {
   const workerId = getRequestUserId(req);
-  const complaints = await Complaint.find({
+  const { page, limit, skip } = parsePagination(req);
+  const query = {
     "assignedWorkers.workerId": workerId,
     status: "resolved",
-  })
-    .populate("userId", "fullName email phone")
-    .sort({ updatedAt: -1 })
-    .limit(50);
+  };
+  applyCommonComplaintFilters(query, {
+    ...req.query,
+    dateField: "updatedAt",
+  });
 
-  return sendSuccess(res, { complaints: complaints.map(buildComplaintView) });
+  const [complaints, total] = await Promise.all([
+    Complaint.find(query)
+      .populate("userId", "fullName email phone")
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Complaint.countDocuments(query),
+  ]);
+
+  return sendSuccess(
+    res,
+    buildListPayload({
+      items: complaints.map(buildComplaintView),
+      itemKey: "complaints",
+      page,
+      limit,
+      total,
+    }),
+  );
 });
 
 exports.getLeaderboard = asyncHandler(async (req, res) => {
   const currentWorkerId = getRequestUserId(req);
-  const { period = "monthly", department: requestedDepartment } = req.query;
+  const period = normalizeEnum(
+    req.query.period || "monthly",
+    ["weekly", "monthly", "yearly"],
+    "period",
+    { allowAll: false },
+  );
 
   const startDate = new Date();
   if (period === "weekly") startDate.setDate(startDate.getDate() - 7);
@@ -282,6 +386,10 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
 
 exports.getWorkerAnalytics = asyncHandler(async (req, res) => {
   const isPrivileged = req.user.role === "head" || req.user.role === "admin";
+  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
+    allowDepartment: false,
+    defaultTimeframe: null,
+  });
   let workerId;
 
   if (isPrivileged && req.query.workerId) {
@@ -295,7 +403,11 @@ exports.getWorkerAnalytics = asyncHandler(async (req, res) => {
       .select("fullName department specializations rating performanceMetrics")
       .lean(),
     Complaint.find(
-      { "assignedWorkers.workerId": workerId },
+      (() => {
+        const query = { "assignedWorkers.workerId": workerId };
+        applyAnalyticsComplaintFilters(query, analyticsFilters, "createdAt");
+        return query;
+      })(),
       { status: 1, priority: 1, resolvedAt: 1, updatedAt: 1, createdAt: 1 },
     ).lean(),
   ]);

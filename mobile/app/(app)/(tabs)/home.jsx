@@ -1,4 +1,4 @@
-import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   FilePlus2,
@@ -23,7 +23,6 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import NotificationBellButton from "../../../components/NotificationBellButton";
 import PressableBlock from "../../../components/PressableBlock";
-import apiCall from "../../../utils/api";
 import {
   getPriorityBackgroundColor,
   getPriorityColor,
@@ -36,36 +35,20 @@ import {
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
-import * as Location from "expo-location";
 import {
-  GET_ANALYTICS_SUMMARY_URL,
-  GET_HEATMAP_URL,
-  GET_NEARBY_COMPLAINTS_URL,
-  UPVOTE_COMPLAINT_URL,
-} from "../../../url";
-
-const EMPTY_SUMMARY = {
-  stats: { total: 0, pending: 0, inProgress: 0, resolved: 0 },
-  avgResolutionTime: null,
-  mostActiveDepartment: null,
-  departmentBreakdown: [],
-  monthlyTrend: [],
-  recent: [],
-};
+  useCitizenHomeSummary,
+} from "../../../utils/hooks/useDashboardData";
+import { useNearbyComplaints } from "../../../utils/hooks/useNearbyComplaints";
+import { invalidateComplaintQueries } from "../../../utils/invalidateComplaintQueries";
 
 export default function Home() {
   const { t } = useTranslation();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const queryClient = useQueryClient();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [summary, setSummary] = useState(EMPTY_SUMMARY);
-  const [spots, setSpots] = useState([]);
   const [user, setUser] = useState(null);
-  const [nearbyLoading, setNearbyLoading] = useState(false);
-  const [nearbyComplaints, setNearbyComplaints] = useState([]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -75,82 +58,31 @@ export default function Home() {
     return t("greetings.night");
   };
 
-  const loadData = async (pullToRefresh = false) => {
-    try {
-      if (pullToRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      const [summaryRes, heatmapRes] = await Promise.all([
-        apiCall({ method: "GET", url: GET_ANALYTICS_SUMMARY_URL }),
-        apiCall({ method: "GET", url: GET_HEATMAP_URL }),
-      ]);
-
-      const summaryPayload = summaryRes?.data;
-      const heatmapPayload = heatmapRes?.data;
-      setSummary(summaryPayload ?? EMPTY_SUMMARY);
-      setSpots(heatmapPayload?.spots ?? []);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.failed"),
-        text2:
-          error?.response?.data?.message ?? t("toast.error.loadHomeFailed"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const loadNearby = async () => {
-    try {
-      setNearbyLoading(true);
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const res = await apiCall({
-        method: "GET",
-        url: `${GET_NEARBY_COMPLAINTS_URL}?lat=${loc.coords.latitude}&lng=${loc.coords.longitude}&radius=5`,
-      });
-      setNearbyComplaints(res?.data?.complaints ?? []);
-    } catch (_) {
-    } finally {
-      setNearbyLoading(false);
-    }
-  };
+  const {
+    summary,
+    heatmapSpots,
+    isLoading: loading,
+    isRefreshing: refreshing,
+    error,
+    refetch: loadData,
+  } = useCitizenHomeSummary();
+  const {
+    complaints: nearbyComplaints,
+    isLoading: nearbyLoading,
+    refetch: refetchNearby,
+    upvoteComplaint,
+  } = useNearbyComplaints();
 
   const handleNearbyUpvote = async (complaintId) => {
     try {
-      const res = await apiCall({
-        method: "POST",
-        url: UPVOTE_COMPLAINT_URL(complaintId),
-      });
-      const { upvoteCount, hasUpvoted } = res?.data ?? {};
-      setNearbyComplaints((prev) =>
-        prev.map((complaint) =>
-          complaint._id === complaintId
-            ? {
-                ...complaint,
-                upvoteCount: upvoteCount ?? complaint.upvoteCount,
-                hasUpvoted:
-                  typeof hasUpvoted === "boolean"
-                    ? hasUpvoted
-                    : complaint.hasUpvoted,
-              }
-            : complaint,
-        ),
-      );
+      await upvoteComplaint(complaintId);
+      await invalidateComplaintQueries(queryClient, { complaintId });
     } catch (_) {
       Toast.show({ type: "error", text1: t("home.nearby.upvoteFailed") });
     }
   };
 
   useEffect(() => {
-    loadData(false);
-    loadNearby();
-
     getUserAuth()
       .then((userData) => {
         if (userData) {
@@ -162,7 +94,19 @@ export default function Home() {
       });
   }, []);
 
-  const topHotspots = useMemo(() => (spots ?? []).slice(0, 6), [spots]);
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.failed"),
+      text2: error?.response?.data?.message ?? t("toast.error.loadHomeFailed"),
+    });
+  }, [error, t]);
+
+  const topHotspots = useMemo(
+    () => heatmapSpots.slice(0, 6),
+    [heatmapSpots],
+  );
   const lastUpdatedText = useMemo(() => {
     const recent = summary?.recent ?? [];
     const latest = recent[0];
@@ -186,7 +130,7 @@ export default function Home() {
       label: t("home.actions.newComplaint"),
       icon: FilePlus2,
       color: colors.primary,
-      onPress: () => router.push("/(app)/(more)/new-complaints"),
+      onPress: () => router.push("/(app)/more/new-complaint"),
     },
     {
       key: "heatmap",
@@ -219,7 +163,7 @@ export default function Home() {
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
-          onRefresh={() => loadData(true)}
+          onRefresh={() => Promise.all([loadData(), refetchNearby()])}
           colors={[colors.primary]}
           tintColor={colors.primary}
         />
@@ -333,7 +277,7 @@ export default function Home() {
             </Text>
           </View>
           <Pressable
-            onPress={loadNearby}
+            onPress={() => refetchNearby()}
             disabled={nearbyLoading}
             className="flex-row items-center px-2.5 py-1 rounded-full"
             style={{
@@ -474,7 +418,11 @@ export default function Home() {
                     </Text>
                   </View>
 
-                  <View className="flex-row items-center">
+                  <Pressable
+                    onPress={() => handleNearbyUpvote(item._id)}
+                    className="flex-row items-center py-1 pl-2"
+                    hitSlop={8}
+                  >
                     <ThumbsUp
                       size={12}
                       color={
@@ -492,7 +440,7 @@ export default function Home() {
                     >
                       {item.upvoteCount ?? 0}
                     </Text>
-                  </View>
+                  </Pressable>
                 </View>
                 </View>
               );

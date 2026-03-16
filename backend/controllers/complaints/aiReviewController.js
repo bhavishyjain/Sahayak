@@ -8,6 +8,10 @@ const {
   assertCanManageComplaintByDepartment,
   normalizeDepartment,
 } = require("../../policies/complaintPolicy");
+const { emitComplaintUpdated } = require("../../services/realtimeService");
+const {
+  appendComplaintHistory,
+} = require("../../services/complaintWorkflowService");
 
 exports.applyAISuggestion = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
@@ -44,14 +48,18 @@ exports.applyAISuggestion = asyncHandler(async (req, res) => {
     throw new AppError("No changes requested", 400);
   }
 
-  complaint.history.push({
+  appendComplaintHistory(complaint, {
     status: complaint.status,
     updatedBy: req.user._id,
     note: `AI suggestions applied by ${req.user.role}: ${changes.join(", ")}`,
-    timestamp: new Date(),
   });
 
   await complaint.save();
+  await emitComplaintUpdated({
+    complaint,
+    actorId: req.user._id,
+    event: "ai-suggestion-applied",
+  });
 
   return sendSuccess(
     res,

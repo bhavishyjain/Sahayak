@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import {
   Mail,
   Send,
@@ -12,7 +12,7 @@ import {
   RefreshCw,
   ChevronDown,
 } from "lucide-react-native";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -31,12 +31,7 @@ import Card from "../../../components/Card";
 import DialogBox from "../../../components/DialogBox";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
-import {
-  HOD_INVITE_WORKER_URL,
-  HOD_INVITATIONS_URL,
-  HOD_REVOKE_INVITATION_URL,
-} from "../../../url";
+import { useHodInvitations } from "../../../utils/hooks/useHodInvitations";
 
 const getStatusConfig = (t, colors) => ({
   pending: {
@@ -83,7 +78,6 @@ function InvitationCard({ item, colors, t, locale, onRevoke }) {
   const cfg = statusConfig[item.status] ?? statusConfig.pending;
   const { Icon } = cfg;
   const canRevoke = item.status === "pending";
-  const invitationId = item.id ?? item._id;
   const invitationEmail =
     item.email ?? t("more.manageInvitations.emailUnavailable");
   const sentDate = formatDate(item.sentAt, locale, t);
@@ -175,42 +169,19 @@ export default function ManageInvitations() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [invitations, setInvitations] = useState([]);
-
   const [email, setEmail] = useState("");
-  const [sending, setSending] = useState(false);
-
   const [revokeTarget, setRevokeTarget] = useState(null);
-  const [revoking, setRevoking] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
-
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      const res = await apiCall({ method: "GET", url: HOD_INVITATIONS_URL });
-      setInvitations(res?.data?.invitations ?? []);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("more.manageInvitations.toasts.loadFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("more.manageInvitations.toasts.loadFailedMessage"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      load(false);
-    }, [t]),
-  );
+  const {
+    invitations,
+    isLoading: loading,
+    isRefreshing: refreshing,
+    refetch: load,
+    sendInvitation,
+    revokeInvitation,
+    sending,
+    revoking,
+  } = useHodInvitations(t);
 
   const handleSend = async () => {
     const trimmed = email.trim().toLowerCase();
@@ -229,65 +200,15 @@ export default function ManageInvitations() {
       return;
     }
 
-    try {
-      setSending(true);
-      await apiCall({
-        method: "POST",
-        url: HOD_INVITE_WORKER_URL,
-        data: { email: trimmed },
-      });
-      Toast.show({
-        type: "success",
-        text1: t("more.manageInvitations.toasts.sentTitle"),
-        text2: t("more.manageInvitations.toasts.sentMessage", {
-          email: trimmed,
-        }),
-      });
-      setEmail("");
-      await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("more.manageInvitations.toasts.sendFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("more.manageInvitations.toasts.sendFailedMessage"),
-      });
-    } finally {
-      setSending(false);
-    }
+    const ok = await sendInvitation(trimmed);
+    if (ok) setEmail("");
   };
 
   const handleRevoke = async () => {
     if (!revokeTarget) return;
     try {
-      setRevoking(true);
-      const targetId = revokeTarget.id ?? revokeTarget._id;
-      await apiCall({
-        method: "DELETE",
-        url: HOD_REVOKE_INVITATION_URL(targetId),
-      });
-      Toast.show({
-        type: "success",
-        text1: t("more.manageInvitations.toasts.revokedTitle"),
-      });
-      setInvitations((prev) =>
-        prev.map((inv) =>
-          (inv.id ?? inv._id) === targetId
-            ? { ...inv, status: "revoked", revokedAt: new Date().toISOString() }
-            : inv,
-        ),
-      );
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("more.manageInvitations.toasts.revokeFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("more.manageInvitations.toasts.revokeFailedMessage"),
-      });
+      await revokeInvitation(revokeTarget);
     } finally {
-      setRevoking(false);
       setRevokeTarget(null);
     }
   };
@@ -318,7 +239,7 @@ export default function ManageInvitations() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => load(true)}
+              onRefresh={() => load()}
               colors={[colors.primary]}
               tintColor={colors.primary}
             />

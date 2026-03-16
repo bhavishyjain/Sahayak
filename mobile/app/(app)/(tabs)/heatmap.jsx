@@ -16,6 +16,7 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import CustomPicker from "../../../components/CustomPicker";
 import { GET_HEATMAP_URL } from "../../../url";
 import apiCall from "../../../utils/api";
+import { queryKeys } from "../../../utils/queryKeys";
 import {
   getSeverityColor,
   getSeverityName,
@@ -79,7 +80,7 @@ export default function HeatMap() {
             });
             break;
           }
-        } catch (err) {
+        } catch (_err) {
           retries--;
 
           if (retries > 0) {
@@ -100,7 +101,7 @@ export default function HeatMap() {
           }
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Silent error handling
     }
   }, []);
@@ -158,7 +159,7 @@ export default function HeatMap() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["heatmap", filters],
+    queryKey: queryKeys.heatmap(filters),
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.department !== "all") {
@@ -573,7 +574,7 @@ export default function HeatMap() {
         if (message.action === "requestLocation") {
           await fetchUserLocation();
         }
-      } catch (error) {
+      } catch (_error) {
         // Silent error handling
       }
     },

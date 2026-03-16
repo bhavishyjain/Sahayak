@@ -128,6 +128,10 @@
       "failedTitle": "रीसेट विफल",
       "failedMessage": "रीसेट लिंक अमान्य है या समाप्त हो चुका है।"
     },
+    "passwordStrength": {
+      "title": "कमज़ोर पासवर्ड",
+      "requirements": "कम से कम 8 अक्षरों का पासवर्ड उपयोग करें, जिसमें एक बड़ा अक्षर, एक छोटा अक्षर और एक संख्या हो।"
+    },
     "verifyEmail": {
       "title": "ईमेल सत्यापित करें",
       "verifying": "आपका ईमेल सत्यापित किया जा रहा है...",
@@ -717,7 +721,6 @@
       "selectAll": "सभी चुनें",
       "deselectAll": "सभी हटाएं",
       "selected": "चुना गया",
-      "unassigned": "अनावंटित",
       "generalWorker": "सामान्य कर्मचारी",
       "assignAll": "सभी आवंटित करें",
       "noComplaintsFound": "कोई शिकायत नहीं मिली",
@@ -1389,9 +1392,18 @@
       "schedule": "रिपोर्ट शेड्यूल करें"
     },
     "sections": {
+      "analytics": "विश्लेषण",
       "download": "डाउनलोड",
       "email": "ईमेल",
       "automated": "स्वचालित रिपोर्ट"
+    },
+    "breakdown": {
+      "description": "विभागों के बीच शिकायतों की संख्या और समाधान प्रगति की तुलना करें।",
+      "empty": "चुने गए फ़िल्टर के लिए कोई विभागीय डेटा उपलब्ध नहीं है।",
+      "totalLabel": "%{count} कुल",
+      "resolvedLabel": "%{count} हल",
+      "pendingLabel": "%{count} सक्रिय",
+      "highPriorityLabel": "%{count} उच्च प्राथमिकता"
     },
     "filterSummary": {
       "status": "स्थिति: %{value}",
@@ -1451,7 +1463,27 @@
       "scheduledMessage": "%{frequency} रिपोर्ट %{email} पर भेजी जाएगी",
       "scheduleFailed": "रिपोर्ट शेड्यूल नहीं हो सकी",
       "cancelledTitle": "शेड्यूल रद्द किया गया",
-      "cancelFailed": "शेड्यूल रद्द नहीं किया जा सका"
+      "cancelFailed": "शेड्यूल रद्द नहीं किया जा सका",
+      "runNow": "अभी चलाएँ",
+      "runNowSuccessTitle": "शेड्यूल चलाया गया",
+      "runNowSuccessMessage": "रिपोर्ट जनरेशन सफलतापूर्वक शुरू कर दी गई",
+      "runNowFailed": "शेड्यूल अभी चलाया नहीं जा सका",
+      "health": {
+        "nextRun": "अगला रन: %{value}",
+        "lastSuccess": "पिछली सफलता: %{value}",
+        "lastFailure": "पिछली विफलता: %{value}",
+        "error": "पिछली %{stage} त्रुटि: %{value}",
+        "status": {
+          "idle": "निष्क्रिय",
+          "pending": "प्रतीक्षारत",
+          "success": "स्वस्थ",
+          "failed": "विफल"
+        },
+        "stages": {
+          "generation": "जनरेशन",
+          "delivery": "डिलीवरी"
+        }
+      }
     },
     "email": {
       "cardTitle": "ईमेल से भेजें",

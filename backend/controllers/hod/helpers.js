@@ -1,5 +1,8 @@
 const Complaint = require("../../models/Complaint");
 const { escapeRegex } = require("../../utils/normalize");
+const {
+  ANALYTICS_STATUS_BUCKETS,
+} = require("../../services/analyticsMetricsService");
 
 async function calculateETA(complaint, worker) {
   try {
@@ -29,7 +32,7 @@ async function calculateETA(complaint, worker) {
 
     const activeWorkload = await Complaint.countDocuments({
       "assignedWorkers.workerId": worker._id,
-      status: { $in: ["assigned", "in-progress", "needs-rework"] },
+      status: { $in: ANALYTICS_STATUS_BUCKETS.workerOpen },
     });
 
     estimatedHours = estimatedHours * (1 + activeWorkload * 0.2);

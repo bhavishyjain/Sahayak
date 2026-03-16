@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react-native";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -14,15 +15,13 @@ import Card from "../../../components/Card";
 import ComplaintCard from "../../../components/ComplaintCard";
 import SearchBar from "../../../components/SearchBar";
 import FilterPanel from "../../../components/FilterPanel";
+import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
 import {
   formatPriorityLabel,
-  normalizePriority,
-  normalizeStatus,
 } from "../../../data/complaintStatus";
-import { WORKER_ASSIGNED_URL } from "../../../url";
+import { useWorkerAssignedList } from "../../../utils/hooks/useWorkerAssignedList";
 
 export default function WorkerAssigned() {
   const { t } = useTranslation();
@@ -30,112 +29,44 @@ export default function WorkerAssigned() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [complaints, setComplaints] = useState([]);
-  const [filteredComplaints, setFilteredComplaints] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortOrder, setSortOrder] = useState("old-to-new");
   const [selectedPriority, setSelectedPriority] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: WORKER_ASSIGNED_URL,
-      });
-
-      const payload = res?.data;
-      const data = payload?.complaints ?? [];
-      setComplaints(data);
-      setFilteredComplaints(data);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("worker.assigned.failed"),
-        text2: e?.response?.data?.message ?? t("worker.assigned.loadingError"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    load(false);
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [
+  const {
+    complaints,
+    isLoading: loading,
+    isRefetching: refreshing,
+    isFetchingNextPage: loadingMore,
+    hasMore,
+    loadMore,
+    refresh,
+    error,
+  } = useWorkerAssignedList({
+    search: searchQuery,
     startDate,
     endDate,
-    sortOrder,
-    selectedPriority,
-    selectedStatus,
-    searchQuery,
-    complaints,
-  ]);
+    priority: selectedPriority,
+    status: selectedStatus,
+    limit: 20,
+  });
 
-  const applyFilters = () => {
-    let filtered = [...complaints];
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((c) =>
-        [c.ticketId, c.title, c.description, c.location].some((value) =>
-          value?.toLowerCase().includes(query),
-        ),
-      );
-    }
-
-    // Date range filter
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(
-        (c) => new Date(c.assignedAt ?? c.createdAt) >= start,
-      );
-    }
-
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(
-        (c) => new Date(c.assignedAt ?? c.createdAt) <= end,
-      );
-    }
-
-    // Priority filter
-    if (selectedPriority !== "all") {
-      filtered = filtered.filter(
-        (c) => normalizePriority(c.priority) === selectedPriority,
-      );
-    }
-
-    // Status filter
-    if (selectedStatus !== "all") {
-      filtered = filtered.filter(
-        (c) => normalizeStatus(c.status) === selectedStatus,
-      );
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      const dateA = new Date(a.assignedAt ?? a.createdAt);
-      const dateB = new Date(b.assignedAt ?? b.createdAt);
-      return sortOrder === "new-to-old" ? dateB - dateA : dateA - dateB;
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("worker.assigned.failed"),
+      text2: error?.response?.data?.message ?? t("worker.assigned.loadingError"),
     });
+  }, [error, t]);
 
-    setFilteredComplaints(filtered);
-  };
+  const sortedComplaints = useMemo(() => [...complaints].sort((a, b) => {
+    const dateA = new Date(a.assignedAt ?? a.createdAt);
+    const dateB = new Date(b.assignedAt ?? b.createdAt);
+    return sortOrder === "new-to-old" ? dateB - dateA : dateA - dateB;
+  }), [complaints, sortOrder]);
 
   const clearFilters = () => {
     setStartDate("");
@@ -189,7 +120,7 @@ export default function WorkerAssigned() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refresh()}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />
@@ -229,36 +160,17 @@ export default function WorkerAssigned() {
         {/* Active count chip */}
         {complaints.length > 0 && (
           <View className="mb-4 flex-row items-center" style={{ gap: 6 }}>
-            {filteredComplaints.length !== complaints.length && (
-              <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                {t("worker.assigned.showingResults", {
-                  count: filteredComplaints.length,
-                  filtered: filteredComplaints.length,
-                  total: complaints.length,
-                })}
-              </Text>
-            )}
+            <Text className="text-xs" style={{ color: colors.textSecondary }}>
+              {t("worker.assigned.showingResults", {
+                count: complaints.length,
+                filtered: complaints.length,
+                total: complaints.length,
+              })}
+            </Text>
           </View>
         )}
 
-        {filteredComplaints.length === 0 && complaints.length > 0 ? (
-          <Card style={{ margin: 0, marginTop: 8 }}>
-            <View className="items-center py-6">
-              <Text
-                className="text-base font-semibold"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.assigned.noResults")}
-              </Text>
-              <Text
-                className="text-sm mt-2 text-center"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("worker.assigned.tryAdjusting")}
-              </Text>
-            </View>
-          </Card>
-        ) : complaints.length === 0 ? (
+        {complaints.length === 0 ? (
           <Card style={{ margin: 0, marginTop: 12 }}>
             <View className="items-center py-6">
               <Text
@@ -276,7 +188,7 @@ export default function WorkerAssigned() {
             </View>
           </Card>
         ) : (
-          filteredComplaints.map((complaint) => (
+          sortedComplaints.map((complaint) => (
             <ComplaintCard
               key={complaint.id}
               complaint={complaint}
@@ -286,6 +198,33 @@ export default function WorkerAssigned() {
               }
             />
           ))
+        )}
+        {hasMore && (
+          <PressableBlock
+            onPress={() => loadMore()}
+            disabled={loadingMore}
+            className="mt-2 mb-4 rounded-xl items-center justify-center py-3"
+            style={{
+              backgroundColor: colors.backgroundSecondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              opacity: loadingMore ? 0.6 : 1,
+            }}
+          >
+            {loadingMore ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <ChevronDown size={14} color={colors.textSecondary} />
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("common.loadMore")}
+                </Text>
+              </View>
+            )}
+          </PressableBlock>
         )}
       </ScrollView>
     </View>

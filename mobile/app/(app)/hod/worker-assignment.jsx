@@ -31,19 +31,12 @@ import Card from "../../../components/Card";
 import DialogBox from "../../../components/DialogBox";
 import SearchBar from "../../../components/SearchBar";
 import { useTheme } from "../../../utils/context/theme";
+import { useHodWorkerAssignment } from "../../../utils/hooks/useHodWorkerAssignment";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
 import {
   formatStatusLabel,
   getStatusColor,
 } from "../../../data/complaintStatus";
-import {
-  HOD_WORKERS_URL,
-  HOD_ASSIGN_MULTIPLE_WORKERS_URL,
-  HOD_UPDATE_WORKER_TASK_URL,
-  HOD_GET_COMPLAINT_WORKERS_URL,
-  GET_COMPLAINT_BY_ID_URL,
-} from "../../../url";
 
 function complaintStatusConfig(status, t, colors) {
   const color = getStatusColor(status, colors) ?? colors.muted;
@@ -96,6 +89,17 @@ function WorkerAvatar({ name, colors, t }) {
   );
 }
 
+function getWorkerDisplayName(worker, t) {
+  return (
+    worker?.fullName ??
+    worker?.username ??
+    worker?.workerName ??
+    worker?.workerId?.fullName ??
+    worker?.workerId?.username ??
+    t("hod.workerAssignment.fallbacks.worker")
+  );
+}
+
 // ─── Main screen ────────────────────────────────────────────────────────────────
 
 export default function WorkerAssignment() {
@@ -119,7 +123,6 @@ export default function WorkerAssignment() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(new Set()); // worker IDs to add
   const [taskDescs, setTaskDescs] = useState({}); // { workerId: string }
-  const [assigning, setAssigning] = useState(false);
   const [modalKeyboardHeight, setModalKeyboardHeight] = useState(0);
 
   // ── Update task description ───────────────────────────────────────────────
@@ -130,17 +133,13 @@ export default function WorkerAssignment() {
   // ── Remove confirm ────────────────────────────────────────────────────────
   const [removeTarget, setRemoveTarget] = useState(null);
   const [removing, setRemoving] = useState(false);
-
-  const getWorkerName = useCallback(
-    (worker) =>
-      worker?.fullName ??
-      worker?.username ??
-      worker?.workerName ??
-      worker?.workerId?.fullName ??
-      worker?.workerId?.username ??
-      t("hod.workerAssignment.fallbacks.worker"),
-    [t],
-  );
+  const {
+    refetchAssignment,
+    assignWorkers,
+    removeWorker,
+    updateTask,
+    assigning,
+  } = useHodWorkerAssignment(complaintId, t);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   const load = async (isRefresh = false) => {
@@ -148,29 +147,10 @@ export default function WorkerAssignment() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const [complainRes, workersRes, allWorkersRes] = await Promise.all([
-        apiCall({ method: "GET", url: GET_COMPLAINT_BY_ID_URL(complaintId) }),
-        apiCall({
-          method: "GET",
-          url: HOD_GET_COMPLAINT_WORKERS_URL(complaintId),
-        }),
-        apiCall({ method: "GET", url: HOD_WORKERS_URL }),
-      ]);
-
-      setComplaint(complainRes?.data?.complaint ?? null);
-
-      // The /workers endpoint returns populated worker docs
-      const populated = (workersRes?.data?.workers ?? []).map((w) => ({
-        workerId: String(w.workerId?._id ?? w.workerId ?? w._id ?? ""),
-        workerName: getWorkerName(w),
-        taskDescription: w.taskDescription ?? "",
-        status: w.status ?? "assigned",
-        notes: w.notes ?? "",
-        assignedAt: w.assignedAt,
-        completedAt: w.completedAt,
-      }));
-      setAssignedWorkers(populated);
-      setAllWorkers(allWorkersRes?.data?.workers ?? []);
+      const data = await refetchAssignment();
+      setComplaint(data?.complaint ?? null);
+      setAssignedWorkers(data?.assignedWorkers ?? []);
+      setAllWorkers(data?.allWorkers ?? []);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -188,7 +168,8 @@ export default function WorkerAssignment() {
   useFocusEffect(
     useCallback(() => {
       load(false);
-    }, [complaintId, t, getWorkerName]),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [complaintId, t, refetchAssignment]),
   );
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -273,55 +254,16 @@ export default function WorkerAssignment() {
   }, [showAddPanel, insets.bottom]);
 
   const handleAssign = async () => {
-    if (selected.size === 0) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.selectWorker"),
-      });
-      return;
-    }
-    try {
-      setAssigning(true);
-
-      // Build the complete new worker list: currently assigned + newly selected
-      const existingWorkers = assignedWorkers.map((w) => ({
-        workerId: w.workerId,
-        taskDescription: w.taskDescription ?? "",
-      }));
-      const newWorkers = [...selected].map((id) => ({
-        workerId: id,
-        taskDescription: taskDescs[id] ?? "",
-      }));
-
-      await apiCall({
-        method: "POST",
-        url: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
-        data: { workers: [...existingWorkers, ...newWorkers] },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("hod.workerAssignment.toasts.assignSuccessTitle"),
-        text2: t("hod.workerAssignment.toasts.assignSuccessMessage", {
-          count: selected.size,
-          plural: selected.size > 1 ? "s" : "",
-        }),
-      });
-
+    const ok = await assignWorkers({
+      selectedWorkerIds: selected,
+      assignedWorkers,
+      taskDescs,
+    });
+    if (ok) {
       setSelected(new Set());
       setTaskDescs({});
       setShowAddPanel(false);
       await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.assignFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("hod.workerAssignment.toasts.assignFailedMessage"),
-      });
-    } finally {
-      setAssigning(false);
     }
   };
 
@@ -330,32 +272,9 @@ export default function WorkerAssignment() {
     if (!removeTarget) return;
     try {
       setRemoving(true);
-      const remaining = assignedWorkers
-        .filter((w) => w.workerId !== removeTarget.workerId)
-        .map((w) => ({
-          workerId: w.workerId,
-          taskDescription: w.taskDescription ?? "",
-        }));
-
-      await apiCall({
-        method: "POST",
-        url: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
-        data: { workers: remaining },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("hod.workerAssignment.toasts.removeSuccessTitle"),
-      });
+      const ok = await removeWorker({ removeTarget, assignedWorkers });
+      if (!ok) return;
       await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.removeFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("hod.workerAssignment.toasts.removeFailedMessage"),
-      });
     } finally {
       setRemoving(false);
       setRemoveTarget(null);
@@ -383,30 +302,14 @@ export default function WorkerAssignment() {
 
     try {
       setUpdatingWorkerId(taskEditTarget.workerId);
-      await apiCall({
-        method: "PUT",
-        url: HOD_UPDATE_WORKER_TASK_URL(complaintId, taskEditTarget.workerId),
-        data: { taskDescription: nextTaskDescription },
+      const ok = await updateTask({
+        workerId: taskEditTarget.workerId,
+        workerName: taskEditTarget.workerName,
+        taskDescription: nextTaskDescription,
       });
-
-      Toast.show({
-        type: "success",
-        text1: t("hod.workerAssignment.toasts.updateSuccessTitle"),
-        text2: t("hod.workerAssignment.toasts.updateSuccessMessage", {
-          name: taskEditTarget.workerName,
-        }),
-      });
-
+      if (!ok) return;
       closeUpdateTaskDialog();
       await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.updateFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("hod.workerAssignment.toasts.updateFailedMessage"),
-      });
     } finally {
       setUpdatingWorkerId(null);
     }
@@ -706,7 +609,7 @@ export default function WorkerAssignment() {
                       filteredWorkers.map((w) => {
                         const id = String(w.id ?? w._id ?? "");
                         const isSelected = selected.has(id);
-                        const workerName = getWorkerName(w);
+                        const workerName = getWorkerDisplayName(w, t);
 
                         return (
                           <View key={id}>

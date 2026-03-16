@@ -16,10 +16,23 @@ const {
 } = require("../../services/complaintService");
 const { sendComplaintRegistered } = require("../../services/emailService");
 const {
+  NOTIFICATION_ROUTE_SCREENS,
+  buildNotificationRoute,
+} = require("../../services/notificationDomainService");
+const {
   analyzeComplaintWithImage,
   analyzeSentiment,
 } = require("../../services/geminiService");
 const { assertCanAccessComplaint } = require("../../policies/complaintPolicy");
+const {
+  VALID_DEPARTMENTS,
+  buildComplaintListQuery,
+  normalizeComplaintSort,
+} = require("../../services/complaintQueryService");
+const {
+  buildDetailPayload,
+  buildListPayload,
+} = require("../../services/responseViewService");
 
 exports.createComplaint = asyncHandler(async (req, res) => {
   const withTimeout = (promise, timeoutMs, fallbackValue) => {
@@ -61,14 +74,6 @@ exports.createComplaint = asyncHandler(async (req, res) => {
       withTimeout(analyzeSentiment(description), 3500, null),
     ]);
 
-    const VALID_DEPARTMENTS = [
-      "Road",
-      "Water",
-      "Electricity",
-      "Waste",
-      "Drainage",
-      "Other",
-    ];
     if (aiResult && !aiResult.error) {
       const rawDept = aiResult.department;
       aiSuggestedDepartment = VALID_DEPARTMENTS.includes(rawDept)
@@ -149,7 +154,18 @@ exports.createComplaint = asyncHandler(async (req, res) => {
   void notifyUser(req.user._id, {
     title: "Complaint Received",
     body: `Ticket ${complaint.ticketId} has been created.`,
-    data: { type: "complaint-update", complaintId: String(complaint._id) },
+    data: {
+      type: "complaint-update",
+      complaintId: String(complaint._id),
+      ticketId: complaint.ticketId,
+      route: buildNotificationRoute(
+        NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
+        {
+          complaintId: String(complaint._id),
+          ticketId: complaint.ticketId,
+        },
+      ),
+    },
   }).catch((notificationError) => {
     console.error("Failed to send complaint notification:", notificationError);
   });
@@ -169,9 +185,10 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     );
   }
 
+  const complaintView = buildComplaintView(complaint);
   return sendSuccess(
     res,
-    { complaint: buildComplaintView(complaint) },
+    buildDetailPayload(complaintView, "complaint", { complaint: complaintView }),
     "Complaint created",
     201,
   );
@@ -195,65 +212,44 @@ exports.myComplaints = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Number(limit) || 10, 100);
   const safePage = Math.max(Number(page) || 1, 1);
 
-  const filter = {};
-  if (scope !== "all") {
-    filter.userId = new mongoose.Types.ObjectId(req.user._id);
-  }
-  if (status && status !== "all") filter.status = status;
-  if (!status && excludeStatus) {
-    const excludedStatuses = String(excludeStatus)
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    if (excludedStatuses.length > 0) {
-      filter.status = { $nin: excludedStatuses };
-    }
-  }
-  if (department && department !== "all") {
-    filter.department = new RegExp(`^${department}$`, "i");
-  }
-  if (priority && priority !== "all")
-    filter.priority = new RegExp(`^${priority}$`, "i");
-  if (startDate || endDate) {
-    filter.createdAt = {};
-    if (startDate) filter.createdAt.$gte = new Date(startDate);
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filter.createdAt.$lte = end;
-    }
-  }
-  if (search && search.trim()) {
-    const re = new RegExp(
-      search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-      "i",
-    );
-    filter.$or = [
-      { ticketId: re },
-      { locationName: re },
-      { rawText: re },
-      { refinedText: re },
-    ];
-  }
-
-  const sortDir = sort === "old-to-new" ? 1 : -1;
+  const filter = buildComplaintListQuery(
+    {},
+    {
+      reqUser: { ...req.user, _id: new mongoose.Types.ObjectId(req.user._id) },
+      scope,
+      status,
+      excludeStatus,
+      department,
+      priority,
+      startDate,
+      endDate,
+      search,
+      validateDepartment: true,
+      validatePriority: true,
+    },
+  );
   const [complaints, total] = await Promise.all([
     Complaint.find(filter)
-      .sort({ createdAt: sortDir })
+      .sort(normalizeComplaintSort(sort))
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit),
     Complaint.countDocuments(filter),
   ]);
 
-  return sendSuccess(res, {
-    total,
-    page: safePage,
-    pages: Math.ceil(total / safeLimit),
-    limit: safeLimit,
-    complaints: complaints.map((complaint) =>
-      buildComplaintView(complaint, { currentUserId: req.user._id }),
-    ),
-  });
+  const complaintItems = complaints.map((complaint) =>
+    buildComplaintView(complaint, { currentUserId: req.user._id }),
+  );
+
+  return sendSuccess(
+    res,
+    buildListPayload({
+      items: complaintItems,
+      itemKey: "complaints",
+      page: safePage,
+      limit: safeLimit,
+      total,
+    }),
+  );
 });
 
 exports.getComplaintById = asyncHandler(async (req, res) => {
@@ -270,9 +266,13 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
   if (req.user?.role !== "user") {
     await assertCanAccessComplaint(req.user, complaint);
   }
-  return sendSuccess(res, {
-    complaint: buildComplaintView(complaint, { currentUserId: req.user._id }),
+  const complaintView = buildComplaintView(complaint, {
+    currentUserId: req.user._id,
   });
+  return sendSuccess(
+    res,
+    buildDetailPayload(complaintView, "complaint", { complaint: complaintView }),
+  );
 });
 
 exports.upvoteComplaint = asyncHandler(async (req, res) => {

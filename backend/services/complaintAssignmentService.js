@@ -2,7 +2,14 @@ const mongoose = require("mongoose");
 const Complaint = require("../models/Complaint");
 const User = require("../models/User");
 const AppError = require("../core/AppError");
-const { notifyUser } = require("../controllers/notificationController");
+const {
+  emitComplaintParticipantRealtime,
+  notifyComplaintParticipants,
+} = require("./complaintAudienceService");
+const {
+  NOTIFICATION_ROUTE_SCREENS,
+  buildNotificationRoute,
+} = require("./notificationDomainService");
 
 function normalizeEstimatedTime(estimatedCompletionTime) {
   if (estimatedCompletionTime === undefined || estimatedCompletionTime === null) {
@@ -124,11 +131,6 @@ async function assignComplaintToWorkers(options) {
       );
       const orderedWorkerDocs = orderedWorkerIds.map((id) => workersById.get(id));
 
-      const previousWorkerIds = (complaintDoc.assignedWorkers || []).map((assignment) =>
-        String(assignment.workerId),
-      );
-      const removedWorkerIds = previousWorkerIds.filter((id) => !seen.has(id));
-
       complaintDoc.assignedWorkers = orderedWorkerDocs.map((workerDoc) => ({
         workerId: workerDoc._id,
         taskDescription: getTaskDescription(
@@ -186,11 +188,6 @@ async function assignComplaintToWorkers(options) {
     );
     const orderedWorkerDocs = orderedWorkerIds.map((id) => workersById.get(id));
     const previousState = complaintDoc.toObject();
-    const previousWorkerIds = (complaintDoc.assignedWorkers || []).map((assignment) =>
-      String(assignment.workerId),
-    );
-    const removedWorkerIds = previousWorkerIds.filter((id) => !seen.has(id));
-
     try {
       complaintDoc.assignedWorkers = orderedWorkerDocs.map((workerDoc) => ({
         workerId: workerDoc._id,
@@ -228,23 +225,58 @@ async function assignComplaintToWorkers(options) {
   // Fire-and-forget notifications after transaction commits
   if (updatedComplaint) {
     const ticketId = updatedComplaint.ticketId;
-    const complaintId = String(updatedComplaint._id);
+    await notifyComplaintParticipants(
+      updatedComplaint,
+      {
+        title: "Complaint Assignment Updated",
+        body: `Complaint #${ticketId} assignment has been updated.`,
+        data: {
+          type: "complaint-update",
+          complaintId: String(updatedComplaint._id),
+          ticketId,
+          status: updatedComplaint.status,
+          route: buildNotificationRoute(
+            NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
+            {
+              complaintId: String(updatedComplaint._id),
+              ticketId,
+            },
+          ),
+        },
+      },
+      { excludeUserIds: [assignedBy] },
+    );
 
-    orderedWorkerIds.forEach((workerId) => {
-      notifyUser(workerId, {
-        title: "New Task Assigned",
-        body: `You have been assigned complaint #${ticketId}`,
-        data: { type: "assignment", complaintId, ticketId },
-      });
-    });
+    await Promise.all(
+      orderedWorkerIds.map((workerId) =>
+        notifyComplaintParticipants(
+          updatedComplaint,
+          {
+            title: "New Task Assigned",
+            body: `You have been assigned complaint #${ticketId}`,
+            data: {
+              type: "assignment",
+              complaintId: String(updatedComplaint._id),
+              ticketId,
+              route: buildNotificationRoute(
+                NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
+                {
+                  complaintId: String(updatedComplaint._id),
+                  ticketId,
+                },
+              ),
+            },
+          },
+          { includeHeads: false, excludeUserIds: [assignedBy, updatedComplaint.userId, ...orderedWorkerIds.filter((id) => id !== workerId)] },
+        ),
+      ),
+    );
 
-    if (updatedComplaint.userId) {
-      notifyUser(updatedComplaint.userId, {
-        title: "Complaint Assigned",
-        body: `Your complaint #${ticketId} has been assigned to a worker`,
-        data: { type: "complaint-update", complaintId, ticketId },
-      });
-    }
+    await emitComplaintParticipantRealtime(
+      updatedComplaint,
+      "workers-assigned",
+      assignedBy,
+    );
   }
 
   return updatedComplaint;

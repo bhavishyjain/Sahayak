@@ -55,7 +55,13 @@ const reportScheduleSchema = new mongoose.Schema(
     },
     lastSentAt: { type: Date, default: null },
     lastAttemptAt: { type: Date, default: null },
+    lastFailureAt: { type: Date, default: null },
     lastError: { type: String, default: null },
+    lastErrorStage: {
+      type: String,
+      enum: ["generation", "delivery", null],
+      default: null,
+    },
   },
   { timestamps: true },
 );

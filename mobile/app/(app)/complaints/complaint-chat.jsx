@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { Clock, MessageSquare, Send } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,10 +15,11 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import {
-  GET_COMPLAINT_MESSAGES_URL,
-  POST_COMPLAINT_MESSAGE_URL,
-} from "../../../url";
-import apiCall from "../../../utils/api";
+  addRealtimeListener,
+  subscribeToComplaint,
+  unsubscribeFromComplaint,
+} from "../../../utils/realtime/socket";
+import { useComplaintChat } from "../../../utils/hooks/useComplaintChat";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
@@ -107,84 +108,67 @@ export default function ComplaintChat() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [text, setText] = useState("");
   const [currentUserId, setCurrentUserId] = useState(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   const flatListRef = useRef(null);
-
-  const fetchMessages = useCallback(
-    async (pageNum = 1, append = false) => {
-      try {
-        if (pageNum === 1) setLoading(true);
-        else setLoadingMore(true);
-
-        const res = await apiCall({
-          method: "GET",
-          url: `${GET_COMPLAINT_MESSAGES_URL(id)}?page=${pageNum}`,
-        });
-
-        const fetched = res?.data?.messages ?? [];
-        const total = res?.data?.total ?? 0;
-        const pageSize = res?.data?.pageSize ?? 50;
-
-        if (append) {
-          // Prepend older messages (they come in ascending order)
-          setMessages((prev) => [...fetched, ...prev]);
-        } else {
-          setMessages(fetched);
-          setTimeout(
-            () => flatListRef.current?.scrollToEnd({ animated: false }),
-            100,
-          );
-        }
-
-        setHasMore(pageNum * pageSize < total);
-        setPage(pageNum);
-      } catch (e) {
-        Toast.show({
-          type: "error",
-          text1: t("complaintChat.toasts.loadFailedTitle"),
-          text2: e?.response?.data?.message ?? t("complaintChat.toasts.tryAgain"),
-        });
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [id],
-  );
+  const {
+    messages,
+    isLoading: loading,
+    hasMore,
+    loadingMore,
+    loadMore,
+    sendMessage,
+    sending,
+    appendRealtimeMessage,
+  } = useComplaintChat(id);
 
   useEffect(() => {
     const init = async () => {
       const user = await getUserAuth();
       setCurrentUserId(String(user?.id ?? user?._id ?? ""));
-      await fetchMessages(1);
+      setTimeout(
+        () => flatListRef.current?.scrollToEnd({ animated: false }),
+        100,
+      );
     };
     if (id) init();
-  }, [id, fetchMessages]);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return undefined;
+
+    subscribeToComplaint(id).catch(() => {});
+    const unsubscribeMessageListener = addRealtimeListener(
+      "complaint-message",
+      (payload) => {
+        if (String(payload?.complaintId || "") !== String(id)) return;
+        const incomingMessage = payload?.message;
+        if (!incomingMessage?._id) return;
+
+        appendRealtimeMessage(incomingMessage);
+
+        setTimeout(
+          () => flatListRef.current?.scrollToEnd({ animated: true }),
+          100,
+        );
+      },
+    );
+
+    return () => {
+      unsubscribeMessageListener();
+      unsubscribeFromComplaint(id);
+    };
+  }, [appendRealtimeMessage, id]);
 
   const handleSend = async () => {
     const msg = text.trim();
     if ([!msg, sending].some(Boolean)) return;
 
     setText("");
-    setSending(true);
     try {
-      const res = await apiCall({
-        method: "POST",
-        url: POST_COMPLAINT_MESSAGE_URL(id),
-        data: { text: msg },
-      });
-
-      const newMsg = res?.data?.message;
+      const newMsg = await sendMessage(msg);
       if (newMsg) {
-        setMessages((prev) => [...prev, newMsg]);
         setTimeout(
           () => flatListRef.current?.scrollToEnd({ animated: true }),
           100,
@@ -199,13 +183,12 @@ export default function ComplaintChat() {
       // Restore text so user doesn't lose their message
       setText(msg);
     } finally {
-      setSending(false);
     }
   };
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) {
-      fetchMessages(page + 1, true);
+      loadMore();
     }
   };
 

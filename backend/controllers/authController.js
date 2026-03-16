@@ -17,6 +17,7 @@ const {
 } = require("../services/authService");
 const { createUserAccount } = require("../services/userProvisionService");
 const {
+  assertStrongPassword,
   validateRegisterBody,
   validateLoginBody,
 } = require("../validators/authValidators");
@@ -332,6 +333,7 @@ exports.updateMe = asyncHandler(async (req, res) => {
   }
 
   if (password && password.trim()) {
+    assertStrongPassword(password.trim());
     user.password = await bcrypt.hash(password.trim(), 10);
   }
 
@@ -379,9 +381,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   const { password } = req.body;
 
   if (!token) throw new AppError("Reset token is required", 400);
-  if (!password || String(password).length < 8) {
-    throw new AppError("Password must be at least 8 characters", 400);
-  }
+  assertStrongPassword(password);
 
   const tokenHash = hashToken(String(token));
   const user = await User.findOne({

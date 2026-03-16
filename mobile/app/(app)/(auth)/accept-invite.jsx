@@ -32,6 +32,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import apiCall from "../../../utils/api";
+import {
+  getPasswordStrengthMessage,
+  isStrongPassword,
+} from "../../../utils/passwordStrength";
 import { useTheme } from "../../../utils/context/theme";
 import getUserAuth, { setUserAuth } from "../../../utils/userAuth";
 import { ACCEPT_INVITE_URL, REGISTER_URL } from "../../../url";
@@ -259,8 +263,13 @@ export default function AcceptInvite() {
     if (!fullName.trim()) return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.fullNameRequired") });
     if (!username.trim()) return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.usernameRequired") });
     if (!phone.trim())    return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.phoneRequired") });
-    if (!password.trim() || password.length < 6)
-      return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.passwordTooShort") });
+    if (!isStrongPassword(password)) {
+      return Toast.show({
+        type: "error",
+        text1: t("auth.passwordStrength.title"),
+        text2: getPasswordStrengthMessage(t),
+      });
+    }
 
     setLoading(true);
     try {
@@ -387,6 +396,12 @@ export default function AcceptInvite() {
                 />
               }
             />
+            <Text
+              className="text-xs mt-1"
+              style={{ color: colors.textSecondary }}
+            >
+              {getPasswordStrengthMessage(t)}
+            </Text>
           </View>
 
           {/* Register button */}

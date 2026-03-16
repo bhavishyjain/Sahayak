@@ -1,12 +1,40 @@
 const Complaint = require("../../models/Complaint");
+const ComplaintMessage = require("../../models/ComplaintMessage");
 const User = require("../../models/User");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const { assertCanAccessComplaint } = require("../../policies/complaintPolicy");
-const { notifyUser } = require("../notificationController");
+const {
+  notifyComplaintChatParticipants,
+} = require("../../services/complaintAudienceService");
+const { buildListPayload, buildDetailPayload } = require("../../services/responseViewService");
 
 const PAGE_SIZE = 50;
+
+async function migrateEmbeddedMessagesIfNeeded(complaint) {
+  if (!complaint?._id) return;
+  const embeddedMessages = complaint.messages || [];
+  if (embeddedMessages.length === 0) return;
+
+  const existingCount = await ComplaintMessage.countDocuments({
+    complaintId: complaint._id,
+  });
+  if (existingCount > 0) return;
+
+  await ComplaintMessage.insertMany(
+    embeddedMessages.map((message) => ({
+      _id: message._id,
+      complaintId: complaint._id,
+      senderId: message.senderId,
+      senderName: message.senderName,
+      senderRole: message.senderRole,
+      text: message.text,
+      createdAt: message.createdAt,
+    })),
+    { ordered: true },
+  );
+}
 
 /**
  * GET /complaints/:id/messages?page=1
@@ -22,13 +50,29 @@ exports.getMessages = asyncHandler(async (req, res) => {
   await assertCanAccessComplaint(req.user, complaint);
 
   const page = Math.max(1, parseInt(req.query.page) || 1);
-  const allMessages = complaint.messages || [];
-  const total = allMessages.length;
+  await migrateEmbeddedMessagesIfNeeded(complaint);
+  const total = await ComplaintMessage.countDocuments({
+    complaintId: complaint._id,
+  });
   const start = Math.max(0, total - page * PAGE_SIZE);
-  const end = total - (page - 1) * PAGE_SIZE;
-  const messages = allMessages.slice(start, end);
+  const limit = Math.max(0, total - (page - 1) * PAGE_SIZE - start);
+  const messages = await ComplaintMessage.find({ complaintId: complaint._id })
+    .sort({ createdAt: 1, _id: 1 })
+    .skip(start)
+    .limit(limit)
+    .lean();
 
-  return sendSuccess(res, { messages, total, page, pageSize: PAGE_SIZE });
+  return sendSuccess(
+    res,
+    buildListPayload({
+      items: messages,
+      itemKey: "messages",
+      page,
+      limit: PAGE_SIZE,
+      total,
+      legacy: { pageSize: PAGE_SIZE },
+    }),
+  );
 });
 
 /**
@@ -50,10 +94,12 @@ exports.postMessage = asyncHandler(async (req, res) => {
   await assertCanAccessComplaint(req.user, complaint);
 
   // Fetch sender display name from DB if not on req.user
-  let senderName = req.user.name || req.user.username || "User";
+  let senderName = req.user.fullName || req.user.username || "User";
   if (!senderName || senderName === "User") {
-    const dbUser = await User.findById(req.user._id).select("name username");
-    senderName = dbUser?.name || dbUser?.username || "User";
+    const dbUser = await User.findById(req.user._id).select(
+      "fullName username",
+    );
+    senderName = dbUser?.fullName || dbUser?.username || "User";
   }
 
   const message = {
@@ -64,52 +110,20 @@ exports.postMessage = asyncHandler(async (req, res) => {
     createdAt: new Date(),
   };
 
-  complaint.messages.push(message);
-  await complaint.save();
-
-  const complaintId = String(complaint._id);
-  const ticketId = complaint.ticketId;
-  const senderId = String(req.user._id);
-  const recipientIds = new Set();
-
-  if (complaint.userId) {
-    recipientIds.add(String(complaint.userId));
-  }
-
-  (complaint.assignedWorkers || []).forEach((assignment) => {
-    if (assignment?.workerId) {
-      recipientIds.add(String(assignment.workerId));
-    }
+  const saved = await ComplaintMessage.create({
+    complaintId: complaint._id,
+    ...message,
   });
-
-  if (complaint.department) {
-    const heads = await User.find({
-      role: "head",
-      department: complaint.department,
-    }).select("_id");
-    heads.forEach((head) => recipientIds.add(String(head._id)));
-  }
-
-  recipientIds.delete(senderId);
-
-  const preview = text.length > 120 ? `${text.slice(0, 117)}...` : text;
-  recipientIds.forEach((recipientId) => {
-    notifyUser(
-      recipientId,
-      {
-        title: `New message on #${ticketId}`,
-        body: `${senderName}: ${preview}`,
-        data: {
-          type: "chat-message",
-          complaintId,
-          ticketId,
-          senderId,
-        },
-      },
-      { saveHistory: false },
-    );
+  await notifyComplaintChatParticipants(complaint, {
+    actorId: String(req.user._id),
+    senderName,
+    text,
+    message: saved,
   });
-
-  const saved = complaint.messages[complaint.messages.length - 1];
-  return sendSuccess(res, { message: saved }, "Message sent", 201);
+  return sendSuccess(
+    res,
+    buildDetailPayload(saved.toObject(), "message", { message: saved }),
+    "Message sent",
+    201,
+  );
 });

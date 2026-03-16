@@ -14,6 +14,15 @@ const {
   assignComplaintToWorkers,
 } = require("../../services/complaintAssignmentService");
 const { calculateETA } = require("./helpers");
+const {
+  buildComplaintListQuery,
+  parsePagination,
+} = require("../../services/complaintQueryService");
+const { ANALYTICS_STATUS_BUCKETS } = require("../../services/analyticsMetricsService");
+const {
+  buildDetailPayload,
+  buildListPayload,
+} = require("../../services/responseViewService");
 
 exports.assignMultipleWorkers = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
@@ -66,16 +75,16 @@ exports.assignMultipleWorkers = asyncHandler(async (req, res) => {
     note: `Assigned to ${validWorkers.length} worker(s) by ${hodDisplayName}: ${assignedWorkerNames}`,
   });
 
+  const complaintView = {
+    id: updatedComplaint._id,
+    assignedWorkers: updatedComplaint.assignedWorkers,
+    status: updatedComplaint.status,
+    estimatedCompletionTime: updatedComplaint.estimatedCompletionTime,
+  };
+
   return sendSuccess(
     res,
-    {
-      complaint: {
-        id: updatedComplaint._id,
-        assignedWorkers: updatedComplaint.assignedWorkers,
-        status: updatedComplaint.status,
-        estimatedCompletionTime: updatedComplaint.estimatedCompletionTime,
-      },
-    },
+    buildDetailPayload(complaintView, "complaint", { complaint: complaintView }),
     "Complaint assigned successfully",
   );
 });
@@ -83,34 +92,56 @@ exports.assignMultipleWorkers = asyncHandler(async (req, res) => {
 exports.getWorkerComplaints = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { workerId } = req.params;
-  const { status } = req.query;
+  const { status, search, startDate, endDate } = req.query;
+  const { page, limit, skip } = parsePagination(req);
 
   await getWorkerOrThrow(workerId, {
     department: hod.department,
     departmentErrorMessage: "Worker not found in your department",
   });
 
-  const query = {
-    "assignedWorkers.workerId": workerId,
-    department: hod.department,
-  };
+  const query = buildComplaintListQuery(
+    {
+      "assignedWorkers.workerId": workerId,
+      department: hod.department,
+    },
+    {
+      status: status === "completed" ? "resolved" : undefined,
+      excludeStatus:
+        status === "active" ? "resolved,cancelled,pending-approval" : undefined,
+      search,
+      startDate,
+      endDate,
+      dateField: "updatedAt",
+    },
+  );
+
   if (status === "active") {
-    query.status = { $in: ["assigned", "in-progress", "needs-rework"] };
-  } else if (status === "completed") {
-    query.status = "resolved";
+    query.status = { $in: ANALYTICS_STATUS_BUCKETS.workerOpen };
   }
 
-  const complaints = await Complaint.find(query)
-    .populate("userId", "fullName email phone")
-    .sort({ updatedAt: -1 });
+  const [complaints, total] = await Promise.all([
+    Complaint.find(query)
+      .populate("userId", "fullName email phone")
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Complaint.countDocuments(query),
+  ]);
 
   const complaintsList = complaints.map((complaint) =>
     buildComplaintView(complaint),
   );
-  return sendSuccess(res, {
-    complaints: complaintsList,
-    total: complaintsList.length,
-  });
+  return sendSuccess(
+    res,
+    buildListPayload({
+      items: complaintsList,
+      itemKey: "complaints",
+      page,
+      limit,
+      total,
+    }),
+  );
 });
 
 exports.getComplaintWorkers = asyncHandler(async (req, res) => {
@@ -136,10 +167,14 @@ exports.getComplaintWorkers = asyncHandler(async (req, res) => {
 
   return sendSuccess(
     res,
-    {
-      workers,
-      totalWorkers: workers.length,
-    },
+    buildListPayload({
+      items: workers,
+      itemKey: "workers",
+      page: 1,
+      limit: workers.length,
+      total: workers.length,
+      legacy: { totalWorkers: workers.length },
+    }),
     "Workers retrieved successfully",
   );
 });

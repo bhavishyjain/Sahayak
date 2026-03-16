@@ -7,8 +7,16 @@ const {
   getCronExpressionForFrequency,
   generateReportBuffer,
   registerScheduleJob,
+  executeSchedule,
 } = require("../../services/reportSchedulerService");
 const { normalizeString, buildFilters } = require("./helpers");
+const {
+  serializeReportSchedule,
+  serializeReportScheduleList,
+} = require("../../services/reportViewService");
+const {
+  normalizeSchedulePolicy,
+} = require("../../services/filterContractService");
 
 exports.getSchedules = asyncHandler(async (req, res) => {
   const schedules = await ReportSchedule.find({
@@ -16,7 +24,11 @@ exports.getSchedules = asyncHandler(async (req, res) => {
     isActive: true,
   }).sort({ createdAt: -1 });
 
-  sendSuccess(res, { schedules }, "Schedules fetched successfully");
+  sendSuccess(
+    res,
+    serializeReportScheduleList(schedules),
+    "Schedules fetched successfully",
+  );
 });
 
 exports.cancelSchedule = asyncHandler(async (req, res) => {
@@ -31,26 +43,42 @@ exports.cancelSchedule = asyncHandler(async (req, res) => {
     throw new AppError("Schedule not found", 404);
   }
 
-  sendSuccess(res, { schedule }, "Schedule cancelled successfully");
+  sendSuccess(
+    res,
+    serializeReportSchedule(schedule),
+    "Schedule cancelled successfully",
+  );
+});
+
+exports.runScheduleNow = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const schedule = await ReportSchedule.findOne({
+    _id: id,
+    userId: req.user._id,
+    isActive: true,
+  });
+
+  if (!schedule) {
+    throw new AppError("Schedule not found", 404);
+  }
+
+  const updatedSchedule = await executeSchedule(schedule._id);
+
+  sendSuccess(
+    res,
+    serializeReportSchedule(updatedSchedule),
+    "Report schedule executed successfully",
+  );
 });
 
 exports.scheduleEmailReport = asyncHandler(async (req, res) => {
-  const { email, frequency, department, format = "pdf", hour = 9 } = req.body;
-  const normalizedEmail = normalizeString(email).toLowerCase();
-  if (!normalizedEmail) {
-    throw new AppError("Email is required", 400);
-  }
-
-  if (!["daily", "weekly", "monthly"].includes(frequency)) {
-    throw new AppError(
-      "Invalid frequency. Use: daily, weekly, or monthly",
-      400,
-    );
-  }
-
-  if (!["pdf", "excel", "csv"].includes(format)) {
-    throw new AppError("Invalid format. Use: pdf, excel, or csv", 400);
-  }
+  const { department } = req.body;
+  const {
+    email: normalizedEmail,
+    frequency,
+    format,
+    hour,
+  } = normalizeSchedulePolicy(req.body);
 
   const filters = await buildFilters(req, "body");
   if (department && req.user?.role === "admin" && department !== "all") {
@@ -80,7 +108,7 @@ exports.scheduleEmailReport = asyncHandler(async (req, res) => {
         filters,
         cronExpression,
         timezone: process.env.REPORT_SCHEDULE_TIMEZONE || "Asia/Kolkata",
-        hour: Number(hour) || 9,
+        hour,
         isActive: true,
       },
     },
@@ -94,7 +122,7 @@ exports.scheduleEmailReport = asyncHandler(async (req, res) => {
 
   sendSuccess(
     res,
-    scheduledReport,
+    serializeReportSchedule(scheduledReport),
     "Report scheduled successfully. You will receive reports via email.",
   );
 });

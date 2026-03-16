@@ -16,11 +16,10 @@ import ComplaintCard from "../../../components/ComplaintCard";
 import FilterPanel from "../../../components/FilterPanel";
 import PressableBlock from "../../../components/PressableBlock";
 import SearchBar from "../../../components/SearchBar";
-import apiCall from "../../../utils/api";
 import { formatPriorityLabel } from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { API_BASE } from "../../../url";
+import useComplaintList from "../../../utils/hooks/useComplaintList";
 
 export default function ResolvedComplaints() {
   const { t } = useTranslation();
@@ -28,103 +27,44 @@ export default function ResolvedComplaints() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [complaints, setComplaints] = useState([]);
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("new-to-old");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
-
   const LIMIT = 10;
-
-  const buildQuery = (currentPage) => {
-    const params = new URLSearchParams();
-    params.set("scope", "all");
-    params.set("status", "resolved");
-    if (departmentFilter !== "all") params.set("department", departmentFilter);
-    if (priorityFilter !== "all") params.set("priority", priorityFilter);
-    params.set("sort", sortOrder);
-    if (startDate) params.set("startDate", startDate);
-    if (endDate) params.set("endDate", endDate);
-    if (searchQuery.trim()) params.set("search", searchQuery.trim());
-    params.set("page", currentPage);
-    params.set("limit", LIMIT);
-    return params.toString();
-  };
-
-  const load = async (pull = false, reset = false, requestedPage = null) => {
-    const currentPage = requestedPage ?? (reset || pull ? 1 : page);
-    try {
-      if (pull) setRefreshing(true);
-      else if (reset) setLoading(true);
-      else setLoadingMore(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: `${API_BASE}/complaints?${buildQuery(currentPage)}`,
-      });
-      const payload = res.data;
-      const fetched = payload.complaints;
-      const pages = payload.pages;
-
-      if (reset || pull) {
-        setComplaints(fetched);
-        setPage(1);
-      } else {
-        setComplaints((prev) => {
-          const merged = [...prev, ...fetched];
-          const seen = new Set();
-          return merged.filter((item) => {
-            const key = item?._id ?? item?.id;
-            if (!key) return true;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-        });
-        setPage(currentPage);
-      }
-
-      setTotalCount(payload.total);
-      setHasMore(currentPage < pages);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.failed"),
-        text2:
-          e?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  };
-
-  useEffect(() => {
-    load(false, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    departmentFilter,
-    priorityFilter,
-    sortOrder,
+  const {
+    complaints,
+    total,
+    isLoading: loading,
+    isFetching: refreshing,
+    isFetchingNextPage: loadingMore,
+    hasMore,
+    loadMore,
+    refresh,
+    error,
+  } = useComplaintList({
+    scope: "mine",
+    status: "resolved",
+    department: departmentFilter,
+    priority: priorityFilter,
+    sort: sortOrder,
     startDate,
     endDate,
-    searchQuery,
-  ]);
+    search: searchQuery,
+    limit: LIMIT,
+  });
 
-  const loadMore = () => {
-    if (!hasMore || loadingMore || loading || refreshing) return;
-    const nextPage = page + 1;
-    load(false, false, nextPage);
-  };
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.failed"),
+      text2:
+        error?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
+    });
+  }, [error, t]);
 
   const hasActiveFilters =
     departmentFilter !== "all" ||
@@ -156,7 +96,7 @@ export default function ResolvedComplaints() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refresh()}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />
@@ -225,7 +165,7 @@ export default function ResolvedComplaints() {
 
         {hasMore && (
           <PressableBlock
-            onPress={loadMore}
+            onPress={() => loadMore()}
             disabled={loadingMore}
             className="mt-4 mb-2 rounded-xl items-center justify-center py-3"
             style={{
@@ -246,7 +186,7 @@ export default function ResolvedComplaints() {
                 >
                   {t("complaints.loadMoreCount", {
                     current: complaints.length,
-                    total: totalCount,
+                    total,
                   })}
                 </Text>
               </View>

@@ -2,8 +2,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
 import {
   AlertCircle,
   AlertTriangle,
@@ -28,7 +26,7 @@ import {
   Upload,
   X,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -52,16 +50,7 @@ import ComplaintTimeline from "../../../components/ComplaintTimeline";
 import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import {
-  GET_COMPLAINT_BY_ID_URL,
-  UPVOTE_COMPLAINT_URL,
-  SUBMIT_FEEDBACK_URL,
-  HOD_APPROVE_COMPLETION_URL,
-  HOD_NEEDS_REWORK_URL,
-  HOD_CANCEL_COMPLAINT_URL,
-  UPDATE_COMPLAINT_STATUS_URL,
-  SATISFACTION_VOTE_URL,
   GET_SATISFACTION_URL,
-  APPLY_AI_SUGGESTION_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
 import {
@@ -77,11 +66,19 @@ import { getSlaCountdown } from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import getUserAuth from "../../../utils/userAuth";
-import {
-  cacheComplaintDetail,
-  getCachedComplaintDetail,
-} from "../../../utils/complaintsCache";
+import { getCachedComplaintDetail } from "../../../utils/complaintsCache";
 import ErrorBoundary from "../../../components/ErrorBoundary";
+import {
+  addRealtimeListener,
+  subscribeToComplaint,
+  unsubscribeFromComplaint,
+} from "../../../utils/realtime/socket";
+import { useComplaintDetail } from "../../../utils/hooks/useComplaintDetail";
+import {
+  useComplaintCitizenActions,
+  useComplaintHodActions,
+  useComplaintWorkerActions,
+} from "../../../utils/hooks/useComplaintActions";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -95,38 +92,28 @@ function ComplaintDetailsInner() {
   const { t } = useTranslation();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [complaint, setComplaint] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
 
   // Citizen-specific states
-  const [upvoting, setUpvoting] = useState(false);
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState("");
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   // HOD-specific states
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
   const [reworkReason, setReworkReason] = useState("");
-  const [approving, setApproving] = useState(false);
-  const [sendingRework, setSendingRework] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
   // Worker-specific states
   const [photoUploadModalVisible, setPhotoUploadModalVisible] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
-  const [uploadingPhotos, setUploadingPhotos] = useState(false);
-  const [startingWork, setStartingWork] = useState(false);
 
   // Satisfaction voting states
   const [satisfactionVotes, setSatisfactionVotes] = useState(null);
-  const [votingInProgress, setVotingInProgress] = useState(false);
 
   // Common states
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -161,74 +148,158 @@ function ComplaintDetailsInner() {
     return () => clearInterval(interval);
   }, [complaint?.sla?.dueDate]);
 
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+  const complaintQuery = useComplaintDetail(id);
+  const {
+    data: complaintQueryData,
+    error: complaintQueryError,
+    refetch: refetchComplaintQuery,
+  } = complaintQuery;
+  const loading = complaintQuery.isLoading && !complaint;
+  const refreshing = complaintQuery.isRefetching && !loading;
 
-      const [res, user] = await Promise.all([
-        apiCall({
-          method: "GET",
-          url: GET_COMPLAINT_BY_ID_URL(id),
-        }),
-        getUserAuth(),
-      ]);
+  useEffect(() => {
+    if (!complaintQueryData) return;
+    const complaintData = complaintQueryData.complaint ?? null;
+    const nextUserRole = complaintQueryData.userRole ?? null;
+    const userIdString = String(complaintQueryData.currentUserId || "");
 
-      const payload = res?.data;
-      const complaintData = payload?.complaint || null;
-      setComplaint(complaintData);
-      // Persist for offline fallback
-      if (complaintData) await cacheComplaintDetail(id, complaintData);
-      setUserRole(user?.role);
+    setComplaint(complaintData);
+    setUserRole(nextUserRole);
+    setCurrentUserId(userIdString);
 
-      const userIdString = String(user?.id || user?._id);
-      setCurrentUserId(userIdString);
+    if (
+      nextUserRole === "user" &&
+      complaintData?.upvotes &&
+      userIdString &&
+      userIdString !== "undefined"
+    ) {
+      setHasUpvoted(complaintData.upvotes.includes(userIdString));
+    }
+  }, [complaintQueryData]);
 
-      // Check if current user has upvoted (for citizens)
-      if (
-        user?.role === "user" &&
-        complaintData?.upvotes &&
-        userIdString &&
-        userIdString !== "undefined"
-      ) {
-        const upvotedByUser = complaintData.upvotes.includes(userIdString);
-        setHasUpvoted(upvotedByUser);
-      }
+  useEffect(() => {
+    if (complaint?.status === "resolved") {
+      fetchSatisfactionVotes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complaint?.status, id]);
 
-      // Fetch satisfaction votes for resolved complaints
-      if (complaintData?.status === "resolved") {
-        await fetchSatisfactionVotes();
-      }
-    } catch (e) {
-      // Try to serve cached version on network failure
+  useEffect(() => {
+    if (!complaintQueryError) return;
+
+    let cancelled = false;
+    const restoreCachedComplaint = async () => {
       const cached = await getCachedComplaintDetail(id);
-      if (cached) {
-        setComplaint(cached);
+      if (cached && !cancelled) {
         const user = await getUserAuth();
-        setUserRole(user?.role);
-        setCurrentUserId(String(user?.id || user?._id));
-      } else {
+        setComplaint(cached);
+        setUserRole(user?.role ?? null);
+        setCurrentUserId(String(user?.id || user?._id || ""));
+        return;
+      }
+
+      if (!cancelled) {
         Toast.show({
           type: "error",
           text1: t("common.failed"),
           text2:
-            e?.response?.data?.message || t("complaints.details.couldNotLoad"),
+            complaintQueryError?.response?.data?.message ||
+            t("complaints.details.couldNotLoad"),
         });
-        if (e?.response?.status === 404) {
+        if (complaintQueryError?.response?.status === 404) {
           setTimeout(() => router.back(), 1500);
         }
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    };
 
-  useEffect(() => {
-    if (id) {
-      load(false);
-    }
-  }, [id]);
+    restoreCachedComplaint();
+    return () => {
+      cancelled = true;
+    };
+  }, [complaintQueryError, id, router, t]);
+
+  const refreshComplaint = useCallback(async () => {
+    await refetchComplaintQuery();
+  }, [refetchComplaintQuery]);
+
+  const {
+    toggleUpvote,
+    submitFeedback,
+    voteSatisfaction,
+    upvoting,
+    submittingFeedback,
+    votingInProgress,
+  } = useComplaintCitizenActions({
+    complaintId: id,
+    t,
+    hasUpvoted,
+    onUpvoteSuccess: async () => {
+      setHasUpvoted((prev) => !prev);
+      setComplaint((prev) =>
+        prev
+          ? {
+              ...prev,
+              upvoteCount: hasUpvoted
+                ? Math.max(0, Number(prev.upvoteCount || 0) - 1)
+                : Number(prev.upvoteCount || 0) + 1,
+            }
+          : prev,
+      );
+      await refreshComplaint();
+    },
+    onFeedbackSuccess: async () => {
+      setFeedbackModalVisible(false);
+      setFeedbackRating(0);
+      setFeedbackComment("");
+      await refreshComplaint();
+    },
+    onSatisfactionSuccess: async (votes) => {
+      if (votes) {
+        setSatisfactionVotes(votes);
+      } else {
+        await fetchSatisfactionVotes();
+      }
+    },
+  });
+
+  const {
+    startWork,
+    uploadCompletionPhotos,
+    startingWork,
+    uploadingPhotos,
+  } = useComplaintWorkerActions({
+    complaintId: id,
+    t,
+    onStartWorkSuccess: refreshComplaint,
+    onUploadSuccess: async () => {
+      setSelectedPhotos([]);
+      await refreshComplaint();
+    },
+  });
+
+  const {
+    approveCompletion,
+    sendForRework,
+    cancelComplaint,
+    applyAiSuggestion,
+    approving,
+    sendingRework,
+    cancelling,
+  } = useComplaintHodActions({
+    complaintId: id,
+    t,
+    onApproveSuccess: refreshComplaint,
+    onReworkSuccess: async () => {
+      setApprovalModalVisible(false);
+      setReworkReason("");
+      await refreshComplaint();
+    },
+    onCancelSuccess: async () => {
+      await refreshComplaint();
+      closeCancelModal();
+    },
+    onAiSuccess: refreshComplaint,
+  });
 
   // Auto-refresh when a push notification arrives that relates to this complaint
   useEffect(() => {
@@ -237,51 +308,35 @@ function ComplaintDetailsInner() {
         const data = notification?.request?.content?.data;
         // Backend sends `complaintId` in the notification payload
         if (data?.complaintId && String(data.complaintId) === String(id)) {
-          load(true);
+          refreshComplaint();
         }
       },
     );
     return () => sub.remove();
-  }, [id]);
+  }, [id, refreshComplaint]);
+
+  useEffect(() => {
+    if (!id) return undefined;
+
+    subscribeToComplaint(id).catch(() => {});
+    const unsubscribeComplaintUpdated = addRealtimeListener(
+      "complaint-updated",
+      (payload) => {
+        if (String(payload?.complaintId || "") !== String(id)) return;
+        refreshComplaint();
+      },
+    );
+
+    return () => {
+      unsubscribeComplaintUpdated();
+      unsubscribeFromComplaint(id);
+    };
+  }, [id, refreshComplaint]);
 
   // Citizen: Handle upvote
   const handleUpvote = async () => {
     if (upvoting) return;
-
-    try {
-      setUpvoting(true);
-      await apiCall({
-        method: "POST",
-        url: UPVOTE_COMPLAINT_URL(id),
-      });
-
-      setHasUpvoted(!hasUpvoted);
-      setComplaint({
-        ...complaint,
-        upvoteCount: hasUpvoted
-          ? (complaint.upvoteCount || 1) - 1
-          : (complaint.upvoteCount || 0) + 1,
-      });
-
-      Toast.show({
-        type: "success",
-        text1: hasUpvoted
-          ? t("complaints.details.upvoteRemoved")
-          : t("complaints.details.upvotedSuccess"),
-        text2: hasUpvoted
-          ? t("complaints.details.upvoteRemovedMessage")
-          : t("complaints.details.thanksForUpvoting"),
-      });
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("common.failed"),
-        text2:
-          e?.response?.data?.message || t("complaints.details.couldNotUpvote"),
-      });
-    } finally {
-      setUpvoting(false);
-    }
+    await toggleUpvote();
   };
 
   // Citizen: Submit feedback
@@ -295,71 +350,15 @@ function ComplaintDetailsInner() {
       return;
     }
 
-    try {
-      setSubmittingFeedback(true);
-
-      await apiCall({
-        method: "POST",
-        url: SUBMIT_FEEDBACK_URL(id),
-        data: {
-          rating: feedbackRating,
-          comment: feedbackComment.trim(),
-        },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.feedbackSubmitted"),
-        text2: t("complaints.details.thankYouFeedback"),
-      });
-
-      setFeedbackModalVisible(false);
-      setFeedbackRating(0);
-      setFeedbackComment("");
-      await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.submissionFailed"),
-        text2:
-          e?.response?.data?.message ||
-          t("complaints.details.couldNotSubmitFeedback"),
-      });
-    } finally {
-      setSubmittingFeedback(false);
-    }
+    await submitFeedback({
+      rating: feedbackRating,
+      comment: feedbackComment.trim(),
+    });
   };
 
   // HOD: Approve completion
   const handleApproveCompletion = async () => {
-    try {
-      setApproving(true);
-
-      await apiCall({
-        method: "POST",
-        url: HOD_APPROVE_COMPLETION_URL(id),
-        data: {
-          hodNotes: "Approved - Work completed satisfactorily",
-        },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.approved"),
-        text2: t("complaints.details.markedAsResolved"),
-      });
-
-      await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.approvalFailed"),
-        text2:
-          e?.response?.data?.message || t("complaints.details.couldNotApprove"),
-      });
-    } finally {
-      setApproving(false);
-    }
+    await approveCompletion();
   };
 
   // HOD: Reject completion
@@ -373,37 +372,7 @@ function ComplaintDetailsInner() {
       return;
     }
 
-    try {
-      setSendingRework(true);
-
-      await apiCall({
-        method: "POST",
-        url: HOD_NEEDS_REWORK_URL(id),
-        data: {
-          reworkReason,
-        },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.sentForRework"),
-        text2: t("complaints.details.workerNotified"),
-      });
-
-      setApprovalModalVisible(false);
-      setReworkReason("");
-      await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.requestFailed"),
-        text2:
-          e?.response?.data?.message ||
-          t("complaints.details.couldNotSendRework"),
-      });
-    } finally {
-      setSendingRework(false);
-    }
+    await sendForRework(reworkReason);
   };
 
   // HOD: Cancel complaint
@@ -424,94 +393,18 @@ function ComplaintDetailsInner() {
       return;
     }
 
-    try {
-      setCancelling(true);
-      await apiCall({
-        method: "POST",
-        url: HOD_CANCEL_COMPLAINT_URL(id),
-        data: { reason },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.cancelled"),
-        text2: t("complaints.details.complaintCancelled"),
-      });
-
-      await load(true);
-      closeCancelModal();
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.cancelFailed"),
-        text2:
-          e?.response?.data?.message || t("complaints.details.couldNotCancel"),
-      });
-    } finally {
-      setCancelling(false);
-    }
+    await cancelComplaint(reason);
   };
 
   // HOD: Apply AI Suggestion
   const handleApplyAISuggestion = async (applyDepartment, applyPriority) => {
-    try {
-      await apiCall({
-        method: "POST",
-        url: APPLY_AI_SUGGESTION_URL(id),
-        data: { applyDepartment, applyPriority },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.aiSuggestionApplied"),
-        text2: t("complaints.details.complaintUpdated"),
-      });
-
-      await load(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.updateFailed"),
-        text2:
-          e?.response?.data?.message || t("complaints.details.couldNotApplyAI"),
-      });
-    }
+    await applyAiSuggestion(applyDepartment, applyPriority);
   };
 
   const handleStartWork = async () => {
     if (startingWork) return;
 
-    try {
-      setStartingWork(true);
-
-      await apiCall({
-        method: "PUT",
-        url: UPDATE_COMPLAINT_STATUS_URL(id),
-        data: {
-          status: "in-progress",
-        },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.statusUpdated"),
-        text2: t("complaints.details.markedAs", {
-          status: t("complaints.status.inProgress"),
-        }),
-      });
-
-      await load(true);
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.updateFailed"),
-        text2:
-          err?.response?.data?.message ||
-          t("complaints.details.couldNotUpdateStatus"),
-      });
-    } finally {
-      setStartingWork(false);
-    }
+    await startWork();
   };
 
   // Worker: Take photo with camera
@@ -559,55 +452,6 @@ function ComplaintDetailsInner() {
   };
 
   // Worker: Upload completion photos and submit for HOD approval
-  const uploadCompletionPhotos = async (photos) => {
-    if (!photos || photos.length === 0) return;
-
-    try {
-      setUploadingPhotos(true);
-
-      const formData = new FormData();
-      photos.forEach((photo, index) => {
-        const fileExtension = photo.uri.split(".").pop();
-        formData.append("completionPhotos", {
-          uri: photo.uri,
-          type: `image/${fileExtension}`,
-          name: `completion_${Date.now()}_${index}.${fileExtension}`,
-        });
-      });
-      formData.append("status", "pending-approval");
-
-      await apiCall({
-        method: "PUT",
-        url: UPDATE_COMPLAINT_STATUS_URL(id),
-        data: formData,
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.statusUpdated"),
-        text2: t("complaints.details.markedAs", {
-          status: t("complaints.status.pendingApproval"),
-        }),
-      });
-
-      setSelectedPhotos([]);
-      await load(true);
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.updateFailed"),
-        text2:
-          err?.response?.data?.message ||
-          t("complaints.details.couldNotUpdateStatus"),
-      });
-    } finally {
-      setUploadingPhotos(false);
-    }
-  };
-
   const handleUploadFromModal = async () => {
     if (!selectedPhotos?.length) return;
     await uploadCompletionPhotos(selectedPhotos);
@@ -637,42 +481,7 @@ function ComplaintDetailsInner() {
   const handleSatisfactionVote = async (voteType) => {
     if (votingInProgress) return;
 
-    try {
-      setVotingInProgress(true);
-
-      const response = await apiCall({
-        method: "POST",
-        url: SATISFACTION_VOTE_URL(id),
-        data: { voteType },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("complaints.details.voteRecorded"),
-        text2:
-          voteType === "up"
-            ? t("complaints.details.thanksForPositiveFeedback")
-            : t("complaints.details.feedbackReceived"),
-      });
-
-      // Update satisfaction votes from response
-      if (response?.data?.satisfactionVotes) {
-        setSatisfactionVotes(response.data.satisfactionVotes);
-      } else {
-        // Fallback: refresh votes
-        await fetchSatisfactionVotes();
-      }
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: t("complaints.details.voteFailed"),
-        text2:
-          err?.response?.data?.message ||
-          t("complaints.details.couldNotRecordVote"),
-      });
-    } finally {
-      setVotingInProgress(false);
-    }
+    await voteSatisfaction(voteType);
   };
 
   const formatDate = (dateString) => {
@@ -732,6 +541,16 @@ function ComplaintDetailsInner() {
     if (exporting) return;
     setExporting(true);
     try {
+      const optionalImport = new Function(
+        "moduleName",
+        "return import(moduleName);",
+      );
+      const Print = await optionalImport("expo-print").catch(() => null);
+      const Sharing = await optionalImport("expo-sharing").catch(() => null);
+      if (!Print?.printToFileAsync || !Sharing?.shareAsync) {
+        throw new Error("Export dependencies are unavailable");
+      }
+
       const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
   body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}
@@ -894,11 +713,7 @@ function ComplaintDetailsInner() {
     userRole === "worker" &&
     (assignedWorkerCount === 0 ||
       (complaint.assignedWorkers || []).some((assignment) => {
-        const workerId =
-          assignment?.workerId?._id ||
-          assignment?.workerId?.id ||
-          assignment?.workerId;
-        return String(workerId || "") === String(currentUserId || "");
+        return String(assignment?.workerId || "") === String(currentUserId || "");
       }));
 
   const showHeadReviewAction =
@@ -1005,7 +820,7 @@ function ComplaintDetailsInner() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refreshComplaint()}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />
@@ -1887,10 +1702,7 @@ function ComplaintDetailsInner() {
         )}
 
         {/* Proof Image */}
-        {complaint.proofImage &&
-          (Array.isArray(complaint.proofImage)
-            ? complaint.proofImage.length > 0
-            : true) && (
+        {complaint.proofImage && complaint.proofImage.length > 0 && (
             <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
               <View className="flex-row items-center mb-3">
                 <ImageIcon size={20} color={colors.primary} />
@@ -1898,52 +1710,26 @@ function ComplaintDetailsInner() {
                   className="text-base font-semibold ml-2"
                   style={{ color: colors.textPrimary }}
                 >
-                  {Array.isArray(complaint.proofImage) &&
-                  complaint.proofImage.length > 1
+                  {complaint.proofImage.length > 1
                     ? t("complaints.details.proofImages")
                     : t("complaints.details.proofImage")}
                 </Text>
               </View>
-              {Array.isArray(complaint.proofImage) ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {complaint.proofImage.map((img, idx) => (
-                    <Pressable
-                      key={`${idx}-${img}`}
-                      onPress={() => openImagePreview(img)}
-                      style={{ marginRight: 8 }}
-                    >
-                      <Image
-                        source={{ uri: img }}
-                        className="w-32 h-32 rounded-xl"
-                        resizeMode="cover"
-                      />
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              ) : (
-                <Pressable
-                  onPress={() => openImagePreview(complaint.proofImage)}
-                >
-                  <Image
-                    source={{ uri: complaint.proofImage }}
-                    className="w-full h-48 rounded-xl"
-                    resizeMode="cover"
-                  />
-                  <View className="absolute inset-0 items-center justify-center bg-black/10 rounded-xl">
-                    <View
-                      className="px-3 py-1.5 rounded-lg"
-                      style={{ backgroundColor: colors.backgroundPrimary }}
-                    >
-                      <Text
-                        className="text-xs font-semibold"
-                        style={{ color: colors.textPrimary }}
-                      >
-                        {t("complaints.details.tapToViewFullSize")}
-                      </Text>
-                    </View>
-                  </View>
-                </Pressable>
-              )}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {complaint.proofImage.map((img, idx) => (
+                  <Pressable
+                    key={`${idx}-${img}`}
+                    onPress={() => openImagePreview(img)}
+                    style={{ marginRight: 8 }}
+                  >
+                    <Image
+                      source={{ uri: img }}
+                      className="w-32 h-32 rounded-xl"
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ))}
+              </ScrollView>
             </Card>
           )}
 

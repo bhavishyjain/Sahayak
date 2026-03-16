@@ -6,8 +6,49 @@ import getUserAuth from "./userAuth";
 import { NOTIFICATION_REGISTER_TOKEN_URL } from "../url";
 
 const PUSH_TOKEN_CACHE_KEY = "registered_push_token";
+const ANDROID_DEFAULT_CHANNEL_ID = "default";
 let hasLoggedPushSetupWarning = false;
 let skipPushRegistrationForSession = false;
+let pushNotificationsInitialized = false;
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldShowBadge: true,
+    shouldShowSound: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+export async function initializePushNotifications() {
+  try {
+    if (pushNotificationsInitialized) return;
+    pushNotificationsInitialized = true;
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync(
+        ANDROID_DEFAULT_CHANNEL_ID,
+        {
+          name: "Default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FFCC00",
+          sound: "default",
+          showBadge: true,
+          lockscreenVisibility:
+            Notifications.AndroidNotificationVisibility.PUBLIC,
+        },
+      );
+    }
+  } catch (error) {
+    pushNotificationsInitialized = false;
+    console.warn(
+      "Push notification initialization failed:",
+      error?.message || "unknown error",
+    );
+  }
+}
 
 /**
  * Requests notification permissions, retrieves the Expo push token,
@@ -18,6 +59,8 @@ let skipPushRegistrationForSession = false;
 export async function registerPushToken() {
   try {
     if (Platform.OS === "web") return;
+
+    await initializePushNotifications();
 
     if (skipPushRegistrationForSession) return;
 
@@ -40,6 +83,10 @@ export async function registerPushToken() {
     const pushToken = tokenData?.data;
     if (!pushToken) return;
 
+    if (__DEV__) {
+      console.log("Expo push token acquired:", pushToken);
+    }
+
     // Skip registration if the token hasn't changed since last successful call
     const cachedToken = await AsyncStorage.getItem(PUSH_TOKEN_CACHE_KEY);
     if (cachedToken === pushToken) return;
@@ -51,6 +98,10 @@ export async function registerPushToken() {
     });
 
     await AsyncStorage.setItem(PUSH_TOKEN_CACHE_KEY, pushToken);
+
+    if (__DEV__) {
+      console.log("Expo push token registered with backend");
+    }
   } catch (error) {
     const message = error?.message || "";
     const missingAndroidFcmSetup =

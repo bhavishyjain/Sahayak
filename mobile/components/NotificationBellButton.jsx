@@ -1,11 +1,10 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { Bell } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { darkColors, lightColors } from "../colors";
-import apiCall from "../utils/api";
+import { useUnreadNotificationCount } from "../utils/hooks/useNotifications";
 import { useTheme } from "../utils/context/theme";
-import { NOTIFICATION_HISTORY_URL } from "../url";
 
 export default function NotificationBellButton({
   route = "/(app)/more/notification-history",
@@ -16,25 +15,12 @@ export default function NotificationBellButton({
     () => (colorScheme === "dark" ? darkColors : lightColors),
     [colorScheme],
   );
-
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const loadUnreadCount = useCallback(async () => {
-    try {
-      const res = await apiCall({
-        method: "GET",
-        url: `${NOTIFICATION_HISTORY_URL}?page=1&limit=1`,
-      });
-      setUnreadCount(Number(res?.data?.unreadCount ?? 0));
-    } catch {
-      setUnreadCount(0);
-    }
-  }, []);
+  const { data: unreadCount = 0, refetch } = useUnreadNotificationCount();
 
   useFocusEffect(
     useCallback(() => {
-      loadUnreadCount();
-    }, [loadUnreadCount]),
+      refetch();
+    }, [refetch]),
   );
 
   return (

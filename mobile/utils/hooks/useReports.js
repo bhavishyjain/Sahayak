@@ -3,9 +3,14 @@ import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Linking, Platform } from "react-native";
 import useApiQuery from "./useApiQuery";
-import { REPORT_DOWNLOAD_URL, REPORT_STATS_URL } from "../../url";
+import {
+  REPORT_DEPARTMENT_BREAKDOWN_URL,
+  REPORT_DOWNLOAD_URL,
+  REPORT_STATS_URL,
+} from "../../url";
 import { getCachedToken } from "../cache/auth";
 import getUserAuth from "../userAuth";
+import { queryKeys } from "../queryKeys";
 
 const REPORTS_FOLDER_NAME = "Sahayak";
 const REPORTS_DIRECTORY_URI_KEY = "reportsDirectoryUri";
@@ -160,11 +165,27 @@ async function openDownloadedFile(uri, mimeType) {
 export function useReportStats(filters, options = {}) {
   const querySuffix = buildReportQueryString(filters);
   return useApiQuery({
-    queryKey: ["reports", "stats", filters],
+    queryKey: queryKeys.reportStats(filters),
     url: `${REPORT_STATS_URL}${querySuffix}`,
     enabled: options.enabled ?? true,
     staleTime: options.staleTime ?? 60 * 1000,
     retry: options.retry ?? 1,
+  });
+}
+
+export function useDepartmentBreakdown(filters, options = {}) {
+  const querySuffix = buildReportQueryString(filters);
+  return useApiQuery({
+    queryKey: queryKeys.reportDepartmentBreakdown(filters),
+    url: `${REPORT_DEPARTMENT_BREAKDOWN_URL}${querySuffix}`,
+    enabled: options.enabled ?? true,
+    staleTime: options.staleTime ?? 60 * 1000,
+    retry: options.retry ?? 1,
+    select: (payload) => {
+      if (!payload) return {};
+      const { success, message, ...breakdown } = payload;
+      return breakdown;
+    },
   });
 }
 

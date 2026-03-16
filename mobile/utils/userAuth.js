@@ -41,6 +41,11 @@ export async function setUserAuth(user) {
     await AsyncStorage.setItem("auth_token", user.auth_token);
   }
   await initAuthToken();
+  try {
+    const { reconnectRealtime } = require("./realtime/socket");
+    await reconnectRealtime();
+  } catch (_error) {
+  }
 }
 
 export async function clearUserAuth() {
@@ -56,6 +61,11 @@ export async function clearUserAuth() {
   }
 
   // Note: QueryClient cache clearing is handled in logout.jsx
+  try {
+    const { disconnectRealtime } = require("./realtime/socket");
+    disconnectRealtime();
+  } catch (_error) {
+  }
 }
 
 export async function updateUserInfo() {

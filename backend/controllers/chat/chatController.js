@@ -1,11 +1,17 @@
 const Complaint = require("../../models/Complaint");
-const { canAccessComplaint } = require("../../policies/complaintPolicy");
 const { audioUpload } = require("../../middlewares/multer");
 const {
   hasGeminiClient,
   runGeminiWithFallback,
   generateChatResponse,
 } = require("../../services/chatAssistantService");
+const {
+  extractTicketId,
+  findComplaintByTicketId,
+  findRecentComplaintsForUser,
+  wantsRecentComplaints,
+  canUserAccessComplaint,
+} = require("../../services/complaintLookupService");
 
 function getOpenAIApiKey() {
   const raw = process.env.OPENAI_API_KEY;
@@ -13,24 +19,6 @@ function getOpenAIApiKey() {
   return String(raw)
     .trim()
     .replace(/^['\"]|['\"]$/g, "");
-}
-
-function wantsRecentComplaints(message = "") {
-  const lower = String(message || "").toLowerCase();
-  return (
-    lower.includes("meri complaint") ||
-    lower.includes("meri complaints") ||
-    lower.includes("meri shikayat") ||
-    lower.includes("my complaint") ||
-    lower.includes("my complaints") ||
-    lower.includes("recent complaint") ||
-    lower.includes("complaint history")
-  );
-}
-
-function extractTicketId(message = "") {
-  const match = String(message || "").match(/\b[A-Z]{2,5}\d{3,8}\b/i);
-  return match ? match[0].toUpperCase() : null;
 }
 
 function resolveAudioMimeType(mimetype = "", originalname = "") {
@@ -127,10 +115,7 @@ async function handleMessage(req, res) {
         });
       }
 
-      const complaints = await Complaint.find({ userId: req.user._id })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select("ticketId status department priority createdAt");
+      const complaints = await findRecentComplaintsForUser(req.user._id, 5);
 
       if (!complaints.length) {
         return res.json({
@@ -169,7 +154,7 @@ async function handleMessage(req, res) {
         });
       }
 
-      const complaint = await Complaint.findOne({ ticketId });
+      const complaint = await findComplaintByTicketId(ticketId);
       if (!complaint) {
         return res.json({
           response: `Ticket ${ticketId} nahi mila.`,
@@ -178,7 +163,7 @@ async function handleMessage(req, res) {
         });
       }
 
-      if (!(await canAccessComplaint(req.user, complaint))) {
+      if (!(await canUserAccessComplaint(req.user, complaint))) {
         return res.status(403).json({
           error: "You are not allowed to access this ticket",
         });

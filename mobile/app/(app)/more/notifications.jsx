@@ -1,4 +1,3 @@
-import { useFocusEffect } from "expo-router";
 import {
   FileText,
   TriangleAlert,
@@ -14,13 +13,14 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
-import { NOTIFICATION_PREFERENCES_URL } from "../../../url";
+import {
+  useNotificationActions,
+  useNotificationPreferences,
+} from "../../../utils/hooks/useNotifications";
 
 const PREF_ROWS = [
   {
@@ -67,67 +67,32 @@ export default function NotificationsScreen() {
     [colors],
   );
 
-  const [loadingPreferences, setLoadingPreferences] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [preferences, setPreferences] = useState({
+  const [savingPref, setSavingPref] = useState(null);
+  const {
+    data: preferenceData,
+    isLoading: loadingPreferences,
+    isRefetching: refreshing,
+    refetch,
+  } = useNotificationPreferences();
+  const { updatePreferences } = useNotificationActions();
+  const preferences = {
     complaintsUpdates: true,
     assignments: true,
     escalations: true,
     systemAlerts: true,
-  });
-  const [savingPref, setSavingPref] = useState(null);
-
-  const loadPreferences = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoadingPreferences(true);
-    }
-
-    try {
-      const res = await apiCall({
-        method: "GET",
-        url: NOTIFICATION_PREFERENCES_URL,
-      });
-      const payload = res.data;
-      setPreferences((prev) => ({ ...prev, ...payload.preferences }));
-    } catch {
-      /* silently fail */
-    } finally {
-      setLoadingPreferences(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadPreferences(false);
-    }, [loadPreferences]),
-  );
+    ...(preferenceData || {}),
+  };
 
   const handleToggle = useCallback(
     async (key, value) => {
-      setPreferences((prev) => ({ ...prev, [key]: value }));
       setSavingPref(key);
       try {
-        const res = await apiCall({
-          method: "PUT",
-          url: NOTIFICATION_PREFERENCES_URL,
-          data: { [key]: value },
-        });
-        const payload = res.data;
-        setPreferences((prev) => ({ ...prev, ...payload.preferences }));
-      } catch {
-        setPreferences((prev) => ({ ...prev, [key]: !value }));
-        Toast.show({
-          type: "error",
-          text1: t("more.notificationsScreen.toasts.savePreferenceFailed"),
-        });
+        await updatePreferences({ [key]: value });
       } finally {
         setSavingPref(null);
       }
     },
-    [t],
+    [updatePreferences],
   );
 
   return (
@@ -147,7 +112,7 @@ export default function NotificationsScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => loadPreferences(true)}
+              onRefresh={() => refetch()}
               tintColor={colors.textSecondary}
               colors={[colors.primary]}
             />

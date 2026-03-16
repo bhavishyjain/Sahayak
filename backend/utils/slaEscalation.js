@@ -2,6 +2,10 @@ const Complaint = require("../models/Complaint");
 const User = require("../models/User");
 const { notifyUser } = require("../controllers/notificationController");
 const cron = require("node-cron");
+const {
+  NOTIFICATION_ROUTE_SCREENS,
+  buildNotificationRoute,
+} = require("../services/notificationDomainService");
 
 /**
  * Check and escalate overdue complaints
@@ -83,6 +87,13 @@ async function checkAndEscalateOverdueComplaints() {
             type: "complaint_escalated",
             complaintId: String(complaint._id),
             ticketId: complaint.ticketId,
+            route: buildNotificationRoute(
+              NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
+              {
+                complaintId: String(complaint._id),
+                ticketId: complaint.ticketId,
+              },
+            ),
           },
         });
       }
@@ -95,6 +106,13 @@ async function checkAndEscalateOverdueComplaints() {
             type: "complaint_escalated",
             complaintId: String(complaint._id),
             ticketId: complaint.ticketId,
+            route: buildNotificationRoute(
+              NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
+              {
+                complaintId: String(complaint._id),
+                ticketId: complaint.ticketId,
+              },
+            ),
           },
         });
       }

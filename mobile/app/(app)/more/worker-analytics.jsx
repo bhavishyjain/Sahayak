@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import {
   BarChart2,
   CheckCircle,
@@ -7,7 +7,7 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -31,8 +31,7 @@ import {
   getStatusColor,
 } from "../../../data/complaintStatus";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
-import { WORKER_ANALYTICS_URL } from "../../../url";
+import { useWorkerAnalytics } from "../../../utils/hooks/useWorkerAnalytics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -204,9 +203,13 @@ export default function WorkerAnalytics() {
     [colorScheme],
   );
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [data, setData] = useState(null);
+  const {
+    data,
+    isLoading: loading,
+    isRefetching: refreshing,
+    error,
+    refetch,
+  } = useWorkerAnalytics(workerId);
 
   const priorityConfig = useMemo(
     () => [
@@ -239,40 +242,17 @@ export default function WorkerAnalytics() {
     [colors, t],
   );
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      try {
-        if (isRefresh) setRefreshing(true);
-        else setLoading(true);
-
-        const url = workerId
-          ? `${WORKER_ANALYTICS_URL}?workerId=${workerId}`
-          : WORKER_ANALYTICS_URL;
-
-        const res = await apiCall({ method: "GET", url });
-        const payload = res.data;
-        setData(payload);
-      } catch (e) {
-        Toast.show({
-          type: "error",
-          text1: t("more.workerAnalyticsScreen.failedTitle"),
-          text2:
-            e?.response?.data?.message ??
-            t("more.workerAnalyticsScreen.failedMessage"),
-        });
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [t, workerId],
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      load(false);
-    }, [load]),
-  );
+  useEffect(() => {
+    if (!error) return null;
+    Toast.show({
+      type: "error",
+      text1: t("more.workerAnalyticsScreen.failedTitle"),
+      text2:
+        error?.response?.data?.message ??
+        t("more.workerAnalyticsScreen.failedMessage"),
+    });
+    return undefined;
+  }, [error, t]);
 
   const title = workerId
     ? data?.worker?.fullName
@@ -317,7 +297,7 @@ export default function WorkerAnalytics() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refetch()}
             tintColor={colors.textSecondary}
             colors={[colors.primary]}
           />

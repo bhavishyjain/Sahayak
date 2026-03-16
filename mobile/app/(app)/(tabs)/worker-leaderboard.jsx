@@ -25,8 +25,7 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
-import { WORKER_LEADERBOARD_URL } from "../../../url";
-import apiCall from "../../../utils/api";
+import { useWorkerLeaderboard } from "../../../utils/hooks/useWorkerLeaderboard";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
@@ -35,10 +34,6 @@ export default function WorkerLeaderboard() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
   const [period, setPeriod] = useState("weekly");
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -110,35 +105,24 @@ export default function WorkerLeaderboard() {
   ];
   const SelectedBadgeIcon = selectedBadge?.Icon ?? Award;
 
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: `${WORKER_LEADERBOARD_URL}?period=${period}`,
-      });
-
-      const payload = res?.data;
-      setLeaderboard(payload?.leaderboard ?? []);
-      setCurrentUser(payload?.currentUser ?? null);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("worker.leaderboard.failed"),
-        text2:
-          e?.response?.data?.message ?? t("worker.leaderboard.loadingError"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const {
+    data,
+    isLoading: loading,
+    isRefetching: refreshing,
+    error,
+    refetch,
+  } = useWorkerLeaderboard(period);
+  const leaderboard = data?.leaderboard ?? [];
+  const currentUser = data?.currentUser ?? null;
 
   useEffect(() => {
-    load(false);
-  }, [period]);
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("worker.leaderboard.failed"),
+      text2: error?.response?.data?.message ?? t("worker.leaderboard.loadingError"),
+    });
+  }, [error, t]);
 
   const getRankIcon = (rank) => {
     if (rank === 1) return { icon: Trophy, color: "#FFD700", size: 28 };
@@ -492,7 +476,7 @@ export default function WorkerLeaderboard() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refetch()}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />

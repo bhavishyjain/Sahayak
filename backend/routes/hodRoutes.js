@@ -2,13 +2,19 @@ const express = require("express");
 const router = express.Router();
 const { attachAuth, requireAuth } = require("../middlewares/jwtAuth");
 const authorize = require("../middlewares/authorize");
-const { getHodOverview, getHodWorkers, getHodWorkerById } = require("../controllers/hod/analyticsController");
+const {
+  getHodDashboardSummary,
+  getHodOverview,
+  getHodWorkers,
+  getHodWorkerById,
+} = require("../controllers/hod/analyticsController");
 const { approveCompletion, markNeedsRework, cancelComplaint, updateWorkerTask } = require("../controllers/hod/workflowController");
 const { assignMultipleWorkers, getWorkerComplaints, getComplaintWorkers } = require("../controllers/hod/assignmentController");
 const { inviteWorker, removeWorker, listInvitations, revokeInvitation } = require("../controllers/hod/invitationController");
 
 router.use(attachAuth, requireAuth, authorize("head"));
 
+router.get("/dashboard-summary", getHodDashboardSummary);
 router.get("/overview", getHodOverview);
 router.get("/workers", getHodWorkers);
 router.get("/workers/:workerId", getHodWorkerById);

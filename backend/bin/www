@@ -11,6 +11,7 @@ var connectDB = require("../config/db");
 var setupSLAEscalationJob = require("../utils/slaEscalation").setupSLAEscalationJob;
 var initializeReportSchedulers =
   require("../services/reportSchedulerService").initializeReportSchedulers;
+var setupRealtime = require("../services/realtimeService").setupRealtime;
 
 /**
  * Get port from environment and store in Express.
@@ -26,6 +27,7 @@ console.log(`Server starting on port ${port}`);
  */
 
 var server = http.createServer(app);
+setupRealtime(server);
 
 /**
  * Listen on provided port, on all network interfaces.

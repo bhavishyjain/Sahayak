@@ -6,7 +6,6 @@ import {
   Calendar,
   Clock,
   Mail,
-  Send,
   AlertCircle,
   CheckCircle,
   Trash2,
@@ -32,16 +31,16 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import FilterPanel from "../../../components/FilterPanel";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { useDownloadReport } from "../../../utils/hooks/useReports";
+import {
+  useDepartmentBreakdown,
+  useDownloadReport,
+  useReportStats,
+} from "../../../utils/hooks/useReports";
+import { useReportSchedules } from "../../../utils/hooks/useReportSchedules";
 import { formatStatusLabel } from "../../../data/complaintStatus";
 import getUserAuth from "../../../utils/userAuth";
+import { REPORT_EMAIL_URL } from "../../../url";
 import apiCall from "../../../utils/api";
-import {
-  REPORT_SCHEDULE_URL,
-  REPORT_SCHEDULES_URL,
-  REPORT_CANCEL_SCHEDULE_URL,
-  REPORT_EMAIL_URL,
-} from "../../../url";
 
 function normalizeFilters(filters) {
   const normalized = {};
@@ -118,6 +117,21 @@ function getFrequencyLabel(t, frequency) {
   return t(key);
 }
 
+function formatScheduleDateTime(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
+}
+
+function getScheduleHealthTone(schedule, colors) {
+  const status = String(schedule?.health?.lastRunStatus || schedule?.lastRunStatus || "idle");
+  if (status === "failed") return colors.danger;
+  if (status === "success") return colors.success;
+  if (status === "pending") return colors.warning;
+  return colors.textSecondary;
+}
+
 export default function HODReports() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
@@ -148,11 +162,6 @@ export default function HODReports() {
   const [scheduleEmail, setScheduleEmail] = useState("");
   const [scheduleFrequency, setScheduleFrequency] = useState("weekly");
   const [scheduleFormat, setScheduleFormat] = useState("pdf");
-  const [scheduling, setScheduling] = useState(false);
-  const [activeSchedules, setActiveSchedules] = useState([]);
-  const [loadingSchedules, setLoadingSchedules] = useState(false);
-  const [cancellingId, setCancellingId] = useState(null);
-
   // Email report states
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
@@ -165,22 +174,43 @@ export default function HODReports() {
   );
 
   const { download } = useDownloadReport();
+  const {
+    schedules: activeSchedules,
+    isLoading: loadingSchedules,
+    createSchedule,
+    cancelSchedule,
+    runScheduleNow,
+    scheduling,
+    cancellingId,
+    runningNowId,
+  } = useReportSchedules(t);
+  const {
+    data: reportStats,
+    isLoading: loadingStats,
+  } = useReportStats(normalizedFilters, {
+    enabled: activeTab === "export",
+  });
+  const {
+    data: departmentBreakdown,
+    isLoading: loadingBreakdown,
+  } = useDepartmentBreakdown(normalizedFilters, {
+    enabled: activeTab === "export",
+  });
 
-  const loadSchedules = async () => {
-    try {
-      setLoadingSchedules(true);
-      const res = await apiCall({ method: "GET", url: REPORT_SCHEDULES_URL });
-      setActiveSchedules(res?.data?.schedules ?? []);
-    } catch {
-      // silently ignore
-    } finally {
-      setLoadingSchedules(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === "schedule") loadSchedules();
-  }, [activeTab]);
+  const departmentCards = useMemo(() => {
+    const entries = Object.entries(departmentBreakdown ?? {});
+    return entries
+      .map(([department, stats]) => ({
+        department,
+        total: Number(stats?.total ?? 0),
+        resolved: Number(stats?.resolved ?? 0),
+        pending:
+          Number(stats?.pending ?? 0) + Number(stats?.inProgress ?? 0),
+        highPriority: Number(stats?.highPriority ?? 0),
+      }))
+      .sort((left, right) => right.total - left.total);
+  }, [departmentBreakdown]);
+  const maxDepartmentTotal = departmentCards[0]?.total ?? 0;
 
   const hasActiveFilters = useMemo(() => {
     const flags = [
@@ -256,11 +286,8 @@ export default function HODReports() {
       appliedFilters.endDate !== "" ? appliedFilters.endDate : undefined;
 
     try {
-      setScheduling(true);
-      await apiCall({
-        method: "POST",
-        url: REPORT_SCHEDULE_URL,
-        data: {
+      const ok = await createSchedule(
+        {
           email: scheduleEmailTrimmed,
           frequency: scheduleFrequency,
           format: scheduleFormat,
@@ -269,56 +296,24 @@ export default function HODReports() {
           startDate: startDateValue,
           endDate: endDateValue,
         },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("reports.schedule.scheduledTitle"),
-        text2: t("reports.schedule.scheduledMessage", {
-          frequency: getFrequencyLabel(t, scheduleFrequency),
-          email: scheduleEmailTrimmed,
-        }),
-      });
-
-      setShowScheduleModal(false);
-      setScheduleEmail("");
-      setScheduleFrequency("weekly");
-      setScheduleFormat("pdf");
-      loadSchedules();
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.title"),
-        text2:
-          error?.response?.data?.message ?? t("reports.schedule.scheduleFailed"),
-      });
+        getFrequencyLabel(t, scheduleFrequency),
+      );
+      if (ok) {
+        setShowScheduleModal(false);
+        setScheduleEmail("");
+        setScheduleFrequency("weekly");
+        setScheduleFormat("pdf");
+      }
     } finally {
-      setScheduling(false);
     }
   };
 
   const handleCancelSchedule = async (scheduleId) => {
-    try {
-      setCancellingId(scheduleId);
-      await apiCall({
-        method: "DELETE",
-        url: REPORT_CANCEL_SCHEDULE_URL(scheduleId),
-      });
-      Toast.show({
-        type: "success",
-        text1: t("reports.schedule.cancelledTitle"),
-      });
-      loadSchedules();
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.title"),
-        text2:
-          error?.response?.data?.message ?? t("reports.schedule.cancelFailed"),
-      });
-    } finally {
-      setCancellingId(null);
-    }
+    await cancelSchedule(scheduleId);
+  };
+
+  const handleRunScheduleNow = async (scheduleId) => {
+    await runScheduleNow(scheduleId);
   };
 
   const handleSendEmail = async () => {
@@ -454,6 +449,186 @@ export default function HODReports() {
           {/* Export Tab Content */}
           {activeTab === "export" && (
             <>
+              <View className="mb-4">
+                <Text
+                  className="text-xs font-semibold uppercase mb-3"
+                  style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
+                >
+                  {t("reports.sections.analytics")}
+                </Text>
+                <View
+                  className="rounded-2xl p-4 mb-3"
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  {(loadingStats || loadingBreakdown) && !reportStats ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <View className="flex-row mb-3">
+                        <View className="flex-1 mr-2">
+                          <Text
+                            className="text-xs mb-1"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            {t("reports.totalComplaints")}
+                          </Text>
+                          <Text
+                            className="text-2xl font-bold"
+                            style={{ color: colors.textPrimary }}
+                          >
+                            {Number(reportStats?.total ?? 0)}
+                          </Text>
+                        </View>
+                        <View className="flex-1 mx-2">
+                          <Text
+                            className="text-xs mb-1"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            {t("reports.resolved")}
+                          </Text>
+                          <Text
+                            className="text-2xl font-bold"
+                            style={{ color: colors.success }}
+                          >
+                            {Number(reportStats?.byStatus?.resolved ?? 0)}
+                          </Text>
+                        </View>
+                        <View className="flex-1 ml-2">
+                          <Text
+                            className="text-xs mb-1"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            {t("reports.pending")}
+                          </Text>
+                          <Text
+                            className="text-2xl font-bold"
+                            style={{ color: colors.warning }}
+                          >
+                            {Number(reportStats?.byStatus?.pending ?? 0) +
+                              Number(reportStats?.byStatus?.["in-progress"] ?? 0)}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text
+                        className="text-xs"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("reports.breakdown.description")}
+                      </Text>
+                    </>
+                  )}
+                </View>
+
+                <View
+                  className="rounded-2xl overflow-hidden"
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  {departmentCards.length > 0 ? (
+                    departmentCards.map((item, idx) => {
+                      const totalRatio =
+                        maxDepartmentTotal > 0 ? item.total / maxDepartmentTotal : 0;
+                      const resolvedRatio =
+                        item.total > 0 ? item.resolved / item.total : 0;
+                      return (
+                        <View key={item.department}>
+                          <View className="px-4 py-3.5">
+                            <View className="flex-row items-center justify-between mb-2">
+                              <Text
+                                className="text-sm font-semibold flex-1 mr-3"
+                                style={{ color: colors.textPrimary }}
+                              >
+                                {item.department}
+                              </Text>
+                              <Text
+                                className="text-xs font-semibold"
+                                style={{ color: colors.textSecondary }}
+                              >
+                                {t("reports.breakdown.totalLabel", {
+                                  count: item.total,
+                                })}
+                              </Text>
+                            </View>
+                            <View
+                              className="h-2 rounded-full overflow-hidden mb-2"
+                              style={{ backgroundColor: colors.border }}
+                            >
+                              <View
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${Math.max(totalRatio * 100, 6)}%`,
+                                  backgroundColor: colors.primary,
+                                }}
+                              />
+                            </View>
+                            <View className="flex-row items-center justify-between">
+                              <Text
+                                className="text-xs"
+                                style={{ color: colors.success }}
+                              >
+                                {t("reports.breakdown.resolvedLabel", {
+                                  count: item.resolved,
+                                })}
+                              </Text>
+                              <Text
+                                className="text-xs"
+                                style={{ color: colors.warning }}
+                              >
+                                {t("reports.breakdown.pendingLabel", {
+                                  count: item.pending,
+                                })}
+                              </Text>
+                              <Text
+                                className="text-xs"
+                                style={{ color: colors.danger }}
+                              >
+                                {t("reports.breakdown.highPriorityLabel", {
+                                  count: item.highPriority,
+                                })}
+                              </Text>
+                            </View>
+                            <View
+                              className="h-1.5 rounded-full overflow-hidden mt-2"
+                              style={{ backgroundColor: colors.border }}
+                            >
+                              <View
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${Math.max(resolvedRatio * 100, 4)}%`,
+                                  backgroundColor: colors.success,
+                                }}
+                              />
+                            </View>
+                          </View>
+                          {idx < departmentCards.length - 1 && (
+                            <View
+                              className="h-[1px] ml-4"
+                              style={{ backgroundColor: colors.border }}
+                            />
+                          )}
+                        </View>
+                      );
+                    })
+                  ) : (
+                    <View className="px-4 py-5">
+                      <Text
+                        className="text-sm"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("reports.breakdown.empty")}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
               {/* Download Reports */}
               <View className="mb-4">
                 <Text
@@ -599,9 +774,27 @@ export default function HODReports() {
                       const existing = activeSchedules.find(
                         (s) => s.frequency === freq && s.isActive,
                       );
+                      const healthColor = getScheduleHealthTone(existing, colors);
+                      const nextRunAt = formatScheduleDateTime(
+                        existing?.health?.nextRunAt || existing?.nextRunAt,
+                      );
+                      const lastSuccessAt = formatScheduleDateTime(
+                        existing?.health?.lastSuccessAt || existing?.lastSentAt,
+                      );
+                      const lastFailureAt = formatScheduleDateTime(
+                        existing?.health?.lastFailureAt || existing?.lastFailureAt,
+                      );
+                      const lastError = existing?.health?.lastError || existing?.lastError;
+                      const lastErrorStage =
+                        existing?.health?.lastErrorStage ||
+                        existing?.lastErrorStage ||
+                        null;
+                      const healthStatusKey =
+                        existing?.health?.lastRunStatus || existing?.lastRunStatus || "idle";
                       return (
                         <View key={freq}>
-                          <View className="flex-row items-center px-4 py-3.5">
+                          <View className="px-4 py-3.5">
+                            <View className="flex-row items-center">
                             <View
                               className="w-8 h-8 rounded-lg items-center justify-center mr-3"
                               style={{
@@ -622,23 +815,86 @@ export default function HODReports() {
                                 style={{
                                   color: existing ? color : colors.textPrimary,
                                 }}
-                              >
-                                {t(labelKey)} {t("reports.schedule.reportsSuffix")}
-                              </Text>
-                              {existing ? (
-                                <Text
-                                  className="text-xs mt-0.5"
-                                  style={{ color: colors.textSecondary }}
                                 >
-                                  {t("reports.schedule.activeMeta", {
-                                    email:
-                                      existing.email ?? t("reports.notAvailable"),
-                                    format:
-                                      existing.format != null
-                                        ? String(existing.format).toUpperCase()
-                                        : t("reports.notAvailable"),
-                                  })}
+                                  {t(labelKey)} {t("reports.schedule.reportsSuffix")}
                                 </Text>
+                              {existing ? (
+                                <>
+                                  <Text
+                                    className="text-xs mt-0.5"
+                                    style={{ color: colors.textSecondary }}
+                                  >
+                                    {t("reports.schedule.activeMeta", {
+                                      email:
+                                        existing.email ?? t("reports.notAvailable"),
+                                      format:
+                                        existing.format != null
+                                          ? String(existing.format).toUpperCase()
+                                          : t("reports.notAvailable"),
+                                    })}
+                                  </Text>
+                                  <View className="flex-row items-center mt-2">
+                                    <View
+                                      className="px-2 py-1 rounded-full"
+                                      style={{ backgroundColor: `${healthColor}20` }}
+                                    >
+                                      <Text
+                                        className="text-[10px] font-semibold uppercase"
+                                        style={{ color: healthColor }}
+                                      >
+                                        {t(`reports.schedule.health.status.${healthStatusKey}`)}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <View className="mt-2">
+                                    <Text
+                                      className="text-xs"
+                                      style={{ color: colors.textSecondary }}
+                                    >
+                                      {t("reports.schedule.health.nextRun", {
+                                        value:
+                                          nextRunAt ?? t("reports.notAvailable"),
+                                      })}
+                                    </Text>
+                                    <Text
+                                      className="text-xs mt-1"
+                                      style={{ color: colors.textSecondary }}
+                                    >
+                                      {t("reports.schedule.health.lastSuccess", {
+                                        value:
+                                          lastSuccessAt ?? t("reports.notAvailable"),
+                                      })}
+                                    </Text>
+                                    <Text
+                                      className="text-xs mt-1"
+                                      style={{
+                                        color: lastFailureAt
+                                          ? colors.danger
+                                          : colors.textSecondary,
+                                      }}
+                                    >
+                                      {t("reports.schedule.health.lastFailure", {
+                                        value:
+                                          lastFailureAt ?? t("reports.notAvailable"),
+                                      })}
+                                    </Text>
+                                    {lastError ? (
+                                      <Text
+                                        className="text-xs mt-1"
+                                        style={{ color: colors.danger }}
+                                      >
+                                        {t("reports.schedule.health.error", {
+                                          stage: lastErrorStage
+                                            ? t(
+                                                `reports.schedule.health.stages.${lastErrorStage}`,
+                                              )
+                                            : t("reports.notAvailable"),
+                                          value: lastError,
+                                        })}
+                                      </Text>
+                                    ) : null}
+                                  </View>
+                                </>
                               ) : (
                                 <Text
                                   className="text-xs mt-0.5"
@@ -649,27 +905,51 @@ export default function HODReports() {
                               )}
                             </View>
                             {existing ? (
-                              <TouchableOpacity
-                                onPress={() =>
-                                  handleCancelSchedule(existing._id)
-                                }
-                                disabled={cancellingId === existing._id}
-                                hitSlop={{
-                                  top: 8,
-                                  bottom: 8,
-                                  left: 8,
-                                  right: 8,
-                                }}
-                              >
-                                {cancellingId === existing._id ? (
-                                  <ActivityIndicator
-                                    size="small"
-                                    color={colors.danger}
-                                  />
-                                ) : (
-                                  <Trash2 size={16} color={colors.danger} />
-                                )}
-                              </TouchableOpacity>
+                              <View className="items-end ml-3">
+                                <TouchableOpacity
+                                  onPress={() =>
+                                    handleRunScheduleNow(existing._id)
+                                  }
+                                  disabled={runningNowId === existing._id}
+                                  className="px-3 py-1.5 rounded-lg mb-2"
+                                  style={{ backgroundColor: colors.primary + "18" }}
+                                >
+                                  {runningNowId === existing._id ? (
+                                    <ActivityIndicator
+                                      size="small"
+                                      color={colors.primary}
+                                    />
+                                  ) : (
+                                    <Text
+                                      className="text-xs font-semibold"
+                                      style={{ color: colors.primary }}
+                                    >
+                                      {t("reports.schedule.runNow")}
+                                    </Text>
+                                  )}
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  onPress={() =>
+                                    handleCancelSchedule(existing._id)
+                                  }
+                                  disabled={cancellingId === existing._id}
+                                  hitSlop={{
+                                    top: 8,
+                                    bottom: 8,
+                                    left: 8,
+                                    right: 8,
+                                  }}
+                                >
+                                  {cancellingId === existing._id ? (
+                                    <ActivityIndicator
+                                      size="small"
+                                      color={colors.danger}
+                                    />
+                                  ) : (
+                                    <Trash2 size={16} color={colors.danger} />
+                                  )}
+                                </TouchableOpacity>
+                              </View>
                             ) : (
                               <TouchableOpacity
                                 onPress={() => {
@@ -687,6 +967,7 @@ export default function HODReports() {
                                 </Text>
                               </TouchableOpacity>
                             )}
+                          </View>
                           </View>
                           {idx < arr.length - 1 && (
                             <View

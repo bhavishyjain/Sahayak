@@ -35,10 +35,17 @@ function buildComplaintView(complaint, options = {}) {
     .find((item) => item.status === "needs-rework" && item.note);
 
   const upvotes = (complaint.upvotes || []).map((id) => String(id));
+  const ownerId = String(
+    complaint.userId?._id || complaint.userId?.id || complaint.userId || "",
+  );
+  const ownerName =
+    complaint.userId?.fullName || complaint.userId?.username || null;
 
   const base = {
     id: complaint._id,
-    userId: complaint.userId?._id || complaint.userId || null,
+    userId: ownerId || null,
+    ownerId: ownerId || null,
+    ownerName,
     ticketId: complaint.ticketId,
     title: getComplaintTitle(complaint),
     description:
@@ -62,6 +69,21 @@ function buildComplaintView(complaint, options = {}) {
     hasUpvoted: viewerId ? upvotes.includes(viewerId) : false,
     feedback: complaint.feedback,
     sla: complaint.sla,
+    aiAnalysis: complaint.aiAnalysis || null,
+    aiSuggestedDepartment:
+      complaint.aiAnalysis?.department ||
+      complaint.aiSuggestedDepartment ||
+      null,
+    aiSuggestion: complaint.aiAnalysis
+      ? {
+          department: complaint.aiAnalysis.department || null,
+          priority: complaint.aiAnalysis.suggestedPriority || null,
+          confidence: complaint.aiAnalysis.confidence ?? null,
+          reasoning: complaint.aiAnalysis.reasoning || null,
+          sentiment: complaint.aiAnalysis.sentiment || null,
+          urgency: complaint.aiAnalysis.urgency || null,
+        }
+      : null,
   };
 
   if (!includeAssignment) {
@@ -69,7 +91,7 @@ function buildComplaintView(complaint, options = {}) {
   }
 
   const assignedWorkers = (complaint.assignedWorkers || []).map((w) => ({
-    workerId: w.workerId?._id || w.workerId,
+    workerId: String(w.workerId?._id || w.workerId?.id || w.workerId || ""),
     workerName: w.workerId?.fullName || w.workerId?.username || null,
     taskDescription: w.taskDescription,
     status: w.status,

@@ -60,6 +60,12 @@ router.get(
   reportController.getSchedules,
 );
 
+router.post(
+  "/schedule/:id/run-now",
+  authorize("head", "admin"),
+  reportController.runScheduleNow,
+);
+
 router.delete(
   "/schedule/:id",
   authorize("head", "admin"),

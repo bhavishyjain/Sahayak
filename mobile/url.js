@@ -14,7 +14,7 @@ export const LOGIN_URL = API_BASE + "/auth/login";
 export const REGISTER_URL = API_BASE + "/auth/register";
 export const LOGOUT_URL = API_BASE + "/auth/logout";
 export const GET_ME_URL = API_BASE + "/auth/me";
-export const UPDATE_USER_PROFILE_URL = API_BASE + "/auth/update-profile";
+export const UPDATE_USER_PROFILE_URL = API_BASE + "/auth/me";
 export const ACCEPT_INVITE_URL = API_BASE + "/auth/accept-invite";
 export const DELETE_ACCOUNT_URL = API_BASE + "/auth/me";
 export const FORGOT_PASSWORD_URL = API_BASE + "/auth/forgot-password";
@@ -78,7 +78,9 @@ export const CHAT_URL = API_BASE + "/chat";
 // WORKER URLs
 // ============================================================================
 export const WORKERS_URL = API_BASE + "/workers";
-export const WORKER_OVERVIEW_URL = API_BASE + "/workers/overview";
+export const WORKER_DASHBOARD_SUMMARY_URL =
+  API_BASE + "/workers/dashboard-summary";
+export const WORKER_ACTIVE_PREVIEW_URL = API_BASE + "/workers/active-preview";
 export const WORKER_ASSIGNED_URL = API_BASE + "/workers/assigned-complaints";
 export const WORKER_COMPLETED_URL = API_BASE + "/workers/completed-complaints";
 export const WORKER_LEADERBOARD_URL = API_BASE + "/workers/leaderboard";
@@ -90,6 +92,7 @@ export const UPDATE_COMPLAINT_STATUS_URL = (id) =>
 // HOD URLs
 // ============================================================================
 export const HOD_URL = API_BASE + "/hod";
+export const HOD_DASHBOARD_SUMMARY_URL = API_BASE + "/hod/dashboard-summary";
 export const HOD_OVERVIEW_URL = API_BASE + "/hod/overview";
 export const HOD_WORKERS_URL = API_BASE + "/hod/workers";
 export const HOD_WORKER_DETAIL_URL = (workerId) =>
@@ -119,9 +122,13 @@ export const HOD_GET_COMPLAINT_WORKERS_URL = (complaintId) =>
 // REPORT URLs
 // ============================================================================
 export const REPORT_STATS_URL = API_BASE + "/reports/stats";
+export const REPORT_DEPARTMENT_BREAKDOWN_URL =
+  API_BASE + "/reports/department-breakdown";
 export const REPORT_DOWNLOAD_URL = (format) => API_BASE + `/reports/${format}`;
 export const REPORT_SCHEDULE_URL = API_BASE + "/reports/schedule";
 export const REPORT_SCHEDULES_URL = API_BASE + "/reports/schedule"; // GET list — same path as POST create
+export const REPORT_RUN_NOW_URL = (id) =>
+  API_BASE + `/reports/schedule/${id}/run-now`;
 export const REPORT_CANCEL_SCHEDULE_URL = (id) =>
   API_BASE + `/reports/schedule/${id}`;
 export const REPORT_EMAIL_URL = API_BASE + "/reports/email";

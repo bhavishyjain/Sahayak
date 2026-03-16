@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Bell,
   BellOff,
@@ -8,7 +8,7 @@ import {
   UserCheck,
   Wrench,
 } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,13 +21,12 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import { useTheme } from "../../../utils/context/theme";
-import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import apiCall from "../../../utils/api";
 import {
-  NOTIFICATION_HISTORY_URL,
-  NOTIFICATION_MARK_ALL_READ_URL,
-  NOTIFICATION_MARK_READ_URL,
-} from "../../../url";
+  useNotificationActions,
+  useInfiniteNotificationHistory,
+} from "../../../utils/hooks/useNotifications";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import { openNotificationRoute } from "../../../utils/notificationNavigation";
 
 const getTypeConfig = (colors) => ({
   "complaint-update": { Icon: FileText, color: colors.info },
@@ -123,6 +122,7 @@ function NotificationItem({ item, colors, onRead, t, typeConfig }) {
 }
 
 export default function NotificationHistoryScreen() {
+  const router = useRouter();
   const { colorScheme } = useTheme();
   const { t } = useTranslation();
   const colors = useMemo(
@@ -131,85 +131,49 @@ export default function NotificationHistoryScreen() {
   );
   const typeConfig = useMemo(() => getTypeConfig(colors), [colors]);
 
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [pagination, setPagination] = useState(null);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const {
+    data,
+    isLoading: loadingHistory,
+    isRefetching: refreshing,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteNotificationHistory({ limit: 20 });
+  const { markRead, markAllRead } = useNotificationActions();
 
-  const loadHistory = useCallback(
-    async (page = 1, append = false, isRefresh = false) => {
-      if (page === 1) {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoadingHistory(true);
-        }
-      } else {
-        setLoadingMore(true);
-      }
-
-      try {
-        const res = await apiCall({
-          method: "GET",
-          url: `${NOTIFICATION_HISTORY_URL}?page=${page}&limit=20`,
-        });
-        const payload = res.data;
-        setNotifications((prev) =>
-          append && page > 1
-            ? [...prev, ...(payload.notifications ?? [])]
-            : (payload.notifications ?? []),
-        );
-        setUnreadCount(Number(payload?.unreadCount ?? 0));
-        setPagination(payload?.pagination ?? null);
-      } catch {
-        /* silently fail */
-      } finally {
-        setLoadingHistory(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-      }
-    },
-    [],
-  );
+  const notifications = data?.notifications ?? [];
+  const unreadCount = Number(data?.unreadCount ?? 0);
 
   useFocusEffect(
     useCallback(() => {
-      loadHistory(1, false, false);
-    }, [loadHistory]),
+      refetch();
+    }, [refetch]),
   );
 
-  const handleMarkRead = useCallback(
-    async (id) => {
-      try {
-        await apiCall({ method: "PUT", url: NOTIFICATION_MARK_READ_URL(id) });
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n._id === id ? { ...n, readAt: new Date().toISOString() } : n,
-          ),
-        );
-        setUnreadCount((c) => Math.max(0, c - 1));
-      } catch {
-        Toast.show({
-          type: "error",
-          text1: t("more.notificationsScreen.toasts.markReadFailed"),
-        });
+  const handleOpenNotification = useCallback(
+    async (item) => {
+      if (!item?.readAt) {
+        try {
+          await markRead(item._id);
+        } catch {
+        }
       }
+
+      openNotificationRoute(item?.data, router);
     },
-    [t],
+    [markRead, router],
   );
+
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const handleMarkAllRead = useCallback(async () => {
     try {
-      await apiCall({ method: "PUT", url: NOTIFICATION_MARK_ALL_READ_URL });
-      setNotifications((prev) =>
-        prev.map((n) => ({
-          ...n,
-          readAt: n.readAt ?? new Date().toISOString(),
-        })),
-      );
-      setUnreadCount(0);
+      await markAllRead();
       Toast.show({
         type: "success",
         text1: t("more.notificationsScreen.toasts.markAllReadSuccess"),
@@ -220,13 +184,7 @@ export default function NotificationHistoryScreen() {
         text1: t("more.notificationsScreen.toasts.markAllReadFailed"),
       });
     }
-  }, [t]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && pagination && pagination.page < pagination.totalPages) {
-      loadHistory(pagination.page + 1, true, false);
-    }
-  }, [loadingMore, pagination, loadHistory]);
+  }, [markAllRead, t]);
 
   const ListHeader = useMemo(
     () => (
@@ -305,7 +263,7 @@ export default function NotificationHistoryScreen() {
             <NotificationItem
               item={item}
               colors={colors}
-              onRead={handleMarkRead}
+              onRead={() => handleOpenNotification(item)}
               t={t}
               typeConfig={typeConfig}
             />
@@ -340,11 +298,11 @@ export default function NotificationHistoryScreen() {
           }
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 56 }}
           onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.3}
+          onEndReachedThreshold={0.35}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => loadHistory(1, false, true)}
+              onRefresh={() => refetch()}
               tintColor={colors.textSecondary}
               colors={[colors.primary]}
             />
@@ -354,13 +312,11 @@ export default function NotificationHistoryScreen() {
         />
       )}
 
-      {loadingMore && (
-        <ActivityIndicator
-          size="small"
-          color={colors.textSecondary}
-          style={{ position: "absolute", bottom: 24, alignSelf: "center" }}
-        />
-      )}
+      {isFetchingNextPage ? (
+        <View className="pb-5">
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : null}
     </View>
   );
 }

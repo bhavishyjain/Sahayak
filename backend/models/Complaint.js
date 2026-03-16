@@ -7,6 +7,11 @@ const complaintSlaSchema = require("./complaintSchemas/complaintSlaSchema");
 const complaintHistorySchema = require("./complaintSchemas/complaintHistorySchema");
 const complaintAiAnalysisSchema = require("./complaintSchemas/complaintAiAnalysisSchema");
 const complaintMessageSchema = require("./complaintSchemas/complaintMessageSchema");
+const {
+  COMPLAINT_DEPARTMENTS,
+  COMPLAINT_PRIORITIES,
+  COMPLAINT_STATUSES,
+} = require("../domain/constants");
 
 const complaintSchema = new mongoose.Schema(
   {
@@ -26,7 +31,7 @@ const complaintSchema = new mongoose.Schema(
 
     department: {
       type: String,
-      enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
+      enum: COMPLAINT_DEPARTMENTS,
       required: true,
     },
     // AI Analysis Fields
@@ -46,21 +51,13 @@ const complaintSchema = new mongoose.Schema(
 
     priority: {
       type: String,
-      enum: ["Low", "Medium", "High"],
+      enum: COMPLAINT_PRIORITIES,
       default: "Low",
     },
     tags: [{ type: String }],
     status: {
       type: String,
-      enum: [
-        "pending",
-        "assigned",
-        "in-progress",
-        "pending-approval",
-        "resolved",
-        "cancelled",
-        "needs-rework",
-      ],
+      enum: COMPLAINT_STATUSES,
       default: "pending",
     },
     // Multi-worker assignment support
@@ -156,5 +153,10 @@ complaintSchema.pre("aggregate", function (next) {
   }
   next();
 });
+
+complaintSchema.index({ userId: 1, createdAt: -1 });
+complaintSchema.index({ department: 1, status: 1, createdAt: -1 });
+complaintSchema.index({ "assignedWorkers.workerId": 1, status: 1, updatedAt: -1 });
+complaintSchema.index({ status: 1, priority: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Complaint", complaintSchema);

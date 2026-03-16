@@ -1,14 +1,12 @@
 import { useRouter } from "expo-router";
-import {
-  AlertCircle,
-  Calendar,
-} from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Calendar, ChevronDown } from "lucide-react-native";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
@@ -34,17 +32,35 @@ export default function HodResolvedComplaints() {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 20;
 
-  const load = async (isRefresh = false) => {
+  const load = async (isRefresh = false, requestedPage = 1) => {
     try {
       if (isRefresh) setRefreshing(true);
+      else if (requestedPage > 1) setLoadingMore(true);
       else setLoading(true);
 
-      const res = await apiCall({ method: "GET", url: HOD_OVERVIEW_URL });
-      const resolvedOnly = res.data.complaints.filter(
-        (c) => c.status?.toLowerCase() === "resolved",
+      const res = await apiCall({
+        method: "GET",
+        url: HOD_OVERVIEW_URL,
+        params: {
+          page: requestedPage,
+          limit: LIMIT,
+          bucket: "resolved",
+          search: searchQuery.trim() || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        },
+      });
+      const resolvedOnly = res.data.complaints ?? [];
+      setComplaints((prev) =>
+        requestedPage === 1 ? resolvedOnly : [...prev, ...resolvedOnly],
       );
-      setComplaints(resolvedOnly);
+      setPage(requestedPage);
+      setHasMore(requestedPage < Number(res.data?.pagination?.totalPages ?? 1));
     } catch (e) {
       Toast.show({
         type: "error",
@@ -56,47 +72,14 @@ export default function HodResolvedComplaints() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
     load(false);
-  }, []);
-
-  const filteredComplaints = useMemo(() => {
-    let list = [...complaints];
-
-    const query = searchQuery.trim().toLowerCase();
-    if (query) {
-      list = list.filter(
-        (c) =>
-          c.ticketId?.toLowerCase().includes(query) ||
-          c.title?.toLowerCase().includes(query) ||
-          c.description?.toLowerCase().includes(query) ||
-          c.locationName?.toLowerCase().includes(query),
-      );
-    }
-
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      list = list.filter((c) => new Date(c.updatedAt) >= start);
-    }
-
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      list = list.filter((c) => new Date(c.updatedAt) <= end);
-    }
-
-    list.sort((a, b) => {
-      const da = new Date(a.updatedAt).getTime();
-      const db = new Date(b.updatedAt).getTime();
-      return (isNaN(db) ? 0 : db) - (isNaN(da) ? 0 : da);
-    });
-
-    return list;
-  }, [complaints, searchQuery, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, startDate, endDate]);
 
   const renderItem = ({ item }) => (
     <ComplaintCard
@@ -169,7 +152,7 @@ export default function HodResolvedComplaints() {
           </View>
 
           <FlatList
-            data={filteredComplaints}
+            data={complaints}
             renderItem={renderItem}
             keyExtractor={(item) => item._id ?? item.id}
             style={{ flex: 1 }}
@@ -198,6 +181,35 @@ export default function HodResolvedComplaints() {
                     : t("hod.resolvedComplaints.noComplaintsDefault")}
                 </Text>
               </View>
+            }
+            ListFooterComponent={
+              hasMore ? (
+                <TouchableOpacity
+                  onPress={() => load(false, page + 1)}
+                  disabled={loadingMore}
+                  className="mt-2 rounded-xl items-center justify-center py-3"
+                  style={{
+                    backgroundColor: colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    opacity: loadingMore ? 0.6 : 1,
+                  }}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <View className="flex-row items-center" style={{ gap: 6 }}>
+                      <ChevronDown size={14} color={colors.textSecondary} />
+                      <Text
+                        className="text-sm font-semibold"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("common.loadMore")}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ) : null
             }
           />
         </>

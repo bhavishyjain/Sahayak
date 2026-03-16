@@ -1,8 +1,10 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
   CheckCircle,
   CheckSquare,
+  ChevronDown,
   Square,
   Users,
   X,
@@ -32,10 +34,8 @@ import {
   HOD_WORKERS_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
-import {
-  formatPriorityLabel,
-  normalizeStatus,
-} from "../../../data/complaintStatus";
+import { formatPriorityLabel } from "../../../data/complaintStatus";
+import { invalidateComplaintQueries } from "../../../utils/invalidateComplaintQueries";
 import { isComplaintAssigned } from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
@@ -45,11 +45,11 @@ export default function HodComplaints() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
-  const [stats, setStats] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -63,65 +63,10 @@ export default function HodComplaints() {
   const [selectedWorker, setSelectedWorker] = useState("");
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
-
-  const matchesStatusFilter = (complaint, filterKey) => {
-    if (filterKey === "all") return true;
-    if (filterKey === "assigned") return isComplaintAssigned(complaint);
-    if (filterKey === "unassigned") return !isComplaintAssigned(complaint);
-    return normalizeStatus(complaint.status) === filterKey;
-  };
-
-  const baseFilteredComplaints = complaints.filter((complaint) => {
-    const normalizedStatus = normalizeStatus(complaint.status);
-    if (normalizedStatus === "resolved" || normalizedStatus === "cancelled") {
-      return false;
-    }
-
-    const query = searchQuery.trim().toLowerCase();
-    const matchesQuery =
-      !query ||
-      complaint.ticketId?.toLowerCase().includes(query) ||
-      complaint.title?.toLowerCase().includes(query) ||
-      complaint.description?.toLowerCase().includes(query) ||
-      complaint.locationName?.toLowerCase().includes(query);
-
-    const matchesPriority =
-      priorityFilter === "all"
-        ? true
-        : String(complaint.priority ?? "").toLowerCase() === priorityFilter;
-
-    const complaintDate = new Date(complaint.createdAt);
-    const hasValidDate = !Number.isNaN(complaintDate.getTime());
-    let matchesStartDate = true;
-    let matchesEndDate = true;
-
-    if (startDate && hasValidDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      matchesStartDate = complaintDate >= start;
-    }
-
-    if (endDate && hasValidDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      matchesEndDate = complaintDate <= end;
-    }
-
-    return (
-      matchesQuery && matchesPriority && matchesStartDate && matchesEndDate
-    );
-  });
-
-  const filteredComplaints = baseFilteredComplaints.filter((complaint) =>
-    matchesStatusFilter(complaint, statusFilter),
-  );
-  const sortedComplaints = [...filteredComplaints].sort((a, b) => {
-    const dateA = new Date(a.createdAt).getTime();
-    const dateB = new Date(b.createdAt).getTime();
-    const safeA = Number.isNaN(dateA) ? 0 : dateA;
-    const safeB = Number.isNaN(dateB) ? 0 : dateB;
-    return sortOrder === "new-to-old" ? safeB - safeA : safeA - safeB;
-  });
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 20;
 
   const hasActiveFilters = () =>
     statusFilter !== "all" ||
@@ -138,29 +83,49 @@ export default function HodComplaints() {
     setEndDate("");
   };
 
-  const load = async (isRefresh = false) => {
+  const load = async (isRefresh = false, requestedPage = 1) => {
     try {
       if (isRefresh) setRefreshing(true);
+      else if (requestedPage > 1) setLoadingMore(true);
       else setLoading(true);
 
       const res = await apiCall({
         method: "GET",
         url: HOD_OVERVIEW_URL,
+        params: {
+          page: requestedPage,
+          limit: LIMIT,
+          bucket: "open",
+          search: searchQuery.trim() || undefined,
+          priority: priorityFilter !== "all" ? priorityFilter : undefined,
+          sort: sortOrder,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          status:
+            statusFilter !== "all" ? statusFilter : undefined,
+        },
       });
 
       const payload = res?.data;
-      setComplaints(payload?.complaints || []);
-      setStats(payload?.stats || null);
-    } catch (e) {
+      const fetchedComplaints = payload?.complaints || [];
+      setComplaints((prev) =>
+        requestedPage === 1 ? fetchedComplaints : [...prev, ...fetchedComplaints],
+      );
+      const totalPages = Number(payload?.pagination?.totalPages ?? 1);
+      setPage(requestedPage);
+      setHasMore(requestedPage < totalPages);
+    } catch (_error) {
       Toast.show({
         type: "error",
         text1: t("toast.error.failed"),
         text2:
-          e?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
+          _error?.response?.data?.message ||
+          t("toast.error.loadComplaintsFailed"),
       });
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
@@ -185,7 +150,8 @@ export default function HodComplaints() {
   useEffect(() => {
     load(false);
     loadWorkers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, statusFilter, priorityFilter, sortOrder, startDate, endDate]);
 
   const toggleSelectMode = () => {
     setSelectMode(!selectMode);
@@ -203,10 +169,10 @@ export default function HodComplaints() {
   };
 
   const selectAll = () => {
-    const unassignedIds = filteredComplaints
+    const selectableComplaintIds = complaints
       .filter((c) => !isComplaintAssigned(c))
       .map((c) => c.id);
-    setSelectedComplaints(unassignedIds);
+    setSelectedComplaints(selectableComplaintIds);
   };
 
   const deselectAll = () => {
@@ -249,8 +215,13 @@ export default function HodComplaints() {
       setSelectedComplaints([]);
       setSelectMode(false);
       setSelectedWorker("");
+      await Promise.all(
+        selectedComplaints.map((complaintId) =>
+          invalidateComplaintQueries(queryClient, { complaintId }),
+        ),
+      );
       load(true);
-    } catch (e) {
+    } catch (_error) {
       Toast.show({
         type: "error",
         text1: t("toast.error.failed"),
@@ -481,7 +452,7 @@ export default function HodComplaints() {
       </View>
 
       <FlatList
-        data={sortedComplaints}
+        data={complaints}
         renderItem={renderComplaintItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
@@ -501,7 +472,7 @@ export default function HodComplaints() {
               className="text-base mt-3 text-center"
               style={{ color: colors.textSecondary }}
             >
-              {searchQuery || hasActiveFilters()
+            {searchQuery || hasActiveFilters()
                 ? t("hod.complaints.noComplaintsFound")
                 : t("hod.complaints.noDepartmentComplaints")}
             </Text>
@@ -514,6 +485,35 @@ export default function HodComplaints() {
               </Text>
             )}
           </View>
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <TouchableOpacity
+              onPress={() => load(false, page + 1)}
+              disabled={loadingMore}
+              className="mt-2 rounded-xl items-center justify-center py-3"
+              style={{
+                backgroundColor: colors.backgroundSecondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+                opacity: loadingMore ? 0.6 : 1,
+              }}
+            >
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <View className="flex-row items-center" style={{ gap: 6 }}>
+                  <ChevronDown size={14} color={colors.textSecondary} />
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("common.loadMore")}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ) : null
         }
       />
 

@@ -1,5 +1,5 @@
-const User = require("../models/User");
 const Notification = require("../models/Notification");
+const User = require("../models/User");
 const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
@@ -7,6 +7,16 @@ const {
   sendExpoPushNotifications,
   isValidExpoPushToken,
 } = require("../services/pushNotificationService");
+const {
+  buildNotificationPayload,
+  persistNotification,
+  shouldDeliverByPreference,
+  shouldPersistNotification,
+} = require("../services/notificationDomainService");
+const {
+  buildDetailPayload,
+  buildListPayload,
+} = require("../services/responseViewService");
 
 exports.registerPushToken = asyncHandler(async (req, res) => {
   const { pushToken } = req.body;
@@ -46,16 +56,25 @@ exports.getHistory = asyncHandler(async (req, res) => {
     readAt: null,
   });
 
-  return sendSuccess(res, {
-    notifications,
-    unreadCount,
-    pagination: {
+  return sendSuccess(
+    res,
+    buildListPayload({
+      items: notifications,
+      itemKey: "notifications",
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit),
-    },
-  });
+      legacy: {
+        unreadCount,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+    }),
+  );
 });
 
 exports.markRead = asyncHandler(async (req, res) => {
@@ -65,7 +84,11 @@ exports.markRead = asyncHandler(async (req, res) => {
     { new: true },
   );
   if (!notification) throw new AppError("Notification not found", 404);
-  return sendSuccess(res, { notification }, "Marked as read");
+  return sendSuccess(
+    res,
+    buildDetailPayload(notification, "notification", { notification }),
+    "Marked as read",
+  );
 });
 
 exports.markAllRead = asyncHandler(async (req, res) => {
@@ -120,30 +143,17 @@ exports.notifyUser = async (userId, payload, options = {}) => {
     );
     if (!user) return;
 
-    // Check preference if type is provided
-    const type = payload?.data?.type;
+    const normalizedPayload = buildNotificationPayload(payload);
+    const type = normalizedPayload.data?.type;
     const prefs = user.notificationPreferences || {};
-    if (type === "complaint-update" && prefs.complaintsUpdates === false)
-      return;
-    if (type === "assignment" && prefs.assignments === false) return;
-    if (type === "escalation" && prefs.escalations === false) return;
-    if (type === "system" && prefs.systemAlerts === false) return;
+    if (!shouldDeliverByPreference(prefs, type)) return;
 
-    // Chat messages are push-only and must never be persisted in notification history.
-    const shouldPersist = saveHistory && type !== "chat-message";
-
-    if (shouldPersist) {
-      Notification.create({
-        userId,
-        title: payload.title || "Notification",
-        body: payload.body || "",
-        type: type || "other",
-        data: payload.data || {},
-      }).catch((err) => console.error("notifyUser: save error", err));
+    if (shouldPersistNotification({ saveHistory, type })) {
+      await persistNotification(userId, normalizedPayload);
     }
 
     if (!user.pushTokens?.length) return;
-    await sendExpoPushNotifications(user.pushTokens, payload);
+    await sendExpoPushNotifications(user.pushTokens, normalizedPayload);
   } catch (error) {
     console.error("notify user error", error);
   }
