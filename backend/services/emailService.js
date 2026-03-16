@@ -547,7 +547,9 @@ const sendEmailWithAttachment = async ({
  * Send email verification link
  */
 const sendEmailVerification = async (email, fullName, token) => {
-  const verifyLink = `sahayak://verify-email?token=${encodeURIComponent(token)}`;
+  const encodedToken = encodeURIComponent(token);
+  const verifyLink = `https://sahayak.app/verify-email?token=${encodedToken}`;
+  const verifyDeepLink = `sahayak://verify-email?token=${encodedToken}`;
 
   const headerHtml = `<h1>✉️ Verify Your Email</h1>`;
   const bodyHtml = `
@@ -558,6 +560,12 @@ const sendEmailVerification = async (email, fullName, token) => {
     </div>
     <div class="warning">
       <p>⏰ <strong>This link expires in 24 hours.</strong></p>
+    </div>
+    <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
+      If the button does not open the app, use this fallback link inside Sahayak:
+    </p>
+    <div class="link-box">
+      <a href="${verifyDeepLink}">${verifyDeepLink}</a>
     </div>
     <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
       If you didn't create a Sahayak account, you can safely ignore this email.
@@ -583,6 +591,14 @@ const sendEmailVerification = async (email, fullName, token) => {
       border-radius: 4px;
     }
     .warning p { margin: 0; color: #92400e; font-size: 14px; }
+    .link-box {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      word-break: break-all;
+    }
+    .link-box a { color: #10b981; font-size: 13px; }
   `;
 
   const html = buildEmailBase(
@@ -606,7 +622,9 @@ const sendEmailVerification = async (email, fullName, token) => {
  * Send password reset link
  */
 const sendPasswordResetEmail = async (email, fullName, token) => {
-  const resetLink = `sahayak://reset-password?token=${encodeURIComponent(token)}`;
+  const encodedToken = encodeURIComponent(token);
+  const resetLink = `https://sahayak.app/reset-password?token=${encodedToken}`;
+  const resetDeepLink = `sahayak://reset-password?token=${encodedToken}`;
 
   const headerHtml = `<h1>🔑 Reset Your Password</h1>`;
   const bodyHtml = `
@@ -617,6 +635,12 @@ const sendPasswordResetEmail = async (email, fullName, token) => {
     </div>
     <div class="warning">
       <p>⏰ <strong>This link expires in 1 hour.</strong></p>
+    </div>
+    <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
+      If the button does not open the app, use this fallback link inside Sahayak:
+    </p>
+    <div class="link-box">
+      <a href="${resetDeepLink}">${resetDeepLink}</a>
     </div>
     <p style="color: #6b7280; font-size: 14px;">
       If you did not request a password reset, please ignore this email — your password will remain unchanged.
@@ -642,6 +666,14 @@ const sendPasswordResetEmail = async (email, fullName, token) => {
       border-radius: 4px;
     }
     .warning p { margin: 0; color: #92400e; font-size: 14px; }
+    .link-box {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      word-break: break-all;
+    }
+    .link-box a { color: #d97706; font-size: 13px; }
   `;
 
   const html = buildEmailBase(

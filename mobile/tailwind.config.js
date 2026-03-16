@@ -45,7 +45,6 @@ module.exports = {
         success: lightColors.success,
         warning: lightColors.warning,
         danger: lightColors.danger,
-        error: lightColors.error,
         dark: lightColors.dark,
         light: lightColors.light,
         muted: lightColors.muted,

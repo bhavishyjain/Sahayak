@@ -147,7 +147,7 @@ export default function VerifyEmail() {
 
       <PressableBlock
         onPress={() => router.replace("/(app)/(auth)/login")}
-        className="py-4 rounded-xl active:opacity-80"
+        className="w-full py-4 rounded-lg items-center active:opacity-80"
         style={{
           backgroundColor: colors.backgroundSecondary,
           borderWidth: 1,
@@ -155,12 +155,8 @@ export default function VerifyEmail() {
         }}
       >
         <Text
-          style={{
-            textAlign: "center",
-            fontSize: 16,
-            fontWeight: "600",
-            color: colors.textSecondary,
-          }}
+          className="text-base font-fira-bold"
+          style={{ color: colors.textSecondary }}
         >
           {verified
             ? t("auth.verifyEmail.continueToLogin")

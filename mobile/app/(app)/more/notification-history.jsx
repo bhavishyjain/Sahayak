@@ -32,7 +32,7 @@ import {
 const getTypeConfig = (colors) => ({
   "complaint-update": { Icon: FileText, color: colors.info },
   assignment: { Icon: UserCheck, color: colors.primary },
-  escalation: { Icon: TriangleAlert, color: colors.error },
+  escalation: { Icon: TriangleAlert, color: colors.danger },
   system: { Icon: Wrench, color: colors.secondary },
   test: { Icon: Bell, color: colors.success },
   other: { Icon: Bell, color: colors.warning },
@@ -250,11 +250,11 @@ export default function NotificationHistoryScreen() {
             {unreadCount > 0 && (
               <View
                 className="ml-2 px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: colors.error + "20" }}
+                style={{ backgroundColor: colors.danger + "20" }}
               >
                 <Text
                   className="text-xs font-semibold"
-                  style={{ color: colors.error }}
+                  style={{ color: colors.danger }}
                 >
                   {t("more.notificationsScreen.history.unread", {
                     count: unreadCount,

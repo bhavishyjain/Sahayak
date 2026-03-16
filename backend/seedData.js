@@ -1487,7 +1487,7 @@ async function seedDatabase() {
         email: `user${i}@example.com`,
         phone: `91${8000000000 + i}`,
         fullName: `${firstName} ${lastName}`,
-        emailVerified: Math.random() < 0.9,
+        emailVerified: true,
         preferredLanguage: getRandomPreferredLanguage(),
         notificationPreferences: getRandomNotificationPreferences("user"),
         ...getUserSeedTimestamps(),

@@ -61,7 +61,7 @@ export default function NotificationsScreen() {
     (key) => {
       if (key === "complaintsUpdates") return colors.info;
       if (key === "assignments") return colors.primary;
-      if (key === "escalations") return colors.error;
+      if (key === "escalations") return colors.danger;
       return colors.secondary;
     },
     [colors],

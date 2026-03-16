@@ -1741,9 +1741,9 @@ function ComplaintDetailsInner() {
               borderWidth: 1.5,
               borderColor:
                 complaint.sla.isOverdue || slaCountdown?.isOverdue
-                  ? colors.error
+                  ? colors.danger
                   : slaCountdown?.isCritical
-                    ? colors.error
+                    ? colors.danger
                     : slaCountdown?.isUrgent
                       ? colors.warning
                       : colors.border,
@@ -1756,9 +1756,9 @@ function ComplaintDetailsInner() {
                   size={18}
                   color={
                     complaint.sla.isOverdue || slaCountdown?.isOverdue
-                      ? colors.error
+                      ? colors.danger
                       : slaCountdown?.isCritical
-                        ? colors.error
+                        ? colors.danger
                         : slaCountdown?.isUrgent
                           ? colors.warning
                           : colors.success
@@ -1825,12 +1825,12 @@ function ComplaintDetailsInner() {
               {complaint.sla.isOverdue || slaCountdown?.isOverdue ? (
                 <View
                   className="flex-row items-center px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: colors.error + "22" }}
+                  style={{ backgroundColor: colors.danger + "22" }}
                 >
-                  <AlertTriangle size={14} color={colors.error} />
+                  <AlertTriangle size={14} color={colors.danger} />
                   <Text
                     className="text-sm font-bold ml-1.5"
-                    style={{ color: colors.error }}
+                    style={{ color: colors.danger }}
                   >
                     {t("complaints.details.sla.overdue")}
                   </Text>
@@ -1840,7 +1840,7 @@ function ComplaintDetailsInner() {
                   className="flex-row items-center px-3 py-1 rounded-lg"
                   style={{
                     backgroundColor: slaCountdown.isCritical
-                      ? colors.error + "22"
+                      ? colors.danger + "22"
                       : slaCountdown.isUrgent
                         ? colors.warning + "22"
                         : colors.success + "22",
@@ -1850,7 +1850,7 @@ function ComplaintDetailsInner() {
                     size={14}
                     color={
                       slaCountdown.isCritical
-                        ? colors.error
+                        ? colors.danger
                         : slaCountdown.isUrgent
                           ? colors.warning
                           : colors.success
@@ -1860,7 +1860,7 @@ function ComplaintDetailsInner() {
                     className="text-sm font-bold ml-1.5"
                     style={{
                       color: slaCountdown.isCritical
-                        ? colors.error
+                        ? colors.danger
                         : slaCountdown.isUrgent
                           ? colors.warning
                           : colors.success,
@@ -2480,7 +2480,7 @@ function ComplaintDetailsInner() {
                 margin: 0,
                 marginBottom: 10,
                 flex: 0,
-                backgroundColor: colors.error,
+                backgroundColor: colors.danger,
               }}
             >
               <View className="flex-row items-center justify-center">
@@ -2580,7 +2580,7 @@ function ComplaintDetailsInner() {
                 style={{
                   margin: 0,
                   flex: 0,
-                  backgroundColor: colors.error,
+                  backgroundColor: colors.danger,
                 }}
               >
                 <View className="flex-row items-center justify-center">
@@ -3056,7 +3056,7 @@ function ComplaintDetailsInner() {
           loading={cancelling}
           titleAlign="center"
           messageAlign="left"
-          confirmButtonStyle={{ backgroundColor: colors.error }}
+          confirmButtonStyle={{ backgroundColor: colors.danger }}
           confirmTextStyle={{ color: colors.light }}
         />
       )}
@@ -3128,7 +3128,7 @@ function ComplaintDetailsInner() {
                   disabled={sendingRework || !reworkReason.trim()}
                   className="flex-1 ml-2 py-3 rounded-xl items-center"
                   style={{
-                    backgroundColor: colors.error,
+                    backgroundColor: colors.danger,
                     opacity: sendingRework || !reworkReason.trim() ? 0.5 : 1,
                   }}
                 >
