@@ -16,9 +16,11 @@ import {
   CheckCircle,
   FileText,
   UserPlus,
+  MessageSquareQuote,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
+import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import AutoSkeleton from "../../../components/AutoSkeleton";
 import DialogBox from "../../../components/DialogBox";
@@ -222,6 +224,12 @@ export default function More() {
             title: "more.menu.workerAnalytics.title",
             subtitle: "more.menu.workerAnalytics.subtitle",
             route: "/(app)/more/worker-analytics",
+          },
+          {
+            icon: MessageSquareQuote,
+            title: "Worker Feedback",
+            subtitle: "See your current rating and all citizen feedback",
+            route: "/(app)/more/worker-feedback",
           },
         ]
       : []),

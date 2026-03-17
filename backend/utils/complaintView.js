@@ -9,6 +9,10 @@ function normalizeComplaintStatus(status) {
   return s;
 }
 
+function hasExplicitLeader(assignments = []) {
+  return assignments.some((assignment) => assignment?.isLeader === true);
+}
+
 function buildComplaintView(complaint, options = {}) {
   const includeAssignment =
     options.includeAssignment === undefined ? true : options.includeAssignment;
@@ -90,13 +94,16 @@ function buildComplaintView(complaint, options = {}) {
     return base;
   }
 
-  const assignedWorkers = (complaint.assignedWorkers || []).map((w) => ({
+  const assignments = complaint.assignedWorkers || [];
+  const explicitLeader = hasExplicitLeader(assignments);
+  const assignedWorkers = assignments.map((w, index) => ({
     workerId: String(w.workerId?._id || w.workerId?.id || w.workerId || ""),
     workerName: w.workerId?.fullName || w.workerId?.username || null,
     taskDescription: w.taskDescription,
     status: w.status,
     assignedAt: w.assignedAt,
     completedAt: w.completedAt,
+    isLeader: explicitLeader ? Boolean(w.isLeader) : index === 0,
   }));
 
   return {

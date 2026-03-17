@@ -62,5 +62,6 @@ export function useNearbyComplaints() {
     permissionDenied: Boolean(query.data?.permissionDenied),
     upvoteComplaint: upvoteMutation.mutateAsync,
     isUpvoting: upvoteMutation.isPending,
+    isRefreshing: query.isFetching,
   };
 }

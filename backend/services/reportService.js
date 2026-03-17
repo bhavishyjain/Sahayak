@@ -2,7 +2,10 @@ const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 const Complaint = require("../models/Complaint");
 const { normalizeStatus, getResolvedAt } = require("../utils/normalize");
-const { COMPLAINT_DEPARTMENTS } = require("../domain/constants");
+const {
+  getComplaintDepartmentBreakdown,
+  getComplaintMetricSnapshot,
+} = require("./complaintAnalyticsService");
 
 const REPORT_MAX_ROWS = Math.max(
   100,
@@ -87,65 +90,14 @@ async function fetchComplaintsForReport(filters, limit) {
 class ReportService {
   async getDashboardStats(filters = {}) {
     return withCachedReportMetric("dashboard-stats", filters, async () => {
-      const [statusRows, priorityRows, departmentRows, resolutionRows, total] =
-        await Promise.all([
-          Complaint.aggregate([
-            { $match: filters },
-            { $group: { _id: "$status", count: { $sum: 1 } } },
-          ]),
-          Complaint.aggregate([
-            { $match: filters },
-            { $group: { _id: "$priority", count: { $sum: 1 } } },
-          ]),
-          Complaint.aggregate([
-            { $match: filters },
-            { $group: { _id: "$department", count: { $sum: 1 } } },
-          ]),
-          Complaint.aggregate([
-            {
-              $match: {
-                ...filters,
-                resolvedAt: { $ne: null },
-                createdAt: { $ne: null },
-              },
-            },
-            {
-              $project: {
-                resolutionHours: {
-                  $divide: [
-                    { $subtract: ["$resolvedAt", "$createdAt"] },
-                    1000 * 60 * 60,
-                  ],
-                },
-              },
-            },
-            {
-              $group: {
-                _id: null,
-                avgResolutionTime: { $avg: "$resolutionHours" },
-              },
-            },
-          ]),
-          Complaint.countDocuments(filters),
-        ]);
+      const snapshot = await getComplaintMetricSnapshot(filters);
 
       return {
-        total,
-        byStatus: statusRows.reduce((acc, row) => {
-          acc[row._id || "unknown"] = row.count;
-          return acc;
-        }, {}),
-        byPriority: priorityRows.reduce((acc, row) => {
-          acc[row._id || "unknown"] = row.count;
-          return acc;
-        }, {}),
-        byDepartment: departmentRows.reduce((acc, row) => {
-          acc[row._id || "Other"] = row.count;
-          return acc;
-        }, {}),
-        avgResolutionTime: Math.round(
-          resolutionRows[0]?.avgResolutionTime || 0,
-        ),
+        total: snapshot.total,
+        byStatus: snapshot.byStatus,
+        byPriority: snapshot.byPriority,
+        byDepartment: snapshot.byDepartment,
+        avgResolutionTime: snapshot.avgResolutionTime,
       };
     });
   }
@@ -154,70 +106,7 @@ class ReportService {
     return withCachedReportMetric(
       "department-breakdown",
       filters,
-      async () => {
-        const rows = await Complaint.aggregate([
-          { $match: filters },
-          {
-            $group: {
-              _id: { $ifNull: ["$department", "Other"] },
-              total: { $sum: 1 },
-              pending: {
-                $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
-              },
-              inProgress: {
-                $sum: {
-                  $cond: [{ $eq: ["$status", "in-progress"] }, 1, 0],
-                },
-              },
-              resolved: {
-                $sum: { $cond: [{ $eq: ["$status", "resolved"] }, 1, 0] },
-              },
-              cancelled: {
-                $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
-              },
-              highPriority: {
-                $sum: { $cond: [{ $eq: ["$priority", "High"] }, 1, 0] },
-              },
-              mediumPriority: {
-                $sum: { $cond: [{ $eq: ["$priority", "Medium"] }, 1, 0] },
-              },
-              lowPriority: {
-                $sum: { $cond: [{ $eq: ["$priority", "Low"] }, 1, 0] },
-              },
-            },
-          },
-          { $sort: { total: -1, _id: 1 } },
-        ]);
-
-        const seededBreakdown = COMPLAINT_DEPARTMENTS.reduce((acc, department) => {
-          acc[department] = {
-            total: 0,
-            pending: 0,
-            inProgress: 0,
-            resolved: 0,
-            cancelled: 0,
-            highPriority: 0,
-            mediumPriority: 0,
-            lowPriority: 0,
-          };
-          return acc;
-        }, {});
-
-        rows.forEach((row) => {
-          seededBreakdown[row._id || "Other"] = {
-            total: row.total || 0,
-            pending: row.pending || 0,
-            inProgress: row.inProgress || 0,
-            resolved: row.resolved || 0,
-            cancelled: row.cancelled || 0,
-            highPriority: row.highPriority || 0,
-            mediumPriority: row.mediumPriority || 0,
-            lowPriority: row.lowPriority || 0,
-          };
-        });
-
-        return seededBreakdown;
-      },
+      async () => getComplaintDepartmentBreakdown(filters),
     );
   }
 

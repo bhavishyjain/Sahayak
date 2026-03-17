@@ -83,6 +83,7 @@ export const WORKER_DASHBOARD_SUMMARY_URL =
 export const WORKER_ACTIVE_PREVIEW_URL = API_BASE + "/workers/active-preview";
 export const WORKER_ASSIGNED_URL = API_BASE + "/workers/assigned-complaints";
 export const WORKER_COMPLETED_URL = API_BASE + "/workers/completed-complaints";
+export const WORKER_FEEDBACK_URL = API_BASE + "/workers/feedback";
 export const WORKER_LEADERBOARD_URL = API_BASE + "/workers/leaderboard";
 export const WORKER_ANALYTICS_URL = API_BASE + "/workers/analytics";
 export const UPDATE_COMPLAINT_STATUS_URL = (id) =>

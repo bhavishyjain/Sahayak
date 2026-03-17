@@ -4,10 +4,13 @@ const User = require("../../models/User");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
-const { assertCanAccessComplaint } = require("../../policies/complaintPolicy");
 const {
-  notifyComplaintChatParticipants,
-} = require("../../services/complaintAudienceService");
+  assertCanParticipateInComplaintChat,
+} = require("../../policies/complaintPolicy");
+const {
+  COMPLAINT_DOMAIN_EVENTS,
+  emitComplaintDomainEvent,
+} = require("../../services/complaintEventService");
 const { buildListPayload, buildDetailPayload } = require("../../services/responseViewService");
 
 const PAGE_SIZE = 50;
@@ -47,7 +50,7 @@ exports.getMessages = asyncHandler(async (req, res) => {
   );
   if (!complaint) throw new AppError("Complaint not found", 404);
 
-  await assertCanAccessComplaint(req.user, complaint);
+  await assertCanParticipateInComplaintChat(req.user, complaint);
 
   const page = Math.max(1, parseInt(req.query.page) || 1);
   await migrateEmbeddedMessagesIfNeeded(complaint);
@@ -91,7 +94,7 @@ exports.postMessage = asyncHandler(async (req, res) => {
   );
   if (!complaint) throw new AppError("Complaint not found", 404);
 
-  await assertCanAccessComplaint(req.user, complaint);
+  await assertCanParticipateInComplaintChat(req.user, complaint);
 
   // Fetch sender display name from DB if not on req.user
   let senderName = req.user.fullName || req.user.username || "User";
@@ -114,12 +117,19 @@ exports.postMessage = asyncHandler(async (req, res) => {
     complaintId: complaint._id,
     ...message,
   });
-  await notifyComplaintChatParticipants(complaint, {
-    actorId: String(req.user._id),
-    senderName,
-    text,
-    message: saved,
-  });
+  await emitComplaintDomainEvent(
+    complaint,
+    COMPLAINT_DOMAIN_EVENTS.COMPLAINT_CHAT_MESSAGE,
+    {
+      actorId: String(req.user._id),
+      senderName,
+      text,
+      message: saved,
+      data: {
+        senderId: String(req.user._id),
+      },
+    },
+  );
   return sendSuccess(
     res,
     buildDetailPayload(saved.toObject(), "message", { message: saved }),

@@ -10,6 +10,9 @@ const {
   getComplaintOrThrow,
 } = require("../../services/accessService");
 const {
+  assertCanUpdateComplaintStatusAsWorker,
+} = require("../../policies/complaintPolicy");
+const {
   appendCompletionPhotos,
 } = require("../../services/completionPhotoService");
 const {
@@ -23,14 +26,7 @@ exports.updateComplaintStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   const workerId = getRequestUserId(req);
   const complaint = await getComplaintOrThrow(complaintId);
-
-  const isAssigned = complaint.assignedWorkers?.some(
-    (item) => item.workerId.toString() === workerId.toString(),
-  );
-
-  if (!isAssigned) {
-    throw new AppError("You are not assigned to this complaint", 403);
-  }
+  await assertCanUpdateComplaintStatusAsWorker(req.user, complaint);
   const oldStatus = complaint.status;
 
   await appendCompletionPhotos(complaint, req.files || []);

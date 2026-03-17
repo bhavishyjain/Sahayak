@@ -38,7 +38,8 @@ Citizen users can:
 
 - register, log in, reset password, and verify email
 - submit complaints with text, media, and coordinates
-- browse their complaints with filters and pagination
+- browse the public complaint feed with filters and pagination
+- browse dedicated self-owned complaint and resolved complaint views
 - view complaint detail, history, worker assignment state, SLA state, and escalation state
 - chat inside complaint threads
 - upvote nearby complaints
@@ -59,6 +60,13 @@ Worker users can:
 - participate in complaint chat
 - view leaderboard metrics
 - view individual worker analytics
+- view rating and citizen feedback history
+
+Important workflow note:
+
+- when multiple workers are assigned, one worker acts as the leader
+- only the leader can update complaint status
+- other workers stay visible in complaint detail for field coordination
 
 ### 2.3 Head Of Department
 
@@ -329,7 +337,8 @@ Implemented by:
 
 Current behavior:
 
-- citizen complaint lists
+- citizen public complaint feed
+- citizen self-owned complaint list
 - worker assigned/completed lists
 - HOD complaint queues
 - pagination support on main list endpoints
@@ -355,6 +364,12 @@ Current behavior:
 - satisfaction state
 - worker assignment preview
 - AI suggestion rendering
+
+Important state notes:
+
+- authenticated citizens can open complaint detail from the public feed and upvote complaints there
+- satisfaction vote actions are citizen-only even though resolved vote counts remain visible
+- multi-worker complaints expose leader/non-leader assignment state in detail UI
 
 ## 7.5 Complaint Workflow
 
@@ -407,10 +422,12 @@ Implemented by:
 What it does:
 
 - assign one or more workers
+- make one worker the effective leader for status control in multi-worker flows
 - update task descriptions
 - fetch workers in department
 - fetch complaint worker list
 - view worker complaint drill-down
+- surface worker feedback history in worker-facing UX
 
 ## 7.8 Chat
 
@@ -451,6 +468,19 @@ Current behavior:
 - realtime notification updates
 - unread count badge
 - deep-link routing from notifications into complaint detail/chat and HOD action contexts
+
+Current complaint event contract:
+
+| Domain event | Trigger | Notification type | Default route |
+| --- | --- | --- | --- |
+| `complaint_created` | citizen creates a complaint | `complaint-update` | complaint detail |
+| `complaint_assigned` | HOD assigns one or more workers | `assignment` | complaint detail |
+| `worker_started` | leader worker moves complaint into active work | `complaint-update` | complaint detail |
+| `submitted_for_approval` | leader worker submits completion for approval | `complaint-update` | complaint detail |
+| `rework_requested` | HOD sends work back | `complaint-update` | complaint detail |
+| `complaint_resolved` | HOD approves completion | `complaint-update` | complaint detail |
+| `complaint_cancelled` | HOD/admin cancels complaint | `complaint-update` | complaint detail |
+| `complaint_chat_message` | citizen, worker, or HOD posts chat message | `chat-message` | complaint chat |
 
 ## 7.10 SLA And Escalation
 
@@ -617,6 +647,7 @@ Admin-only complaint operations:
 - `GET /api/workers/active-preview`
 - `GET /api/workers/assigned-complaints`
 - `GET /api/workers/completed-complaints`
+- `GET /api/workers/feedback`
 - `GET /api/workers/leaderboard`
 - `GET /api/workers/analytics`
 - `PUT /api/workers/complaint/:complaintId/status`
@@ -703,8 +734,8 @@ Public date contract:
 
 Role-aware behavior:
 
-- citizen list defaults to authenticated user scope
-- `scope=all` is blocked for citizen role
+- citizen feeds can use `scope=all` for public discovery and `scope=mine` for self-owned queues
+- dedicated "my complaints" flows still rely on self scope for focused tracking
 - worker and HOD endpoints add assignment or department constraints on top of common filters
 
 ## 11. Reports Filter Contract
@@ -883,6 +914,8 @@ Backend functionality already exists for:
 - festival event CRUD
 - admin user CRUD
 - deleted complaint restore and purge
+- notification-preference APIs and hooks that still need stronger UX exposure
+- report stats and department breakdown endpoints that currently exist beyond the latest HOD reports screen
 - deeper operational telemetry for scheduled work and delivery surfaces
 
 That means the system is functionally richer on the server than what the mobile UI currently exposes.
@@ -936,6 +969,7 @@ The backend is significantly cleaner than earlier revisions, but duplication sti
 - assigned and completed complaint flows: complete
 - worker status updates and completion proof upload: complete
 - worker analytics and leaderboard: complete
+- worker feedback and rating history: complete
 - complaint chat and notifications: complete
 
 ### 14.3 HOD
@@ -978,7 +1012,31 @@ When extending the system:
 - favor React Query-based hooks over screen-local request state
 - keep mobile route deep links aligned with `notificationNavigation.js`
 
-## 17. Documentation Scope
+## 17. Seed Data And Demo Coverage
+
+`backend/seedData.js` is intentionally broad because the product already spans authentication, workflow, analytics, notifications, reports, chat, and admin-only operations.
+
+The seeded environment now aims to cover:
+
+- all roles with realistic language, notification, token, and device-state variation
+- complaint lifecycle states from pending through resolved, cancelled, and needs-rework
+- leader-based multi-worker assignment data
+- AI analysis, upvotes, citizen feedback, satisfaction votes, SLA escalation, and completion photos
+- complaint chat history in `ComplaintMessage`
+- worker invitations in pending/accepted/expired/revoked states
+- report schedules with both successful and failing health metadata
+- persisted notifications for complaint, assignment, escalation, AI-review, and system scenarios
+- soft-deleted complaints so admin recycle-bin flows have realistic data
+
+When adding new backend capabilities, update the seeder whenever you introduce:
+
+- new workflow states
+- new admin-only collections
+- new notification types or route targets
+- new analytics-critical timestamps
+- new frontend flows that require realistic demo data to feel believable
+
+## 18. Documentation Scope
 
 This README is intentionally broad and deep, but it is still not a generated API spec. If the project grows further, the next documentation step should be:
 

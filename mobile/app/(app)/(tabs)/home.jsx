@@ -69,6 +69,7 @@ export default function Home() {
   const {
     complaints: nearbyComplaints,
     isLoading: nearbyLoading,
+    isRefreshing: nearbyRefreshing,
     refetch: refetchNearby,
     upvoteComplaint,
   } = useNearbyComplaints();
@@ -278,10 +279,10 @@ export default function Home() {
           </View>
           <Pressable
             onPress={() => refetchNearby()}
-            disabled={nearbyLoading}
+            disabled={nearbyRefreshing}
             className="flex-row items-center px-2.5 py-1 rounded-full"
             style={{
-              opacity: nearbyLoading ? 0.7 : 1,
+              opacity: nearbyRefreshing ? 0.7 : 1,
             }}
           >
             <RefreshCw size={12} color={colors.primary} />
@@ -301,7 +302,7 @@ export default function Home() {
             borderColor: colors.border,
           }}
         >
-          {nearbyLoading ? (
+          {nearbyRefreshing || nearbyLoading ? (
             <View className="py-6 items-center">
               <ActivityIndicator size="small" color={colors.primary} />
             </View>

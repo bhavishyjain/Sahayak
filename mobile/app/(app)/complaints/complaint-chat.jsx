@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
@@ -44,6 +45,10 @@ function MessageBubble({ msg, currentUserId, colors, t }) {
   const roleColor = roleColors[msg.senderRole] ?? colors.primary;
   const roleLabelKey = ROLE_LABEL_KEY[msg.senderRole];
   const roleLabel = roleLabelKey ? t(roleLabelKey) : t("complaintChat.roles.unknown");
+  const senderHeading =
+    msg.senderRole === "worker" || msg.senderRole === "head"
+      ? `${msg.senderName} • ${roleLabel}`
+      : msg.senderName || roleLabel;
 
   const date = new Date(msg.createdAt);
   const timeStr = date.toLocaleTimeString([], {
@@ -59,10 +64,11 @@ function MessageBubble({ msg, currentUserId, colors, t }) {
     <View
       className={`mb-3 max-w-[80%] ${isOwn ? "self-end items-end" : "self-start items-start"}`}
     >
-      {!isOwn && (
-        <View className="flex-row items-center mb-1 ml-1 gap-1">
+      <View
+        className={`flex-row items-center mb-1 gap-1 ${isOwn ? "mr-1" : "ml-1"}`}
+      >
           <Text className="text-xs font-semibold" style={{ color: roleColor }}>
-            {msg.senderName}
+            {senderHeading}
           </Text>
           <View
             className="px-1.5 py-0.5 rounded-full"
@@ -75,8 +81,7 @@ function MessageBubble({ msg, currentUserId, colors, t }) {
               {roleLabel}
             </Text>
           </View>
-        </View>
-      )}
+      </View>
       <View
         className="px-4 py-3 rounded-2xl"
         style={{
@@ -107,6 +112,7 @@ export default function ComplaintChat() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
 
   const [text, setText] = useState("");
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -201,7 +207,7 @@ export default function ComplaintChat() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
     >
       <BackButtonHeader
         title={t("complaintChat.threadTitle", { title: discussionTitle })}
@@ -246,7 +252,15 @@ export default function ComplaintChat() {
                   t={t}
                 />
               )}
-              contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+              contentContainerStyle={{
+                padding: 16,
+                paddingBottom: 8,
+                flexGrow: 1,
+                justifyContent: "flex-end",
+              }}
+              onContentSizeChange={() =>
+                flatListRef.current?.scrollToEnd({ animated: false })
+              }
               onEndReachedThreshold={0.1}
               ListHeaderComponent={
                 loadingMore ? (
@@ -277,6 +291,7 @@ export default function ComplaintChat() {
               borderTopWidth: 1,
               borderTopColor: colors.border,
               backgroundColor: colors.backgroundPrimary,
+              paddingBottom: Math.max(insets.bottom, 12),
             }}
           >
             <TextInput

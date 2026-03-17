@@ -14,6 +14,7 @@ const complaintAssignmentSchema = new mongoose.Schema(
       enum: ["assigned", "in-progress", "completed", "needs-rework"],
       default: "assigned",
     },
+    isLeader: { type: Boolean, default: false },
     completedAt: { type: Date, default: null },
   },
   { _id: false },

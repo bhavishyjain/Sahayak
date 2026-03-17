@@ -1,9 +1,7 @@
-const Complaint = require("../../models/Complaint");
 const User = require("../../models/User");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
-const { buildComplaintView } = require("../../utils/complaintView");
 const {
   getRequestUserId,
   getHodOrThrow,
@@ -15,10 +13,10 @@ const {
 } = require("../../services/complaintAssignmentService");
 const { calculateETA } = require("./helpers");
 const {
-  buildComplaintListQuery,
   parsePagination,
 } = require("../../services/complaintQueryService");
 const { ANALYTICS_STATUS_BUCKETS } = require("../../services/analyticsMetricsService");
+const { listComplaints } = require("../../services/complaintListService");
 const {
   buildDetailPayload,
   buildListPayload,
@@ -93,54 +91,39 @@ exports.getWorkerComplaints = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { workerId } = req.params;
   const { status, search, startDate, endDate } = req.query;
-  const { page, limit, skip } = parsePagination(req);
+  const { page, limit } = parsePagination(req);
 
   await getWorkerOrThrow(workerId, {
     department: hod.department,
     departmentErrorMessage: "Worker not found in your department",
   });
 
-  const query = buildComplaintListQuery(
-    {
-      "assignedWorkers.workerId": workerId,
-      department: hod.department,
-    },
-    {
-      status: status === "completed" ? "resolved" : undefined,
-      excludeStatus:
-        status === "active" ? "resolved,cancelled,pending-approval" : undefined,
-      search,
-      startDate,
-      endDate,
-      dateField: "updatedAt",
-    },
-  );
+  const { payload } = await listComplaints({
+    actorRole: hod.role,
+    actorDepartment: hod.department,
+    scope: "department",
+    baseQuery: { department: hod.department },
+    assignmentConstraints: { workerId },
+    status: status === "completed" ? "resolved" : undefined,
+    excludeStatus:
+      status === "active" ? "resolved,cancelled,pending-approval" : undefined,
+    statusList:
+      status === "active" ? ANALYTICS_STATUS_BUCKETS.workerOpen : undefined,
+    search,
+    startDate,
+    endDate,
+    dateField: "updatedAt",
+    req,
+    page,
+    limit,
+    sort: "updated-desc",
+    populate: ["ownerSummary"],
+    includeAssignment: true,
+  });
 
-  if (status === "active") {
-    query.status = { $in: ANALYTICS_STATUS_BUCKETS.workerOpen };
-  }
-
-  const [complaints, total] = await Promise.all([
-    Complaint.find(query)
-      .populate("userId", "fullName email phone")
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(limit),
-    Complaint.countDocuments(query),
-  ]);
-
-  const complaintsList = complaints.map((complaint) =>
-    buildComplaintView(complaint),
-  );
   return sendSuccess(
     res,
-    buildListPayload({
-      items: complaintsList,
-      itemKey: "complaints",
-      page,
-      limit,
-      total,
-    }),
+    payload,
   );
 });
 
@@ -161,6 +144,7 @@ exports.getComplaintWorkers = asyncHandler(async (req, res) => {
     workerId: item.workerId,
     taskDescription: item.taskDescription || null,
     status: item.status,
+    isLeader: Boolean(item.isLeader),
     assignedAt: item.assignedAt,
     completedAt: item.completedAt,
   }));

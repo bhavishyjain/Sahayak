@@ -14,6 +14,9 @@ const {
   applyAnalyticsComplaintFilters,
 } = require("../services/filterContractService");
 const { buildSummaryPayload } = require("../services/responseViewService");
+const {
+  getComplaintMetricSnapshot,
+} = require("../services/complaintAnalyticsService");
 
 function severityFromIntensity(intensity) {
   if (intensity >= 100) return "critical";
@@ -34,34 +37,17 @@ exports.summary = asyncHandler(async (req, res) => {
     summaryQuery.createdAt?.$gte ?? monthsAgoStart(5);
 
   const [
-    statusRows,
+    snapshot,
     recentComplaints,
-    resolvedComplaints,
-    departmentBreakdownRaw,
     monthlyData,
   ] = await Promise.all([
-    Complaint.aggregate([
-      { $match: summaryQuery },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
+    getComplaintMetricSnapshot(summaryQuery),
     Complaint.find(summaryQuery)
       .sort({ createdAt: -1 })
       .limit(5)
       .select(
         "ticketId rawText refinedText department priority status locationName createdAt",
       ),
-    Complaint.find({
-      ...summaryQuery,
-      status: "resolved",
-      resolvedAt: { $ne: null },
-    })
-      .select("createdAt resolvedAt")
-      .lean(),
-    Complaint.aggregate([
-      { $match: summaryQuery },
-      { $group: { _id: "$department", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ]),
     Complaint.aggregate([
       { $match: { ...summaryQuery, createdAt: { $gte: trendStart } } },
       {
@@ -76,20 +62,8 @@ exports.summary = asyncHandler(async (req, res) => {
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ]),
   ]);
-
-  let avgResolutionTime = null;
-  if (resolvedComplaints.length > 0) {
-    const totalHours = resolvedComplaints.reduce((sum, c) => {
-      const hrs =
-        (new Date(c.resolvedAt) - new Date(c.createdAt)) / (1000 * 60 * 60);
-      return sum + (Number.isFinite(hrs) && hrs >= 0 ? hrs : 0);
-    }, 0);
-    avgResolutionTime = Math.round(totalHours / resolvedComplaints.length);
-  }
-
-  const departmentBreakdown = (departmentBreakdownRaw || [])
-    .filter((item) => item?._id)
-    .map((item) => ({ department: item._id, count: item.count }));
+  const avgResolutionTime = snapshot.avgResolutionTime || null;
+  const departmentBreakdown = snapshot.departmentRows;
 
   const mostActiveDepartment = departmentBreakdown[0]?.department || null;
 
@@ -107,12 +81,11 @@ exports.summary = asyncHandler(async (req, res) => {
 
   const summary = {
     stats: {
-      total: statusRows.reduce((sum, row) => sum + Number(row.count || 0), 0),
-      pending: statusRows.find((row) => row._id === "pending")?.count || 0,
-      assigned: statusRows.find((row) => row._id === "assigned")?.count || 0,
-      inProgress:
-        statusRows.find((row) => row._id === "in-progress")?.count || 0,
-      resolved: statusRows.find((row) => row._id === "resolved")?.count || 0,
+      total: snapshot.total || 0,
+      pending: snapshot.byStatus.pending || 0,
+      assigned: snapshot.byStatus.assigned || 0,
+      inProgress: snapshot.byStatus["in-progress"] || 0,
+      resolved: snapshot.byStatus.resolved || 0,
     },
     avgResolutionTime,
     mostActiveDepartment,

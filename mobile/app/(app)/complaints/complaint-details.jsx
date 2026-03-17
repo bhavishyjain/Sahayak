@@ -715,6 +715,22 @@ function ComplaintDetailsInner() {
       (complaint.assignedWorkers || []).some((assignment) => {
         return String(assignment?.workerId || "") === String(currentUserId || "");
       }));
+  const hasExplicitLeader = (complaint.assignedWorkers || []).some(
+    (assignment) => assignment?.isLeader,
+  );
+  const currentWorkerAssignment = (complaint.assignedWorkers || []).find(
+    (assignment) => String(assignment?.workerId || "") === String(currentUserId || ""),
+  );
+  const isCurrentWorkerLeader =
+    userRole === "worker" &&
+    Boolean(
+      currentWorkerAssignment &&
+        (currentWorkerAssignment?.isLeader ||
+          (!hasExplicitLeader &&
+            String(
+              complaint.assignedWorkers?.[0]?.workerId || "",
+            ) === String(currentUserId || ""))),
+    );
 
   const showHeadReviewAction =
     userRole === "head" && effectiveActionStatus === "pending-approval";
@@ -732,10 +748,13 @@ function ComplaintDetailsInner() {
       : 0;
   const showWorkerStartWorkAction =
     isCurrentWorkerAssigned &&
+    isCurrentWorkerLeader &&
     (workerActionStatus === "assigned" ||
       workerActionStatus === "needs-rework");
   const showWorkerUploadAction =
-    isCurrentWorkerAssigned && workerActionStatus === "in-progress";
+    isCurrentWorkerAssigned &&
+    isCurrentWorkerLeader &&
+    workerActionStatus === "in-progress";
   const workerActionFooterHeight =
     showWorkerStartWorkAction || showWorkerUploadAction ? 100 : 0;
   const detailBottomPadding =
@@ -778,6 +797,7 @@ function ComplaintDetailsInner() {
       };
     },
   );
+  const showSatisfactionActions = userRole === "user";
 
   return (
     <View
@@ -1169,6 +1189,87 @@ function ComplaintDetailsInner() {
               </Text>
             </Card>
           )}
+
+        {hasAssignedWorkers && (
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <Users size={18} color={colors.primary} />
+                <Text
+                  className="text-base font-semibold ml-2"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("complaints.details.assignedWorkersTitle", {
+                    count: assignedWorkerCount,
+                  })}
+                </Text>
+              </View>
+              {userRole === "worker" && !isCurrentWorkerLeader && (
+                <View
+                  className="px-3 py-1 rounded-full"
+                  style={{ backgroundColor: colors.warning + "20" }}
+                >
+                  <Text
+                    className="text-xs font-semibold"
+                    style={{ color: colors.warning }}
+                  >
+                    Leader updates status
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {(complaint.assignedWorkers || []).map((assignment, index) => (
+              <View key={`${assignment.workerId}-${index}`}>
+                {index > 0 && (
+                  <View
+                    className="h-[1px] my-3"
+                    style={{ backgroundColor: colors.border }}
+                  />
+                )}
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 pr-3">
+                    <View className="flex-row items-center flex-wrap">
+                      <Text
+                        className="text-base font-semibold"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {assignment.workerName || "Worker"}
+                      </Text>
+                      {assignment.isLeader && (
+                        <View
+                          className="ml-2 px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: colors.primary + "18" }}
+                        >
+                          <Text
+                            className="text-[10px] font-bold"
+                            style={{ color: colors.primary }}
+                          >
+                            Leader
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text
+                      className="text-xs mt-1"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {formatStatusLabel(t, assignment.status || "assigned")}
+                    </Text>
+                    {assignment.taskDescription ? (
+                      <Text
+                        className="text-sm mt-2 leading-5"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {assignment.taskDescription}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            ))}
+          </Card>
+        )}
 
         {/* Title and Description */}
         <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
@@ -1782,14 +1883,14 @@ function ComplaintDetailsInner() {
             <View className="flex-row items-center justify-around mb-4">
               <Pressable
                 onPress={() => handleSatisfactionVote("up")}
-                disabled={votingInProgress}
+                disabled={votingInProgress || !showSatisfactionActions}
                 className="flex-1 mr-2 py-4 rounded-xl items-center"
                 style={{
                   backgroundColor:
                     satisfactionVotes.userVote === "up"
                       ? colors.success
                       : colors.backgroundSecondary,
-                  opacity: votingInProgress ? 0.5 : 1,
+                  opacity: votingInProgress || !showSatisfactionActions ? 0.5 : 1,
                 }}
               >
                 <ThumbsUp
@@ -1826,14 +1927,14 @@ function ComplaintDetailsInner() {
 
               <Pressable
                 onPress={() => handleSatisfactionVote("down")}
-                disabled={votingInProgress}
+                disabled={votingInProgress || !showSatisfactionActions}
                 className="flex-1 ml-2 py-4 rounded-xl items-center"
                 style={{
                   backgroundColor:
                     satisfactionVotes.userVote === "down"
                       ? colors.danger
                       : colors.backgroundSecondary,
-                  opacity: votingInProgress ? 0.5 : 1,
+                  opacity: votingInProgress || !showSatisfactionActions ? 0.5 : 1,
                 }}
               >
                 <ThumbsDown
@@ -1868,6 +1969,12 @@ function ComplaintDetailsInner() {
                 </Text>
               </Pressable>
             </View>
+
+            {!showSatisfactionActions && (
+              <Text className="text-xs mb-3" style={{ color: colors.textSecondary }}>
+                Satisfaction voting is available only for citizens.
+              </Text>
+            )}
 
             {/* Satisfaction percentage bar */}
             {(() => {

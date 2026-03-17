@@ -3,6 +3,7 @@ function normalizeAssignedWorker(worker = {}) {
     ...worker,
     workerId: String(worker.workerId || ""),
     workerName: worker.workerName || null,
+    isLeader: Boolean(worker.isLeader),
   };
 }
 

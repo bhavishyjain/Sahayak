@@ -45,7 +45,7 @@ export default function ResolvedComplaints() {
     refresh,
     error,
   } = useComplaintList({
-    scope: "mine",
+    scope: "all",
     status: "resolved",
     department: departmentFilter,
     priority: priorityFilter,

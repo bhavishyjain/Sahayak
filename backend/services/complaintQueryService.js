@@ -142,9 +142,6 @@ function normalizeComplaintSort(sort, fallback = { createdAt: -1 }) {
 function applyComplaintScopeFilter(query, { reqUser, scope = "mine" } = {}) {
   const normalizedScope = String(scope || "mine").trim().toLowerCase();
   if (normalizedScope === "all") {
-    if (reqUser?.role === "user") {
-      throw new AppError("Forbidden", 403);
-    }
     return normalizedScope;
   }
 

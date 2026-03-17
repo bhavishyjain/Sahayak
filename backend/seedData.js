@@ -4,6 +4,7 @@ const crypto = require("crypto");
 require("dotenv").config();
 const User = require("./models/User");
 const Complaint = require("./models/Complaint");
+const ComplaintMessage = require("./models/ComplaintMessage");
 const WorkerInvitation = require("./models/WorkerInvitation");
 const Notification = require("./models/Notification");
 const ReportSchedule = require("./models/ReportSchedule");
@@ -142,6 +143,68 @@ function getRandomNotificationPreferences(role = "user") {
     assignments: Math.random() < 0.94 ? base.assignments : !base.assignments,
     escalations: Math.random() < 0.9 ? base.escalations : !base.escalations,
     systemAlerts: Math.random() < 0.96 ? base.systemAlerts : !base.systemAlerts,
+  };
+}
+
+function buildSeedPushTokens(seedKey, maxDevices = 1) {
+  const deviceCount = Math.max(0, Number(maxDevices) || 0);
+  return Array.from({ length: deviceCount }, (_, index) => {
+    const tokenSeed = crypto
+      .createHash("sha256")
+      .update(`${seedKey}-push-${index}`)
+      .digest("hex")
+      .slice(0, 22);
+    return `ExponentPushToken[${tokenSeed}]`;
+  });
+}
+
+function buildSeedRefreshTokens(seedKey, sessionCount = 1, now = new Date()) {
+  const safeCount = Math.max(0, Number(sessionCount) || 0);
+  return Array.from({ length: safeCount }, (_, index) => ({
+    tokenHash: crypto
+      .createHash("sha256")
+      .update(`${seedKey}-refresh-${index}`)
+      .digest("hex"),
+    expiresAt: new Date(
+      now.getTime() + (7 + Math.floor(Math.random() * 45)) * ONE_DAY_MS,
+    ),
+  }));
+}
+
+function getEstimatedCompletionHours(department, priority) {
+  const baseByDepartment = {
+    Road: 42,
+    Water: 20,
+    Electricity: 16,
+    Waste: 10,
+    Drainage: 28,
+    Other: 18,
+  };
+  const priorityMultiplier =
+    priority === "High" ? 0.75 : priority === "Medium" ? 1 : 1.25;
+  const variance = 0.85 + Math.random() * 0.35;
+  const base = baseByDepartment[department] || baseByDepartment.Other;
+  return Math.max(4, Math.round(base * priorityMultiplier * variance));
+}
+
+function getDurationHours(startAt, endAt) {
+  if (!startAt || !endAt) return null;
+  const start = new Date(startAt).getTime();
+  const end = new Date(endAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return null;
+  }
+  return Math.round(((end - start) / ONE_HOUR_MS) * 10) / 10;
+}
+
+function createRouteData(screen, params = {}) {
+  return {
+    screen,
+    params: Object.entries(params).reduce((acc, [key, value]) => {
+      if (value === undefined || value === null || value === "") return acc;
+      acc[key] = String(value);
+      return acc;
+    }, {}),
   };
 }
 
@@ -889,6 +952,135 @@ const reworkReasonTemplates = [
   "Final finish quality is below standard. Rework and upload proper completion photos for review.",
 ];
 
+function buildComplaintMessageSeeds({
+  complaint,
+  owner,
+  assignedWorkers = [],
+  workersById = new Map(),
+  hodByDepartment = new Map(),
+  now = new Date(),
+}) {
+  if (!complaint || !owner) return [];
+
+  const messages = [];
+  const addMessage = (sender, role, text, createdAt) => {
+    if (!sender || !text || !createdAt) return;
+    const timestamp = new Date(createdAt);
+    if (Number.isNaN(timestamp.getTime())) return;
+    messages.push({
+      complaintId: complaint._id,
+      senderId: sender._id,
+      senderName: sender.fullName || sender.username || "User",
+      senderRole: role,
+      text,
+      createdAt: timestamp > now ? now : timestamp,
+    });
+  };
+
+  const leaderAssignment =
+    assignedWorkers.find((assignment) => assignment?.isLeader) ||
+    assignedWorkers[0] ||
+    null;
+  const leaderWorker = leaderAssignment
+    ? workersById.get(String(leaderAssignment.workerId))
+    : null;
+  const departmentHod = hodByDepartment.get(complaint.department);
+  const assignedEntry = (complaint.history || []).find(
+    (entry) => entry.status === "assigned",
+  );
+  const pendingApprovalEntry = (complaint.history || []).find(
+    (entry) => entry.status === "pending-approval",
+  );
+  const reworkEntry = (complaint.history || []).find(
+    (entry) => entry.status === "needs-rework",
+  );
+  const resolvedEntry = (complaint.history || []).find(
+    (entry) => entry.status === "resolved",
+  );
+
+  addMessage(
+    owner,
+    "user",
+    `Please help with ${complaint.locationName}. Ticket ${complaint.ticketId} is affecting daily life here.`,
+    new Date(new Date(complaint.createdAt).getTime() + 30 * 60 * 1000),
+  );
+
+  if (leaderWorker && assignedEntry?.timestamp) {
+    addMessage(
+      leaderWorker,
+      "worker",
+      `I am taking the lead on this ${complaint.department.toLowerCase()} complaint and will coordinate the field work.`,
+      new Date(new Date(assignedEntry.timestamp).getTime() + 45 * 60 * 1000),
+    );
+  }
+
+  if (assignedWorkers.length > 1 && assignedEntry?.timestamp) {
+    assignedWorkers
+      .filter((assignment) => !assignment?.isLeader)
+      .slice(0, 1)
+      .forEach((assignment, index) => {
+        const worker = workersById.get(String(assignment.workerId));
+        if (!worker) return;
+        addMessage(
+          worker,
+          "worker",
+          `I have joined this task and will support the leader with on-site execution.`,
+          new Date(
+            new Date(assignedEntry.timestamp).getTime() +
+              (2 + index) * ONE_HOUR_MS,
+          ),
+        );
+      });
+  }
+
+  if (departmentHod && assignedEntry?.timestamp && Math.random() < 0.75) {
+    addMessage(
+      departmentHod,
+      "head",
+      `Department team assigned. Please use this thread for updates and blocker escalation.`,
+      new Date(new Date(assignedEntry.timestamp).getTime() + 90 * 60 * 1000),
+    );
+  }
+
+  if (pendingApprovalEntry?.timestamp && leaderWorker) {
+    addMessage(
+      leaderWorker,
+      "worker",
+      "Field work is completed from our side. Completion photos have been uploaded for approval.",
+      new Date(
+        new Date(pendingApprovalEntry.timestamp).getTime() + 20 * 60 * 1000,
+      ),
+    );
+  }
+
+  if (reworkEntry?.timestamp && departmentHod) {
+    addMessage(
+      departmentHod,
+      "head",
+      String(
+        complaint.note ||
+          "Please rework the unresolved portion and update once complete.",
+      ),
+      new Date(new Date(reworkEntry.timestamp).getTime() + 15 * 60 * 1000),
+    );
+  }
+
+  if (resolvedEntry?.timestamp && owner && Math.random() < 0.65) {
+    addMessage(
+      owner,
+      "user",
+      complaint.feedback?.rating >= 4
+        ? "The issue looks resolved now. Thank you for the quick action."
+        : "I can confirm the issue was attended to. Sharing my feedback separately.",
+      new Date(new Date(resolvedEntry.timestamp).getTime() + 2 * ONE_HOUR_MS),
+    );
+  }
+
+  return messages
+    .filter((message) => message.createdAt >= complaint.createdAt)
+    .sort((left, right) => left.createdAt - right.createdAt);
+}
+
 // Generate random complaint
 function generateComplaint(userId, allUsers) {
   const departments = [
@@ -1305,6 +1497,7 @@ async function seedDatabase() {
     console.log("\n🗑️  Clearing existing data...");
     await User.deleteMany({});
     await Complaint.deleteMany({});
+    await ComplaintMessage.deleteMany({});
     await WorkerInvitation.deleteMany({});
     await Notification.deleteMany({});
     await ReportSchedule.deleteMany({});
@@ -1318,8 +1511,9 @@ async function seedDatabase() {
 
     // Admin users (2)
     for (let i = 1; i <= 2; i++) {
+      const username = `admin${i}`;
       users.push({
-        username: `admin${i}`,
+        username,
         password: hashedPassword,
         role: "admin",
         department: "Other",
@@ -1329,6 +1523,8 @@ async function seedDatabase() {
         emailVerified: true,
         preferredLanguage: "en",
         notificationPreferences: getRandomNotificationPreferences("admin"),
+        pushTokens: buildSeedPushTokens(username, 1),
+        refreshTokens: buildSeedRefreshTokens(username, 2),
         ...getUserSeedTimestamps(),
       });
     }
@@ -1336,8 +1532,9 @@ async function seedDatabase() {
     // HOD/Head users (5 - one per department)
     const departments = ["Road", "Water", "Electricity", "Waste", "Drainage"];
     departments.forEach((dept, idx) => {
+      const username = `hod_${dept.toLowerCase()}`;
       users.push({
-        username: `hod_${dept.toLowerCase()}`,
+        username,
         password: hashedPassword,
         role: "head",
         department: dept,
@@ -1347,6 +1544,11 @@ async function seedDatabase() {
         emailVerified: true,
         preferredLanguage: Math.random() < 0.65 ? "hi" : "en",
         notificationPreferences: getRandomNotificationPreferences("head"),
+        pushTokens: buildSeedPushTokens(username, Math.random() < 0.4 ? 2 : 1),
+        refreshTokens: buildSeedRefreshTokens(
+          username,
+          Math.random() < 0.5 ? 2 : 1,
+        ),
         ...getUserSeedTimestamps(),
       });
     });
@@ -1355,8 +1557,9 @@ async function seedDatabase() {
     for (let dept of departments) {
       for (let i = 1; i <= 6; i++) {
         const location = getRandomLocation();
+        const username = `worker_${dept.toLowerCase()}_${i}`;
         users.push({
-          username: `worker_${dept.toLowerCase()}_${i}`,
+          username,
           password: hashedPassword,
           role: "worker",
           department: dept,
@@ -1378,6 +1581,14 @@ async function seedDatabase() {
           emailVerified: true,
           preferredLanguage: Math.random() < 0.7 ? "hi" : "en",
           notificationPreferences: getRandomNotificationPreferences("worker"),
+          pushTokens: buildSeedPushTokens(
+            username,
+            Math.random() < 0.3 ? 2 : 1,
+          ),
+          refreshTokens: buildSeedRefreshTokens(
+            username,
+            1 + Math.floor(Math.random() * 2),
+          ),
           ...getUserSeedTimestamps(),
         });
       }
@@ -1479,8 +1690,9 @@ async function seedDatabase() {
       const firstName =
         firstNames[Math.floor(Math.random() * firstNames.length)];
       const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+      const username = `user${i}`;
       users.push({
-        username: `user${i}`,
+        username,
         password: hashedPassword,
         role: "user",
         department: "Other",
@@ -1490,6 +1702,14 @@ async function seedDatabase() {
         emailVerified: true,
         preferredLanguage: getRandomPreferredLanguage(),
         notificationPreferences: getRandomNotificationPreferences("user"),
+        pushTokens:
+          Math.random() < 0.7
+            ? buildSeedPushTokens(username, Math.random() < 0.2 ? 2 : 1)
+            : [],
+        refreshTokens: buildSeedRefreshTokens(
+          username,
+          Math.random() < 0.55 ? 1 : 0,
+        ),
         ...getUserSeedTimestamps(),
       });
     }
@@ -1547,6 +1767,11 @@ async function seedDatabase() {
           const deptHod = hods.find(
             (h) => h.department === complaint.department,
           );
+          complaint.assignedBy = deptHod?._id || null;
+          complaint.estimatedCompletionTime = getEstimatedCompletionHours(
+            complaint.department,
+            complaint.priority,
+          );
 
           // Patch updatedBy in history entries
           complaint.history.forEach((h) => {
@@ -1592,6 +1817,7 @@ async function seedDatabase() {
               assignedAt: complaint.assignedAt,
               taskDescription: getTaskDescription(complaint.department),
               status: primaryTaskStatus,
+              isLeader: true,
               completedAt: completedAtTimestamp,
             },
           ];
@@ -1622,6 +1848,7 @@ async function seedDatabase() {
                 assignedAt: complaint.assignedAt,
                 taskDescription: getTaskDescription(complaint.department),
                 status: secondTaskStatus,
+                isLeader: false,
                 completedAt: completedAtTimestamp,
               });
 
@@ -1716,6 +1943,14 @@ async function seedDatabase() {
       }
 
       syncComplaintTimestamps(complaint);
+      if (complaint.status === "resolved") {
+        complaint.actualCompletionTime =
+          getDurationHours(complaint.assignedAt, complaint.resolvedAt) ||
+          complaint.estimatedCompletionTime ||
+          null;
+      } else {
+        complaint.actualCompletionTime = null;
+      }
 
       complaints.push(complaint);
 
@@ -1760,9 +1995,61 @@ async function seedDatabase() {
       `   - ${createdComplaints.filter((c) => c.satisfactionVotes && ((c.satisfactionVotes.thumbsUp || []).length > 0 || (c.satisfactionVotes.thumbsDown || []).length > 0)).length} With satisfaction votes`,
     );
 
+    console.log("\n💬 Seeding complaint chat threads...");
+    const workersById = new Map(
+      workers.map((worker) => [String(worker._id), worker]),
+    );
+    const hodByDepartment = new Map(hods.map((hod) => [hod.department, hod]));
+    const usersById = new Map(
+      regularUsers.map((user) => [String(user._id), user]),
+    );
+    const now = new Date();
+    const complaintMessageRows = [];
+    createdComplaints.forEach((complaint) => {
+      if (Math.random() > 0.42) return;
+      const owner = usersById.get(String(complaint.userId));
+      const threadMessages = buildComplaintMessageSeeds({
+        complaint,
+        owner,
+        assignedWorkers: complaint.assignedWorkers || [],
+        workersById,
+        hodByDepartment,
+        now,
+      });
+      complaintMessageRows.push(...threadMessages);
+    });
+    if (complaintMessageRows.length > 0) {
+      await ComplaintMessage.insertMany(complaintMessageRows);
+    }
+    console.log(`✅ Created ${complaintMessageRows.length} complaint messages`);
+
+    console.log("\n🗃️  Creating recycle-bin sample complaints...");
+    const softDeletedComplaints = createdComplaints
+      .filter(
+        (complaint) =>
+          ["resolved", "cancelled"].includes(complaint.status) &&
+          complaint.createdAt < new Date(now.getTime() - 10 * ONE_DAY_MS),
+      )
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .slice(0, 18);
+    for (const complaint of softDeletedComplaints) {
+      const deletedAt = createStageTimestamp(
+        new Date(complaint.updatedAt),
+        12,
+        120,
+        now,
+      );
+      await Complaint.updateOne(
+        { _id: complaint._id },
+        { $set: { deleted: true, deletedAt } },
+      );
+    }
+    console.log(
+      `✅ Marked ${softDeletedComplaints.length} complaints as soft-deleted for admin recovery flows`,
+    );
+
     // ── Seed Worker Invitations ────────────────────────────────────────
     console.log("\n📧 Seeding worker invitations...");
-    const now = new Date();
 
     const invitationTemplates = [
       // pending
@@ -1900,10 +2187,26 @@ async function seedDatabase() {
     console.log("\n📈 Seeding report schedules...");
     const scheduleRows = [];
     for (const hod of hods) {
-      const frequency = Math.random() < 0.6 ? "weekly" : "daily";
-      const format = Math.random() < 0.5 ? "pdf" : "excel";
+      const frequency =
+        Math.random() < 0.5
+          ? "weekly"
+          : Math.random() < 0.8
+            ? "daily"
+            : "monthly";
+      const format =
+        Math.random() < 0.4 ? "pdf" : Math.random() < 0.75 ? "excel" : "csv";
       const hour = 8 + Math.floor(Math.random() * 3);
       const createdAt = getDateWithinLastDays(4, 40, now);
+      const lastAttemptAt =
+        Math.random() < 0.9 ? getRandomDateBetween(createdAt, now) : null;
+      const hasRecentFailure = lastAttemptAt && Math.random() < 0.2;
+      const lastFailureAt = hasRecentFailure
+        ? getRandomDateBetween(lastAttemptAt, now)
+        : null;
+      const lastSentAt =
+        hasRecentFailure || !lastAttemptAt
+          ? getRandomDateBetween(createdAt, now)
+          : getRandomDateBetween(lastAttemptAt, now);
       scheduleRows.push({
         userId: hod._id,
         email: hod.email,
@@ -1914,8 +2217,20 @@ async function seedDatabase() {
         filters: { department: hod.department },
         timezone: process.env.REPORT_SCHEDULE_TIMEZONE || "Asia/Kolkata",
         hour,
-        isActive: true,
-        lastSentAt: getRandomDateBetween(createdAt, now),
+        isActive: Math.random() < 0.88,
+        lastSentAt,
+        lastAttemptAt,
+        lastFailureAt,
+        lastError: hasRecentFailure
+          ? pickRandom([
+              "PDF generation timed out for large report",
+              "SMTP delivery was rejected by remote server",
+              "Temporary filesystem write failure during report export",
+            ])
+          : null,
+        lastErrorStage: hasRecentFailure
+          ? pickRandom(["generation", "delivery"])
+          : null,
         createdAt,
         updatedAt: now,
       });
@@ -1946,6 +2261,10 @@ async function seedDatabase() {
             ticketId: complaint.ticketId,
             status: complaint.status,
             type: "complaint-update",
+            route: createRouteData("complaint-detail", {
+              complaintId: complaint._id,
+              ticketId: complaint.ticketId,
+            }),
           },
           readAt:
             Math.random() < 0.55 ? getDateWithinLastDays(0, 14, now) : null,
@@ -1966,6 +2285,10 @@ async function seedDatabase() {
               ticketId: complaint.ticketId,
               department: complaint.department,
               type: "assignment",
+              route: createRouteData("complaint-detail", {
+                complaintId: complaint._id,
+                ticketId: complaint.ticketId,
+              }),
             },
             readAt:
               Math.random() < 0.7 ? getDateWithinLastDays(0, 10, now) : null,
@@ -1988,6 +2311,10 @@ async function seedDatabase() {
               ticketId: complaint.ticketId,
               escalationLevel: complaint.sla.escalationLevel,
               type: "escalation",
+              route: createRouteData("complaint-detail", {
+                complaintId: complaint._id,
+                ticketId: complaint.ticketId,
+              }),
             },
             readAt:
               Math.random() < 0.45 ? getDateWithinLastDays(0, 10, now) : null,
@@ -1996,7 +2323,52 @@ async function seedDatabase() {
           });
         }
       }
+
+      if (Math.random() < 0.15) {
+        const deptHod = hods.find((h) => h.department === complaint.department);
+        if (deptHod) {
+          notificationRows.push({
+            userId: deptHod._id,
+            title: `AI review suggestion for ${complaint.ticketId}`,
+            body: "A complaint in your department has a strong AI department or priority suggestion.",
+            type: "system",
+            data: {
+              complaintId: String(complaint._id),
+              ticketId: complaint.ticketId,
+              type: "system",
+              route: createRouteData("ai-review", {
+                complaintId: complaint._id,
+                ticketId: complaint.ticketId,
+              }),
+            },
+            readAt:
+              Math.random() < 0.4 ? getDateWithinLastDays(0, 10, now) : null,
+            createdAt: getDateWithinLastDays(0, 12, now),
+            updatedAt: now,
+          });
+        }
+      }
     }
+
+    createdUsers
+      .filter((user) => user.role === "admin" || user.role === "head")
+      .forEach((user) => {
+        if (Math.random() < 0.75) {
+          notificationRows.push({
+            userId: user._id,
+            title: "Daily system digest available",
+            body: "Review pending approvals, escalations, schedules, and unresolved backlog from the operations dashboard.",
+            type: "system",
+            data: {
+              type: "system",
+            },
+            readAt:
+              Math.random() < 0.35 ? getDateWithinLastDays(0, 6, now) : null,
+            createdAt: getDateWithinLastDays(0, 6, now),
+            updatedAt: now,
+          });
+        }
+      });
 
     if (notificationRows.length > 0) {
       await Notification.insertMany(notificationRows);

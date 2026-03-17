@@ -3,13 +3,9 @@ const Complaint = require("../models/Complaint");
 const User = require("../models/User");
 const AppError = require("../core/AppError");
 const {
-  emitComplaintParticipantRealtime,
-  notifyComplaintParticipants,
-} = require("./complaintAudienceService");
-const {
-  NOTIFICATION_ROUTE_SCREENS,
-  buildNotificationRoute,
-} = require("./notificationDomainService");
+  COMPLAINT_DOMAIN_EVENTS,
+  emitComplaintDomainEvent,
+} = require("./complaintEventService");
 
 function normalizeEstimatedTime(estimatedCompletionTime) {
   if (estimatedCompletionTime === undefined || estimatedCompletionTime === null) {
@@ -31,6 +27,10 @@ function getTaskDescription(taskDescriptions, workerId) {
   if (!taskDescriptions) return null;
   const value = taskDescriptions[String(workerId)];
   return value ? String(value) : null;
+}
+
+function hasExplicitLeader(workers) {
+  return Array.isArray(workers) && workers.some((item) => item?.isLeader === true);
 }
 
 function buildTaskDescriptionMap(workers) {
@@ -131,15 +131,20 @@ async function assignComplaintToWorkers(options) {
       );
       const orderedWorkerDocs = orderedWorkerIds.map((id) => workersById.get(id));
 
-      complaintDoc.assignedWorkers = orderedWorkerDocs.map((workerDoc) => ({
-        workerId: workerDoc._id,
-        taskDescription: getTaskDescription(
-          mergedTaskDescriptions,
-          workerDoc._id,
-        ),
-        assignedAt: now,
-        status: "assigned",
-      }));
+      const useExplicitLeader = hasExplicitLeader(workers);
+      complaintDoc.assignedWorkers = orderedWorkerDocs.map((workerDoc, index) => {
+        const sourceWorker = workers[index] || {};
+        return {
+          workerId: workerDoc._id,
+          taskDescription: getTaskDescription(
+            mergedTaskDescriptions,
+            workerDoc._id,
+          ),
+          assignedAt: now,
+          status: "assigned",
+          isLeader: useExplicitLeader ? Boolean(sourceWorker?.isLeader) : index === 0,
+        };
+      });
       complaintDoc.status = "assigned";
       complaintDoc.assignedAt = now;
       complaintDoc.assignedBy = assignedBy;
@@ -189,15 +194,20 @@ async function assignComplaintToWorkers(options) {
     const orderedWorkerDocs = orderedWorkerIds.map((id) => workersById.get(id));
     const previousState = complaintDoc.toObject();
     try {
-      complaintDoc.assignedWorkers = orderedWorkerDocs.map((workerDoc) => ({
-        workerId: workerDoc._id,
-        taskDescription: getTaskDescription(
-          mergedTaskDescriptions,
-          workerDoc._id,
-        ),
-        assignedAt: now,
-        status: "assigned",
-      }));
+      const useExplicitLeader = hasExplicitLeader(workers);
+      complaintDoc.assignedWorkers = orderedWorkerDocs.map((workerDoc, index) => {
+        const sourceWorker = workers[index] || {};
+        return {
+          workerId: workerDoc._id,
+          taskDescription: getTaskDescription(
+            mergedTaskDescriptions,
+            workerDoc._id,
+          ),
+          assignedAt: now,
+          status: "assigned",
+          isLeader: useExplicitLeader ? Boolean(sourceWorker?.isLeader) : index === 0,
+        };
+      });
       complaintDoc.status = "assigned";
       complaintDoc.assignedAt = now;
       complaintDoc.assignedBy = assignedBy;
@@ -224,58 +234,13 @@ async function assignComplaintToWorkers(options) {
 
   // Fire-and-forget notifications after transaction commits
   if (updatedComplaint) {
-    const ticketId = updatedComplaint.ticketId;
-    await notifyComplaintParticipants(
+    await emitComplaintDomainEvent(
       updatedComplaint,
+      COMPLAINT_DOMAIN_EVENTS.COMPLAINT_ASSIGNED,
       {
-        title: "Complaint Assignment Updated",
-        body: `Complaint #${ticketId} assignment has been updated.`,
-        data: {
-          type: "complaint-update",
-          complaintId: String(updatedComplaint._id),
-          ticketId,
-          status: updatedComplaint.status,
-          route: buildNotificationRoute(
-            NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
-            {
-              complaintId: String(updatedComplaint._id),
-              ticketId,
-            },
-          ),
-        },
+        actorId: assignedBy,
+        realtimeEvent: "workers-assigned",
       },
-      { excludeUserIds: [assignedBy] },
-    );
-
-    await Promise.all(
-      orderedWorkerIds.map((workerId) =>
-        notifyComplaintParticipants(
-          updatedComplaint,
-          {
-            title: "New Task Assigned",
-            body: `You have been assigned complaint #${ticketId}`,
-            data: {
-              type: "assignment",
-              complaintId: String(updatedComplaint._id),
-              ticketId,
-              route: buildNotificationRoute(
-                NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
-                {
-                  complaintId: String(updatedComplaint._id),
-                  ticketId,
-                },
-              ),
-            },
-          },
-          { includeHeads: false, excludeUserIds: [assignedBy, updatedComplaint.userId, ...orderedWorkerIds.filter((id) => id !== workerId)] },
-        ),
-      ),
-    );
-
-    await emitComplaintParticipantRealtime(
-      updatedComplaint,
-      "workers-assigned",
-      assignedBy,
     );
   }
 

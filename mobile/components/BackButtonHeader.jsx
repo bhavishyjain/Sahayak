@@ -12,6 +12,8 @@ export default function BackButtonHeader({
   title,
   hasBackButton = true,
   rightElement = null,
+  onBack = null,
+  fallbackHref = "/(app)/(tabs)/more",
 }) {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -29,10 +31,12 @@ export default function BackButtonHeader({
       {hasBackButton ? (
         <TouchableOpacity
           onPress={() => {
-            if (router.canGoBack()) {
+            if (typeof onBack === "function") {
+              onBack();
+            } else if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace("/"); // fallback
+              router.replace(fallbackHref);
             }
           }}
           className="w-10 h-10 rounded-full items-center justify-center"

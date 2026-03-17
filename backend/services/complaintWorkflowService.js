@@ -1,16 +1,9 @@
-const {
-  emitComplaintParticipantRealtime,
-  notifyComplaintParticipants,
-} = require("./complaintAudienceService");
 const AppError = require("../core/AppError");
+const { ROLES } = require("../domain/constants");
 const {
-  NOTIFICATION_TYPES,
-  ROLES,
-} = require("../domain/constants");
-const {
-  NOTIFICATION_ROUTE_SCREENS,
-  buildNotificationRoute,
-} = require("./notificationDomainService");
+  COMPLAINT_DOMAIN_EVENTS,
+  emitComplaintDomainEvent,
+} = require("./complaintEventService");
 
 const COMPLAINT_STATUS_TRANSITIONS = Object.freeze({
   [ROLES.WORKER]: {
@@ -124,34 +117,32 @@ async function broadcastComplaintStatusChange(
     actorId,
     status,
     body,
-    type = NOTIFICATION_TYPES.COMPLAINT_UPDATE,
     includeHeads = false,
     event = "status-changed",
+    reason,
   },
 ) {
-  await notifyComplaintParticipants(
-    complaint,
-    {
-      title: "Complaint Status Updated",
-      body,
-      data: {
-        type,
-        complaintId: String(complaint._id),
-        ticketId: complaint.ticketId,
-        status,
-        route: buildNotificationRoute(
-          NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
-          {
-            complaintId: String(complaint._id),
-            ticketId: complaint.ticketId,
-          },
-        ),
-      },
-    },
-    { excludeUserIds: [actorId], includeHeads },
-  );
+  let complaintEvent = COMPLAINT_DOMAIN_EVENTS.WORKER_STARTED;
+  if (status === "pending-approval") {
+    complaintEvent = COMPLAINT_DOMAIN_EVENTS.SUBMITTED_FOR_APPROVAL;
+  } else if (status === "needs-rework") {
+    complaintEvent = COMPLAINT_DOMAIN_EVENTS.REWORK_REQUESTED;
+  } else if (status === "resolved") {
+    complaintEvent = COMPLAINT_DOMAIN_EVENTS.COMPLAINT_RESOLVED;
+  } else if (status === "cancelled") {
+    complaintEvent = COMPLAINT_DOMAIN_EVENTS.COMPLAINT_CANCELLED;
+  } else if (event === "task-updated") {
+    complaintEvent = COMPLAINT_DOMAIN_EVENTS.TASK_UPDATED;
+  }
 
-  await emitComplaintParticipantRealtime(complaint, event, actorId);
+  await emitComplaintDomainEvent(complaint, complaintEvent, {
+    actorId,
+    status,
+    body,
+    includeHeads,
+    realtimeEvent: event,
+    reason,
+  });
 }
 
 module.exports = {

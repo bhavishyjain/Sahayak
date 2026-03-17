@@ -9,6 +9,7 @@ const {
   getWorkerActivePreview,
   getAssignedComplaints,
   getCompletedComplaints,
+  getWorkerFeedback,
   getLeaderboard,
   getWorkerAnalytics,
 } = require("../controllers/worker/analyticsController");
@@ -35,6 +36,7 @@ router.get(
 );
 router.get("/assigned-complaints", authorize("worker", "admin"), getAssignedComplaints);
 router.get("/completed-complaints", authorize("worker", "admin"), getCompletedComplaints);
+router.get("/feedback", authorize("worker", "admin"), getWorkerFeedback);
 router.get("/leaderboard", authorize("worker", "admin", "head"), getLeaderboard);
 router.get("/analytics", authorize("worker", "admin", "head"), getWorkerAnalytics);
 router.put(

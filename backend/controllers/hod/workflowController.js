@@ -135,6 +135,7 @@ exports.markNeedsRework = asyncHandler(async (req, res) => {
     status: "needs-rework",
     body: `Complaint #${complaint.ticketId} needs rework: ${reason}`,
     includeHeads: false,
+    reason,
   });
   return sendSuccess(
     res,
@@ -183,6 +184,7 @@ exports.cancelComplaint = asyncHandler(async (req, res) => {
     status: "cancelled",
     body: `Complaint #${complaint.ticketId} has been cancelled.`,
     includeHeads: false,
+    reason,
   });
   return sendSuccess(
     res,

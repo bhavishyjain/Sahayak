@@ -54,6 +54,7 @@ export function useHodWorkerAssignment(complaintId, t) {
         workerName: getWorkerName(w, t),
         taskDescription: w.taskDescription ?? "",
         status: w.status ?? "assigned",
+        isLeader: Boolean(w.isLeader),
         notes: w.notes ?? "",
         assignedAt: w.assignedAt,
         completedAt: w.completedAt,

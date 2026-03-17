@@ -2,6 +2,9 @@ const Complaint = require("../../models/Complaint");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
+const {
+  assertCanVoteSatisfaction,
+} = require("../../policies/complaintPolicy");
 
 exports.voteSatisfaction = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -12,18 +15,12 @@ exports.voteSatisfaction = asyncHandler(async (req, res) => {
   }
 
   const userId = req.user?._id || req.user?.id;
-  if (!userId) {
-    throw new AppError("Authentication required", 401);
-  }
 
   const complaint = await Complaint.findById(id);
   if (!complaint) {
     throw new AppError("Complaint not found", 404);
   }
-
-  if (complaint.status !== "resolved") {
-    throw new AppError("Can only vote on resolved complaints", 400);
-  }
+  await assertCanVoteSatisfaction(req.user, complaint);
 
   if (!complaint.satisfactionVotes) {
     complaint.satisfactionVotes = {

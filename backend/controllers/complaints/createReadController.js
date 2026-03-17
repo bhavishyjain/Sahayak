@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Complaint = require("../../models/Complaint");
-const { notifyUser } = require("../notificationController");
 const { buildComplaintView } = require("../../utils/complaintView");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
@@ -23,16 +22,18 @@ const {
   analyzeComplaintWithImage,
   analyzeSentiment,
 } = require("../../services/geminiService");
-const { assertCanAccessComplaint } = require("../../policies/complaintPolicy");
+const { assertCanViewComplaint } = require("../../policies/complaintPolicy");
 const {
   VALID_DEPARTMENTS,
-  buildComplaintListQuery,
-  normalizeComplaintSort,
 } = require("../../services/complaintQueryService");
+const { listComplaints } = require("../../services/complaintListService");
 const {
   buildDetailPayload,
-  buildListPayload,
 } = require("../../services/responseViewService");
+const {
+  COMPLAINT_DOMAIN_EVENTS,
+  emitComplaintDomainEvent,
+} = require("../../services/complaintEventService");
 
 exports.createComplaint = asyncHandler(async (req, res) => {
   const withTimeout = (promise, timeoutMs, fallbackValue) => {
@@ -151,22 +152,25 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  void notifyUser(req.user._id, {
-    title: "Complaint Received",
-    body: `Ticket ${complaint.ticketId} has been created.`,
-    data: {
-      type: "complaint-update",
-      complaintId: String(complaint._id),
-      ticketId: complaint.ticketId,
-      route: buildNotificationRoute(
-        NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
-        {
-          complaintId: String(complaint._id),
-          ticketId: complaint.ticketId,
-        },
-      ),
+  void emitComplaintDomainEvent(
+    complaint,
+    COMPLAINT_DOMAIN_EVENTS.COMPLAINT_CREATED,
+    {
+      actorId: req.user._id,
+      recipientUserIds: [req.user._id],
+      excludeUserIds: [],
+      data: {
+        route: buildNotificationRoute(
+          NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
+          {
+            complaintId: String(complaint._id),
+            ticketId: complaint.ticketId,
+          },
+        ),
+      },
+      realtimeEvent: "complaint-created",
     },
-  }).catch((notificationError) => {
+  ).catch((notificationError) => {
     console.error("Failed to send complaint notification:", notificationError);
   });
 
@@ -208,48 +212,27 @@ exports.myComplaints = asyncHandler(async (req, res) => {
     limit = 10,
     page = 1,
   } = req.query;
+  const { payload } = await listComplaints({
+    actorRole: req.user?.role,
+    actorId: new mongoose.Types.ObjectId(req.user._id),
+    scope,
+    status,
+    excludeStatus,
+    department,
+    priority,
+    startDate,
+    endDate,
+    search,
+    validateDepartment: true,
+    validatePriority: true,
+    currentUserId: req.user._id,
+    page,
+    limit,
+    sort,
+    includeAssignment: true,
+  });
 
-  const safeLimit = Math.min(Number(limit) || 10, 100);
-  const safePage = Math.max(Number(page) || 1, 1);
-
-  const filter = buildComplaintListQuery(
-    {},
-    {
-      reqUser: { ...req.user, _id: new mongoose.Types.ObjectId(req.user._id) },
-      scope,
-      status,
-      excludeStatus,
-      department,
-      priority,
-      startDate,
-      endDate,
-      search,
-      validateDepartment: true,
-      validatePriority: true,
-    },
-  );
-  const [complaints, total] = await Promise.all([
-    Complaint.find(filter)
-      .sort(normalizeComplaintSort(sort))
-      .skip((safePage - 1) * safeLimit)
-      .limit(safeLimit),
-    Complaint.countDocuments(filter),
-  ]);
-
-  const complaintItems = complaints.map((complaint) =>
-    buildComplaintView(complaint, { currentUserId: req.user._id }),
-  );
-
-  return sendSuccess(
-    res,
-    buildListPayload({
-      items: complaintItems,
-      itemKey: "complaints",
-      page: safePage,
-      limit: safeLimit,
-      total,
-    }),
-  );
+  return sendSuccess(res, payload);
 });
 
 exports.getComplaintById = asyncHandler(async (req, res) => {
@@ -263,9 +246,7 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
     throw new AppError("Complaint not found", 404);
   }
 
-  if (req.user?.role !== "user") {
-    await assertCanAccessComplaint(req.user, complaint);
-  }
+  await assertCanViewComplaint(req.user, complaint);
   const complaintView = buildComplaintView(complaint, {
     currentUserId: req.user._id,
   });
