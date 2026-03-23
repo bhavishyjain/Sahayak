@@ -8,7 +8,6 @@ const complaintHistorySchema = require("./complaintSchemas/complaintHistorySchem
 const complaintAiAnalysisSchema = require("./complaintSchemas/complaintAiAnalysisSchema");
 const complaintMessageSchema = require("./complaintSchemas/complaintMessageSchema");
 const {
-  COMPLAINT_DEPARTMENTS,
   COMPLAINT_PRIORITIES,
   COMPLAINT_STATUSES,
 } = require("../domain/constants");
@@ -31,8 +30,8 @@ const complaintSchema = new mongoose.Schema(
 
     department: {
       type: String,
-      enum: COMPLAINT_DEPARTMENTS,
       required: true,
+      trim: true,
     },
     // AI Analysis Fields
     aiAnalysis: { type: complaintAiAnalysisSchema, default: {} },

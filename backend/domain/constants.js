@@ -5,15 +5,6 @@ const ROLES = Object.freeze({
   ADMIN: "admin",
 });
 
-const COMPLAINT_DEPARTMENTS = Object.freeze([
-  "Road",
-  "Water",
-  "Electricity",
-  "Waste",
-  "Drainage",
-  "Other",
-]);
-
 const COMPLAINT_PRIORITIES = Object.freeze(["Low", "Medium", "High"]);
 
 const COMPLAINT_STATUSES = Object.freeze([
@@ -47,7 +38,6 @@ const NOTIFICATION_TYPES = Object.freeze({
 
 module.exports = {
   ROLES,
-  COMPLAINT_DEPARTMENTS,
   COMPLAINT_PRIORITIES,
   COMPLAINT_STATUSES,
   ACTIVE_COMPLAINT_STATUSES,

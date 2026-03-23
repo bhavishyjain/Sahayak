@@ -17,6 +17,7 @@ import CustomPicker from "../../../components/CustomPicker";
 import { GET_HEATMAP_URL } from "../../../url";
 import apiCall from "../../../utils/api";
 import { queryKeys } from "../../../utils/queryKeys";
+import useDepartments from "../../../utils/hooks/useDepartments";
 import {
   getSeverityColor,
   getSeverityName,
@@ -32,6 +33,7 @@ export default function HeatMap() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const webViewRef = useRef(null);
   const { isOnline } = useNetworkStatus();
+  const { departmentOptions } = useDepartments();
 
   const [filters, setFilters] = useState({
     department: "all",
@@ -199,24 +201,7 @@ export default function HeatMap() {
   // Filter options
   const departments = [
     { label: t("heatmap.allDepartments"), value: "all" },
-    { label: t("complaints.departments.road"), value: "Road" },
-    {
-      label: t("complaints.departments.water"),
-      value: "Water",
-    },
-    {
-      label: t("complaints.departments.electricity"),
-      value: "Electricity",
-    },
-    {
-      label: t("complaints.departments.waste"),
-      value: "Waste",
-    },
-    {
-      label: t("complaints.departments.drainage"),
-      value: "Drainage",
-    },
-    { label: t("complaints.departments.other"), value: "Other" },
+    ...departmentOptions,
   ];
 
   const priorities = [

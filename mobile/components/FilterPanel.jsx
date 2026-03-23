@@ -13,6 +13,7 @@ import DateTimePickerModal from "./DateTimePickerModal";
 import { useTheme } from "../utils/context/theme";
 import { useState } from "react";
 import { formatStatusLabel, ALL_STATUS_OPTIONS } from "../data/complaintStatus";
+import useDepartments from "../utils/hooks/useDepartments";
 
 function FilterChip({ label, isActive, onPress, colors }) {
   return (
@@ -55,6 +56,7 @@ export default function FilterPanel({
   onClearFilters,
   t,
   formatPriorityLabel,
+  departmentOptions,
   style,
 }) {
   const { colorScheme } = useTheme();
@@ -71,6 +73,13 @@ export default function FilterPanel({
   const [draftSort, setDraftSort] = useState(sortOrder);
   const [draftStart, setDraftStart] = useState(startDate);
   const [draftEnd, setDraftEnd] = useState(endDate);
+  const { departmentOptions: fetchedDepartmentOptions = [] } = useDepartments({
+    enabled: Boolean(setDepartmentFilter),
+  });
+  const resolvedDepartmentOptions =
+    departmentOptions && departmentOptions.length > 0
+      ? departmentOptions
+      : [{ value: "all", label: t("common.all") }, ...fetchedDepartmentOptions];
 
   const openPanel = () => {
     setDraftStatus(statusFilter);
@@ -248,33 +257,7 @@ export default function FilterPanel({
                       className="flex-row flex-wrap mb-3"
                       style={{ gap: 6 }}
                     >
-                      {[
-                        { value: "all", label: t("common.all") },
-                        {
-                          value: "Road",
-                          label: t("complaints.departments.road"),
-                        },
-                        {
-                          value: "Water",
-                          label: t("complaints.departments.water"),
-                        },
-                        {
-                          value: "Electricity",
-                          label: t("complaints.departments.electricity"),
-                        },
-                        {
-                          value: "Waste",
-                          label: t("complaints.departments.waste"),
-                        },
-                        {
-                          value: "Drainage",
-                          label: t("complaints.departments.drainage"),
-                        },
-                        {
-                          value: "Other",
-                          label: t("complaints.departments.other"),
-                        },
-                      ].map((department) => (
+                      {resolvedDepartmentOptions.map((department) => (
                         <FilterChip
                           key={department.value}
                           label={department.label}

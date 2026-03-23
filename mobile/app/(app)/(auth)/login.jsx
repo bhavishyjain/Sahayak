@@ -85,7 +85,9 @@ export default function Login() {
 
         // Redirect based on user role
         const redirectPath =
-          userData.role === "head"
+          userData.role === "admin"
+            ? "/(app)/(tabs)/admin-home"
+            : userData.role === "head"
             ? "/(app)/(tabs)/hod-overview"
             : userData.role === "worker"
               ? "/(app)/(tabs)/worker-home"

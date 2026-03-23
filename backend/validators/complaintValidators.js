@@ -1,17 +1,9 @@
 const AppError = require("../core/AppError");
-
-const VALID_DEPARTMENTS = [
-  "Road",
-  "Water",
-  "Electricity",
-  "Waste",
-  "Drainage",
-  "Other",
-];
+const { getDepartmentNames } = require("../services/departmentService");
 
 const VALID_PRIORITIES = ["Low", "Medium", "High"];
 
-function validateCreateComplaint({ body, coordinates, files }) {
+async function validateCreateComplaint({ body, coordinates, files }) {
   const required = [
     "title",
     "description",
@@ -31,9 +23,10 @@ function validateCreateComplaint({ body, coordinates, files }) {
     );
   }
 
-  if (!VALID_DEPARTMENTS.includes(String(body.department).trim())) {
+  const validDepartments = await getDepartmentNames();
+  if (!validDepartments.includes(String(body.department).trim())) {
     throw new AppError("Invalid department value", 400, {
-      allowed: VALID_DEPARTMENTS,
+      allowed: validDepartments,
     });
   }
 

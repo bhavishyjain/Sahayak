@@ -1,9 +1,9 @@
 const AppError = require("../core/AppError");
 const {
-  COMPLAINT_DEPARTMENTS,
   COMPLAINT_PRIORITIES,
   COMPLAINT_STATUSES,
 } = require("../domain/constants");
+const { getDepartmentNames } = require("./departmentService");
 const {
   ANALYTICS_STATUS_BUCKETS,
   getTimeframeWindowStart,
@@ -86,10 +86,11 @@ function normalizeAnalyticsBucket(value, { defaultBucket = "all" } = {}) {
   return aliased;
 }
 
-function normalizeAnalyticsFilters(
+async function normalizeAnalyticsFilters(
   input = {},
   { allowDepartment = true, defaultTimeframe = "30days", defaultScope = "mine" } = {},
 ) {
+  const departmentNames = allowDepartment ? await getDepartmentNames() : [];
   const timeframe = defaultTimeframe
     ? normalizeEnum(
         input.timeframe || defaultTimeframe,
@@ -108,7 +109,7 @@ function normalizeAnalyticsFilters(
     "priority",
   );
   const department = allowDepartment
-    ? normalizeEnum(input.department, COMPLAINT_DEPARTMENTS, "department")
+    ? normalizeEnum(input.department, departmentNames, "department")
     : null;
   const dateRange = normalizeDateRange({
     startDate: input.startDate,
@@ -151,10 +152,11 @@ function applyAnalyticsComplaintFilters(query, filters = {}, dateField = "create
   applyAnalyticsDateFilter(query, filters, dateField);
 }
 
-function normalizeReportFilters(input = {}, { allowDepartment = true } = {}) {
+async function normalizeReportFilters(input = {}, { allowDepartment = true } = {}) {
+  const departmentNames = allowDepartment ? await getDepartmentNames() : [];
   return {
     department: allowDepartment
-      ? normalizeEnum(input.department, COMPLAINT_DEPARTMENTS, "department")
+      ? normalizeEnum(input.department, departmentNames, "department")
       : null,
     status: normalizeEnum(input.status, COMPLAINT_STATUSES, "status"),
     priority: normalizeEnum(input.priority, COMPLAINT_PRIORITIES, "priority"),

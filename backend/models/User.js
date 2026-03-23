@@ -16,8 +16,8 @@ const userSchema = new mongoose.Schema({
   },
   department: {
     type: String,
-    enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
     default: "Other",
+    trim: true,
   },
   email: {
     type: String,

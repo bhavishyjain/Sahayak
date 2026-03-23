@@ -3,6 +3,7 @@ const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const { createUserAccount } = require("../../services/userProvisionService");
+const { assertDepartmentExists } = require("../../services/departmentService");
 const {
   getWorkerMetrics,
   calculateWorkerPerformanceScore,
@@ -85,7 +86,7 @@ exports.createUser = asyncHandler(async (req, res) => {
 });
 
 exports.updateUser = asyncHandler(async (req, res) => {
-  const { username, role, department } = req.body;
+  const { username, role, department, fullName, email, phone, isActive } = req.body;
 
   if (role !== undefined && !ASSIGNABLE_ROLES.includes(role)) {
     throw new AppError(
@@ -94,13 +95,32 @@ exports.updateUser = asyncHandler(async (req, res) => {
     );
   }
 
-  const user = await User.findByIdAndUpdate(
-    req.params.id,
-    { username, role, department },
-    { new: true, runValidators: true },
-  ).select("-password");
+  const update = {};
+  if (username !== undefined) update.username = username;
+  if (role !== undefined) update.role = role;
+  if (fullName !== undefined) update.fullName = fullName;
+  if (email !== undefined) update.email = email;
+  if (phone !== undefined) update.phone = phone;
+  if (typeof isActive === "boolean") update.isActive = isActive;
 
-  if (!user) throw new AppError("User not found", 404);
+  const existingUser = await User.findById(req.params.id).select("role department");
+  if (!existingUser) throw new AppError("User not found", 404);
+
+  const nextRole = role !== undefined ? role : existingUser.role;
+  const nextDepartment =
+    department !== undefined ? department : existingUser.department;
+
+  if (["worker", "head"].includes(nextRole)) {
+    await assertDepartmentExists(nextDepartment);
+  }
+
+  if (department !== undefined) update.department = department;
+
+  const user = await User.findByIdAndUpdate(req.params.id, update, {
+    new: true,
+    runValidators: true,
+  }).select("-password");
+
   return sendSuccess(res, { data: user }, "User updated successfully");
 });
 

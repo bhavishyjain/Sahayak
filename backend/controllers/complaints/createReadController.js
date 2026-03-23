@@ -24,8 +24,8 @@ const {
 } = require("../../services/geminiService");
 const { assertCanViewComplaint } = require("../../policies/complaintPolicy");
 const {
-  VALID_DEPARTMENTS,
-} = require("../../services/complaintQueryService");
+  getDepartmentNames,
+} = require("../../services/departmentService");
 const { listComplaints } = require("../../services/complaintListService");
 const {
   buildDetailPayload,
@@ -49,7 +49,7 @@ exports.createComplaint = asyncHandler(async (req, res) => {
   };
 
   const coordinates = parseCoordinates(req.body.coordinates);
-  validateCreateComplaint({
+  await validateCreateComplaint({
     body: req.body,
     coordinates,
     files: req.files,
@@ -77,7 +77,8 @@ exports.createComplaint = asyncHandler(async (req, res) => {
 
     if (aiResult && !aiResult.error) {
       const rawDept = aiResult.department;
-      aiSuggestedDepartment = VALID_DEPARTMENTS.includes(rawDept)
+      const validDepartments = await getDepartmentNames();
+      aiSuggestedDepartment = validDepartments.includes(rawDept)
         ? rawDept
         : department || "Other";
       aiSuggestedPriority = aiResult.suggestedPriority || priority;

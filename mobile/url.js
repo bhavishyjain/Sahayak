@@ -73,6 +73,7 @@ export const NOTIFICATION_PREFERENCES_URL =
 // CHAT URLs
 // ============================================================================
 export const CHAT_URL = API_BASE + "/chat";
+export const CHAT_SPEECH_TO_TEXT_URL = API_BASE + "/chat/speech-to-text";
 
 // ============================================================================
 // WORKER URLs
@@ -133,6 +134,21 @@ export const REPORT_RUN_NOW_URL = (id) =>
 export const REPORT_CANCEL_SCHEDULE_URL = (id) =>
   API_BASE + `/reports/schedule/${id}`;
 export const REPORT_EMAIL_URL = API_BASE + "/reports/email";
+
+// ============================================================================
+// ADMIN URLs
+// ============================================================================
+export const USERS_URL = API_BASE + "/users";
+export const USER_DETAIL_URL = (id) => API_BASE + `/users/${id}`;
+export const DEPARTMENTS_URL = API_BASE + "/departments";
+export const DEPARTMENT_DETAIL_URL = (id) => API_BASE + `/departments/${id}`;
+export const DEACTIVATE_DEPARTMENT_URL = (id) =>
+  API_BASE + `/departments/${id}/deactivate`;
+export const DELETED_COMPLAINTS_URL = API_BASE + "/complaints/deleted";
+export const RESTORE_COMPLAINT_URL = (id) =>
+  API_BASE + `/complaints/${id}/restore`;
+export const PURGE_COMPLAINT_URL = (id) =>
+  API_BASE + `/complaints/${id}/purge`;
 
 // ============================================================================
 // LEGACY/OPTIONAL URLs

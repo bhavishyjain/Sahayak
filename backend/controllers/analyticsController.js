@@ -27,7 +27,7 @@ function severityFromIntensity(intensity) {
 
 exports.summary = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });
@@ -102,7 +102,7 @@ exports.heatmap = asyncHandler(async (req, res) => {
     timeframe,
     granularity,
     ...analyticsFilters
-  } = normalizeAnalyticsFilters(req.query, {
+  } = await normalizeAnalyticsFilters(req.query, {
     allowDepartment: req.user?.role !== "head" && req.user?.role !== "worker",
   });
   const role = req.user?.role;

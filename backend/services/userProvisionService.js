@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const AppError = require("../core/AppError");
+const { assertDepartmentExists } = require("./departmentService");
 
 async function assertIdentityAvailable({ username, email, phone }, excludeUserId = null) {
   const normalizedUsername = username ? String(username).trim().toLowerCase() : "";
@@ -49,6 +50,10 @@ async function createUserAccount({
     email: normalizedEmail,
     phone: normalizedPhone,
   });
+
+  if (["worker", "head"].includes(role)) {
+    await assertDepartmentExists(department);
+  }
 
   const hashedPassword = await bcrypt.hash(password, 10);
   return User.create({

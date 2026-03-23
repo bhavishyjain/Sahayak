@@ -17,6 +17,7 @@ import {
   FileText,
   UserPlus,
   MessageSquareQuote,
+  Send,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -230,6 +231,16 @@ export default function More() {
             title: "more.menu.workerFeedback.title",
             subtitle: "more.menu.workerFeedback.subtitle",
             route: "/(app)/more/worker-feedback",
+          },
+        ]
+      : []),
+    ...(user?.role === "admin"
+      ? [
+          {
+            icon: Send,
+            title: "Send notification",
+            subtitle: "Draft admin notifications and review notification history in one place.",
+            route: "/(app)/more/admin-send-notification",
           },
         ]
       : []),

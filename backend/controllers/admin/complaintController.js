@@ -16,11 +16,36 @@ exports.listDeletedComplaints = asyncHandler(async (req, res) => {
       .sort({ deletedAt: -1 })
       .skip(skip)
       .limit(Number(limit))
-      .select("ticketId rawText department status deletedAt userId createdAt"),
+      .select("ticketId rawText department status deletedAt userId createdAt history")
+      .populate("userId", "fullName username email"),
     Complaint.countDocuments(filter).setOptions({ withDeleted: true }),
   ]);
 
-  sendSuccess(res, { complaints, total, page: Number(page), limit: Number(limit) });
+  const serializedComplaints = complaints.map((complaint) => {
+    const history = Array.isArray(complaint.history) ? complaint.history : [];
+    const latestEntry = history[history.length - 1] || null;
+
+    return {
+      ...complaint.toObject(),
+      owner: complaint.userId
+        ? {
+            id: complaint.userId._id,
+            fullName: complaint.userId.fullName,
+            username: complaint.userId.username,
+            email: complaint.userId.email,
+          }
+        : null,
+      originalStatus: complaint.status,
+      deletedReason: latestEntry?.note || "Soft-deleted by admin",
+    };
+  });
+
+  sendSuccess(res, {
+    complaints: serializedComplaints,
+    total,
+    page: Number(page),
+    limit: Number(limit),
+  });
 });
 
 exports.softDeleteComplaint = asyncHandler(async (req, res) => {
@@ -28,6 +53,12 @@ exports.softDeleteComplaint = asyncHandler(async (req, res) => {
   const complaint = await Complaint.findById(complaintId);
   if (!complaint) throw new AppError("Complaint not found", 404);
   if (complaint.deleted) throw new AppError("Complaint is already deleted", 409);
+  if (complaint.status !== "pending") {
+    throw new AppError("Only pending complaints can be deleted", 409);
+  }
+  if (Array.isArray(complaint.assignedWorkers) && complaint.assignedWorkers.length > 0) {
+    throw new AppError("Assigned complaints cannot be deleted", 409);
+  }
 
   complaint.deleted = true;
   complaint.deletedAt = new Date();

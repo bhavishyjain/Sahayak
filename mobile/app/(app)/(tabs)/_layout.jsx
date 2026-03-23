@@ -1,18 +1,18 @@
 import { Tabs } from "expo-router";
 import {
-  CirclePlus,
   Home,
   ListChecks,
   Map,
   MessageCircle,
   Settings,
   ClipboardList,
-  CheckCircle,
   LayoutDashboard,
   Users,
   Trophy,
+  Building2,
+  Trash2,
 } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { darkColors, lightColors } from "../../../colors";
 import CurvedTabBar from "../../../components/CurvedTabBar";
 import { useTheme } from "../../../utils/context/theme";
@@ -100,6 +100,73 @@ export default function TabsLayout() {
     return null; // or a loading screen
   }
 
+  if (userRole === "admin") {
+    return (
+      <Tabs screenOptions={commonScreenOptions}>
+        <Tabs.Screen
+          name="admin-home"
+          options={{
+            title: "Dashboard",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={LayoutDashboard} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="admin-recycle-bin"
+          options={{
+            title: "Deleted",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={Trash2} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="admin-departments"
+          options={{
+            title: "",
+            tabBarIcon: () => (
+              <View style={{ position: "absolute", top: -40 }}>
+                <CenterNewButton colors={colors} icon={Building2} />
+              </View>
+            ),
+            tabBarLabel: () => null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="heatmap"
+          options={{
+            title: "Map",
+            tabBarIcon: ({ color }) => <TabIcon Icon={Map} color={color} />,
+          }}
+        />
+
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: "Settings",
+            tabBarIcon: ({ color }) => (
+              <TabIcon Icon={Settings} color={color} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen name="home" options={{ href: null }} />
+        <Tabs.Screen name="complaints" options={{ href: null }} />
+        <Tabs.Screen name="assistant" options={{ href: null }} />
+        <Tabs.Screen name="worker-home" options={{ href: null }} />
+        <Tabs.Screen name="worker-assigned" options={{ href: null }} />
+        <Tabs.Screen name="worker-leaderboard" options={{ href: null }} />
+        <Tabs.Screen name="hod-overview" options={{ href: null }} />
+        <Tabs.Screen name="hod-workers" options={{ href: null }} />
+        <Tabs.Screen name="hod-complaints" options={{ href: null }} />
+      </Tabs>
+    );
+  }
+
   // Worker/HOD Tabs
   if (userRole === "worker") {
     return (
@@ -162,6 +229,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="hod-overview" options={{ href: null }} />
         <Tabs.Screen name="hod-workers" options={{ href: null }} />
         <Tabs.Screen name="hod-complaints" options={{ href: null }} />
+        <Tabs.Screen name="admin-recycle-bin" options={{ href: null }} />
       </Tabs>
     );
   }
@@ -225,6 +293,9 @@ export default function TabsLayout() {
         <Tabs.Screen name="assistant" options={{ href: null }} />
         <Tabs.Screen name="worker-assigned" options={{ href: null }} />
         <Tabs.Screen name="worker-leaderboard" options={{ href: null }} />
+        <Tabs.Screen name="admin-home" options={{ href: null }} />
+        <Tabs.Screen name="admin-recycle-bin" options={{ href: null }} />
+        <Tabs.Screen name="admin-departments" options={{ href: null }} />
       </Tabs>
     );
   }
@@ -286,6 +357,9 @@ export default function TabsLayout() {
       <Tabs.Screen name="hod-overview" options={{ href: null }} />
       <Tabs.Screen name="hod-workers" options={{ href: null }} />
       <Tabs.Screen name="hod-complaints" options={{ href: null }} />
+      <Tabs.Screen name="admin-home" options={{ href: null }} />
+      <Tabs.Screen name="admin-recycle-bin" options={{ href: null }} />
+      <Tabs.Screen name="admin-departments" options={{ href: null }} />
     </Tabs>
   );
 }

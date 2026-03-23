@@ -423,7 +423,7 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
 
 exports.getWorkerAnalytics = asyncHandler(async (req, res) => {
   const isPrivileged = req.user.role === "head" || req.user.role === "admin";
-  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });

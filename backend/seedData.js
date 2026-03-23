@@ -2027,7 +2027,9 @@ async function seedDatabase() {
     const softDeletedComplaints = createdComplaints
       .filter(
         (complaint) =>
-          ["resolved", "cancelled"].includes(complaint.status) &&
+          complaint.status === "pending" &&
+          (!Array.isArray(complaint.assignedWorkers) ||
+            complaint.assignedWorkers.length === 0) &&
           complaint.createdAt < new Date(now.getTime() - 10 * ONE_DAY_MS),
       )
       .sort((left, right) => left.createdAt - right.createdAt)
@@ -2041,7 +2043,17 @@ async function seedDatabase() {
       );
       await Complaint.updateOne(
         { _id: complaint._id },
-        { $set: { deleted: true, deletedAt } },
+        {
+          $set: { deleted: true, deletedAt },
+          $push: {
+            history: {
+              status: complaint.status,
+              updatedBy: complaint.userId,
+              timestamp: deletedAt,
+              note: "Soft-deleted by admin while pending and unassigned",
+            },
+          },
+        },
       );
     }
     console.log(

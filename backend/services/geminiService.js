@@ -1,5 +1,10 @@
 // services/geminiService.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const {
+  DEFAULT_DEPARTMENT_NAMES,
+  getDepartmentNames,
+} = require("./departmentService");
+
 function getGeminiApiKey() {
   const raw = process.env.GEMINI_API_KEY;
   if (!raw) return "";
@@ -23,12 +28,25 @@ function sanitizeInput(text, maxLength = 2000) {
     .slice(0, maxLength);
 }
 
+async function getPromptDepartmentNames() {
+  try {
+    const departmentNames = await getDepartmentNames();
+    if (departmentNames.length > 0) {
+      return departmentNames;
+    }
+  } catch (_error) {
+  }
+  return [...DEFAULT_DEPARTMENT_NAMES];
+}
+
 // Analyze raw text and return structured complaint or FAQ info
 async function analyze(rawText) {
   if (!genAI) return { error: "Gemini API not configured" };
 
   try {
     const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
+    const departmentNames = await getPromptDepartmentNames();
+    const departmentList = departmentNames.join(", ");
 
     // Prompt for Gemini
     const safeText = sanitizeInput(rawText);
@@ -43,7 +61,7 @@ Instructions:
    - "statusQuery" => user wants complaint status
    - "faq" => general question
 2. For new complaints, extract:
-  - "department": Road, Water, Drainage, Electricity, Waste, Other
+  - "department": one of ${departmentList}
    - "refinedText": a concise, clear version of the complaint
    - "priority": 
        • Default to "Medium".
@@ -219,6 +237,8 @@ async function analyzeComplaintWithImage(description, imageUrl = null) {
 
   try {
     const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
+    const departmentNames = await getPromptDepartmentNames();
+    const departmentList = departmentNames.map((name) => `"${name}"`).join(" | ");
 
     const safeDesc = sanitizeInput(description);
     let prompt = `Analyze this complaint and categorize it:
@@ -228,7 +248,7 @@ ${imageUrl ? `Image URL: ${imageUrl}` : ''}
 
 Return ONLY valid JSON:
 {
-  "department": "Road" | "Water" | "Electricity" | "Waste" | "Drainage" | "Other",
+  "department": ${departmentList},
   "priority": "Low" | "Medium" | "High",
   "refinedText": "Clear, concise description",
   "confidence": 0-100 (number),
@@ -236,12 +256,8 @@ Return ONLY valid JSON:
 }
 
 Department Guidelines:
-- Road: potholes, cracks, road damage, traffic signs, zebra crossings
-- Water: leaks, burst pipes, water shortage, contamination, tanker issues
-- Electricity: power outage, streetlight not working, exposed wires, pole damage
-- Waste: garbage not collected, overflowing bins, littering, sanitation
-- Drainage: blocked drains, waterlogging, sewage overflow, manhole issues
-- Other: anything else
+- Choose the best fit from the currently available departments.
+- Use "Other" when the complaint does not clearly belong to a specific department.
 
 Priority Guidelines:
 - High: Safety hazards, affecting many people, urgent situations, dangerous conditions

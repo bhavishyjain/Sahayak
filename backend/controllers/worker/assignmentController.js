@@ -6,6 +6,7 @@ const {
   getWorkerOrThrow,
   getHodOrThrow,
 } = require("../../services/accessService");
+const { assertDepartmentExists } = require("../../services/departmentService");
 const { createUserAccount } = require("../../services/userProvisionService");
 const { getWorkerMetricsBulk } = require("../../services/workerMetricsService");
 
@@ -52,6 +53,10 @@ exports.updateWorker = asyncHandler(async (req, res) => {
   const { workerId } = req.params;
   const { fullName, email, phone, department, specializations } = req.body;
   const worker = await getWorkerOrThrow(workerId);
+
+  if (department) {
+    await assertDepartmentExists(department);
+  }
 
   if (fullName) worker.fullName = fullName;
   if (email) worker.email = email;

@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Camera, X, Navigation } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -20,6 +20,7 @@ import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import useDepartments from "../../../utils/hooks/useDepartments";
 import { CREATE_COMPLAINT_URL } from "../../../url";
 import { invalidateComplaintQueries } from "../../../utils/invalidateComplaintQueries";
 import { useNetworkStatus } from "../../../utils/useNetworkStatus";
@@ -59,10 +60,11 @@ export default function NewComplaintPage() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
+  const { departmentOptions } = useDepartments();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [department, setDepartment] = useState("Road");
+  const [department, setDepartment] = useState("");
   const [locationName, setLocationName] = useState("");
   const [priority, setPriority] = useState("Low");
   const [saving, setSaving] = useState(false);
@@ -70,20 +72,18 @@ export default function NewComplaintPage() {
   const [coordinates, setCoordinates] = useState(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  const DEPARTMENT_OPTIONS = [
-    { label: t("complaints.departments.road"), value: "Road" },
-    { label: t("complaints.departments.water"), value: "Water" },
-    { label: t("complaints.departments.electricity"), value: "Electricity" },
-    { label: t("complaints.departments.waste"), value: "Waste" },
-    { label: t("complaints.departments.drainage"), value: "Drainage" },
-    { label: t("complaints.departments.other"), value: "Other" },
-  ];
+  const DEPARTMENT_OPTIONS = departmentOptions;
 
   const PRIORITY_OPTIONS = [
     { label: t("complaints.priority.low"), value: "Low" },
     { label: t("complaints.priority.medium"), value: "Medium" },
     { label: t("complaints.priority.high"), value: "High" },
   ];
+
+  useEffect(() => {
+    if (department || DEPARTMENT_OPTIONS.length === 0) return;
+    setDepartment(DEPARTMENT_OPTIONS[0].value);
+  }, [DEPARTMENT_OPTIONS, department]);
 
   const takePhoto = async () => {
     try {

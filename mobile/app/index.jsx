@@ -16,7 +16,9 @@ export default function Index() {
       if (user?.auth_token) {
         // Redirect based on user role
         const redirectPath =
-          user.role === "head"
+          user.role === "admin"
+            ? "/(app)/(tabs)/admin-home"
+            : user.role === "head"
             ? "/(app)/(tabs)/hod-overview"
             : user.role === "worker"
               ? "/(app)/(tabs)/worker-home"

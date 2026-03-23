@@ -29,7 +29,7 @@ async function buildHodDashboardStats(department, analyticsFilters = {}) {
 
 exports.getHodDashboardSummary = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
-  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });
@@ -40,7 +40,7 @@ exports.getHodDashboardSummary = asyncHandler(async (req, res) => {
 exports.getHodOverview = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { department } = hod;
-  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });

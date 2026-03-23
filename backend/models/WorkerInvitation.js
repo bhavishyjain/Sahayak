@@ -11,8 +11,8 @@ const workerInvitationSchema = new mongoose.Schema(
     },
     department: {
       type: String,
-      enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
       required: true,
+      trim: true,
     },
     invitedBy: {
       type: mongoose.Schema.Types.ObjectId,

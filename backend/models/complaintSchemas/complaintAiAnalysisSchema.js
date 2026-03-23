@@ -4,8 +4,8 @@ const complaintAiAnalysisSchema = new mongoose.Schema(
   {
     department: {
       type: String,
-      enum: ["Road", "Water", "Electricity", "Waste", "Drainage", "Other"],
       default: null,
+      trim: true,
     },
     confidence: { type: Number, min: 0, max: 1, default: null },
     sentiment: {

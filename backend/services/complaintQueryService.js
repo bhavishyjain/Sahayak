@@ -1,11 +1,10 @@
 const AppError = require("../core/AppError");
 const {
-  COMPLAINT_DEPARTMENTS,
   COMPLAINT_PRIORITIES,
   COMPLAINT_STATUSES,
 } = require("../domain/constants");
+const { getDepartmentNames } = require("./departmentService");
 
-const VALID_DEPARTMENTS = COMPLAINT_DEPARTMENTS;
 const VALID_PRIORITIES = COMPLAINT_PRIORITIES;
 const VALID_STATUSES = COMPLAINT_STATUSES;
 
@@ -61,7 +60,7 @@ function normalizeEnumValue(value, validValues, errorMessage) {
   return normalized;
 }
 
-function applyCommonComplaintFilters(query, options = {}) {
+async function applyCommonComplaintFilters(query, options = {}) {
   const {
     status,
     excludeStatus,
@@ -87,8 +86,9 @@ function applyCommonComplaintFilters(query, options = {}) {
     }
   }
 
+  const validDepartments = validateDepartment ? await getDepartmentNames() : [];
   const normalizedDepartment = validateDepartment
-    ? normalizeEnumValue(department, VALID_DEPARTMENTS, "Invalid department filter")
+    ? normalizeEnumValue(department, validDepartments, "Invalid department filter")
     : department && department !== "all"
       ? department
       : null;
@@ -151,7 +151,7 @@ function applyComplaintScopeFilter(query, { reqUser, scope = "mine" } = {}) {
   return "mine";
 }
 
-function buildComplaintListQuery(baseQuery = {}, options = {}) {
+async function buildComplaintListQuery(baseQuery = {}, options = {}) {
   const query = { ...baseQuery };
   const {
     reqUser,
@@ -173,7 +173,7 @@ function buildComplaintListQuery(baseQuery = {}, options = {}) {
     applyComplaintScopeFilter(query, { reqUser, scope });
   }
 
-  applyCommonComplaintFilters(query, {
+  await applyCommonComplaintFilters(query, {
     status,
     excludeStatus,
     department,
@@ -191,7 +191,6 @@ function buildComplaintListQuery(baseQuery = {}, options = {}) {
 }
 
 module.exports = {
-  VALID_DEPARTMENTS,
   VALID_PRIORITIES,
   VALID_STATUSES,
   parsePagination,

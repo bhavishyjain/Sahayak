@@ -1,6 +1,5 @@
 const Complaint = require("../models/Complaint");
 const User = require("../models/User");
-const { COMPLAINT_DEPARTMENTS } = require("../domain/constants");
 const { calculateAvgResponseTimeHours } = require("../utils/normalize");
 const {
   ANALYTICS_STATUS_BUCKETS,
@@ -36,19 +35,7 @@ function buildCountMap(rows = [], fallbackKeys = [], fallbackKey = "unknown") {
 }
 
 function buildDepartmentBreakdownObject(rows = []) {
-  const seeded = COMPLAINT_DEPARTMENTS.reduce((acc, department) => {
-    acc[department] = {
-      total: 0,
-      pending: 0,
-      inProgress: 0,
-      resolved: 0,
-      cancelled: 0,
-      highPriority: 0,
-      mediumPriority: 0,
-      lowPriority: 0,
-    };
-    return acc;
-  }, {});
+  const seeded = {};
 
   rows.forEach((row) => {
     const department = row?._id || "Other";
@@ -115,7 +102,7 @@ async function getComplaintMetricSnapshot(filters = {}) {
     total,
     byStatus: buildCountMap(statusRows, STATUS_KEYS),
     byPriority: buildCountMap(priorityRows, PRIORITY_KEYS),
-    byDepartment: buildCountMap(departmentRows, COMPLAINT_DEPARTMENTS, "Other"),
+    byDepartment: buildCountMap(departmentRows, [], "Other"),
     departmentRows: (departmentRows || [])
       .filter((row) => row?._id)
       .map((row) => ({

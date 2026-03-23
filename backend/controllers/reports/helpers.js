@@ -20,8 +20,8 @@ async function buildFilters(req, source = "query") {
     }
     filters.department = user.department;
   } else {
-    const normalizedFilters = normalizeReportFilters(input);
-    const analyticsFilters = normalizeAnalyticsFilters(input, {
+    const normalizedFilters = await normalizeReportFilters(input);
+    const analyticsFilters = await normalizeAnalyticsFilters(input, {
       allowDepartment: false,
       defaultTimeframe: null,
     });
@@ -41,10 +41,10 @@ async function buildFilters(req, source = "query") {
     return filters;
   }
 
-  const normalizedFilters = normalizeReportFilters(input, {
+  const normalizedFilters = await normalizeReportFilters(input, {
     allowDepartment: false,
   });
-  const analyticsFilters = normalizeAnalyticsFilters(input, {
+  const analyticsFilters = await normalizeAnalyticsFilters(input, {
     allowDepartment: false,
     defaultTimeframe: null,
   });
