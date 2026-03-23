@@ -227,8 +227,8 @@ export default function More() {
           },
           {
             icon: MessageSquareQuote,
-            title: "Worker Feedback",
-            subtitle: "See your current rating and all citizen feedback",
+            title: "more.menu.workerFeedback.title",
+            subtitle: "more.menu.workerFeedback.subtitle",
             route: "/(app)/more/worker-feedback",
           },
         ]

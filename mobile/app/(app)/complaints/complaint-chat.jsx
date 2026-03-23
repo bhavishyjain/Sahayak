@@ -206,8 +206,8 @@ export default function ComplaintChat() {
     <KeyboardAvoidingView
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 12 : 84}
     >
       <BackButtonHeader
         title={t("complaintChat.threadTitle", { title: discussionTitle })}
@@ -254,10 +254,11 @@ export default function ComplaintChat() {
               )}
               contentContainerStyle={{
                 padding: 16,
-                paddingBottom: 8,
+                paddingBottom: 20,
                 flexGrow: 1,
                 justifyContent: "flex-end",
               }}
+              keyboardShouldPersistTaps="handled"
               onContentSizeChange={() =>
                 flatListRef.current?.scrollToEnd({ animated: false })
               }
@@ -291,7 +292,7 @@ export default function ComplaintChat() {
               borderTopWidth: 1,
               borderTopColor: colors.border,
               backgroundColor: colors.backgroundPrimary,
-              paddingBottom: Math.max(insets.bottom, 12),
+              paddingBottom: Math.max(insets.bottom, 16),
             }}
           >
             <TextInput

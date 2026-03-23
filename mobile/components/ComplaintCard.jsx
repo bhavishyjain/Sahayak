@@ -1,9 +1,4 @@
-import {
-  CheckCircle,
-  Clock,
-  MapPin,
-  ThumbsUp,
-} from "lucide-react-native";
+import { CheckCircle, Clock, MapPin, ThumbsUp } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../colors";
 import {
@@ -55,6 +50,11 @@ export default function ComplaintCard({
     complaint?.assignedAt,
     t("complaints.overdue"),
   );
+  const shouldHideSlaIndicators = [
+    "resolved",
+    "cancelled",
+    "needs-rework",
+  ].includes(String(complaint?.status || "").toLowerCase());
 
   return (
     <PressableBlock
@@ -88,7 +88,9 @@ export default function ComplaintCard({
           className="flex-row justify-between items-center flex-wrap mb-2"
           style={{ gap: 6 }}
         >
-          {complaint?.sla && <SlaStatusBadge sla={complaint.sla} />}
+          {complaint?.sla && !shouldHideSlaIndicators && (
+            <SlaStatusBadge sla={complaint.sla} status={complaint?.status} />
+          )}
           <View
             className="px-2 py-1 rounded"
             style={{
@@ -177,29 +179,31 @@ export default function ComplaintCard({
                 {formatPriorityLabel(t, complaint?.priority)}
               </Text>
             </View>
-            {complaint?.estimatedCompletionTime && eta && (
-              <View className="flex-row items-center">
-                <Clock
-                  size={12}
-                  color={
-                    eta === t("complaints.overdue")
-                      ? "#EF4444"
-                      : colors.info || "#3B82F6"
-                  }
-                />
-                <Text
-                  className="text-xs ml-1 font-semibold"
-                  style={{
-                    color:
+            {!shouldHideSlaIndicators &&
+              complaint?.estimatedCompletionTime &&
+              eta && (
+                <View className="flex-row items-center">
+                  <Clock
+                    size={12}
+                    color={
                       eta === t("complaints.overdue")
                         ? "#EF4444"
-                        : colors.info || "#3B82F6",
-                  }}
-                >
-                  {eta}
-                </Text>
-              </View>
-            )}
+                        : colors.info || "#3B82F6"
+                    }
+                  />
+                  <Text
+                    className="text-xs ml-1 font-semibold"
+                    style={{
+                      color:
+                        eta === t("complaints.overdue")
+                          ? "#EF4444"
+                          : colors.info || "#3B82F6",
+                    }}
+                  >
+                    {eta}
+                  </Text>
+                </View>
+              )}
           </View>
 
           <View

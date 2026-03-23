@@ -126,12 +126,15 @@ complaintSchema.pre("save", function (next) {
 
   // Check if overdue
   if (
-    this.sla && this.sla.dueDate &&
+    this.sla &&
+    this.sla.dueDate &&
     this.status !== "resolved" &&
     this.status !== "cancelled" &&
     this.status !== "needs-rework"
   ) {
     this.sla.isOverdue = new Date() > this.sla.dueDate;
+  } else if (this.sla) {
+    this.sla.isOverdue = false;
   }
 
   next();
@@ -156,7 +159,11 @@ complaintSchema.pre("aggregate", function (next) {
 
 complaintSchema.index({ userId: 1, createdAt: -1 });
 complaintSchema.index({ department: 1, status: 1, createdAt: -1 });
-complaintSchema.index({ "assignedWorkers.workerId": 1, status: 1, updatedAt: -1 });
+complaintSchema.index({
+  "assignedWorkers.workerId": 1,
+  status: 1,
+  updatedAt: -1,
+});
 complaintSchema.index({ status: 1, priority: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Complaint", complaintSchema);

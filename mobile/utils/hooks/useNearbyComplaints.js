@@ -17,7 +17,11 @@ async function fetchNearbyComplaints() {
     url: `${GET_NEARBY_COMPLAINTS_URL}?lat=${loc.coords.latitude}&lng=${loc.coords.longitude}&radius=5`,
   });
   return {
-    complaints: response?.data?.complaints ?? [],
+    complaints: (response?.data?.complaints ?? []).slice().sort((a, b) => {
+      const distanceA = Number(a?.distance ?? Number.MAX_SAFE_INTEGER);
+      const distanceB = Number(b?.distance ?? Number.MAX_SAFE_INTEGER);
+      return distanceA - distanceB || Number(b?.upvoteCount || 0) - Number(a?.upvoteCount || 0);
+    }),
     permissionDenied: false,
   };
 }

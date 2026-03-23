@@ -239,7 +239,7 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
   const complaint = await Complaint.findById(complaintId).populate(
     "assignedWorkers.workerId",
-    "fullName username",
+    "fullName username phone",
   );
 
   if (!complaint) {
@@ -382,7 +382,7 @@ exports.getNearbyComplaints = asyncHandler(async (req, res) => {
         ) / 10,
     }))
     .filter((c) => c.distance <= radius)
-    .sort((a, b) => b.upvoteCount - a.upvoteCount || a.distance - b.distance)
+    .sort((a, b) => a.distance - b.distance || b.upvoteCount - a.upvoteCount)
     .slice(0, 20);
 
   return sendSuccess(res, { complaints: nearby });

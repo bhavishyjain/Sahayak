@@ -17,6 +17,10 @@ function buildComplaintView(complaint, options = {}) {
   const includeAssignment =
     options.includeAssignment === undefined ? true : options.includeAssignment;
   const viewerId = options.currentUserId ? String(options.currentUserId) : null;
+  const normalizedStatus = normalizeComplaintStatus(complaint.status);
+  const isTerminalStatus = ["resolved", "cancelled", "needs-rework"].includes(
+    normalizedStatus,
+  );
 
   const history = (complaint.history || []).map((item) => {
     const source =
@@ -56,7 +60,7 @@ function buildComplaintView(complaint, options = {}) {
       complaint.refinedText || complaint.rawText || complaint.description,
     department: complaint.department,
     priority: complaint.priority,
-    status: normalizeComplaintStatus(complaint.status),
+    status: normalizedStatus,
     locationName: complaint.locationName,
     coordinates: complaint.coordinates,
     proofImage: complaint.proofImage,
@@ -72,7 +76,14 @@ function buildComplaintView(complaint, options = {}) {
     upvotes,
     hasUpvoted: viewerId ? upvotes.includes(viewerId) : false,
     feedback: complaint.feedback,
-    sla: complaint.sla,
+    sla: complaint.sla
+      ? {
+          ...complaint.sla,
+          isOverdue: isTerminalStatus
+            ? false
+            : Boolean(complaint.sla.isOverdue),
+        }
+      : complaint.sla,
     aiAnalysis: complaint.aiAnalysis || null,
     aiSuggestedDepartment:
       complaint.aiAnalysis?.department ||
@@ -99,6 +110,7 @@ function buildComplaintView(complaint, options = {}) {
   const assignedWorkers = assignments.map((w, index) => ({
     workerId: String(w.workerId?._id || w.workerId?.id || w.workerId || ""),
     workerName: w.workerId?.fullName || w.workerId?.username || null,
+    workerPhone: w.workerId?.phone || null,
     taskDescription: w.taskDescription,
     status: w.status,
     assignedAt: w.assignedAt,

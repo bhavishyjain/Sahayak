@@ -379,8 +379,11 @@
       "shareStatusLine": "स्थिति: %{status} | प्राथमिकता: %{priority}",
       "shareOpenInApp": "सहायक में खोलें: %{link}",
       "currentlyAssigned": "वर्तमान में सौंपा गया",
+      "assignedWorkersTitle": "सौंपे गए कर्मी (%{count})",
       "assignedWorkersCount": "सौंपे गए कर्मी (%{count})",
       "assignedWorker": "सौंपा गया कार्यकर्ता",
+      "leaderBadge": "लीडर",
+      "leaderControlsStatus": "स्थिति केवल लीडर अपडेट करेगा",
       "assignToWorker": "कार्यकर्ता को सौंपें",
       "manageWorkers": "कर्मी प्रबंधित करें",
       "reassignWorker": "कार्यकर्ता पुनः सौंपें",
@@ -1599,6 +1602,10 @@
         "title": "मेरे विश्लेषण",
         "subtitle": "प्रदर्शन ग्राफ और रुझान"
       },
+      "workerFeedback": {
+        "title": "रेटिंग और प्रतिक्रिया",
+        "subtitle": "अपनी रेटिंग और सभी नागरिक प्रतिक्रियाएं देखें"
+      },
       "deleteAccount": {
         "title": "खाता हटाएं",
         "description": "अपने खाते को स्थायी रूप से हटाएं",
@@ -1738,6 +1745,17 @@
         "subtitle": "कुल %{count} कार्यों में वितरण"
       },
       "noData": "डेटा उपलब्ध नहीं है"
+    },
+    "workerFeedbackScreen": {
+      "title": "रेटिंग और प्रतिक्रिया",
+      "currentRating": "वर्तमान रेटिंग",
+      "feedbackEntries": "%{count} प्रतिक्रियाएं प्राप्त हुईं",
+      "emptyTitle": "अभी तक कोई प्रतिक्रिया नहीं",
+      "emptyDescription": "नागरिक रेटिंग वाली सुलझी शिकायतें यहां दिखेंगी।",
+      "byCitizen": "%{name} द्वारा",
+      "noComment": "इस शिकायत पर कोई लिखित प्रतिक्रिया नहीं छोड़ी गई।",
+      "failedTitle": "प्रतिक्रिया लोड नहीं हो सकी",
+      "failedMessage": "कृपया फिर से प्रयास करें"
     },
     "dialog": {
       "logout": {

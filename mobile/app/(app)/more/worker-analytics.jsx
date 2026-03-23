@@ -1,8 +1,10 @@
 import { useLocalSearchParams } from "expo-router";
 import {
+  ActivitySquare,
   BarChart2,
   CheckCircle,
-  Clock,
+  Clock3,
+  Sparkles,
   Star,
   Target,
   TrendingUp,
@@ -20,8 +22,6 @@ import Svg, { G, Line, Rect, Text as SvgText } from "react-native-svg";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
-import Card from "../../../components/Card";
-import MetricCard from "../../../components/MetricCard";
 import { useTheme } from "../../../utils/context/theme";
 import {
   ALL_STATUS_OPTIONS,
@@ -35,76 +35,136 @@ import { useWorkerAnalytics } from "../../../utils/hooks/useWorkerAnalytics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// ─── Bar Chart ────────────────────────────────────────────────────────────────
-function WeeklyBarChart({ data, barColor, gridColor, labelColor }) {
-  const CHART_PADDING = 32; // px on each side of the outer screen
-  const CARD_PADDING = 16; // Card p-4 = 16
-  const chartWidth = SCREEN_WIDTH - CHART_PADDING * 2 - CARD_PADDING * 2;
-  const chartHeight = 140;
-  const labelH = 24;
-  const totalH = chartHeight + labelH;
+function HeroPill({ icon: Icon, tone, label, value, colors }) {
+  return (
+    <View
+      className="flex-1 rounded-[22px] px-4 py-3"
+      style={{
+        backgroundColor: colors.backgroundPrimary,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
+    >
+      <View className="flex-row items-center mb-2">
+        <View
+          className="w-8 h-8 rounded-2xl items-center justify-center mr-2"
+          style={{ backgroundColor: tone + "18" }}
+        >
+          <Icon size={15} color={tone} />
+        </View>
+        <Text className="text-[11px]" style={{ color: colors.textSecondary }}>
+          {label}
+        </Text>
+      </View>
+      <Text className="text-2xl font-extrabold" style={{ color: tone }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
 
-  const maxVal = Math.max(...data.map((d) => d.count), 1);
-  const n = data.length;
-  const gap = 5;
-  const barW = (chartWidth - gap * (n - 1)) / n;
+function MetricPanel({ label, value, hint, icon: Icon, tone, colors }) {
+  return (
+    <View
+      className="rounded-[24px] p-4"
+      style={{
+        backgroundColor: colors.backgroundSecondary,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1 pr-3">
+          <Text className="text-xs uppercase" style={{ color: colors.textSecondary }}>
+            {label}
+          </Text>
+          <Text className="text-2xl font-extrabold mt-2" style={{ color: colors.textPrimary }}>
+            {value}
+          </Text>
+          {hint ? (
+            <Text className="text-xs mt-2 leading-5" style={{ color: colors.textSecondary }}>
+              {hint}
+            </Text>
+          ) : null}
+        </View>
+        <View
+          className="w-12 h-12 rounded-[18px] items-center justify-center"
+          style={{ backgroundColor: tone + "18" }}
+        >
+          <Icon size={20} color={tone} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function WeeklyStripChart({ data, colors }) {
+  const outerPadding = 32;
+  const cardPadding = 20;
+  const width = SCREEN_WIDTH - outerPadding - cardPadding;
+  const chartHeight = 150;
+  const labelHeight = 24;
+  const totalHeight = chartHeight + labelHeight;
+  const maxValue = Math.max(...data.map((item) => item.count), 1);
+  const count = data.length || 1;
+  const gap = 8;
+  const barWidth = (width - gap * (count - 1)) / count;
 
   return (
-    <Svg width={chartWidth} height={totalH}>
-      {/* Horizontal grid lines at 25 / 50 / 75 / 100% */}
-      {[0.25, 0.5, 0.75, 1].map((frac, i) => {
-        const y = chartHeight - frac * chartHeight;
+    <Svg width={width} height={totalHeight}>
+      {[0.25, 0.5, 0.75, 1].map((fraction, index) => {
+        const y = chartHeight - fraction * chartHeight;
         return (
           <Line
-            key={i}
+            key={index}
             x1={0}
             y1={y}
-            x2={chartWidth}
+            x2={width}
             y2={y}
-            stroke={gridColor}
-            strokeWidth={0.5}
+            stroke={colors.border}
+            strokeWidth={0.6}
           />
         );
       })}
 
-      {/* Bars + labels */}
-      {data.map((item, i) => {
-        const x = i * (barW + gap);
-        const barH = (item.count / maxVal) * (chartHeight - 12);
-        const y = chartHeight - barH;
+      {data.map((item, index) => {
+        const x = index * (barWidth + gap);
+        const height = (item.count / maxValue) * (chartHeight - 14);
+        const y = chartHeight - height;
+        const fill = item.count > 0 ? colors.primary : colors.border;
 
         return (
-          <G key={i}>
+          <G key={`${item.label}-${index}`}>
             <Rect
               x={x}
               y={item.count > 0 ? y : chartHeight - 2}
-              width={barW}
-              height={item.count > 0 ? barH : 2}
-              rx={3}
-              fill={barColor}
-              opacity={item.count === 0 ? 0.2 : 1}
+              width={barWidth}
+              height={item.count > 0 ? height : 2}
+              rx={5}
+              fill={fill}
+              opacity={item.count > 0 ? 1 : 0.6}
             />
-            {item.count > 0 && (
-              <SvgText
-                x={x + barW / 2}
-                y={y - 3}
-                textAnchor="middle"
-                fontSize={9}
-                fill={barColor}
-                fontWeight="600"
-              >
-                {item.count}
-              </SvgText>
-            )}
             <SvgText
-              x={x + barW / 2}
-              y={totalH - 4}
+              x={x + barWidth / 2}
+              y={totalHeight - 6}
               textAnchor="middle"
-              fontSize={7.5}
-              fill={labelColor}
+              fontSize={8}
+              fill={colors.textSecondary}
             >
               {item.label}
             </SvgText>
+            {item.count > 0 ? (
+              <SvgText
+                x={x + barWidth / 2}
+                y={y - 4}
+                textAnchor="middle"
+                fontSize={9}
+                fill={colors.primary}
+                fontWeight="700"
+              >
+                {item.count}
+              </SvgText>
+            ) : null}
           </G>
         );
       })}
@@ -112,47 +172,50 @@ function WeeklyBarChart({ data, barColor, gridColor, labelColor }) {
   );
 }
 
-// ─── Segmented priority bar ───────────────────────────────────────────────────
-function PriorityBar({
-  breakdown,
-  priorityConfig,
-  legendTextColor,
-  emptyTrackColor,
-}) {
-  const total = priorityConfig.reduce(
-    (sum, item) => sum + (breakdown[item.key] ?? 0),
+function PriorityLane({ breakdown, config, colors }) {
+  const total = config.reduce(
+    (sum, item) => sum + Number(breakdown?.[item.key] || 0),
     0,
   );
 
   return (
     <View>
-      {total === 0 ? (
-        <View
-          className="h-5 rounded-full"
-          style={{ backgroundColor: emptyTrackColor }}
-        />
-      ) : (
-        <View className="flex-row rounded-full overflow-hidden h-5">
-          {priorityConfig.map(({ key, color }) => {
-            const pct = total > 0 ? (breakdown[key] ?? 0) / total : 0;
-            if (pct === 0) return null;
-            return (
-              <View key={key} style={{ flex: pct, backgroundColor: color }} />
-            );
-          })}
-        </View>
-      )}
+      <View
+        className="h-5 rounded-full overflow-hidden"
+        style={{ backgroundColor: colors.border }}
+      >
+        {total > 0
+          ? config.map((item) => {
+              const count = Number(breakdown?.[item.key] || 0);
+              const flex = count / total;
+              if (flex <= 0) return null;
+              return (
+                <View
+                  key={item.key}
+                  style={{ flex, backgroundColor: item.color }}
+                />
+              );
+            })
+          : null}
+      </View>
 
-      {/* Legend */}
-      <View className="flex-row mt-2 flex-wrap gap-3">
-        {priorityConfig.map(({ key, label, color }) => (
-          <View key={key} className="flex-row items-center mr-3">
-            <View
-              className="w-2.5 h-2.5 rounded-full mr-1.5"
-              style={{ backgroundColor: color }}
-            />
-            <Text className="text-xs" style={{ color: legendTextColor }}>
-              {label}: {breakdown[key] ?? 0}
+      <View className="mt-4">
+        {config.map((item) => (
+          <View
+            key={item.key}
+            className="flex-row items-center justify-between mb-3"
+          >
+            <View className="flex-row items-center">
+              <View
+                className="w-3 h-3 rounded-full mr-2"
+                style={{ backgroundColor: item.color }}
+              />
+              <Text className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                {item.label}
+              </Text>
+            </View>
+            <Text className="text-sm font-bold" style={{ color: colors.textSecondary }}>
+              {Number(breakdown?.[item.key] || 0)}
             </Text>
           </View>
         ))}
@@ -161,43 +224,41 @@ function PriorityBar({
   );
 }
 
-function StatusRow({ label, count, total, color, textColor, trackColor }) {
-  const pct = total > 0 ? count / total : 0;
+function StatusMeter({ label, count, total, tone, colors }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <View className="mb-3">
-      <View className="flex-row justify-between mb-1">
+    <View className="mb-4">
+      <View className="flex-row items-center justify-between mb-2">
         <View className="flex-row items-center">
           <View
-            className="w-2 h-2 rounded-full mr-2"
-            style={{ backgroundColor: color }}
+            className="w-2.5 h-2.5 rounded-full mr-2"
+            style={{ backgroundColor: tone }}
           />
-          <Text className="text-xs font-medium" style={{ color: textColor }}>
+          <Text className="text-sm font-medium" style={{ color: colors.textPrimary }}>
             {label}
           </Text>
         </View>
-        <Text className="text-xs font-semibold" style={{ color: textColor }}>
-          {count}
+        <Text className="text-xs font-semibold" style={{ color: colors.textSecondary }}>
+          {count} · {pct}%
         </Text>
       </View>
       <View
-        className="h-1.5 rounded-full overflow-hidden"
-        style={{ backgroundColor: trackColor }}
+        className="h-2 rounded-full overflow-hidden"
+        style={{ backgroundColor: colors.border }}
       >
         <View
           className="h-full rounded-full"
-          style={{ width: `${Math.round(pct * 100)}%`, backgroundColor: color }}
+          style={{ width: `${pct}%`, backgroundColor: tone }}
         />
       </View>
     </View>
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function WorkerAnalytics() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const { workerId } = useLocalSearchParams();
-
   const colors = useMemo(
     () => (colorScheme === "dark" ? darkColors : lightColors),
     [colorScheme],
@@ -211,22 +272,41 @@ export default function WorkerAnalytics() {
     refetch,
   } = useWorkerAnalytics(workerId);
 
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("more.workerAnalyticsScreen.failedTitle"),
+      text2:
+        error?.response?.data?.message ??
+        t("more.workerAnalyticsScreen.failedMessage"),
+    });
+  }, [error, t]);
+
+  const title = workerId
+    ? data?.worker?.fullName
+      ? t("more.workerAnalyticsScreen.titleForWorker", {
+          name: data.worker.fullName,
+        })
+      : t("more.workerAnalyticsScreen.titleWorker")
+    : t("more.menu.workerAnalytics.title");
+
   const priorityConfig = useMemo(
     () => [
       {
-        key: "Low",
-        label: formatPriorityLabel(t, "Low"),
-        color: getPriorityColor("Low", colors) ?? colors.textSecondary,
+        key: "High",
+        label: formatPriorityLabel(t, "High"),
+        color: getPriorityColor("High", colors) ?? colors.danger,
       },
       {
         key: "Medium",
         label: formatPriorityLabel(t, "Medium"),
-        color: getPriorityColor("Medium", colors) ?? colors.textSecondary,
+        color: getPriorityColor("Medium", colors) ?? colors.warning,
       },
       {
-        key: "High",
-        label: formatPriorityLabel(t, "High"),
-        color: getPriorityColor("High", colors) ?? colors.textSecondary,
+        key: "Low",
+        label: formatPriorityLabel(t, "Low"),
+        color: getPriorityColor("Low", colors) ?? colors.success,
       },
     ],
     [colors, t],
@@ -242,42 +322,23 @@ export default function WorkerAnalytics() {
     [colors, t],
   );
 
-  useEffect(() => {
-    if (!error) return null;
-    Toast.show({
-      type: "error",
-      text1: t("more.workerAnalyticsScreen.failedTitle"),
-      text2:
-        error?.response?.data?.message ??
-        t("more.workerAnalyticsScreen.failedMessage"),
-    });
-    return undefined;
-  }, [error, t]);
-
-  const title = workerId
-    ? data?.worker?.fullName
-      ? t("more.workerAnalyticsScreen.titleForWorker", {
-          name: data.worker.fullName,
-        })
-      : t("more.workerAnalyticsScreen.titleWorker")
-    : t("more.menu.workerAnalytics.title");
-
-  const totalForStatus = data
-    ? Object.values(data.statusDistribution ?? {}).reduce((a, b) => a + b, 0)
-    : 0;
-
-  const gridColor = colors.border;
-  const labelColor = colors.textSecondary;
-  const trackColor = colors.backgroundSecondary;
+  const totalStatusCount = Object.values(data?.statusDistribution ?? {}).reduce(
+    (sum, value) => sum + Number(value || 0),
+    0,
+  );
+  const completionRate = Number(data?.summary?.completionRate ?? 0);
+  const totalAssigned = Number(data?.summary?.totalAssigned ?? 0);
+  const totalCompleted = Number(data?.summary?.totalCompleted ?? 0);
+  const avgCompletionTime = data?.summary?.avgCompletionTime;
+  const workerRating = Number.isFinite(data?.worker?.rating)
+    ? data.worker.rating.toFixed(1)
+    : t("more.workerAnalyticsScreen.noValue");
 
   if (loading) {
     return (
-      <View
-        className="flex-1"
-        style={{ backgroundColor: colors.backgroundPrimary }}
-      >
+      <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
         <BackButtonHeader title={title} />
-        <View className="flex-1 justify-center items-center">
+        <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </View>
@@ -285,10 +346,7 @@ export default function WorkerAnalytics() {
   }
 
   return (
-    <View
-      className="flex-1"
-      style={{ backgroundColor: colors.backgroundPrimary }}
-    >
+    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
       <BackButtonHeader title={title} />
 
       <ScrollView
@@ -298,206 +356,181 @@ export default function WorkerAnalytics() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => refetch()}
-            tintColor={colors.textSecondary}
             colors={[colors.primary]}
+            tintColor={colors.primary}
           />
         }
       >
-        {/* Worker Info Banner */}
-        {data?.worker && (
-          <Card style={{ marginBottom: 12 }}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text
-                  className="text-base font-bold"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {data.worker.fullName}
-                </Text>
-                <Text
-                  className="text-xs mt-0.5"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t("more.workerAnalyticsScreen.departmentWithName", {
-                    department: data.worker.department,
-                  })}
-                  {data.worker.specializations?.length > 0
-                    ? `, ${data.worker.specializations.slice(0, 2).join(", ")}`
-                    : ""}
-                </Text>
-              </View>
-              <View className="flex-row items-center">
-                <Star size={14} color={colors.warning} />
-                <Text
-                  className="text-sm font-bold ml-1"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {Number.isFinite(data.worker.rating)
-                    ? data.worker.rating.toFixed(1)
-                    : t("more.workerAnalyticsScreen.noValue")}
-                </Text>
-              </View>
-            </View>
-          </Card>
-        )}
-
-        {/* Summary Metrics — 2×2 grid */}
-        <View className="flex-row mb-2">
-          <View className="flex-1 mr-1">
-            <MetricCard
-              colors={colors}
-              Icon={Target}
-              iconColor={colors.info}
-              iconBgColor={colors.info + "22"}
-              title={t("more.workerAnalyticsScreen.metrics.totalAssigned")}
-              value={data?.summary?.totalAssigned ?? 0}
-            />
-          </View>
-          <View className="flex-1 ml-1">
-            <MetricCard
-              colors={colors}
-              Icon={CheckCircle}
-              iconColor={colors.success}
-              iconBgColor={colors.success + "22"}
-              title={t("more.workerAnalyticsScreen.metrics.completed")}
-              value={data?.summary?.totalCompleted ?? 0}
-            />
-          </View>
-        </View>
-        <View className="flex-row mb-4">
-          <View className="flex-1 mr-1">
-            <MetricCard
-              colors={colors}
-              Icon={TrendingUp}
-              iconColor={colors.primary}
-              iconBgColor={colors.primary + "22"}
-              title={t("more.workerAnalyticsScreen.metrics.completionRate")}
-              value={t("more.workerAnalyticsScreen.percentValue", {
-                value: data?.summary?.completionRate ?? 0,
-              })}
-              valueColor={colors.primary}
-            />
-          </View>
-          <View className="flex-1 ml-1">
-            <MetricCard
-              colors={colors}
-              Icon={Clock}
-              iconColor={colors.warning}
-              iconBgColor={colors.warning + "22"}
-              title={t("more.workerAnalyticsScreen.metrics.avgCompletion")}
-              value={
-                typeof data?.summary?.avgCompletionTime === "number"
-                  ? t("more.workerAnalyticsScreen.hoursValue", {
-                      value: data.summary.avgCompletionTime.toFixed(1),
+        <View
+          className="rounded-[30px] p-5 mb-5"
+          style={{
+            backgroundColor: colors.primary + "10",
+            borderWidth: 1,
+            borderColor: colors.primary + "2A",
+          }}
+        >
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-xs uppercase" style={{ color: colors.textSecondary }}>
+                {t("more.workerAnalyticsScreen.titleWorker")}
+              </Text>
+              <Text className="text-2xl font-extrabold mt-1" style={{ color: colors.textPrimary }}>
+                {data?.worker?.fullName || t("more.workerAnalyticsScreen.titleWorker")}
+              </Text>
+              <Text className="text-sm mt-2" style={{ color: colors.textSecondary }}>
+                {data?.worker?.department
+                  ? t("more.workerAnalyticsScreen.departmentWithName", {
+                      department: data.worker.department,
                     })
-                  : t("more.workerAnalyticsScreen.noValue")
-              }
+                  : t("more.workerAnalyticsScreen.noValue")}
+              </Text>
+              {data?.worker?.specializations?.length ? (
+                <Text className="text-xs mt-2 leading-5" style={{ color: colors.textSecondary }}>
+                  {data.worker.specializations.join(", ")}
+                </Text>
+              ) : null}
+            </View>
+            <View
+              className="w-14 h-14 rounded-[20px] items-center justify-center"
+              style={{ backgroundColor: colors.primary + "18" }}
+            >
+              <Sparkles size={24} color={colors.primary} />
+            </View>
+          </View>
+
+          <View className="flex-row mt-4" style={{ gap: 10 }}>
+            <HeroPill
+              icon={Star}
+              tone={colors.warning}
+              label={t("more.workerAnalyticsScreen.metrics.avgCompletion")}
+              value={workerRating}
+              colors={colors}
+            />
+            <HeroPill
+              icon={TrendingUp}
+              tone={colors.success}
+              label={t("more.workerAnalyticsScreen.metrics.completionRate")}
+              value={t("more.workerAnalyticsScreen.percentValue", {
+                value: completionRate,
+              })}
+              colors={colors}
             />
           </View>
         </View>
 
-        {/* Weekly Completion Trend */}
-        <Card style={{ marginBottom: 12 }}>
+        <View className="mb-5" style={{ gap: 12 }}>
+          <MetricPanel
+            label={t("more.workerAnalyticsScreen.metrics.totalAssigned")}
+            value={totalAssigned}
+            hint="All complaints assigned to this worker in the selected analytics window."
+            icon={Target}
+            tone={colors.info}
+            colors={colors}
+          />
+          <MetricPanel
+            label={t("more.workerAnalyticsScreen.metrics.completed")}
+            value={totalCompleted}
+            hint="Resolved work completed in the same reporting window."
+            icon={CheckCircle}
+            tone={colors.success}
+            colors={colors}
+          />
+          <MetricPanel
+            label={t("more.workerAnalyticsScreen.metrics.avgCompletion")}
+            value={
+              typeof avgCompletionTime === "number"
+                ? t("more.workerAnalyticsScreen.hoursValue", {
+                    value: avgCompletionTime.toFixed(1),
+                  })
+                : t("more.workerAnalyticsScreen.noValue")
+            }
+            hint="Average time taken to close work after assignment."
+            icon={Clock3}
+            tone={colors.warning}
+            colors={colors}
+          />
+        </View>
+
+        <View
+          className="rounded-[28px] p-5 mb-5"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
           <View className="flex-row items-center mb-3">
-            <BarChart2
-              size={16}
-              color={colors.info}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              className="text-sm font-bold"
-              style={{ color: colors.textPrimary }}
-            >
+            <BarChart2 size={18} color={colors.primary} style={{ marginRight: 8 }} />
+            <Text className="text-base font-bold" style={{ color: colors.textPrimary }}>
               {t("more.workerAnalyticsScreen.weeklyTrend.title")}
             </Text>
           </View>
-          <Text
-            className="text-xs mb-4"
-            style={{ color: colors.textSecondary }}
-          >
+          <Text className="text-xs mb-4 leading-5" style={{ color: colors.textSecondary }}>
             {t("more.workerAnalyticsScreen.weeklyTrend.subtitle")}
           </Text>
-          {data?.weeklyTrend?.length > 0 ? (
-            <WeeklyBarChart
-              data={data.weeklyTrend}
-              barColor={colors.info}
-              gridColor={gridColor}
-              labelColor={labelColor}
-            />
+          {data?.weeklyTrend?.length ? (
+            <WeeklyStripChart data={data.weeklyTrend} colors={colors} />
           ) : (
-            <Text className="text-xs" style={{ color: colors.textSecondary }}>
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>
               {t("more.workerAnalyticsScreen.noData")}
             </Text>
           )}
-        </Card>
+        </View>
 
-        {/* Priority Breakdown */}
-        <Card style={{ marginBottom: 12 }}>
+        <View
+          className="rounded-[28px] p-5 mb-5"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
           <View className="flex-row items-center mb-3">
-            <Target
-              size={16}
-              color={colors.warning}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              className="text-sm font-bold"
-              style={{ color: colors.textPrimary }}
-            >
+            <ActivitySquare size={18} color={colors.warning} style={{ marginRight: 8 }} />
+            <Text className="text-base font-bold" style={{ color: colors.textPrimary }}>
               {t("more.workerAnalyticsScreen.priority.title")}
             </Text>
           </View>
-          <Text
-            className="text-xs mb-3"
-            style={{ color: colors.textSecondary }}
-          >
+          <Text className="text-xs mb-4 leading-5" style={{ color: colors.textSecondary }}>
             {t("more.workerAnalyticsScreen.priority.subtitle")}
           </Text>
-          <PriorityBar
+          <PriorityLane
             breakdown={data?.priorityBreakdown ?? {}}
-            priorityConfig={priorityConfig}
-            legendTextColor={colors.textSecondary}
-            emptyTrackColor={colors.border}
+            config={priorityConfig}
+            colors={colors}
           />
-        </Card>
+        </View>
 
-        {/* Status Distribution */}
-        <Card style={{ marginBottom: 4 }}>
+        <View
+          className="rounded-[28px] p-5"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
           <View className="flex-row items-center mb-3">
-            <CheckCircle
-              size={16}
-              color={colors.success}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              className="text-sm font-bold"
-              style={{ color: colors.textPrimary }}
-            >
+            <CheckCircle size={18} color={colors.success} style={{ marginRight: 8 }} />
+            <Text className="text-base font-bold" style={{ color: colors.textPrimary }}>
               {t("more.workerAnalyticsScreen.status.title")}
             </Text>
           </View>
-          <Text
-            className="text-xs mb-4"
-            style={{ color: colors.textSecondary }}
-          >
+          <Text className="text-xs mb-4 leading-5" style={{ color: colors.textSecondary }}>
             {t("more.workerAnalyticsScreen.status.subtitle", {
-              count: totalForStatus,
+              count: totalStatusCount,
             })}
           </Text>
-          {statusConfig.map(({ key, label, color }) => {
-            const count = data?.statusDistribution?.[key] ?? 0;
-            return (
-              <StatusRow
-                key={key}
-                label={label}
-                count={count}
-                total={totalForStatus}
-                color={color}
-                textColor={colors.textPrimary}
-                trackColor={trackColor}
-              />
-            );
-          })}
-        </Card>
+          {statusConfig.map((status) => (
+            <StatusMeter
+              key={status.key}
+              label={status.label}
+              count={Number(data?.statusDistribution?.[status.key] || 0)}
+              total={totalStatusCount}
+              tone={status.color}
+              colors={colors}
+            />
+          ))}
+        </View>
       </ScrollView>
     </View>
   );

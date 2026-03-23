@@ -9,8 +9,13 @@ import { getSlaCountdown } from "../utils/complaintHelpers";
  *   sla          – the complaint.sla object from the API
  *   style        – optional extra style for the container View
  */
-export default function SlaStatusBadge({ sla, style }) {
+export default function SlaStatusBadge({ sla, status, style }) {
   if (!sla) return null;
+
+  const normalizedStatus = String(status || "").toLowerCase();
+  if (["resolved", "cancelled", "needs-rework"].includes(normalizedStatus)) {
+    return null;
+  }
 
   const countdown = getSlaCountdown(sla.dueDate);
   const isOverdue = sla.isOverdue || countdown?.isOverdue || false;

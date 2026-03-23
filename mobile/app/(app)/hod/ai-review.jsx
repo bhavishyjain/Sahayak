@@ -1,13 +1,15 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import {
+  ActivitySquare,
   CheckCircle,
+  CheckSquare,
   ChevronRight,
   Layers,
-  Tag,
-  Zap,
-  CheckSquare,
   Square,
+  Tag,
+  WandSparkles,
   X,
+  Zap,
 } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
@@ -23,7 +25,6 @@ import {
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
-import Card from "../../../components/Card";
 import { useTheme } from "../../../utils/context/theme";
 import { useAiReviewActions } from "../../../utils/hooks/useAiReviewActions";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
@@ -63,7 +64,8 @@ const normalizeTicketId = (value, fallback) => {
 const normalizeText = (value, fallback = "") => {
   const raw = String(value ?? "")
     .replace(/\r/g, "\n")
-    .replace(/[\u0000-\u001F\u007F]/g, " ");
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/[\u2500-\u257F\u2580-\u259F]/g, " ");
 
   const flattened = raw
     .split("\n")
@@ -73,6 +75,8 @@ const normalizeText = (value, fallback = "") => {
 
   const cleaned = flattened
     .replace(/[-_=~•·|]{3,}/g, " ")
+    .replace(/[.]{4,}/g, " ")
+    .replace(/[\u2010-\u2015]{4,}/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
 
@@ -87,6 +91,15 @@ const isMostlyLineArt = (value) => {
   const symbolRatio = (compact.length - alphaNum) / compact.length;
 
   return compact.length > 80 && alphaNum < 8 && symbolRatio > 0.85;
+};
+
+const isVisualNoiseOnly = (value) => {
+  const text = String(value ?? "").trim();
+  if (!text) return true;
+
+  const alnumCount = (text.match(/[A-Za-z0-9]/g) || []).length;
+  const symbolCount = text.length - alnumCount;
+  return text.length > 40 && symbolCount / text.length > 0.85;
 };
 
 const pickDisplayDescription = (item, fallback) => {
@@ -108,61 +121,314 @@ const pickDisplayDescription = (item, fallback) => {
   return fallback;
 };
 
-function ConfidenceBadge({ value, colors, t }) {
-  const confidence = Number(value ?? 0);
-  const pct = Math.round(confidence * 100);
-  const color =
-    pct >= 90 ? colors.success : pct >= 75 ? colors.warning : colors.danger;
+function StatPanel({ label, value, hint, accent, colors }) {
   return (
     <View
-      className="px-2 py-0.5 rounded-full"
-      style={{ backgroundColor: color + "22" }}
+      className="flex-1 rounded-[22px] p-4"
+      style={{
+        backgroundColor: colors.backgroundPrimary,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
     >
-      <Text className="text-xs font-semibold" style={{ color }}>
+      <Text
+        className="text-[11px] uppercase"
+        style={{ color: colors.textSecondary }}
+      >
+        {label}
+      </Text>
+      <Text className="text-2xl font-extrabold mt-1" style={{ color: accent }}>
+        {value}
+      </Text>
+      <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+        {hint}
+      </Text>
+    </View>
+  );
+}
+
+function ConfidencePill({ confidence, colors, t }) {
+  const pct = Math.round(Number(confidence || 0) * 100);
+  const tone =
+    pct >= 90 ? colors.success : pct >= 75 ? colors.warning : colors.danger;
+
+  return (
+    <View
+      className="px-3 py-1 rounded-full"
+      style={{ backgroundColor: tone + "1F" }}
+    >
+      <Text className="text-xs font-semibold" style={{ color: tone }}>
         {t("hod.aiReview.confidence", { pct })}
       </Text>
     </View>
   );
 }
 
-function SentimentBadge({ sentiment, colors, t }) {
-  const sentimentConfig = getSentimentConfig(colors);
-  const normalizedSentiment = String(sentiment || "unknown").toLowerCase();
-  const cfg = sentimentConfig[normalizedSentiment] ?? sentimentConfig.unknown;
+function SentimentPill({ sentiment, colors, t }) {
+  const configMap = getSentimentConfig(colors);
+  const normalized = String(sentiment || "unknown").toLowerCase();
+  const config = configMap[normalized] ?? configMap.unknown;
+
   return (
     <View
-      className="px-2 py-0.5 rounded-full ml-2"
-      style={{ backgroundColor: cfg.color + "22" }}
+      className="px-2.5 py-1 rounded-full"
+      style={{ backgroundColor: config.color + "18" }}
     >
-      <Text className="text-xs font-semibold" style={{ color: cfg.color }}>
-        {t(cfg.labelKey)}
+      <Text
+        className="text-[11px] font-semibold"
+        style={{ color: config.color }}
+      >
+        {t(config.labelKey)}
       </Text>
     </View>
   );
 }
 
-function DiffRow({ label, current, suggested, colors }) {
-  const hasDiff = current !== suggested;
+function SuggestionChip({ label, current, suggested, tone, colors }) {
   return (
-    <View className="flex-row items-center mt-1">
-      <Text className="text-xs w-20" style={{ color: colors.textSecondary }}>
+    <View
+      className="rounded-2xl px-3 py-2 mr-2 mb-2"
+      style={{
+        backgroundColor: colors.backgroundPrimary,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
+    >
+      <Text
+        className="text-[10px] uppercase"
+        style={{ color: colors.textSecondary }}
+      >
         {label}
       </Text>
-      <Text
-        className="text-xs font-semibold"
-        style={{ color: hasDiff ? colors.textSecondary : colors.textPrimary }}
-      >
-        {current}
-      </Text>
-      {hasDiff && (
-        <>
-          <ChevronRight size={12} color={colors.textSecondary} />
-          <Text className="text-xs font-bold" style={{ color: colors.info }}>
-            {suggested}
-          </Text>
-        </>
-      )}
+      <View className="flex-row items-center mt-1">
+        <Text
+          className="text-xs font-semibold"
+          style={{ color: colors.textSecondary }}
+        >
+          {current}
+        </Text>
+        <ChevronRight
+          size={11}
+          color={colors.textSecondary}
+          style={{ marginHorizontal: 4 }}
+        />
+        <Text className="text-xs font-bold" style={{ color: tone }}>
+          {suggested}
+        </Text>
+      </View>
     </View>
+  );
+}
+
+function ActionPill({ label, icon: Icon, tone, onPress, disabled = false }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      className="flex-row items-center px-3 py-2 rounded-full mr-2 mb-2"
+      style={{
+        backgroundColor: tone + "14",
+        borderWidth: 1,
+        borderColor: tone + "45",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Icon size={14} color={tone} />
+      <Text className="text-xs font-semibold ml-1.5" style={{ color: tone }}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function QueueCard({
+  item,
+  selectMode,
+  isSelected,
+  isApplying,
+  colors,
+  t,
+  onToggleSelect,
+  onApplyDepartment,
+  onApplyPriority,
+  onApplyBoth,
+}) {
+  const ai = item.aiSuggestion ?? {};
+  const current = item.currentValues ?? {};
+  const departmentChanged =
+    ai.department != null && ai.department !== current.department;
+  const priorityChanged =
+    ai.priority != null && ai.priority !== current.priority;
+  const complaintText =
+    item.description ??
+    item.refinedText ??
+    item.rawText ??
+    t("hod.aiReview.notAvailable");
+  const sentiment = ai.sentiment;
+  const confidenceValue = item.aiConfidence ?? Number(ai.confidence ?? 0) / 100;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={selectMode ? 0.75 : 1}
+      onPress={() => selectMode && onToggleSelect(item._id)}
+      onLongPress={() => onToggleSelect(item._id)}
+      disabled={isApplying}
+      className="mb-4"
+    >
+      <View
+        className="rounded-[28px] p-5"
+        style={{
+          backgroundColor: colors.backgroundSecondary,
+          borderWidth: isSelected ? 2 : 1,
+          borderColor: isSelected ? colors.primary : colors.border,
+        }}
+      >
+        <View className="flex-row items-start justify-between mb-4">
+          <View className="flex-1 pr-3">
+            <View className="flex-row items-center mb-2">
+              {selectMode ? (
+                <View className="mr-2">
+                  {isSelected ? (
+                    <CheckSquare size={18} color={colors.primary} />
+                  ) : (
+                    <Square size={18} color={colors.textSecondary} />
+                  )}
+                </View>
+              ) : null}
+              <Text
+                className="text-[11px] font-mono"
+                style={{ color: colors.textSecondary }}
+              >
+                {item.ticketId}
+              </Text>
+            </View>
+            <Text
+              className="text-base font-bold leading-6"
+              style={{ color: colors.textPrimary }}
+              numberOfLines={3}
+            >
+              {complaintText}
+            </Text>
+          </View>
+          <ConfidencePill confidence={confidenceValue} colors={colors} t={t} />
+        </View>
+
+        <View className="flex-row flex-wrap items-center mb-4">
+          <SentimentPill sentiment={sentiment} colors={colors} t={t} />
+          {ai.urgency != null ? (
+            <View className="flex-row items-center ml-2 mb-2">
+              <Zap size={12} color={colors.warning} />
+              <Text
+                className="text-xs ml-1"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("hod.aiReview.urgency", { value: ai.urgency })}
+              </Text>
+            </View>
+          ) : null}
+          {ai.affectedCount != null ? (
+            <Text
+              className="text-xs ml-2 mb-2"
+              style={{ color: colors.textSecondary }}
+            >
+              {t("hod.aiReview.affected", { count: ai.affectedCount })}
+            </Text>
+          ) : null}
+        </View>
+
+        <View
+          className="rounded-[22px] p-4 mb-4"
+          style={{
+            backgroundColor: colors.backgroundPrimary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Text
+            className="text-xs font-semibold mb-3"
+            style={{ color: colors.primary }}
+          >
+            {t("hod.aiReview.suggestionsTitle")}
+          </Text>
+          <View className="flex-row flex-wrap">
+            {departmentChanged ? (
+              <SuggestionChip
+                label={t("hod.aiReview.labels.department")}
+                current={current.department ?? t("hod.aiReview.notAvailable")}
+                suggested={ai.department ?? t("hod.aiReview.notAvailable")}
+                tone={colors.info}
+                colors={colors}
+              />
+            ) : null}
+            {priorityChanged ? (
+              <SuggestionChip
+                label={t("hod.aiReview.labels.priority")}
+                current={current.priority ?? t("hod.aiReview.notAvailable")}
+                suggested={ai.priority ?? t("hod.aiReview.notAvailable")}
+                tone={colors.warning}
+                colors={colors}
+              />
+            ) : null}
+            {!departmentChanged && !priorityChanged ? (
+              <Text className="text-xs" style={{ color: colors.textSecondary }}>
+                {t("hod.aiReview.priorityOnly")}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        {ai.reasoning ? (
+          <View
+            className="rounded-[20px] px-4 py-3 mb-4"
+            style={{ backgroundColor: colors.primary + "10" }}
+          >
+            <Text
+              className="text-xs leading-5"
+              style={{ color: colors.textSecondary }}
+            >
+              {ai.reasoning}
+            </Text>
+          </View>
+        ) : null}
+
+        {!selectMode ? (
+          <View className="flex-row flex-wrap">
+            {departmentChanged ? (
+              <ActionPill
+                label={t("hod.aiReview.actions.applyDepartment")}
+                icon={Layers}
+                tone={colors.info}
+                onPress={onApplyDepartment}
+                disabled={isApplying}
+              />
+            ) : null}
+            {priorityChanged ? (
+              <ActionPill
+                label={t("hod.aiReview.actions.applyPriority")}
+                icon={Tag}
+                tone={colors.warning}
+                onPress={onApplyPriority}
+                disabled={isApplying}
+              />
+            ) : null}
+            {departmentChanged && priorityChanged ? (
+              <ActionPill
+                label={t("hod.aiReview.actions.applyBoth")}
+                icon={CheckCircle}
+                tone={colors.primary}
+                onPress={onApplyBoth}
+                disabled={isApplying}
+              />
+            ) : null}
+            {isApplying ? (
+              <View className="py-2 pl-2">
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -176,16 +442,16 @@ export default function AiReview() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
-
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
-  const [applying, setApplying] = useState(new Set()); // ids currently being patched
+  const [applying, setApplying] = useState(new Set());
 
   const load = async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+
       const res = await apiCall({ method: "GET", url: AI_REVIEW_URL });
       const normalizedComplaints = (res?.data?.complaints ?? [])
         .map((item) => {
@@ -194,10 +460,7 @@ export default function AiReview() {
 
           const fallbackText = t("hod.aiReview.notAvailable");
           const description = pickDisplayDescription(item, fallbackText);
-          const normalizedTicketId = normalizeTicketId(
-            item?.ticketId,
-            fallbackText,
-          );
+          const ticketId = normalizeTicketId(item?.ticketId, fallbackText);
           const looksCorrupt =
             isMostlyLineArt(item?.description) &&
             isMostlyLineArt(item?.refinedText) &&
@@ -214,11 +477,17 @@ export default function AiReview() {
           return {
             ...item,
             _id: id,
-            ticketId: normalizedTicketId,
+            ticketId,
             description,
             aiSuggestion: {
               ...item?.aiSuggestion,
-              reasoning: normalizeText(item?.aiSuggestion?.reasoning, ""),
+              reasoning: (() => {
+                const reasoning = normalizeText(
+                  item?.aiSuggestion?.reasoning,
+                  "",
+                );
+                return isVisualNoiseOnly(reasoning) ? "" : reasoning;
+              })(),
             },
           };
         })
@@ -260,7 +529,7 @@ export default function AiReview() {
         applyPriority,
         silentSuccess: !showSuccessToast,
       });
-      setComplaints((prev) => prev.filter((c) => c._id !== complaintId));
+      setComplaints((prev) => prev.filter((item) => item._id !== complaintId));
       return true;
     } catch (e) {
       Toast.show({
@@ -283,20 +552,19 @@ export default function AiReview() {
   const applyBulk = async (applyDepartment, applyPriority) => {
     setBulkModalVisible(false);
     const ids = [...selected];
-    if (ids.length === 0) return;
+    if (!ids.length) return;
 
     let successCount = 0;
-    for (const id of ids) {
+    for (const complaintId of ids) {
       const wasSuccessful = await applyOne(
-        id,
+        complaintId,
         applyDepartment,
         applyPriority,
         false,
       );
-      if (wasSuccessful) {
-        successCount++;
-      }
+      if (wasSuccessful) successCount += 1;
     }
+
     setSelected(new Set());
     setSelectMode(false);
     Toast.show({
@@ -316,243 +584,126 @@ export default function AiReview() {
       return next;
     });
   };
+  const departmentShiftCount = complaints.filter((item) => {
+    const currentDepartment = item.currentValues?.department;
+    const suggestedDepartment = item.aiSuggestion?.department;
+    return suggestedDepartment && suggestedDepartment !== currentDepartment;
+  }).length;
+  const priorityShiftCount = complaints.filter((item) => {
+    const currentPriority = item.currentValues?.priority;
+    const suggestedPriority = item.aiSuggestion?.priority;
+    return suggestedPriority && suggestedPriority !== currentPriority;
+  }).length;
 
-  const renderItem = ({ item }) => {
-    if (!item?._id) return null;
-
-    const c = item;
-    const ai = c.aiSuggestion ?? {};
-    const cur = c.currentValues ?? {};
-    const deptDiff = ai.department != null && ai.department !== cur.department;
-    const priorityDiff = ai.priority != null && ai.priority !== cur.priority;
-    const isApplying = applying.has(c._id);
-    const isSelected = selected.has(c._id);
-    const confidenceValue = c.aiConfidence ?? Number(ai.confidence ?? 0) / 100;
-    const complaintText =
-      c.description ??
-      c.refinedText ??
-      c.rawText ??
-      t("hod.aiReview.notAvailable");
-
-    return (
-      <TouchableOpacity
-        activeOpacity={selectMode ? 0.7 : 1}
-        onPress={() => selectMode && toggleSelect(c._id)}
-        onLongPress={() => {
-          if (!selectMode) {
-            setSelectMode(true);
-            toggleSelect(c._id);
-          }
+  const listHeader = (
+    <View className="px-4 pt-4 pb-2">
+      <View
+        className="rounded-[30px] p-5 mb-4"
+        style={{
+          backgroundColor: colors.primary + "10",
+          borderWidth: 1,
+          borderColor: colors.primary + "30",
         }}
       >
-        <Card
-          style={{
-            margin: 0,
-            marginBottom: 12,
-            flex: 0,
-            borderWidth: isSelected ? 2 : 1,
-            borderColor: isSelected ? colors.info : colors.border,
-          }}
-        >
-          {/* Header row */}
-          <View className="flex-row items-start justify-between mb-2">
-            <View className="flex-row items-center flex-1">
-              {selectMode && (
-                <TouchableOpacity
-                  onPress={() => toggleSelect(c._id)}
-                  className="mr-2"
-                >
-                  {isSelected ? (
-                    <CheckSquare size={20} color={colors.info} />
-                  ) : (
-                    <Square size={20} color={colors.textSecondary} />
-                  )}
-                </TouchableOpacity>
-              )}
-              <View className="flex-1">
-                <Text
-                  className="text-xs font-mono"
-                  style={{ color: colors.textSecondary }}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {c.ticketId}
-                </Text>
-                <Text
-                  className="text-sm font-semibold mt-0.5"
-                  style={{ color: colors.textPrimary }}
-                  numberOfLines={2}
-                >
-                  {complaintText}
-                </Text>
-              </View>
-            </View>
-            <ConfidenceBadge value={confidenceValue} colors={colors} t={t} />
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 pr-4">
+            <Text
+              className="text-xs uppercase"
+              style={{ color: colors.textSecondary }}
+            >
+              {t("hod.aiReview.title")}
+            </Text>
+            <Text
+              className="text-3xl font-extrabold mt-1"
+              style={{ color: colors.textPrimary }}
+            >
+              {complaints.length}
+            </Text>
+            <Text
+              className="text-sm mt-2 leading-6"
+              style={{ color: colors.textSecondary }}
+            >
+              Review AI-suggested department and priority corrections in one
+              focused queue instead of jumping complaint by complaint.
+            </Text>
           </View>
-
-          {/* Sentiment + urgency */}
-          <View className="flex-row items-center mb-3">
-            <SentimentBadge sentiment={ai.sentiment} colors={colors} t={t} />
-            {ai.urgency != null && (
-              <View className="flex-row items-center ml-2">
-                <Zap size={11} color={colors.warning} />
-                <Text
-                  className="text-xs ml-0.5"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t("hod.aiReview.urgency", { value: ai.urgency })}
-                </Text>
-              </View>
-            )}
-            {ai.affectedCount != null && (
-              <View className="flex-row items-center ml-2">
-                <Text
-                  className="text-xs"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t("hod.aiReview.affected", { count: ai.affectedCount })}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Keywords */}
-          {ai.keywords && ai.keywords.length > 0 && (
-            <View className="flex-row flex-wrap gap-1 mb-3">
-              {ai.keywords.map((kw, i) => (
-                <View
-                  key={i}
-                  className="px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: colors.info + "18" }}
-                >
-                  <Text
-                    className="text-xs font-medium"
-                    style={{ color: colors.info }}
-                  >
-                    {kw}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Diff rows */}
           <View
-            className="rounded-lg p-3 mb-3"
-            style={{ backgroundColor: colors.backgroundSecondary }}
+            className="w-14 h-14 rounded-[20px] items-center justify-center"
+            style={{ backgroundColor: colors.primary + "16" }}
+          >
+            <WandSparkles size={24} color={colors.primary} />
+          </View>
+        </View>
+
+        <View className="flex-row mt-4" style={{ gap: 10 }}>
+          <StatPanel
+            label="Department shifts"
+            value={departmentShiftCount}
+            hint="Routing changes suggested"
+            accent={colors.info}
+            colors={colors}
+          />
+          <StatPanel
+            label="Priority shifts"
+            value={priorityShiftCount}
+            hint="Urgency changes suggested"
+            accent={colors.warning}
+            colors={colors}
+          />
+        </View>
+      </View>
+
+      {complaints.length > 0 ? (
+        <View className="flex-row items-center justify-between mb-4">
+          <View>
+            <Text
+              className="text-base font-bold"
+              style={{ color: colors.textPrimary }}
+            >
+              Review Queue
+            </Text>
+            <Text
+              className="text-xs mt-1"
+              style={{ color: colors.textSecondary }}
+            >
+              {selectMode
+                ? t("hod.aiReview.bulk.selectedCount", { count: selected.size })
+                : `${complaints.length} items waiting`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              if (selectMode) {
+                setSelectMode(false);
+                setSelected(new Set());
+              } else {
+                setSelectMode(true);
+              }
+            }}
+            className="px-4 py-2 rounded-full"
+            style={{
+              backgroundColor: selectMode
+                ? colors.backgroundSecondary
+                : colors.primary + "14",
+              borderWidth: 1,
+              borderColor: selectMode ? colors.border : colors.primary + "35",
+            }}
           >
             <Text
-              className="text-xs font-semibold mb-2"
-              style={{ color: colors.info }}
+              className="text-xs font-semibold"
+              style={{
+                color: selectMode ? colors.textSecondary : colors.primary,
+              }}
             >
-              {t("hod.aiReview.suggestionsTitle")}
+              {selectMode
+                ? t("hod.aiReview.actions.cancel")
+                : t("hod.aiReview.actions.select")}
             </Text>
-            {deptDiff && (
-              <DiffRow
-                label={t("hod.aiReview.labels.department")}
-                current={cur.department ?? t("hod.aiReview.notAvailable")}
-                suggested={ai.department ?? t("hod.aiReview.notAvailable")}
-                colors={colors}
-              />
-            )}
-            {priorityDiff && (
-              <DiffRow
-                label={t("hod.aiReview.labels.priority")}
-                current={cur.priority ?? t("hod.aiReview.notAvailable")}
-                suggested={ai.priority ?? t("hod.aiReview.notAvailable")}
-                colors={colors}
-              />
-            )}
-            {!deptDiff && !priorityDiff && (
-              <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                {t("hod.aiReview.priorityOnly")}
-              </Text>
-            )}
-          </View>
-
-          {/* Reasoning */}
-          {ai.reasoning && (
-            <Text
-              className="text-xs mb-3 italic"
-              style={{ color: colors.textSecondary }}
-              numberOfLines={2}
-            >
-              {ai.reasoning}
-            </Text>
-          )}
-
-          {/* Action buttons */}
-          {!selectMode && (
-            <View className="flex-row flex-wrap gap-2">
-              {deptDiff && (
-                <TouchableOpacity
-                  onPress={() => applyOne(c._id, true, false)}
-                  disabled={isApplying}
-                  className="flex-row items-center px-3 py-1.5 rounded-lg"
-                  style={{
-                    backgroundColor: colors.info + "20",
-                    borderWidth: 1,
-                    borderColor: colors.info,
-                  }}
-                >
-                  <Layers size={13} color={colors.info} />
-                  <Text
-                    className="text-xs font-semibold ml-1"
-                    style={{ color: colors.info }}
-                  >
-                    {t("hod.aiReview.actions.applyDepartment")}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {priorityDiff && (
-                <TouchableOpacity
-                  onPress={() => applyOne(c._id, false, true)}
-                  disabled={isApplying}
-                  className="flex-row items-center px-3 py-1.5 rounded-lg"
-                  style={{
-                    backgroundColor: colors.warning + "20",
-                    borderWidth: 1,
-                    borderColor: colors.warning,
-                  }}
-                >
-                  <Tag size={13} color={colors.warning} />
-                  <Text
-                    className="text-xs font-semibold ml-1"
-                    style={{ color: colors.warning }}
-                  >
-                    {t("hod.aiReview.actions.applyPriority")}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {deptDiff && priorityDiff && (
-                <TouchableOpacity
-                  onPress={() => applyOne(c._id, true, true)}
-                  disabled={isApplying}
-                  className="flex-row items-center px-3 py-1.5 rounded-lg"
-                  style={{
-                    backgroundColor: colors.primary + "20",
-                    borderWidth: 1,
-                    borderColor: colors.primary,
-                  }}
-                >
-                  <CheckCircle size={13} color={colors.primary} />
-                  <Text
-                    className="text-xs font-semibold ml-1"
-                    style={{ color: colors.primary }}
-                  >
-                    {t("hod.aiReview.actions.applyBoth")}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {isApplying && (
-                <ActivityIndicator size="small" color={colors.primary} />
-              )}
-            </View>
-          )}
-        </Card>
-      </TouchableOpacity>
-    );
-  };
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  );
 
   return (
     <View
@@ -560,47 +711,12 @@ export default function AiReview() {
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
       <BackButtonHeader
-        title={
-          complaints.length
-            ? t("hod.aiReview.titleWithCount", { count: complaints.length })
-            : t("hod.aiReview.title")
-        }
+        title={t("hod.aiReview.title")}
         onBack={() => router.back()}
-        rightElement={
-          complaints.length > 0 ? (
-            <TouchableOpacity
-              onPress={() => {
-                if (selectMode) {
-                  setSelectMode(false);
-                  setSelected(new Set());
-                } else {
-                  setSelectMode(true);
-                }
-              }}
-              className="px-3 py-1.5 rounded-lg"
-              style={{
-                backgroundColor: selectMode
-                  ? colors.backgroundSecondary
-                  : colors.info + "20",
-              }}
-            >
-              <Text
-                className="text-xs font-semibold"
-                style={{
-                  color: selectMode ? colors.textSecondary : colors.info,
-                }}
-              >
-                {selectMode
-                  ? t("hod.aiReview.actions.cancel")
-                  : t("hod.aiReview.actions.select")}
-              </Text>
-            </TouchableOpacity>
-          ) : null
-        }
       />
 
       {loading ? (
-        <View className="flex-1 justify-center items-center">
+        <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.primary} />
           <Text
             className="text-sm mt-3"
@@ -613,8 +729,24 @@ export default function AiReview() {
         <FlatList
           data={complaints}
           keyExtractor={(item, index) => String(item?._id ?? item?.id ?? index)}
-          renderItem={renderItem}
-          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+          renderItem={({ item }) => (
+            <View className="px-4">
+              <QueueCard
+                item={item}
+                selectMode={selectMode}
+                isSelected={selected.has(item._id)}
+                isApplying={applying.has(item._id)}
+                colors={colors}
+                t={t}
+                onToggleSelect={toggleSelect}
+                onApplyDepartment={() => applyOne(item._id, true, false)}
+                onApplyPriority={() => applyOne(item._id, false, true)}
+                onApplyBoth={() => applyOne(item._id, true, true)}
+              />
+            </View>
+          )}
+          ListHeaderComponent={listHeader}
+          contentContainerStyle={{ paddingBottom: 130 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -624,67 +756,82 @@ export default function AiReview() {
             />
           }
           ListEmptyComponent={
-            <Card style={{ margin: 0, marginTop: 24 }}>
-              <View className="items-center py-10">
+            <View className="px-4">
+              <View
+                className="rounded-[30px] p-8 items-center"
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
                 <View
-                  className="w-16 h-16 rounded-full items-center justify-center mb-4"
-                  style={{ backgroundColor: colors.success + "20" }}
+                  className="w-18 h-18 rounded-full items-center justify-center mb-4"
+                  style={{ backgroundColor: colors.success + "18" }}
                 >
                   <CheckCircle size={32} color={colors.success} />
                 </View>
                 <Text
-                  className="text-base font-semibold"
+                  className="text-lg font-bold"
                   style={{ color: colors.textPrimary }}
                 >
                   {t("hod.aiReview.empty.title")}
                 </Text>
                 <Text
-                  className="text-sm mt-1 text-center"
+                  className="text-sm mt-2 text-center leading-6"
                   style={{ color: colors.textSecondary }}
                 >
                   {t("hod.aiReview.empty.description")}
                 </Text>
               </View>
-            </Card>
+            </View>
           }
         />
       )}
 
-      {/* Bulk action bar */}
-      {selectMode && selected.size > 0 && (
+      {selectMode && selected.size > 0 ? (
         <View
-          className="absolute bottom-24 left-4 right-4 rounded-2xl p-4 flex-row items-center justify-between"
+          className="absolute left-4 right-4 bottom-6 rounded-[26px] p-4"
           style={{
-            backgroundColor: colors.info,
+            backgroundColor: colors.textPrimary,
             shadowColor: colors.dark,
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 8,
+            shadowOpacity: 0.22,
+            shadowRadius: 14,
+            elevation: 10,
           }}
         >
-          <Text
-            className="text-sm font-semibold"
-            style={{ color: colors.light }}
-          >
-            {t("hod.aiReview.bulk.selectedCount", { count: selected.size })}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setBulkModalVisible(true)}
-            className="flex-row items-center px-4 py-2 rounded-xl"
-            style={{ backgroundColor: colors.light + "33" }}
-          >
-            <CheckCircle size={16} color={colors.light} />
-            <Text
-              className="text-sm font-bold ml-1"
-              style={{ color: colors.light }}
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-sm font-bold"
+                style={{ color: colors.backgroundPrimary }}
+              >
+                {t("hod.aiReview.bulk.selectedCount", { count: selected.size })}
+              </Text>
+              <Text
+                className="text-xs mt-1"
+                style={{ color: colors.backgroundPrimary + "CC" }}
+              >
+                Bulk-apply the same AI decision across the selected queue items.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setBulkModalVisible(true)}
+              className="px-4 py-3 rounded-full flex-row items-center"
+              style={{ backgroundColor: colors.primary }}
             >
-              {t("hod.aiReview.bulk.applyCta")}
-            </Text>
-          </TouchableOpacity>
+              <ActivitySquare size={16} color={colors.light} />
+              <Text
+                className="text-xs font-bold ml-1.5"
+                style={{ color: colors.light }}
+              >
+                {t("hod.aiReview.bulk.applyCta")}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      )}
+      ) : null}
 
-      {/* Bulk apply modal */}
       <Modal
         visible={bulkModalVisible}
         transparent
@@ -697,88 +844,91 @@ export default function AiReview() {
           onPress={() => setBulkModalVisible(false)}
         >
           <Pressable
-            className="rounded-t-3xl p-6"
+            className="rounded-t-[34px] p-6"
             style={{ backgroundColor: colors.backgroundPrimary }}
             onPress={() => {}}
           >
             <View className="flex-row items-center justify-between mb-4">
-              <Text
-                className="text-lg font-bold"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("hod.aiReview.bulk.modalTitle", {
-                  count: selected.size,
-                  plural: selected.size !== 1 ? "s" : "",
-                })}
-              </Text>
+              <View className="flex-1 pr-3">
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {t("hod.aiReview.bulk.modalTitle", {
+                    count: selected.size,
+                    plural: selected.size !== 1 ? "s" : "",
+                  })}
+                </Text>
+                <Text
+                  className="text-sm mt-2"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("hod.aiReview.bulk.modalHint")}
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => setBulkModalVisible(false)}>
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <Text
-              className="text-sm mb-5"
-              style={{ color: colors.textSecondary }}
-            >
-              {t("hod.aiReview.bulk.modalHint")}
-            </Text>
-
             {[
               {
-                id: "department",
-                label: t("hod.aiReview.bulk.options.departmentOnly.label"),
-                sub: t("hod.aiReview.bulk.options.departmentOnly.sub"),
+                key: "department",
                 icon: Layers,
-                color: colors.info,
-                action: () => applyBulk(true, false),
+                tone: colors.info,
+                title: t("hod.aiReview.bulk.options.departmentOnly.label"),
+                subtitle: t("hod.aiReview.bulk.options.departmentOnly.sub"),
+                onPress: () => applyBulk(true, false),
               },
               {
-                id: "priority",
-                label: t("hod.aiReview.bulk.options.priorityOnly.label"),
-                sub: t("hod.aiReview.bulk.options.priorityOnly.sub"),
+                key: "priority",
                 icon: Tag,
-                color: colors.warning,
-                action: () => applyBulk(false, true),
+                tone: colors.warning,
+                title: t("hod.aiReview.bulk.options.priorityOnly.label"),
+                subtitle: t("hod.aiReview.bulk.options.priorityOnly.sub"),
+                onPress: () => applyBulk(false, true),
               },
               {
-                id: "both",
-                label: t(
+                key: "both",
+                icon: CheckCircle,
+                tone: colors.primary,
+                title: t(
                   "hod.aiReview.bulk.options.departmentAndPriority.label",
                 ),
-                sub: t("hod.aiReview.bulk.options.departmentAndPriority.sub"),
-                icon: CheckCircle,
-                color: colors.primary,
-                action: () => applyBulk(true, true),
+                subtitle: t(
+                  "hod.aiReview.bulk.options.departmentAndPriority.sub",
+                ),
+                onPress: () => applyBulk(true, true),
               },
-            ].map(({ id, label, sub, icon: Icon, color, action }) => (
+            ].map((option) => (
               <TouchableOpacity
-                key={id}
-                onPress={action}
-                className="flex-row items-center p-4 rounded-xl mb-3"
+                key={option.key}
+                onPress={option.onPress}
+                className="flex-row items-center rounded-[24px] p-4 mb-3"
                 style={{
-                  backgroundColor: color + "15",
+                  backgroundColor: option.tone + "12",
                   borderWidth: 1,
-                  borderColor: color + "40",
+                  borderColor: option.tone + "34",
                 }}
               >
                 <View
-                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                  style={{ backgroundColor: color + "25" }}
+                  className="w-12 h-12 rounded-2xl items-center justify-center mr-3"
+                  style={{ backgroundColor: option.tone + "1E" }}
                 >
-                  <Icon size={18} color={color} />
+                  <option.icon size={20} color={option.tone} />
                 </View>
                 <View className="flex-1">
                   <Text
-                    className="text-sm font-semibold"
+                    className="text-sm font-bold"
                     style={{ color: colors.textPrimary }}
                   >
-                    {label}
+                    {option.title}
                   </Text>
                   <Text
-                    className="text-xs mt-0.5"
+                    className="text-xs mt-1"
                     style={{ color: colors.textSecondary }}
                   >
-                    {sub}
+                    {option.subtitle}
                   </Text>
                 </View>
                 <ChevronRight size={16} color={colors.textSecondary} />

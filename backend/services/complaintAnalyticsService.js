@@ -197,8 +197,19 @@ async function getHodDashboardStats(department, analyticsFilters = {}) {
       },
     ]),
     Complaint.aggregate([
-      { $match: complaintFilters },
-      { $group: { _id: null, avgFeedbackRating: { $avg: "$feedback.rating" } } },
+      {
+        $match: {
+          ...complaintFilters,
+          status: "resolved",
+          "feedback.rating": { $gte: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          avgFeedbackRating: { $avg: "$feedback.rating" },
+        },
+      },
     ]),
   ]);
 

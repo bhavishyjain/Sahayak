@@ -1,7 +1,6 @@
 import { GET_ME_URL } from "@/url";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import apiCall from "./api";
 import { initAuthToken } from "./cache/auth";
 
 let ongoingGetUser = null;
@@ -69,6 +68,7 @@ export async function clearUserAuth() {
 }
 
 export async function updateUserInfo() {
+  const apiCall = require("./api").default;
   const res = await apiCall({
     method: "GET",
     url: GET_ME_URL,

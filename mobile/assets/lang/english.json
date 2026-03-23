@@ -26,6 +26,7 @@
     "filters": "Filters",
     "sort": "Sort",
     "refresh": "Refresh",
+    "loadMore": "Load more",
     "loading": "Loading...",
     "noData": "No data available",
     "error": "Error",
@@ -379,8 +380,11 @@
       "shareStatusLine": "Status: %{status} | Priority: %{priority}",
       "shareOpenInApp": "Open in Sahayak: %{link}",
       "currentlyAssigned": "Currently Assigned",
+      "assignedWorkersTitle": "Assigned Workers (%{count})",
       "assignedWorkersCount": "Assigned Workers (%{count})",
       "assignedWorker": "Assigned Worker",
+      "leaderBadge": "Leader",
+      "leaderControlsStatus": "Leader updates status",
       "assignToWorker": "Assign to Worker",
       "manageWorkers": "Manage Workers",
       "reassignWorker": "Reassign Worker",
@@ -1599,6 +1603,10 @@
         "title": "My Analytics",
         "subtitle": "Performance graphs and trends"
       },
+      "workerFeedback": {
+        "title": "Rating & Feedback",
+        "subtitle": "See your rating and all citizen feedback"
+      },
       "deleteAccount": {
         "title": "Delete Account",
         "description": "Permanently delete your account",
@@ -1738,6 +1746,17 @@
         "subtitle": "Distribution across all %{count} tasks"
       },
       "noData": "No data available"
+    },
+    "workerFeedbackScreen": {
+      "title": "Rating & Feedback",
+      "currentRating": "Current rating",
+      "feedbackEntries": "%{count} feedback received",
+      "emptyTitle": "No feedback yet",
+      "emptyDescription": "Resolved complaints with citizen ratings will appear here.",
+      "byCitizen": "by %{name}",
+      "noComment": "No written feedback left for this complaint.",
+      "failedTitle": "Failed to load feedback",
+      "failedMessage": "Please try again"
     },
     "dialog": {
       "logout": {

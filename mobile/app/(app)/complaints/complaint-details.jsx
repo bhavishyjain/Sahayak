@@ -695,6 +695,13 @@ function ComplaintDetailsInner() {
 
   const assignedWorkerCount = complaint.assignedWorkers?.length ?? 0;
   const hasAssignedWorkers = assignedWorkerCount > 0;
+  const canViewMultiWorkerDetails =
+    userRole === "head" || userRole === "worker" || userRole === "admin";
+  const showAssignedWorkersSection =
+    hasAssignedWorkers &&
+    (assignedWorkerCount === 1 || canViewMultiWorkerDetails);
+  const showWorkerPhoneDetails =
+    assignedWorkerCount > 1 && canViewMultiWorkerDetails;
   const latestHistoryStatus = normalizeStatus(
     complaint.history?.[complaint.history.length - 1]?.status,
   );
@@ -1190,7 +1197,7 @@ function ComplaintDetailsInner() {
             </Card>
           )}
 
-        {hasAssignedWorkers && (
+        {showAssignedWorkersSection && (
           <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
             <View className="flex-row items-center justify-between mb-3">
               <View className="flex-row items-center">
@@ -1213,7 +1220,7 @@ function ComplaintDetailsInner() {
                     className="text-xs font-semibold"
                     style={{ color: colors.warning }}
                   >
-                    Leader updates status
+                    {t("complaints.details.leaderControlsStatus")}
                   </Text>
                 </View>
               )}
@@ -1234,9 +1241,9 @@ function ComplaintDetailsInner() {
                         className="text-base font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        {assignment.workerName || "Worker"}
+                        {assignment.workerName || t("complaints.details.assignedWorker")}
                       </Text>
-                      {assignment.isLeader && (
+                      {assignedWorkerCount > 1 && assignment.isLeader && (
                         <View
                           className="ml-2 px-2 py-0.5 rounded-full"
                           style={{ backgroundColor: colors.primary + "18" }}
@@ -1245,17 +1252,26 @@ function ComplaintDetailsInner() {
                             className="text-[10px] font-bold"
                             style={{ color: colors.primary }}
                           >
-                            Leader
+                            {t("complaints.details.leaderBadge")}
                           </Text>
                         </View>
                       )}
                     </View>
-                    <Text
-                      className="text-xs mt-1"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {formatStatusLabel(t, assignment.status || "assigned")}
-                    </Text>
+                    {showWorkerPhoneDetails && assignment.workerPhone ? (
+                      <View className="flex-row items-center mt-2">
+                        <MaterialIcons
+                          name="phone"
+                          size={13}
+                          color={colors.textSecondary}
+                        />
+                        <Text
+                          className="text-xs ml-1"
+                          style={{ color: colors.textSecondary }}
+                        >
+                          {assignment.workerPhone}
+                        </Text>
+                      </View>
+                    ) : null}
                     {assignment.taskDescription ? (
                       <Text
                         className="text-sm mt-2 leading-5"
