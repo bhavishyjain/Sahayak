@@ -41,11 +41,18 @@ import getUserAuth, { setUserAuth } from "../../../utils/userAuth";
 import { ACCEPT_INVITE_URL, REGISTER_URL } from "../../../url";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 
-const BENEFITS = [
+const WORKER_BENEFITS = [
   { Icon: ClipboardList, key: "manageAssignments" },
   { Icon: Smartphone, key: "updateStatus" },
   { Icon: BarChart2, key: "trackMetrics" },
   { Icon: Trophy, key: "leaderboard" },
+];
+
+const HEAD_BENEFITS = [
+  { Icon: ClipboardList, label: "Manage department complaints" },
+  { Icon: User, label: "Supervise workers and assignments" },
+  { Icon: BarChart2, label: "Track department analytics" },
+  { Icon: CheckCircle2, label: "Approve and review complaint work" },
 ];
 
 export default function AcceptInvite() {
@@ -62,6 +69,9 @@ export default function AcceptInvite() {
   const department = params.department
     ? decodeURIComponent(String(params.department))
     : "";
+  const invitedRole = params.role ? decodeURIComponent(String(params.role)) : "worker";
+  const isHeadInvite = invitedRole === "head";
+  const benefits = isHeadInvite ? HEAD_BENEFITS : WORKER_BENEFITS;
 
   const [loggedInUser, setLoggedInUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -150,7 +160,7 @@ export default function AcceptInvite() {
           await setUserAuth({ ...updatedUser, auth_token: newJwt, token: newJwt });
         }
         Toast.show({ type: "success", text1: t("auth.acceptInvite.toast.welcomeTitle"), text2: `${t("auth.acceptInvite.toast.welcomeMessage")} ${department}` });
-        router.replace("/(app)/(tabs)/worker-home");
+        router.replace(updatedUser?.role === "head" ? "/(app)/(tabs)/hod-home" : "/(app)/(tabs)/worker-home");
       } catch (err) {
         const msg = err?.response?.data?.message || err?.message || t("auth.acceptInvite.toast.acceptFailed");
         Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.acceptFailedTitle"), text2: msg });
@@ -168,7 +178,9 @@ export default function AcceptInvite() {
             <TouchableOpacity onPress={() => router.back()} hitSlop={16} className="p-1">
               <ArrowLeft size={24} color={colors.textPrimary} />
             </TouchableOpacity>
-            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.workerInvitationTitle")}</Text>
+            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>
+              {isHeadInvite ? "Department Head Invitation" : t("auth.acceptInvite.workerInvitationTitle")}
+            </Text>
           </View>
 
           {/* Hero */}
@@ -180,7 +192,9 @@ export default function AcceptInvite() {
               <HardHat size={48} color={colors.primary} />
             </View>
             <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.youreInvited")}</Text>
-            <Text className="text-base font-semibold mb-3" style={{ color: colors.primary }}>{department} {t("auth.acceptInvite.departmentLabel")}</Text>
+            <Text className="text-base font-semibold mb-3" style={{ color: colors.primary }}>
+              {department} {isHeadInvite ? "Department HOD Role" : t("auth.acceptInvite.departmentLabel")}
+            </Text>
             <View
               className="flex-row items-center gap-2 rounded-full px-4 py-2 max-w-xs"
               style={{ backgroundColor: colors.backgroundSecondary }}
@@ -207,7 +221,7 @@ export default function AcceptInvite() {
             <Text className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: colors.textSecondary }}>
               {t("auth.acceptInvite.benefitsTitle")}
             </Text>
-            {BENEFITS.map(({ Icon, key }, i) => (
+            {benefits.map(({ Icon, key, label }, i) => (
               <View key={i} className="flex-row items-center gap-3 mb-3">
                 <View
                   className="w-9 h-9 rounded-lg justify-center items-center"
@@ -215,7 +229,9 @@ export default function AcceptInvite() {
                 >
                   <Icon size={18} color={colors.primary} />
                 </View>
-                <Text className="flex-1 text-sm leading-5" style={{ color: colors.textPrimary }}>{t(`auth.acceptInvite.benefits.${key}`)}</Text>
+                <Text className="flex-1 text-sm leading-5" style={{ color: colors.textPrimary }}>
+                  {label || t(`auth.acceptInvite.benefits.${key}`)}
+                </Text>
               </View>
             ))}
           </View>
@@ -258,7 +274,7 @@ export default function AcceptInvite() {
     );
   }
 
-  // ── NOT LOGGED IN FLOW — Register as Worker ───────────────────────────────
+  // ── NOT LOGGED IN FLOW — Register from invite ────────────────────────────
   const handleRegister = async () => {
     if (!fullName.trim()) return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.fullNameRequired") });
     if (!username.trim()) return Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.usernameRequired") });
@@ -290,7 +306,7 @@ export default function AcceptInvite() {
         await setUserAuth({ ...userData, auth_token: newJwt, token: newJwt });
       }
       Toast.show({ type: "success", text1: t("auth.acceptInvite.toast.accountCreatedTitle"), text2: `${t("auth.acceptInvite.toast.accountCreatedMessage")} ${department}` });
-      router.replace("/(app)/(tabs)/worker-home");
+      router.replace(userData?.role === "head" ? "/(app)/(tabs)/hod-home" : "/(app)/(tabs)/worker-home");
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || t("auth.acceptInvite.toast.registerFailed");
       Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.registerFailedTitle"), text2: msg });
@@ -313,7 +329,9 @@ export default function AcceptInvite() {
             <TouchableOpacity onPress={() => router.back()} hitSlop={16} className="p-1">
               <ArrowLeft size={24} color={colors.textPrimary} />
             </TouchableOpacity>
-            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.workerRegistrationTitle")}</Text>
+            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>
+              {isHeadInvite ? "Create Department Head Account" : t("auth.acceptInvite.workerRegistrationTitle")}
+            </Text>
           </View>
 
           {/* Hero */}
@@ -324,14 +342,18 @@ export default function AcceptInvite() {
             >
               <HardHat size={48} color={colors.primary} />
             </View>
-            <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.joinAsWorker")}</Text>
-            <Text className="text-base font-semibold" style={{ color: colors.primary }}>{department} {t("auth.acceptInvite.departmentLabel")}</Text>
+            <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>
+              {isHeadInvite ? "Join as Department Head" : t("auth.acceptInvite.joinAsWorker")}
+            </Text>
+            <Text className="text-base font-semibold" style={{ color: colors.primary }}>
+              {department} {t("auth.acceptInvite.departmentLabel")}
+            </Text>
           </View>
 
           <Text className="text-sm text-center mb-6 leading-5" style={{ color: colors.textSecondary }}>
             {t("auth.acceptInvite.createAccountTo")}{" "}
             <Text className="font-bold" style={{ color: colors.primary }}>{department}</Text>
-            {" "}{t("auth.acceptInvite.asAWorker")}
+            {" "}{isHeadInvite ? "as a department head" : t("auth.acceptInvite.asAWorker")}
           </Text>
 
           {/* Form */}

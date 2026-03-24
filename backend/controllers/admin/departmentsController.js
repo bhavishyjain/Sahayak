@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const Complaint = require("../../models/Complaint");
 const Department = require("../../models/Department");
 const User = require("../../models/User");
@@ -5,6 +6,7 @@ const WorkerInvitation = require("../../models/WorkerInvitation");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
+const { sendWorkerInvitation } = require("../../services/emailService");
 const {
   assertDepartmentExists,
   listDepartments,
@@ -119,4 +121,147 @@ exports.deleteDepartment = asyncHandler(async (req, res) => {
 
   await department.deleteOne();
   return sendSuccess(res, {}, "Department deleted successfully");
+});
+
+exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
+  const department = await Department.findById(req.params.id);
+  if (!department) throw new AppError("Department not found", 404);
+  if (department.isActive === false) {
+    throw new AppError("Cannot invite members to an inactive department", 400);
+  }
+
+  const role = req.body?.role === "head" ? "head" : "worker";
+  const email = String(req.body?.email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!email) {
+    throw new AppError("Email is required", 400);
+  }
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    if (existingUser.role === role && existingUser.department === department.name) {
+      throw new AppError(
+        `This user is already a ${role === "head" ? "department head" : "worker"} in this department`,
+        400,
+      );
+    }
+    throw new AppError(
+      "A user account with this email already exists. Update the existing user instead of inviting again.",
+      400,
+    );
+  }
+
+  if (role === "head") {
+    const activeHead = await User.findOne({
+      role: "head",
+      department: department.name,
+      isActive: true,
+    });
+    if (activeHead) {
+      throw new AppError("This department already has an active HOD", 409);
+    }
+  }
+
+  const inviteToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(inviteToken).digest("hex");
+  const inviteExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await WorkerInvitation.updateMany(
+    {
+      email,
+      department: department.name,
+      role,
+      acceptedAt: null,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    },
+    { $set: { revokedAt: new Date() } },
+  );
+
+  const invitation = await WorkerInvitation.create({
+    email,
+    department: department.name,
+    role,
+    invitedBy: req.user._id,
+    tokenHash,
+    expiresAt: inviteExpiry,
+  });
+
+  try {
+    await sendWorkerInvitation(
+      email,
+      inviteToken,
+      department.name,
+      req.user.fullName || req.user.username,
+      role,
+    );
+  } catch (emailError) {
+    console.error("Failed to send invitation email:", emailError);
+  }
+
+  return sendSuccess(
+    res,
+    {
+      data: {
+        id: invitation._id,
+        email: invitation.email,
+        department: invitation.department,
+        role: invitation.role,
+        expiresAt: invitation.expiresAt,
+      },
+    },
+    `${role === "head" ? "HOD" : "Worker"} invitation sent successfully`,
+    201,
+  );
+});
+
+exports.listDepartmentInvitations = asyncHandler(async (req, res) => {
+  const department = await Department.findById(req.params.id);
+  if (!department) throw new AppError("Department not found", 404);
+
+  const now = new Date();
+  const invitations = await WorkerInvitation.find({
+    department: department.name,
+    acceptedAt: null,
+    revokedAt: null,
+    expiresAt: { $gt: now },
+  })
+    .sort({ createdAt: -1 })
+    .select("-tokenHash");
+
+  return sendSuccess(res, {
+    data: invitations.map((invitation) => ({
+      id: invitation._id,
+      email: invitation.email,
+      department: invitation.department,
+      role: invitation.role || "worker",
+      invitedBy: invitation.invitedBy,
+      expiresAt: invitation.expiresAt,
+      createdAt: invitation.createdAt,
+    })),
+  });
+});
+
+exports.revokeDepartmentInvitation = asyncHandler(async (req, res) => {
+  const department = await Department.findById(req.params.id);
+  if (!department) throw new AppError("Department not found", 404);
+
+  const invitation = await WorkerInvitation.findOne({
+    _id: req.params.invitationId,
+    department: department.name,
+    acceptedAt: null,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!invitation) {
+    throw new AppError("Invitation not found or already inactive", 404);
+  }
+
+  invitation.revokedAt = new Date();
+  await invitation.save();
+
+  return sendSuccess(res, { data: { id: invitation._id } }, "Invitation revoked");
 });

@@ -55,7 +55,7 @@ exports.register = asyncHandler(async (req, res) => {
     }
   }
 
-  const role = invitation ? "worker" : "user";
+  const role = invitation ? invitation.role || "worker" : "user";
   const department = invitation ? invitation.department : "Other";
   const user = await createUserAccount({
     username,
@@ -84,7 +84,7 @@ exports.register = asyncHandler(async (req, res) => {
       console.error("register: verification email error", err),
     );
   } else {
-    // Workers' email is confirmed by HOD invitation
+    // Invited worker/head email is confirmed by invitation
     await User.updateOne({ _id: user._id }, { emailVerified: true });
   }
 
@@ -261,7 +261,7 @@ exports.acceptInvite = asyncHandler(async (req, res) => {
 
   const user = await User.findByIdAndUpdate(
     req.user._id,
-    { role: "worker", department: invitation.department },
+    { role: invitation.role || "worker", department: invitation.department },
     { new: true },
   );
 
@@ -280,7 +280,7 @@ exports.acceptInvite = asyncHandler(async (req, res) => {
       refreshToken: plainRefreshToken,
       user: buildUserPayload(user),
     },
-    "You have joined as a worker",
+    `You have joined as a ${invitation.role === "head" ? "department head" : "worker"}`,
   );
 });
 

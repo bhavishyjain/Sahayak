@@ -76,25 +76,39 @@ const sendWorkerInvitation = async (
   inviteToken,
   department,
   hodName,
+  invitedRole = "worker",
 ) => {
   try {
-    const inviteLink = `sahayak://accept-invite?token=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(email)}&department=${encodeURIComponent(department)}`;
+    const inviteLink = `sahayak://accept-invite?token=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(email)}&department=${encodeURIComponent(department)}&role=${encodeURIComponent(invitedRole)}`;
+    const roleLabel = invitedRole === "head" ? "department head" : "worker";
 
     const headerHtml = `<h1>🎉 You're Invited!</h1>`;
 
     const bodyHtml = `
       <h2 style="color: #1f2937; font-size: 24px; margin-top: 0;">Join ${department} Department</h2>
       <p>Hello,</p>
-      <p><strong>${hodName}</strong> has invited you to join the <strong>${department} Department</strong> as a worker in the Sahayak system.</p>
+      <p><strong>${hodName}</strong> has invited you to join the <strong>${department} Department</strong> as a <strong>${roleLabel}</strong> in the Sahayak system.</p>
 
       <div class="benefits">
-        <p><strong>As a worker, you'll be able to:</strong></p>
+        <p><strong>As a ${roleLabel}, you'll be able to:</strong></p>
         <ul>
+          ${
+            invitedRole === "head"
+              ? `
+          <li>✅ Review and manage department complaints</li>
+          <li>👷 Assign and supervise workers</li>
+          <li>📊 Track department performance metrics</li>
+          <li>💬 Coordinate with citizens and workers</li>
+          <li>📌 Approve, rework, or escalate complaint actions</li>
+          `
+              : `
           <li>✅ Receive and manage complaint assignments</li>
           <li>📱 Update complaint status in real-time</li>
           <li>📊 Track your performance metrics</li>
           <li>💬 Communicate with citizens and department heads</li>
           <li>🏆 Compete in leaderboards and earn recognition</li>
+          `
+          }
         </ul>
       </div>
 
@@ -169,7 +183,7 @@ const sendWorkerInvitation = async (
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
       to: [email],
-      subject: `Invitation to Join ${department} Department as Worker`,
+      subject: `Invitation to Join ${department} Department as ${invitedRole === "head" ? "Department Head" : "Worker"}`,
       html,
     });
 

@@ -14,6 +14,12 @@ const workerInvitationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    role: {
+      type: String,
+      enum: ["worker", "head"],
+      default: "worker",
+      index: true,
+    },
     invitedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -42,7 +48,7 @@ const workerInvitationSchema = new mongoose.Schema(
 );
 
 workerInvitationSchema.index(
-  { email: 1, department: 1, expiresAt: 1 },
+  { email: 1, department: 1, role: 1, expiresAt: 1 },
   { name: "worker_invitation_lookup" },
 );
 

@@ -7,6 +7,9 @@ const {
   updateDepartment,
   deactivateDepartment,
   deleteDepartment,
+  inviteDepartmentMember,
+  listDepartmentInvitations,
+  revokeDepartmentInvitation,
 } = require("../controllers/admin/departmentsController");
 
 const router = express.Router();
@@ -17,6 +20,13 @@ router.get("/", listDepartments);
 router.post("/", authorize("admin"), createDepartment);
 router.put("/:id", authorize("admin"), updateDepartment);
 router.post("/:id/deactivate", authorize("admin"), deactivateDepartment);
+router.get("/:id/invitations", authorize("admin"), listDepartmentInvitations);
+router.post("/:id/invitations", authorize("admin"), inviteDepartmentMember);
+router.delete(
+  "/:id/invitations/:invitationId",
+  authorize("admin"),
+  revokeDepartmentInvitation,
+);
 router.delete("/:id", authorize("admin"), deleteDepartment);
 
 module.exports = router;

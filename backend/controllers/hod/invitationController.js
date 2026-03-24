@@ -62,6 +62,7 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
   const invitation = await WorkerInvitation.create({
     email: normalizedEmail,
     department: hod.department,
+    role: "worker",
     invitedBy: hod._id,
     tokenHash,
     expiresAt: inviteExpiry,
@@ -142,6 +143,7 @@ exports.listInvitations = asyncHandler(async (req, res) => {
     id: inv._id,
     email: inv.email,
     department: inv.department,
+    role: inv.role || "worker",
     sentAt: inv.createdAt,
     expiresAt: inv.expiresAt,
     status: inv.acceptedAt

@@ -128,8 +128,8 @@ function applyStatusConstraints(query, constraints = {}) {
   }
 }
 
-function buildRoleAwareComplaintListQuery(baseQuery = {}, options = {}) {
-  const query = buildComplaintListQuery(baseQuery, options);
+async function buildRoleAwareComplaintListQuery(baseQuery = {}, options = {}) {
+  const query = await buildComplaintListQuery(baseQuery, options);
 
   applyActorComplaintScope(query, {
     actorRole: options.actorRole,
@@ -252,7 +252,7 @@ async function listComplaints(options = {}) {
     ...executionOptions
   } = options;
 
-  const query = buildRoleAwareComplaintListQuery(baseQuery, {
+  const query = await buildRoleAwareComplaintListQuery(baseQuery, {
     actorRole,
     actorId,
     actorDepartment,

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { ChevronRight, Plus } from "lucide-react-native";
+import { Plus } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
@@ -138,7 +138,26 @@ export default function AdminDepartmentsTab() {
                 >
                   {department.name}
                 </Text>
-                <ChevronRight size={18} color={colors.textSecondary} />
+                <View className="flex-row items-center">
+                  <View
+                    className="w-2.5 h-2.5 rounded-full mr-2"
+                    style={{
+                      backgroundColor: department.isActive
+                        ? colors.success
+                        : colors.danger,
+                    }}
+                  />
+                  <Text
+                    className="text-xs font-semibold"
+                    style={{
+                      color: department.isActive
+                        ? colors.success
+                        : colors.danger,
+                    }}
+                  >
+                    {department.isActive ? "Active" : "Inactive"}
+                  </Text>
+                </View>
               </View>
             </PressableBlock>
           ))

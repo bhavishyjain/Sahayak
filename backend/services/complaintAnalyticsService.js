@@ -42,7 +42,10 @@ function buildDepartmentBreakdownObject(rows = []) {
     seeded[department] = {
       total: Number(row?.total || 0),
       pending: Number(row?.pending || 0),
+      assigned: Number(row?.assigned || 0),
       inProgress: Number(row?.inProgress || 0),
+      pendingApproval: Number(row?.pendingApproval || 0),
+      needsRework: Number(row?.needsRework || 0),
       resolved: Number(row?.resolved || 0),
       cancelled: Number(row?.cancelled || 0),
       highPriority: Number(row?.highPriority || 0),
@@ -123,8 +126,17 @@ async function getComplaintDepartmentBreakdown(filters = {}) {
         pending: {
           $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
         },
+        assigned: {
+          $sum: { $cond: [{ $eq: ["$status", "assigned"] }, 1, 0] },
+        },
         inProgress: {
           $sum: { $cond: [{ $eq: ["$status", "in-progress"] }, 1, 0] },
+        },
+        pendingApproval: {
+          $sum: { $cond: [{ $eq: ["$status", "pending-approval"] }, 1, 0] },
+        },
+        needsRework: {
+          $sum: { $cond: [{ $eq: ["$status", "needs-rework"] }, 1, 0] },
         },
         resolved: {
           $sum: { $cond: [{ $eq: ["$status", "resolved"] }, 1, 0] },

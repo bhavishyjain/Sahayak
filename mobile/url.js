@@ -144,6 +144,10 @@ export const DEPARTMENTS_URL = API_BASE + "/departments";
 export const DEPARTMENT_DETAIL_URL = (id) => API_BASE + `/departments/${id}`;
 export const DEACTIVATE_DEPARTMENT_URL = (id) =>
   API_BASE + `/departments/${id}/deactivate`;
+export const DEPARTMENT_INVITATIONS_URL = (id) =>
+  API_BASE + `/departments/${id}/invitations`;
+export const DEPARTMENT_INVITATION_DETAIL_URL = (id, invitationId) =>
+  API_BASE + `/departments/${id}/invitations/${invitationId}`;
 export const DELETED_COMPLAINTS_URL = API_BASE + "/complaints/deleted";
 export const RESTORE_COMPLAINT_URL = (id) =>
   API_BASE + `/complaints/${id}/restore`;

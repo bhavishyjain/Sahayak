@@ -8,9 +8,11 @@ import {
   View,
 } from "react-native";
 import {
+  Plus,
   ChevronDown,
   ChevronRight,
   Shield,
+  Trash2,
   Users,
 } from "lucide-react-native";
 import Toast from "react-native-toast-message";
@@ -20,8 +22,13 @@ import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import { darkColors, lightColors } from "../../../colors";
 import apiCall from "../../../utils/api";
+import {
+  COMPLAINT_STATUS_META,
+} from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import {
+  DEPARTMENT_INVITATIONS_URL,
+  DEPARTMENT_INVITATION_DETAIL_URL,
   REPORT_DEPARTMENT_BREAKDOWN_URL,
   DEACTIVATE_DEPARTMENT_URL,
   DEPARTMENT_DETAIL_URL,
@@ -114,13 +121,64 @@ function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
   );
 }
 
+function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
+  return (
+    <View
+      className="rounded-xl p-4 mb-3"
+      style={{
+        backgroundColor: colors.backgroundPrimary,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
+    >
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-3">
+          <Text className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+            {invitation?.email}
+          </Text>
+          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+            Invited {roleLabel}
+          </Text>
+          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+            Pending invitation
+          </Text>
+        </View>
+        <View
+          className="px-2.5 py-1 rounded-full"
+          style={{ backgroundColor: colors.warning + "18" }}
+        >
+          <Text className="text-[11px] font-semibold" style={{ color: colors.warning }}>
+            Pending
+          </Text>
+        </View>
+      </View>
+
+      <PressableBlock
+        onPress={onRevoke}
+        className="rounded-xl py-3 items-center mt-4"
+        style={{ backgroundColor: colors.danger + "18" }}
+      >
+        <View className="flex-row items-center">
+          <Trash2 size={15} color={colors.danger} />
+          <Text className="text-sm font-semibold ml-2" style={{ color: colors.danger }}>
+            Revoke
+          </Text>
+        </View>
+      </PressableBlock>
+    </View>
+  );
+}
+
 function DropdownSection({
   title,
   count,
+  pendingCount = 0,
   icon: Icon,
   tone,
   open,
   onToggle,
+  actionLabel,
+  onAction,
   children,
   colors,
 }) {
@@ -133,8 +191,8 @@ function DropdownSection({
         borderColor: colors.border,
       }}
     >
-      <PressableBlock onPress={onToggle}>
-        <View className="flex-row items-center justify-between">
+      <View className="flex-row items-center justify-between">
+        <PressableBlock onPress={onToggle} className="flex-1">
           <View className="flex-row items-center flex-1 pr-3">
             <View
               className="w-11 h-11 rounded-2xl items-center justify-center mr-3"
@@ -148,16 +206,40 @@ function DropdownSection({
               </Text>
               <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
                 {count} {count === 1 ? "member" : "members"}
+                {pendingCount > 0
+                  ? ` • ${pendingCount} pending`
+                  : ""}
               </Text>
             </View>
           </View>
-          {open ? (
-            <ChevronDown size={18} color={colors.textSecondary} />
-          ) : (
-            <ChevronRight size={18} color={colors.textSecondary} />
-          )}
+        </PressableBlock>
+        <View className="flex-row items-center ml-3">
+          {actionLabel && onAction ? (
+            <PressableBlock
+              onPress={onAction}
+              className="px-3 py-2 rounded-xl mr-3"
+              style={{ backgroundColor: tone + "16" }}
+            >
+              <View className="flex-row items-center">
+                <Plus size={14} color={tone} />
+                <Text
+                  className="text-xs font-semibold ml-1"
+                  style={{ color: tone }}
+                >
+                  {actionLabel}
+                </Text>
+              </View>
+            </PressableBlock>
+          ) : null}
+          <PressableBlock onPress={onToggle}>
+            {open ? (
+              <ChevronDown size={18} color={colors.textSecondary} />
+            ) : (
+              <ChevronRight size={18} color={colors.textSecondary} />
+            )}
+          </PressableBlock>
         </View>
-      </PressableBlock>
+      </View>
 
       {open ? <View className="mt-4">{children}</View> : null}
     </View>
@@ -174,6 +256,7 @@ export default function DepartmentDetailsScreen() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const queryClient = useQueryClient();
   const [confirmState, setConfirmState] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState("");
   const [renameValue, setRenameValue] = useState("");
   const [hodOpen, setHodOpen] = useState(false);
   const [workersOpen, setWorkersOpen] = useState(false);
@@ -185,9 +268,9 @@ export default function DepartmentDetailsScreen() {
 
   const { data, isLoading, isRefetching, refetch, error } = useQuery({
     queryKey: ["admin-department-detail", departmentName, departmentRecord?.id],
-    enabled: Boolean(departmentName),
+    enabled: Boolean(departmentName && departmentRecord?.id),
     queryFn: async () => {
-      const [usersRes, breakdownRes] = await Promise.all([
+      const [usersRes, breakdownRes, invitationsRes] = await Promise.all([
         apiCall({
           method: "GET",
           url: `${USERS_URL}?includeStats=true&department=${encodeURIComponent(
@@ -198,10 +281,15 @@ export default function DepartmentDetailsScreen() {
           method: "GET",
           url: REPORT_DEPARTMENT_BREAKDOWN_URL,
         }),
+        apiCall({
+          method: "GET",
+          url: DEPARTMENT_INVITATIONS_URL(departmentRecord?.id),
+        }),
       ]);
 
       const users = usersRes?.data ?? [];
       const breakdownPayload = breakdownRes?.data ?? {};
+      const invitations = invitationsRes?.data ?? [];
       const analytics =
         breakdownPayload?.[departmentName] ||
         breakdownPayload?.breakdown?.[departmentName] ||
@@ -212,6 +300,7 @@ export default function DepartmentDetailsScreen() {
         analytics,
         heads: users.filter((item) => item.role === "head"),
         workers: users.filter((item) => item.role === "worker"),
+        invitations: invitations.filter(Boolean),
       };
     },
   });
@@ -262,6 +351,67 @@ export default function DepartmentDetailsScreen() {
       Toast.show({
         type: "error",
         text1: "Could not update member",
+        text2: mutationError?.response?.data?.message || "Please try again.",
+      });
+    },
+  });
+
+  const inviteDepartmentMemberMutation = useMutation({
+    mutationFn: async ({ role, email }) => {
+      if (!departmentRecord?.id) {
+        throw new Error("Department not found");
+      }
+      return apiCall({
+        method: "POST",
+        url: DEPARTMENT_INVITATIONS_URL(departmentRecord.id),
+        data: {
+          role,
+          email: email.trim().toLowerCase(),
+        },
+      });
+    },
+    onSuccess: (_response, variables) => {
+      invalidateAdminQueries();
+      setConfirmState(null);
+      setInviteEmail("");
+      Toast.show({
+        type: "success",
+        text1: `${variables.role === "head" ? "HOD" : "Worker"} invited`,
+        text2: `Invitation sent to ${variables.email.trim().toLowerCase()}.`,
+      });
+    },
+    onError: (mutationError, variables) => {
+      Toast.show({
+        type: "error",
+        text1: `Could not invite ${variables?.role === "head" ? "HOD" : "worker"}`,
+        text2: mutationError?.response?.data?.message || "Please try again.",
+      });
+    },
+  });
+
+  const revokeInvitationMutation = useMutation({
+    mutationFn: async (invitation) => {
+      if (!departmentRecord?.id) {
+        throw new Error("Department not found");
+      }
+      return apiCall({
+        method: "DELETE",
+        url: DEPARTMENT_INVITATION_DETAIL_URL(departmentRecord.id, invitation.id),
+      });
+    },
+    onSuccess: () => {
+      invalidateAdminQueries();
+      setConfirmState(null);
+      Toast.show({
+        type: "success",
+        text1: "Invitation revoked",
+        text2: "The pending invite has been removed.",
+      });
+    },
+    onError: (mutationError) => {
+      Toast.show({
+        type: "error",
+        text1: "Could not revoke invitation",
         text2: mutationError?.response?.data?.message || "Please try again.",
       });
     },
@@ -361,7 +511,31 @@ export default function DepartmentDetailsScreen() {
 
   const heads = useMemo(() => data?.heads ?? [], [data?.heads]);
   const workers = useMemo(() => data?.workers ?? [], [data?.workers]);
-  const analytics = data?.analytics ?? {};
+  const invitations = useMemo(() => data?.invitations ?? [], [data?.invitations]);
+  const analytics = useMemo(() => data?.analytics ?? {}, [data?.analytics]);
+  const headInvitations = useMemo(
+    () => invitations.filter((item) => item.role === "head"),
+    [invitations],
+  );
+  const workerInvitations = useMemo(
+    () => invitations.filter((item) => item.role !== "head"),
+    [invitations],
+  );
+  const statusCards = useMemo(
+    () => [
+      { key: "pending", value: Number(analytics.pending ?? 0) },
+      { key: "assigned", value: Number(analytics.assigned ?? 0) },
+      { key: "in-progress", value: Number(analytics.inProgress ?? 0) },
+      {
+        key: "pending-approval",
+        value: Number(analytics.pendingApproval ?? 0),
+      },
+      { key: "needs-rework", value: Number(analytics.needsRework ?? 0) },
+      { key: "resolved", value: Number(analytics.resolved ?? 0) },
+      { key: "cancelled", value: Number(analytics.cancelled ?? 0) },
+    ],
+    [analytics],
+  );
 
   if (isLoading) {
     return (
@@ -436,41 +610,48 @@ export default function DepartmentDetailsScreen() {
             colors={colors}
           />
           <MetricCard
-            label="Pending"
-            value={Number(analytics.pending ?? 0)}
-            tone={colors.warning}
+            label="Total members"
+            value={heads.length + workers.length}
+            tone={colors.primary}
             colors={colors}
           />
         </View>
 
-        <View className="flex-row mb-4" style={{ gap: 12 }}>
-          <MetricCard
-            label="In progress"
-            value={Number(analytics.inProgress ?? 0)}
-            tone={colors.primary}
-            colors={colors}
-          />
-          <MetricCard
-            label="Resolved"
-            value={Number(analytics.resolved ?? 0)}
-            tone={colors.success}
-            colors={colors}
-          />
+        <View className="flex-row flex-wrap mb-2" style={{ gap: 12 }}>
+          {statusCards.map((item) => {
+            const meta = COMPLAINT_STATUS_META[item.key];
+            const tone = colors[meta?.colorRole] || colors.textPrimary;
+            return (
+              <View key={item.key} style={{ width: "47%" }}>
+                <MetricCard
+                  label={meta?.fallbackLabel || item.key}
+                  value={item.value}
+                  tone={tone}
+                  colors={colors}
+                />
+              </View>
+            );
+          })}
         </View>
 
         <DropdownSection
           title="HOD"
           count={heads.length}
+          pendingCount={headInvitations.length}
           icon={Shield}
           tone={colors.warning}
           open={hodOpen}
           onToggle={() => setHodOpen((value) => !value)}
+          actionLabel="Add HOD"
+          onAction={() => setConfirmState({ type: "invite", role: "head" })}
           colors={colors}
         >
           {heads.length === 0 ? (
-            <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              No HOD found for this department.
-            </Text>
+            headInvitations.length === 0 ? (
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                No HOD found for this department.
+              </Text>
+            ) : null
           ) : (
             heads.map((head) => (
               <MemberRow
@@ -488,21 +669,40 @@ export default function DepartmentDetailsScreen() {
               />
             ))
           )}
+          {headInvitations.map((invitation) => (
+            <InvitationRow
+              key={invitation.id}
+              invitation={invitation}
+              roleLabel="department head"
+              colors={colors}
+              onRevoke={() =>
+                setConfirmState({
+                  type: "revoke-invite",
+                  invitation,
+                })
+              }
+            />
+          ))}
         </DropdownSection>
 
         <DropdownSection
           title="Workers"
           count={workers.length}
+          pendingCount={workerInvitations.length}
           icon={Users}
           tone={colors.primary}
           open={workersOpen}
           onToggle={() => setWorkersOpen((value) => !value)}
+          actionLabel="Add worker"
+          onAction={() => setConfirmState({ type: "invite", role: "worker" })}
           colors={colors}
         >
           {workers.length === 0 ? (
-            <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              No workers found for this department.
-            </Text>
+            workerInvitations.length === 0 ? (
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                No workers found for this department.
+              </Text>
+            ) : null
           ) : (
             workers.map((worker) => (
               <MemberRow
@@ -526,6 +726,20 @@ export default function DepartmentDetailsScreen() {
               />
             ))
           )}
+          {workerInvitations.map((invitation) => (
+            <InvitationRow
+              key={invitation.id}
+              invitation={invitation}
+              roleLabel="worker"
+              colors={colors}
+              onRevoke={() =>
+                setConfirmState({
+                  type: "revoke-invite",
+                  invitation,
+                })
+              }
+            />
+          ))}
         </DropdownSection>
       </ScrollView>
 
@@ -535,6 +749,10 @@ export default function DepartmentDetailsScreen() {
         title={
           confirmState?.type === "rename"
             ? "Edit department name"
+            : confirmState?.type === "invite"
+              ? `Invite ${confirmState?.role === "head" ? "HOD" : "worker"}`
+            : confirmState?.type === "revoke-invite"
+              ? "Revoke invitation"
             : confirmState?.type === "delete"
               ? "Delete department"
             : confirmState?.type === "department"
@@ -546,6 +764,10 @@ export default function DepartmentDetailsScreen() {
         message={
           confirmState?.type === "rename"
             ? "Update the department name everywhere it is used."
+            : confirmState?.type === "invite"
+              ? `Send an invitation email to join ${departmentName} Department as a ${confirmState?.role === "head" ? "department head" : "worker"}.`
+            : confirmState?.type === "revoke-invite"
+              ? `Revoke the pending invitation for ${confirmState?.invitation?.email}?`
             : confirmState?.type === "delete"
               ? "This will remove the department and move linked users, complaints, and invitations to Other."
             : confirmState?.type === "department"
@@ -554,13 +776,26 @@ export default function DepartmentDetailsScreen() {
               ? `Reactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`
               : `Deactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`
         }
-        showInput={confirmState?.type === "rename"}
-        inputPlaceholder="Department name"
-        inputValue={renameValue}
-        onInputChange={setRenameValue}
+        showInput={
+          confirmState?.type === "rename" || confirmState?.type === "invite"
+        }
+        inputPlaceholder={
+          confirmState?.type === "invite" ? "Email address" : "Department name"
+        }
+        inputKeyboardType={
+          confirmState?.type === "invite" ? "email-address" : "default"
+        }
+        inputValue={confirmState?.type === "invite" ? inviteEmail : renameValue}
+        onInputChange={
+          confirmState?.type === "invite" ? setInviteEmail : setRenameValue
+        }
         confirmText={
           confirmState?.type === "rename"
             ? "Save"
+            : confirmState?.type === "invite"
+              ? "Send invite"
+            : confirmState?.type === "revoke-invite"
+              ? "Revoke"
             : confirmState?.type === "delete"
               ? "Delete"
             : confirmState?.type === "department"
@@ -582,8 +817,27 @@ export default function DepartmentDetailsScreen() {
             renameDepartmentMutation.mutate();
             return;
           }
+          if (confirmState?.type === "invite") {
+            if (!inviteEmail.trim()) {
+              Toast.show({
+                type: "error",
+                text1: "Email required",
+                text2: "Enter an email before sending the invitation.",
+              });
+              return;
+            }
+            inviteDepartmentMemberMutation.mutate({
+              role: confirmState.role,
+              email: inviteEmail,
+            });
+            return;
+          }
           if (confirmState?.type === "delete") {
             deleteDepartmentMutation.mutate();
+            return;
+          }
+          if (confirmState?.type === "revoke-invite") {
+            revokeInvitationMutation.mutate(confirmState.invitation);
             return;
           }
           if (confirmState?.type === "department") {
@@ -602,6 +856,8 @@ export default function DepartmentDetailsScreen() {
           updateMemberMutation.isPending ||
           deactivateDepartmentMutation.isPending ||
           renameDepartmentMutation.isPending ||
+          inviteDepartmentMemberMutation.isPending ||
+          revokeInvitationMutation.isPending ||
           deleteDepartmentMutation.isPending
         }
       />

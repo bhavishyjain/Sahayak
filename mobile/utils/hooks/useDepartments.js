@@ -5,7 +5,7 @@ import { DEPARTMENTS_URL } from "../../url";
 function normalizeDepartmentRows(rows) {
   return (rows ?? []).map((department) => ({
     ...department,
-    id: department?._id || department?.id,
+    id: String(department?._id || department?.id || ""),
     name: department?.name || "",
     code: department?.code || "",
     isActive: department?.isActive !== false,
