@@ -5,11 +5,22 @@ require("dotenv").config();
 const User = require("./models/User");
 const Complaint = require("./models/Complaint");
 const ComplaintMessage = require("./models/ComplaintMessage");
+const ComplaintSpecialRequest = require("./models/ComplaintSpecialRequest");
+const Department = require("./models/Department");
 const WorkerInvitation = require("./models/WorkerInvitation");
 const Notification = require("./models/Notification");
 const ReportSchedule = require("./models/ReportSchedule");
 const FestivalEvent = require("./models/FestivalEvent");
 const generateTicketId = require("./utils/generateTicketId");
+
+const SEED_DEPARTMENTS = [
+  { name: "Road", code: "road" },
+  { name: "Water", code: "water" },
+  { name: "Electricity", code: "electricity" },
+  { name: "Waste", code: "waste" },
+  { name: "Drainage", code: "drainage" },
+  { name: "Other", code: "other" },
+];
 
 // Indore areas with accurate coordinates - Expanded list for better coverage
 const indoreAreas = [
@@ -95,6 +106,10 @@ function getLocationForArea(areaName) {
 function getRandomLocation() {
   const area = indoreAreas[Math.floor(Math.random() * indoreAreas.length)];
   return getLocationForArea(area.name);
+}
+
+function getDepartmentNames() {
+  return SEED_DEPARTMENTS.map((department) => department.name);
 }
 
 const LAST_60_DAYS = 60;
@@ -1081,16 +1096,23 @@ function buildComplaintMessageSeeds({
     .sort((left, right) => left.createdAt - right.createdAt);
 }
 
+function getAlternativeDepartment(currentDepartment) {
+  const candidates = getDepartmentNames().filter(
+    (department) => department !== currentDepartment,
+  );
+  return pickRandom(candidates);
+}
+
+function getAlternativePriority(currentPriority) {
+  const candidates = ["Low", "Medium", "High"].filter(
+    (priority) => priority !== currentPriority,
+  );
+  return pickRandom(candidates);
+}
+
 // Generate random complaint
 function generateComplaint(userId, allUsers) {
-  const departments = [
-    "Road",
-    "Water",
-    "Electricity",
-    "Waste",
-    "Drainage",
-    "Other",
-  ];
+  const departments = getDepartmentNames();
   const department =
     departments[Math.floor(Math.random() * departments.length)];
   const templates = complaintTemplates[department];
@@ -1274,14 +1296,7 @@ function generateComplaint(userId, allUsers) {
 
   // ~20% chance AI suggests a different department (creates review candidates)
   if (Math.random() < 0.2) {
-    const altDepts = [
-      "Road",
-      "Water",
-      "Electricity",
-      "Waste",
-      "Drainage",
-      "Other",
-    ].filter((d) => d !== department);
+    const altDepts = getDepartmentNames().filter((d) => d !== department);
     complaint.aiAnalysis.department =
       altDepts[Math.floor(Math.random() * altDepts.length)];
     complaint.aiAnalysis.confidence = 0.7 + Math.random() * 0.2; // 70-90% when dept differs
@@ -1498,11 +1513,22 @@ async function seedDatabase() {
     await User.deleteMany({});
     await Complaint.deleteMany({});
     await ComplaintMessage.deleteMany({});
+    await ComplaintSpecialRequest.deleteMany({});
+    await Department.deleteMany({});
     await WorkerInvitation.deleteMany({});
     await Notification.deleteMany({});
     await ReportSchedule.deleteMany({});
     await FestivalEvent.deleteMany({});
     console.log("✅ Existing data cleared");
+
+    console.log("\n🏢 Creating departments...");
+    const createdDepartments = await Department.insertMany(
+      SEED_DEPARTMENTS.map((department) => ({
+        ...department,
+        isActive: true,
+      })),
+    );
+    console.log(`✅ Created ${createdDepartments.length} departments`);
 
     // Create users
     console.log("\n👥 Creating users...");
@@ -1529,18 +1555,40 @@ async function seedDatabase() {
       });
     }
 
-    // HOD/Head users (5 - one per department)
-    const departments = ["Road", "Water", "Electricity", "Waste", "Drainage"];
-    departments.forEach((dept, idx) => {
-      const username = `hod_${dept.toLowerCase()}`;
+    // HOD/Head users
+    const departments = getDepartmentNames().filter(
+      (department) => department !== "Other",
+    );
+    const hodSeedPlan = [
+      { department: "Road", variant: "primary" },
+      { department: "Road", variant: "operations" },
+      { department: "Water", variant: "primary" },
+      { department: "Water", variant: "field" },
+      { department: "Electricity", variant: "primary" },
+      { department: "Electricity", variant: "support" },
+      { department: "Waste", variant: "primary" },
+      { department: "Drainage", variant: "primary" },
+    ];
+    hodSeedPlan.forEach(({ department: dept, variant }, idx) => {
+      const username =
+        variant === "primary"
+          ? `hod_${dept.toLowerCase()}`
+          : `hod_${dept.toLowerCase()}_${variant}`;
+      const fullNameSuffix =
+        variant === "primary"
+          ? ""
+          : ` ${variant.charAt(0).toUpperCase() + variant.slice(1)}`;
       users.push({
         username,
         password: hashedPassword,
         role: "head",
         department: dept,
-        email: `hod.${dept}@indore.gov.in`,
+        email:
+          variant === "primary"
+            ? `hod.${dept.toLowerCase()}@indore.gov.in`
+            : `hod.${dept.toLowerCase()}.${variant}@indore.gov.in`,
         phone: `91${9100000000 + idx}`,
-        fullName: `HOD ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+        fullName: `HOD ${dept}${fullNameSuffix}`,
         emailVerified: true,
         preferredLanguage: Math.random() < 0.65 ? "hi" : "en",
         notificationPreferences: getRandomNotificationPreferences("head"),
@@ -2058,6 +2106,331 @@ async function seedDatabase() {
     }
     console.log(
       `✅ Marked ${softDeletedComplaints.length} complaints as soft-deleted for admin recovery flows`,
+    );
+
+    console.log("\n📝 Seeding complaint special requests...");
+    const admins = createdUsers.filter((user) => user.role === "admin");
+    const primaryAdmin = admins[0];
+    const usedSpecialRequestComplaintIds = new Set();
+    const specialRequestRows = [];
+    const complaintUpdateOps = [];
+
+    const takeComplaint = (items, matcher) => {
+      const complaint = items.find((item) => {
+        if (!item || usedSpecialRequestComplaintIds.has(String(item._id))) {
+          return false;
+        }
+        return matcher(item);
+      });
+      if (!complaint) return null;
+      usedSpecialRequestComplaintIds.add(String(complaint._id));
+      return complaint;
+    };
+
+    const eligibleUpdateComplaints = createdComplaints.filter(
+      (complaint) => !complaint.deleted && complaint.status !== "cancelled",
+    );
+    const eligibleDeleteComplaints = createdComplaints.filter(
+      (complaint) =>
+        !complaint.deleted &&
+        complaint.status === "pending" &&
+        (!Array.isArray(complaint.assignedWorkers) ||
+          complaint.assignedWorkers.length === 0),
+    );
+
+    const addComplaintHistoryUpdate = (complaint, historyEntries, updates = {}) => {
+      complaint.history = [...(complaint.history || []), ...historyEntries];
+      Object.assign(complaint, updates);
+      complaint.updatedAt =
+        historyEntries[historyEntries.length - 1]?.timestamp || complaint.updatedAt;
+      complaintUpdateOps.push({
+        updateOne: {
+          filter: { _id: complaint._id },
+          update: {
+            $set: {
+              ...updates,
+              updatedAt: complaint.updatedAt,
+            },
+            $push: {
+              history: {
+                $each: historyEntries,
+              },
+            },
+          },
+        },
+      });
+    };
+
+    const createUpdateRequestSeed = ({
+      complaint,
+      hod,
+      status = "pending",
+      reviewNote = null,
+    }) => {
+      if (!complaint || !hod) return;
+      const requestCreatedAt = createStageTimestamp(
+        new Date(complaint.updatedAt),
+        4,
+        72,
+        now,
+      );
+      const requestedDepartment =
+        Math.random() < 0.6
+          ? getAlternativeDepartment(complaint.department)
+          : complaint.department;
+      const requestedPriority =
+        requestedDepartment === complaint.department
+          ? getAlternativePriority(complaint.priority)
+          : Math.random() < 0.5
+            ? getAlternativePriority(complaint.priority)
+            : complaint.priority;
+      const reason = pickRandom([
+        "Citizen follow-up and field review suggest this should be handled by a different team.",
+        "Priority needs correction after on-site inspection from the department office.",
+        "Escalation review indicates the complaint was triaged under the wrong department.",
+      ]);
+
+      const row = {
+        complaintId: complaint._id,
+        ticketId: complaint.ticketId,
+        department: complaint.department,
+        requestType: "update",
+        currentDepartment: complaint.department,
+        requestedDepartment,
+        currentPriority: complaint.priority,
+        requestedPriority,
+        reason,
+        requestedBy: hod._id,
+        status,
+        createdAt: requestCreatedAt,
+        updatedAt: requestCreatedAt,
+      };
+
+      const createNoteParts = [];
+      if (requestedDepartment !== complaint.department) {
+        createNoteParts.push(
+          `change department from ${complaint.department} to ${requestedDepartment}`,
+        );
+      }
+      if (requestedPriority !== complaint.priority) {
+        createNoteParts.push(
+          `change priority from ${complaint.priority} to ${requestedPriority}`,
+        );
+      }
+      const createNote = `Special request submitted by HOD - ${createNoteParts.join(" and ")} - ${reason}`;
+
+      const historyEntries = [
+        {
+          status: complaint.status,
+          updatedBy: hod._id,
+          timestamp: requestCreatedAt,
+          note: createNote,
+        },
+      ];
+
+      if (status === "approved" && primaryAdmin) {
+        const reviewedAt = createStageTimestamp(requestCreatedAt, 2, 36, now);
+        row.reviewedBy = primaryAdmin._id;
+        row.reviewedAt = reviewedAt;
+        row.reviewNote =
+          reviewNote ||
+          "Approved after verifying routing and urgency with admin desk.";
+        row.updatedAt = reviewedAt;
+
+        historyEntries.push({
+          status: complaint.status,
+          updatedBy: primaryAdmin._id,
+          timestamp: reviewedAt,
+          note: `Special request approved by admin - ${createNoteParts.join(" and ")} - ${row.reviewNote}`,
+        });
+
+        const nextFields = {};
+        if (requestedDepartment !== complaint.department) {
+          nextFields.department = requestedDepartment;
+          if (complaint.aiAnalysis && typeof complaint.aiAnalysis === "object") {
+            nextFields.aiAnalysis = {
+              ...complaint.aiAnalysis,
+              department: requestedDepartment,
+            };
+          }
+        }
+        if (requestedPriority !== complaint.priority) {
+          nextFields.priority = requestedPriority;
+        }
+        addComplaintHistoryUpdate(complaint, historyEntries, nextFields);
+      } else if (status === "rejected" && primaryAdmin) {
+        const reviewedAt = createStageTimestamp(requestCreatedAt, 2, 36, now);
+        row.reviewedBy = primaryAdmin._id;
+        row.reviewedAt = reviewedAt;
+        row.reviewNote =
+          reviewNote ||
+          "Rejected because current routing and priority are already correct.";
+        row.updatedAt = reviewedAt;
+
+        historyEntries.push({
+          status: complaint.status,
+          updatedBy: primaryAdmin._id,
+          timestamp: reviewedAt,
+          note: `Special request rejected by admin - ${row.reviewNote}`,
+        });
+        addComplaintHistoryUpdate(complaint, historyEntries);
+      } else {
+        addComplaintHistoryUpdate(complaint, historyEntries);
+      }
+
+      specialRequestRows.push(row);
+    };
+
+    const createDeleteRequestSeed = ({
+      complaint,
+      hod,
+      status = "pending",
+      reviewNote = null,
+    }) => {
+      if (!complaint || !hod) return;
+      const requestCreatedAt = createStageTimestamp(
+        new Date(complaint.updatedAt),
+        4,
+        72,
+        now,
+      );
+      const reason = pickRandom([
+        "Citizen reported duplicate complaint and requested removal.",
+        "Complaint was created against the wrong location and should be removed.",
+        "Field team confirmed this pending complaint is a duplicate of another active ticket.",
+      ]);
+
+      const row = {
+        complaintId: complaint._id,
+        ticketId: complaint.ticketId,
+        department: complaint.department,
+        requestType: "delete",
+        currentDepartment: complaint.department,
+        requestedDepartment: null,
+        currentPriority: complaint.priority,
+        requestedPriority: null,
+        reason,
+        requestedBy: hod._id,
+        status,
+        createdAt: requestCreatedAt,
+        updatedAt: requestCreatedAt,
+      };
+
+      const historyEntries = [
+        {
+          status: complaint.status,
+          updatedBy: hod._id,
+          timestamp: requestCreatedAt,
+          note: `Special delete request submitted by HOD - ${reason}`,
+        },
+      ];
+
+      if (status === "approved" && primaryAdmin) {
+        const reviewedAt = createStageTimestamp(requestCreatedAt, 2, 36, now);
+        row.reviewedBy = primaryAdmin._id;
+        row.reviewedAt = reviewedAt;
+        row.reviewNote =
+          reviewNote ||
+          "Approved because the complaint is still pending and unassigned.";
+        row.updatedAt = reviewedAt;
+
+        historyEntries.push({
+          status: complaint.status,
+          updatedBy: primaryAdmin._id,
+          timestamp: reviewedAt,
+          note: `Special delete request approved by admin - ${row.reviewNote}`,
+        });
+        addComplaintHistoryUpdate(complaint, historyEntries, {
+          deleted: true,
+          deletedAt: reviewedAt,
+        });
+      } else if (status === "rejected" && primaryAdmin) {
+        const reviewedAt = createStageTimestamp(requestCreatedAt, 2, 36, now);
+        row.reviewedBy = primaryAdmin._id;
+        row.reviewedAt = reviewedAt;
+        row.reviewNote =
+          reviewNote ||
+          "Rejected because this complaint still needs to remain in the queue.";
+        row.updatedAt = reviewedAt;
+
+        historyEntries.push({
+          status: complaint.status,
+          updatedBy: primaryAdmin._id,
+          timestamp: reviewedAt,
+          note: `Special request rejected by admin - ${row.reviewNote}`,
+        });
+        addComplaintHistoryUpdate(complaint, historyEntries);
+      } else {
+        addComplaintHistoryUpdate(complaint, historyEntries);
+      }
+
+      specialRequestRows.push(row);
+    };
+
+    const roadOrWaterHod = hods.find(
+      (hod) => hod.department === "Road" || hod.department === "Water",
+    );
+
+    for (let index = 0; index < 8; index += 1) {
+      const complaint = takeComplaint(
+        eligibleUpdateComplaints,
+        (item) => item.status !== "resolved",
+      );
+      if (!complaint) break;
+      const hod = hods.find((user) => user.department === complaint.department);
+      createUpdateRequestSeed({ complaint, hod, status: "pending" });
+    }
+
+    for (let index = 0; index < 4; index += 1) {
+      const complaint = takeComplaint(
+        eligibleDeleteComplaints,
+        (item) => !item.deleted,
+      );
+      if (!complaint) break;
+      const hod = hods.find((user) => user.department === complaint.department);
+      createDeleteRequestSeed({ complaint, hod, status: "pending" });
+    }
+
+    for (let index = 0; index < 5; index += 1) {
+      const complaint = takeComplaint(
+        eligibleUpdateComplaints,
+        (item) => item.status !== "cancelled",
+      );
+      if (!complaint) break;
+      const hod = hods.find((user) => user.department === complaint.department);
+      createUpdateRequestSeed({ complaint, hod, status: "approved" });
+    }
+
+    for (let index = 0; index < 3; index += 1) {
+      const complaint = takeComplaint(
+        eligibleUpdateComplaints,
+        (item) => item.status !== "resolved",
+      );
+      if (!complaint) break;
+      const hod =
+        hods.find((user) => user.department === complaint.department) ||
+        roadOrWaterHod;
+      createUpdateRequestSeed({ complaint, hod, status: "rejected" });
+    }
+
+    for (let index = 0; index < 2; index += 1) {
+      const complaint = takeComplaint(
+        eligibleDeleteComplaints,
+        (item) => !item.deleted,
+      );
+      if (!complaint) break;
+      const hod = hods.find((user) => user.department === complaint.department);
+      createDeleteRequestSeed({ complaint, hod, status: "approved" });
+    }
+
+    if (complaintUpdateOps.length > 0) {
+      await Complaint.bulkWrite(complaintUpdateOps);
+    }
+    if (specialRequestRows.length > 0) {
+      await ComplaintSpecialRequest.insertMany(specialRequestRows);
+    }
+    console.log(
+      `✅ Created ${specialRequestRows.length} special requests (${specialRequestRows.filter((item) => item.status === "pending").length} pending, ${specialRequestRows.filter((item) => item.status === "approved").length} approved, ${specialRequestRows.filter((item) => item.status === "rejected").length} rejected)`,
     );
 
     // ── Seed Worker Invitations ────────────────────────────────────────

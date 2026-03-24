@@ -4,10 +4,8 @@ import {
   BarChart2,
   CheckCircle,
   Clock3,
-  Sparkles,
   Star,
   Target,
-  TrendingUp,
 } from "lucide-react-native";
 import { useEffect, useMemo } from "react";
 import {
@@ -35,38 +33,10 @@ import { useWorkerAnalytics } from "../../../utils/hooks/useWorkerAnalytics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-function HeroPill({ icon: Icon, tone, label, value, colors }) {
-  return (
-    <View
-      className="flex-1 rounded-[22px] px-4 py-3"
-      style={{
-        backgroundColor: colors.backgroundPrimary,
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}
-    >
-      <View className="flex-row items-center mb-2">
-        <View
-          className="w-8 h-8 rounded-2xl items-center justify-center mr-2"
-          style={{ backgroundColor: tone + "18" }}
-        >
-          <Icon size={15} color={tone} />
-        </View>
-        <Text className="text-[11px]" style={{ color: colors.textSecondary }}>
-          {label}
-        </Text>
-      </View>
-      <Text className="text-2xl font-extrabold" style={{ color: tone }}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 function MetricPanel({ label, value, hint, icon: Icon, tone, colors }) {
   return (
     <View
-      className="rounded-[24px] p-4"
+      className="rounded-2xl p-4 flex-1"
       style={{
         backgroundColor: colors.backgroundSecondary,
         borderWidth: 1,
@@ -75,14 +45,23 @@ function MetricPanel({ label, value, hint, icon: Icon, tone, colors }) {
     >
       <View className="flex-row items-center justify-between">
         <View className="flex-1 pr-3">
-          <Text className="text-xs uppercase" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs font-semibold"
+            style={{ color: colors.textSecondary }}
+          >
             {label}
           </Text>
-          <Text className="text-2xl font-extrabold mt-2" style={{ color: colors.textPrimary }}>
+          <Text
+            className="text-2xl font-bold mt-2"
+            style={{ color: colors.textPrimary }}
+          >
             {value}
           </Text>
           {hint ? (
-            <Text className="text-xs mt-2 leading-5" style={{ color: colors.textSecondary }}>
+            <Text
+              className="text-xs mt-2 leading-5"
+              style={{ color: colors.textSecondary }}
+            >
               {hint}
             </Text>
           ) : null}
@@ -94,6 +73,48 @@ function MetricPanel({ label, value, hint, icon: Icon, tone, colors }) {
           <Icon size={20} color={tone} />
         </View>
       </View>
+    </View>
+  );
+}
+
+function SummaryTile({ label, value, hint, icon: Icon, tone, colors }) {
+  return (
+    <View
+      className="rounded-2xl p-4 flex-1"
+      style={{
+        backgroundColor: colors.backgroundSecondary,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
+    >
+      <View className="flex-row items-start justify-between">
+        <Text
+          className="text-xs font-semibold flex-1 pr-3"
+          style={{ color: colors.textSecondary }}
+        >
+          {label}
+        </Text>
+        <View
+          className="w-10 h-10 rounded-2xl items-center justify-center"
+          style={{ backgroundColor: tone + "18" }}
+        >
+          <Icon size={18} color={tone} />
+        </View>
+      </View>
+      <Text
+        className="text-3xl font-bold"
+        style={{ color: colors.textPrimary }}
+      >
+        {value}
+      </Text>
+      {hint ? (
+        <Text
+          className="text-xs mt-2 leading-5"
+          style={{ color: colors.textSecondary }}
+        >
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -181,7 +202,7 @@ function PriorityLane({ breakdown, config, colors }) {
   return (
     <View>
       <View
-        className="h-5 rounded-full overflow-hidden"
+        className="h-5 rounded-full overflow-hidden flex-row"
         style={{ backgroundColor: colors.border }}
       >
         {total > 0
@@ -210,11 +231,17 @@ function PriorityLane({ breakdown, config, colors }) {
                 className="w-3 h-3 rounded-full mr-2"
                 style={{ backgroundColor: item.color }}
               />
-              <Text className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+              <Text
+                className="text-sm font-medium"
+                style={{ color: colors.textPrimary }}
+              >
                 {item.label}
               </Text>
             </View>
-            <Text className="text-sm font-bold" style={{ color: colors.textSecondary }}>
+            <Text
+              className="text-sm font-bold"
+              style={{ color: colors.textSecondary }}
+            >
               {Number(breakdown?.[item.key] || 0)}
             </Text>
           </View>
@@ -234,11 +261,17 @@ function StatusMeter({ label, count, total, tone, colors }) {
             className="w-2.5 h-2.5 rounded-full mr-2"
             style={{ backgroundColor: tone }}
           />
-          <Text className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+          <Text
+            className="text-sm font-medium"
+            style={{ color: colors.textPrimary }}
+          >
             {label}
           </Text>
         </View>
-        <Text className="text-xs font-semibold" style={{ color: colors.textSecondary }}>
+        <Text
+          className="text-xs font-semibold"
+          style={{ color: colors.textSecondary }}
+        >
           {count} · {pct}%
         </Text>
       </View>
@@ -326,9 +359,7 @@ export default function WorkerAnalytics() {
     (sum, value) => sum + Number(value || 0),
     0,
   );
-  const completionRate = Number(data?.summary?.completionRate ?? 0);
   const totalAssigned = Number(data?.summary?.totalAssigned ?? 0);
-  const totalCompleted = Number(data?.summary?.totalCompleted ?? 0);
   const avgCompletionTime = data?.summary?.avgCompletionTime;
   const workerRating = Number.isFinite(data?.worker?.rating)
     ? data.worker.rating.toFixed(1)
@@ -336,7 +367,10 @@ export default function WorkerAnalytics() {
 
   if (loading) {
     return (
-      <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+      <View
+        className="flex-1"
+        style={{ backgroundColor: colors.backgroundPrimary }}
+      >
         <BackButtonHeader title={title} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.primary} />
@@ -346,7 +380,10 @@ export default function WorkerAnalytics() {
   }
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
+    >
       <BackButtonHeader title={title} />
 
       <ScrollView
@@ -361,80 +398,26 @@ export default function WorkerAnalytics() {
           />
         }
       >
-        <View
-          className="rounded-[30px] p-5 mb-5"
-          style={{
-            backgroundColor: colors.primary + "10",
-            borderWidth: 1,
-            borderColor: colors.primary + "2A",
-          }}
-        >
-          <View className="flex-row items-start justify-between">
-            <View className="flex-1 pr-3">
-              <Text className="text-xs uppercase" style={{ color: colors.textSecondary }}>
-                {t("more.workerAnalyticsScreen.titleWorker")}
-              </Text>
-              <Text className="text-2xl font-extrabold mt-1" style={{ color: colors.textPrimary }}>
-                {data?.worker?.fullName || t("more.workerAnalyticsScreen.titleWorker")}
-              </Text>
-              <Text className="text-sm mt-2" style={{ color: colors.textSecondary }}>
-                {data?.worker?.department
-                  ? t("more.workerAnalyticsScreen.departmentWithName", {
-                      department: data.worker.department,
-                    })
-                  : t("more.workerAnalyticsScreen.noValue")}
-              </Text>
-              {data?.worker?.specializations?.length ? (
-                <Text className="text-xs mt-2 leading-5" style={{ color: colors.textSecondary }}>
-                  {data.worker.specializations.join(", ")}
-                </Text>
-              ) : null}
-            </View>
-            <View
-              className="w-14 h-14 rounded-[20px] items-center justify-center"
-              style={{ backgroundColor: colors.primary + "18" }}
-            >
-              <Sparkles size={24} color={colors.primary} />
-            </View>
-          </View>
-
-          <View className="flex-row mt-4" style={{ gap: 10 }}>
-            <HeroPill
+        <View className="mb-5" style={{ gap: 12 }}>
+          <View className="flex-row" style={{ gap: 12 }}>
+            <SummaryTile
+              label="Worker Rating"
+              value={workerRating}
+              hint="Current service rating"
               icon={Star}
               tone={colors.warning}
-              label={t("more.workerAnalyticsScreen.metrics.avgCompletion")}
-              value={workerRating}
               colors={colors}
             />
-            <HeroPill
-              icon={TrendingUp}
-              tone={colors.success}
-              label={t("more.workerAnalyticsScreen.metrics.completionRate")}
-              value={t("more.workerAnalyticsScreen.percentValue", {
-                value: completionRate,
-              })}
+            <SummaryTile
+              label="Active Assigned"
+              value={totalAssigned}
+              hint="Current assigned complaints"
+              icon={Target}
+              tone={colors.info}
               colors={colors}
             />
           </View>
-        </View>
 
-        <View className="mb-5" style={{ gap: 12 }}>
-          <MetricPanel
-            label={t("more.workerAnalyticsScreen.metrics.totalAssigned")}
-            value={totalAssigned}
-            hint="All complaints assigned to this worker in the selected analytics window."
-            icon={Target}
-            tone={colors.info}
-            colors={colors}
-          />
-          <MetricPanel
-            label={t("more.workerAnalyticsScreen.metrics.completed")}
-            value={totalCompleted}
-            hint="Resolved work completed in the same reporting window."
-            icon={CheckCircle}
-            tone={colors.success}
-            colors={colors}
-          />
           <MetricPanel
             label={t("more.workerAnalyticsScreen.metrics.avgCompletion")}
             value={
@@ -452,7 +435,7 @@ export default function WorkerAnalytics() {
         </View>
 
         <View
-          className="rounded-[28px] p-5 mb-5"
+          className="rounded-2xl p-5 mb-5"
           style={{
             backgroundColor: colors.backgroundSecondary,
             borderWidth: 1,
@@ -460,12 +443,22 @@ export default function WorkerAnalytics() {
           }}
         >
           <View className="flex-row items-center mb-3">
-            <BarChart2 size={18} color={colors.primary} style={{ marginRight: 8 }} />
-            <Text className="text-base font-bold" style={{ color: colors.textPrimary }}>
+            <BarChart2
+              size={18}
+              color={colors.primary}
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              className="text-base font-bold"
+              style={{ color: colors.textPrimary }}
+            >
               {t("more.workerAnalyticsScreen.weeklyTrend.title")}
             </Text>
           </View>
-          <Text className="text-xs mb-4 leading-5" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mb-4 leading-5"
+            style={{ color: colors.textSecondary }}
+          >
             {t("more.workerAnalyticsScreen.weeklyTrend.subtitle")}
           </Text>
           {data?.weeklyTrend?.length ? (
@@ -478,7 +471,7 @@ export default function WorkerAnalytics() {
         </View>
 
         <View
-          className="rounded-[28px] p-5 mb-5"
+          className="rounded-2xl p-5 mb-5"
           style={{
             backgroundColor: colors.backgroundSecondary,
             borderWidth: 1,
@@ -486,12 +479,22 @@ export default function WorkerAnalytics() {
           }}
         >
           <View className="flex-row items-center mb-3">
-            <ActivitySquare size={18} color={colors.warning} style={{ marginRight: 8 }} />
-            <Text className="text-base font-bold" style={{ color: colors.textPrimary }}>
+            <ActivitySquare
+              size={18}
+              color={colors.warning}
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              className="text-base font-bold"
+              style={{ color: colors.textPrimary }}
+            >
               {t("more.workerAnalyticsScreen.priority.title")}
             </Text>
           </View>
-          <Text className="text-xs mb-4 leading-5" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mb-4 leading-5"
+            style={{ color: colors.textSecondary }}
+          >
             {t("more.workerAnalyticsScreen.priority.subtitle")}
           </Text>
           <PriorityLane
@@ -502,7 +505,7 @@ export default function WorkerAnalytics() {
         </View>
 
         <View
-          className="rounded-[28px] p-5"
+          className="rounded-2xl p-5"
           style={{
             backgroundColor: colors.backgroundSecondary,
             borderWidth: 1,
@@ -510,12 +513,22 @@ export default function WorkerAnalytics() {
           }}
         >
           <View className="flex-row items-center mb-3">
-            <CheckCircle size={18} color={colors.success} style={{ marginRight: 8 }} />
-            <Text className="text-base font-bold" style={{ color: colors.textPrimary }}>
+            <CheckCircle
+              size={18}
+              color={colors.success}
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              className="text-base font-bold"
+              style={{ color: colors.textPrimary }}
+            >
               {t("more.workerAnalyticsScreen.status.title")}
             </Text>
           </View>
-          <Text className="text-xs mb-4 leading-5" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mb-4 leading-5"
+            style={{ color: colors.textSecondary }}
+          >
             {t("more.workerAnalyticsScreen.status.subtitle", {
               count: totalStatusCount,
             })}

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
-import { BellRing, History, Send } from "lucide-react-native";
+import { BellRing, Clock3, History, Send } from "lucide-react-native";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import PressableBlock from "../../../components/PressableBlock";
@@ -17,6 +17,47 @@ function formatTimestamp(value) {
   } catch {
     return "";
   }
+}
+
+function SimpleInput({
+  value,
+  onChangeText,
+  placeholder,
+  colors,
+  multiline = false,
+}) {
+  return (
+    <PaperTextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      mode="flat"
+      multiline={multiline}
+      underlineStyle={{ display: "none" }}
+      style={{
+        backgroundColor: colors.backgroundPrimary,
+        borderWidth: 1,
+        borderColor: colors.border,
+        color: colors.textPrimary,
+        minHeight: multiline ? 120 : 48,
+        borderRadius: 12,
+        textAlignVertical: multiline ? "top" : "center",
+      }}
+      contentStyle={{
+        color: colors.textPrimary,
+        fontSize: 14,
+        paddingHorizontal: 16,
+        paddingVertical: multiline ? 12 : 10,
+      }}
+      theme={{
+        colors: {
+          text: colors.textPrimary,
+          placeholder: colors.textSecondary,
+        },
+        roundness: 12,
+      }}
+    />
+  );
 }
 
 export default function AdminSendNotificationScreen() {
@@ -104,96 +145,83 @@ export default function AdminSendNotificationScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
+        <View className="mb-4">
+          <Text
+            className="text-base font-semibold"
+            style={{ color: colors.textPrimary }}
+          >
+            Create notification
+          </Text>
+          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+            Draft a notification to save in admin send history.
+          </Text>
+        </View>
+
         <View
-          className="rounded-2xl p-4 mb-4"
+          className="rounded-2xl p-4 mb-5"
           style={{
             backgroundColor: colors.backgroundSecondary,
             borderWidth: 1,
             borderColor: colors.border,
           }}
         >
-          <View className="flex-row items-center mb-3">
-            <View
-              className="w-11 h-11 rounded-2xl items-center justify-center mr-3"
-              style={{ backgroundColor: colors.primary + "18" }}
-            >
-              <Send size={18} color={colors.primary} />
-            </View>
-            <View className="flex-1">
-              <Text className="text-base font-semibold" style={{ color: colors.textPrimary }}>
-                Create notification
-              </Text>
-              <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-                Write the admin notification you want to send.
-              </Text>
-            </View>
-          </View>
-
-          <PaperTextInput
-            mode="outlined"
-            label="Notification title"
+          <Text
+            className="text-xs font-semibold mb-2"
+            style={{ color: colors.textSecondary }}
+          >
+            Title
+          </Text>
+          <SimpleInput
             value={title}
             onChangeText={setTitle}
-            style={{ marginBottom: 12, backgroundColor: colors.backgroundPrimary }}
-          />
-          <PaperTextInput
-            mode="outlined"
-            label="Notification body"
-            value={body}
-            onChangeText={setBody}
-            multiline
-            numberOfLines={5}
-            style={{ marginBottom: 14, backgroundColor: colors.backgroundPrimary }}
+            placeholder="Notification title"
+            colors={colors}
           />
 
-          <View
-            className="rounded-xl px-3 py-3 mb-4"
-            style={{ backgroundColor: colors.warning + "14" }}
+          <Text
+            className="text-xs font-semibold mt-4 mb-2"
+            style={{ color: colors.textSecondary }}
           >
-            <Text className="text-xs" style={{ color: colors.textSecondary }}>
-              The backend does not yet expose an admin broadcast endpoint. This page keeps a history
-              of notifications drafted and sent from here only.
-            </Text>
-          </View>
+            Message
+          </Text>
+          <SimpleInput
+            value={body}
+            onChangeText={setBody}
+            placeholder="Notification body"
+            colors={colors}
+            multiline={true}
+          />
+
+          <Text className="text-xs mt-3" style={{ color: colors.textSecondary }}>
+            Saved locally until admin broadcast API is available.
+          </Text>
 
           <PressableBlock
             onPress={handleSend}
             disabled={saving}
-            className="rounded-2xl py-4 items-center"
+            className="rounded-2xl py-4 items-center mt-4"
             style={{
               backgroundColor: saving ? colors.border : colors.primary,
               opacity: saving ? 0.75 : 1,
             }}
           >
-            <Text className="text-sm font-semibold" style={{ color: colors.dark }}>
-              {saving ? "Saving..." : "Send Notification"}
-            </Text>
+            <View className="flex-row items-center">
+              <Send size={16} color={colors.dark} />
+              <Text className="text-sm font-semibold ml-2" style={{ color: colors.dark }}>
+                {saving ? "Saving..." : "Send Notification"}
+              </Text>
+            </View>
           </PressableBlock>
         </View>
 
-        <View
-          className="rounded-2xl p-4"
-          style={{
-            backgroundColor: colors.backgroundSecondary,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <View className="flex-row items-center mb-4">
-            <View
-              className="w-11 h-11 rounded-2xl items-center justify-center mr-3"
-              style={{ backgroundColor: colors.info + "18" }}
-            >
-              <History size={18} color={colors.info} />
-            </View>
-            <View className="flex-1">
+        <View>
+          <View className="flex-row items-center justify-between mb-4">
+            <View>
               <Text className="text-base font-semibold" style={{ color: colors.textPrimary }}>
                 Sent history
               </Text>
-              <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-                Only notifications created from this page are shown here.
-              </Text>
             </View>
+            <History size={17} color={colors.textSecondary} />
           </View>
 
           {loading ? (
@@ -201,45 +229,75 @@ export default function AdminSendNotificationScreen() {
               Loading history...
             </Text>
           ) : sortedHistory.length === 0 ? (
-            <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              No sent notifications yet.
-            </Text>
+            <View
+              className="rounded-2xl p-5"
+              style={{
+                backgroundColor: colors.backgroundSecondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <Text className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                No sent notifications yet.
+              </Text>
+            </View>
           ) : (
             sortedHistory.map((item) => (
               <View
                 key={item.id}
-                className="rounded-xl p-4 mb-3"
-                style={{ backgroundColor: colors.backgroundPrimary }}
+                className="rounded-2xl p-4 mb-3"
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
               >
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1 pr-3">
-                    <Text className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
-                      {item.title}
-                    </Text>
-                    <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-                      {item.body}
-                    </Text>
-                  </View>
+                <View className="flex-row items-start justify-between mb-3">
+                  <Text
+                    className="text-sm font-semibold flex-1 pr-3"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {item.title}
+                  </Text>
                   <View
                     className="px-2.5 py-1 rounded-full"
-                    style={{ backgroundColor: colors.warning + "18" }}
+                    style={{ backgroundColor: colors.primary + "18" }}
                   >
-                    <Text className="text-[11px] font-semibold" style={{ color: colors.warning }}>
+                    <Text
+                      className="text-[11px] font-semibold"
+                      style={{ color: colors.primary }}
+                    >
                       {item.status}
                     </Text>
                   </View>
                 </View>
 
-                <View className="flex-row items-center justify-between mt-3">
-                  <View className="flex-row items-center">
+                <Text
+                  className="text-xs leading-5"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {item.body}
+                </Text>
+
+                <View
+                  className="flex-row items-center justify-between mt-4 pt-3"
+                  style={{ borderTopWidth: 1, borderTopColor: colors.border }}
+                >
+                  <View className="flex-row items-center flex-1 pr-3">
                     <BellRing size={14} color={colors.textSecondary} />
-                    <Text className="text-xs ml-2" style={{ color: colors.textSecondary }}>
+                    <Text
+                      className="text-xs ml-2"
+                      style={{ color: colors.textSecondary }}
+                    >
                       {item.audience}
                     </Text>
                   </View>
-                  <Text className="text-xs" style={{ color: colors.textSecondary }}>
-                    {formatTimestamp(item.createdAt)}
-                  </Text>
+                  <View className="flex-row items-center">
+                    <Clock3 size={13} color={colors.textSecondary} />
+                    <Text className="text-xs ml-2" style={{ color: colors.textSecondary }}>
+                      {formatTimestamp(item.createdAt)}
+                    </Text>
+                  </View>
                 </View>
               </View>
             ))

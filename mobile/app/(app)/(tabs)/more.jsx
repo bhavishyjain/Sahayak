@@ -11,6 +11,7 @@ import {
   LogOut,
   Moon,
   Pencil,
+  ShieldCheck,
   Sun,
   Trash2,
   CheckCircle,
@@ -18,6 +19,7 @@ import {
   UserPlus,
   MessageSquareQuote,
   Send,
+  SearchCheck,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -209,6 +211,12 @@ export default function More() {
             subtitle: "more.menu.aiReviewQueue.subtitle",
             route: "/(app)/hod/ai-review",
           },
+          {
+            icon: ShieldCheck,
+            title: "Special requests",
+            subtitle: "Send and track complaint edit or delete requests.",
+            route: "/(app)/more/special-requests",
+          },
         ]
       : []),
     // Worker-only: Completed Complaints
@@ -237,10 +245,22 @@ export default function More() {
     ...(user?.role === "admin"
       ? [
           {
+            icon: SearchCheck,
+            title: "Edit complaint",
+            subtitle: "Search by complaint ID, update department or priority, and delete complaints.",
+            route: "/(app)/more/admin-edit-complaint",
+          },
+          {
             icon: Send,
             title: "Send notification",
             subtitle: "Draft admin notifications and review notification history in one place.",
             route: "/(app)/more/admin-send-notification",
+          },
+          {
+            icon: ShieldCheck,
+            title: "Special requests",
+            subtitle: "Accept or reject HOD complaint edit and delete requests.",
+            route: "/(app)/more/special-requests",
           },
         ]
       : []),

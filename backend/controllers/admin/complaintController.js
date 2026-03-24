@@ -2,6 +2,7 @@ const Complaint = require("../../models/Complaint");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
+const { assertDepartmentExists } = require("../../services/departmentService");
 
 exports.listDeletedComplaints = asyncHandler(async (req, res) => {
   const { department, page = 1, limit = 20 } = req.query;
@@ -103,4 +104,67 @@ exports.hardDeleteComplaint = asyncHandler(async (req, res) => {
   await complaint.deleteOne();
 
   sendSuccess(res, { message: "Complaint permanently deleted" });
+});
+
+exports.updateComplaintByAdmin = asyncHandler(async (req, res) => {
+  const { complaintId } = req.params;
+  const { priority, department } = req.body;
+
+  const complaint = await Complaint.findById(complaintId);
+  if (!complaint) throw new AppError("Complaint not found", 404);
+  if (complaint.deleted) {
+    throw new AppError("Deleted complaints cannot be edited", 409);
+  }
+
+  const updates = {};
+  const changeNotes = [];
+
+  if (department !== undefined) {
+    const nextDepartment = String(department || "").trim();
+    if (!nextDepartment) {
+      throw new AppError("Department is required", 400);
+    }
+    await assertDepartmentExists(nextDepartment);
+    if (complaint.department !== nextDepartment) {
+      changeNotes.push(
+        `changed department from ${complaint.department || "-"} to ${nextDepartment}`,
+      );
+    }
+    updates.department = nextDepartment;
+    if (complaint.aiAnalysis && typeof complaint.aiAnalysis === "object") {
+      complaint.aiAnalysis.department = nextDepartment;
+    }
+  }
+
+  if (priority !== undefined) {
+    const nextPriority = String(priority || "").trim();
+    if (!["Low", "Medium", "High"].includes(nextPriority)) {
+      throw new AppError("Invalid priority", 400);
+    }
+    if (complaint.priority !== nextPriority) {
+      changeNotes.push(
+        `changed priority from ${complaint.priority || "-"} to ${nextPriority}`,
+      );
+    }
+    updates.priority = nextPriority;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new AppError("No valid fields provided for update", 400);
+  }
+
+  if (changeNotes.length === 0) {
+    throw new AppError("No complaint changes were made", 400);
+  }
+
+  Object.assign(complaint, updates);
+  complaint.history.push({
+    status: complaint.status,
+    updatedBy: req.user?._id || req.user?.userId,
+    timestamp: new Date(),
+    note: `Complaint edited by admin - ${changeNotes.join(" and ")}`,
+  });
+  await complaint.save();
+
+  sendSuccess(res, { data: complaint }, "Complaint updated successfully");
 });

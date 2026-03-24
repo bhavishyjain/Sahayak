@@ -14,6 +14,24 @@ const {
   slugifyDepartmentName,
 } = require("../../services/departmentService");
 
+async function assertDepartmentComplaintsResolved(departmentName) {
+  const [totalComplaints, resolvedComplaints] = await Promise.all([
+    Complaint.countDocuments({ department: departmentName }),
+    Complaint.countDocuments({ department: departmentName, status: "resolved" }),
+  ]);
+
+  if (totalComplaints !== resolvedComplaints) {
+    throw new AppError(
+      "Department can only be deleted or deactivated when all complaints are resolved",
+      409,
+      {
+        totalComplaints,
+        resolvedComplaints,
+      },
+    );
+  }
+}
+
 exports.listDepartments = asyncHandler(async (req, res) => {
   const includeInactive =
     req.user?.role === "admin" && req.query.includeInactive === "true";
@@ -86,6 +104,8 @@ exports.deactivateDepartment = asyncHandler(async (req, res) => {
     throw new AppError("The Other department cannot be deactivated", 409);
   }
 
+  await assertDepartmentComplaintsResolved(department.name);
+
   department.isActive = false;
   await department.save();
   await User.updateMany(
@@ -103,6 +123,8 @@ exports.deleteDepartment = asyncHandler(async (req, res) => {
   if (department.name === "Other") {
     throw new AppError("The Other department cannot be deleted", 409);
   }
+
+  await assertDepartmentComplaintsResolved(department.name);
 
   const fallback = await assertDepartmentExists("Other", { includeInactive: true });
   const fallbackName = fallback.name;
@@ -151,17 +173,6 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
       "A user account with this email already exists. Update the existing user instead of inviting again.",
       400,
     );
-  }
-
-  if (role === "head") {
-    const activeHead = await User.findOne({
-      role: "head",
-      department: department.name,
-      isActive: true,
-    });
-    if (activeHead) {
-      throw new AppError("This department already has an active HOD", 409);
-    }
   }
 
   const inviteToken = crypto.randomBytes(32).toString("hex");

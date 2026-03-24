@@ -11,6 +11,10 @@ const {
 const { approveCompletion, markNeedsRework, cancelComplaint, updateWorkerTask } = require("../controllers/hod/workflowController");
 const { assignMultipleWorkers, getWorkerComplaints, getComplaintWorkers } = require("../controllers/hod/assignmentController");
 const { inviteWorker, removeWorker, listInvitations, revokeInvitation } = require("../controllers/hod/invitationController");
+const {
+  createSpecialRequest,
+  listHodSpecialRequests,
+} = require("../controllers/complaints/specialRequestController");
 
 router.use(attachAuth, requireAuth, authorize("head"));
 
@@ -22,6 +26,7 @@ router.get("/workers/:workerId/complaints", getWorkerComplaints);
 router.post("/invite-worker", inviteWorker);
 router.get("/invitations", listInvitations);
 router.delete("/invitations/:invitationId", revokeInvitation);
+router.get("/special-requests", listHodSpecialRequests);
 router.delete("/workers/:workerId", removeWorker);
 
 // HOD Approval Workflow
@@ -33,5 +38,6 @@ router.post("/cancel-complaint/:complaintId", cancelComplaint);
 router.post("/complaints/:complaintId/assign-workers", assignMultipleWorkers);
 router.put("/complaints/:complaintId/workers/:workerId", updateWorkerTask);
 router.get("/complaints/:complaintId/workers", getComplaintWorkers);
+router.post("/complaints/:complaintId/special-request", createSpecialRequest);
 
 module.exports = router;

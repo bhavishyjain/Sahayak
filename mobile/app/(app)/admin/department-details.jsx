@@ -635,7 +635,7 @@ export default function DepartmentDetailsScreen() {
         </View>
 
         <DropdownSection
-          title="HOD"
+          title="HODs"
           count={heads.length}
           pendingCount={headInvitations.length}
           icon={Shield}
@@ -769,9 +769,9 @@ export default function DepartmentDetailsScreen() {
             : confirmState?.type === "revoke-invite"
               ? `Revoke the pending invitation for ${confirmState?.invitation?.email}?`
             : confirmState?.type === "delete"
-              ? "This will remove the department and move linked users, complaints, and invitations to Other."
+              ? "This will remove the department and move linked users, complaints, and invitations to Other. This is only allowed when every complaint in the department is resolved."
             : confirmState?.type === "department"
-            ? "This will deactivate the HOD and all workers in this department."
+            ? "This will deactivate the HODs and all workers in this department. This is only allowed when every complaint in the department is resolved."
             : confirmState?.isActive
               ? `Reactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`
               : `Deactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`

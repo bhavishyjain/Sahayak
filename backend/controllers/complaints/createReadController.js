@@ -210,6 +210,7 @@ exports.myComplaints = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     search,
+    ticketId,
     limit = 10,
     page = 1,
   } = req.query;
@@ -224,6 +225,7 @@ exports.myComplaints = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     search,
+    ticketId,
     validateDepartment: true,
     validatePriority: true,
     currentUserId: req.user._id,

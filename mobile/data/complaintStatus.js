@@ -103,11 +103,22 @@ export function normalizeStatus(status) {
   return normalizeComplaintStatus(status);
 }
 
+function formatFallbackStatusLabel(status) {
+  return String(status || "-")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export function formatStatusLabel(t, status) {
   const key = getComplaintStatusTranslationKey(status);
-  if (!key) return status || "-";
+  if (!key) return formatFallbackStatusLabel(status);
   if (typeof t === "function") return t(key);
-  return getComplaintStatusMeta(status)?.fallbackLabel ?? status ?? "-";
+  return (
+    getComplaintStatusMeta(status)?.fallbackLabel ??
+    formatFallbackStatusLabel(status)
+  );
 }
 
 export const COMPLAINT_PRIORITY_META = {

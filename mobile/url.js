@@ -119,6 +119,9 @@ export const HOD_UPDATE_WORKER_TASK_URL = (complaintId, workerId) =>
   API_BASE + `/hod/complaints/${complaintId}/workers/${workerId}`;
 export const HOD_GET_COMPLAINT_WORKERS_URL = (complaintId) =>
   API_BASE + `/hod/complaints/${complaintId}/workers`;
+export const HOD_SPECIAL_REQUESTS_URL = API_BASE + "/hod/special-requests";
+export const HOD_COMPLAINT_SPECIAL_REQUEST_URL = (complaintId) =>
+  API_BASE + `/hod/complaints/${complaintId}/special-request`;
 
 // ============================================================================
 // REPORT URLs
@@ -149,6 +152,10 @@ export const DEPARTMENT_INVITATIONS_URL = (id) =>
 export const DEPARTMENT_INVITATION_DETAIL_URL = (id, invitationId) =>
   API_BASE + `/departments/${id}/invitations/${invitationId}`;
 export const DELETED_COMPLAINTS_URL = API_BASE + "/complaints/deleted";
+export const ADMIN_COMPLAINT_DETAIL_URL = (id) => API_BASE + `/complaints/${id}`;
+export const ADMIN_SPECIAL_REQUESTS_URL = API_BASE + "/complaints/special-requests";
+export const ADMIN_REVIEW_SPECIAL_REQUEST_URL = (requestId) =>
+  API_BASE + `/complaints/special-requests/${requestId}/review`;
 export const RESTORE_COMPLAINT_URL = (id) =>
   API_BASE + `/complaints/${id}/restore`;
 export const PURGE_COMPLAINT_URL = (id) =>

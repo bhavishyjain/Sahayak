@@ -13,6 +13,23 @@ const {
   appendComplaintHistory,
 } = require("../../services/complaintWorkflowService");
 
+function normalizeComparisonValue(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function hasChangedValue(currentValue, suggestedValue) {
+  if (suggestedValue == null || String(suggestedValue).trim() === "") {
+    return false;
+  }
+
+  return (
+    normalizeComparisonValue(currentValue) !==
+    normalizeComparisonValue(suggestedValue)
+  );
+}
+
 exports.applyAISuggestion = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
   const { applyDepartment, applyPriority } = req.body;
@@ -69,7 +86,7 @@ exports.applyAISuggestion = asyncHandler(async (req, res) => {
 });
 
 exports.getComplaintsNeedingReview = asyncHandler(async (req, res) => {
-  const { department } = req.query;
+  const { department, type, page, limit } = req.query;
   const mismatchFilter = {
     $or: [
       { $expr: { $ne: ["$department", "$aiAnalysis.department"] } },
@@ -82,6 +99,14 @@ exports.getComplaintsNeedingReview = asyncHandler(async (req, res) => {
     $and: [mismatchFilter],
   };
   const normalizedRequestedDepartment = String(department || "").trim();
+  const normalizedType = String(type || "all")
+    .trim()
+    .toLowerCase();
+  const requestedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+  const requestedLimit = Math.max(
+    1,
+    Math.min(50, Number.parseInt(limit, 10) || 20),
+  );
 
   if (req.user.role === "head") {
     const head = await User.findById(req.user._id).select("role department");
@@ -114,32 +139,108 @@ exports.getComplaintsNeedingReview = asyncHandler(async (req, res) => {
     });
   }
 
-  const complaints = await Complaint.find(filter)
-    .populate("userId", "fullName username")
-    .sort({ "aiAnalysis.confidence": -1, createdAt: -1 })
-    .limit(50);
+  const complaints = await Complaint.find(filter).populate(
+    "userId",
+    "fullName username",
+  );
 
-  const formatted = complaints.map((c) => ({
-    ...buildComplaintView(c),
-    aiSuggestion: {
-      department: c.aiAnalysis?.department,
-      priority: c.aiAnalysis?.suggestedPriority,
-      confidence: Math.round((c.aiAnalysis?.confidence ?? 0) * 100),
-      reasoning: c.aiAnalysis?.reasoning,
-      sentiment: c.aiAnalysis?.sentiment,
-      urgency: c.aiAnalysis?.urgency,
-    },
-    currentValues: {
-      department: c.department,
-      priority: c.priority,
-    },
-  }));
+  const formatted = complaints.map((c) => {
+    const view = buildComplaintView(c);
+    const suggestedDepartment = c.aiAnalysis?.department;
+    const suggestedPriority = c.aiAnalysis?.suggestedPriority;
+    const departmentChanged = hasChangedValue(c.department, suggestedDepartment);
+    const priorityChanged = hasChangedValue(c.priority, suggestedPriority);
+
+    return {
+      ...view,
+      aiSuggestion: {
+        department: suggestedDepartment,
+        priority: suggestedPriority,
+        confidence: Math.round((c.aiAnalysis?.confidence ?? 0) * 100),
+        reasoning: c.aiAnalysis?.reasoning,
+        sentiment: c.aiAnalysis?.sentiment,
+        urgency: c.aiAnalysis?.urgency,
+      },
+      currentValues: {
+        department: c.department,
+        priority: c.priority,
+      },
+      reviewMeta: {
+        departmentChanged,
+        priorityChanged,
+        confidence: Number(c.aiAnalysis?.confidence ?? 0),
+        createdAt: c.createdAt,
+      },
+    };
+  });
+
+  const departmentShiftCount = formatted.filter(
+    (item) => item.reviewMeta?.departmentChanged,
+  ).length;
+  const priorityShiftCount = formatted.filter(
+    (item) => item.reviewMeta?.priorityChanged,
+  ).length;
+
+  const filteredComplaints = formatted.filter((item) => {
+    const departmentChanged = Boolean(item.reviewMeta?.departmentChanged);
+    const priorityChanged = Boolean(item.reviewMeta?.priorityChanged);
+
+    if (normalizedType === "department") {
+      return departmentChanged && !priorityChanged;
+    }
+    if (normalizedType === "priority") {
+      return priorityChanged && !departmentChanged;
+    }
+    if (normalizedType === "both") {
+      return departmentChanged && priorityChanged;
+    }
+    return departmentChanged || priorityChanged;
+  });
+
+  const prioritizedComplaints = filteredComplaints
+    .sort((left, right) => {
+      const departmentScore =
+        Number(Boolean(right.reviewMeta?.departmentChanged)) -
+        Number(Boolean(left.reviewMeta?.departmentChanged));
+      if (departmentScore !== 0) return departmentScore;
+
+      const priorityScore =
+        Number(Boolean(right.reviewMeta?.priorityChanged)) -
+        Number(Boolean(left.reviewMeta?.priorityChanged));
+      if (priorityScore !== 0) return priorityScore;
+
+      const confidenceScore =
+        Number(right.reviewMeta?.confidence ?? 0) -
+        Number(left.reviewMeta?.confidence ?? 0);
+      if (confidenceScore !== 0) return confidenceScore;
+
+      return new Date(right.createdAt || 0) - new Date(left.createdAt || 0);
+    });
+
+  const total = prioritizedComplaints.length;
+  const totalPages = Math.max(1, Math.ceil(total / requestedLimit));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const startIndex = (currentPage - 1) * requestedLimit;
+  const paginatedComplaints = prioritizedComplaints.slice(
+    startIndex,
+    startIndex + requestedLimit,
+  );
 
   return sendSuccess(
     res,
     {
-      total: formatted.length,
-      complaints: formatted,
+      total,
+      departmentShiftCount,
+      priorityShiftCount,
+      complaints: paginatedComplaints,
+      pagination: {
+        page: currentPage,
+        limit: requestedLimit,
+        total,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+      },
     },
     "Complaints needing review retrieved successfully",
   );
