@@ -3,7 +3,24 @@ const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const { assertDepartmentExists } = require("../../services/departmentService");
-const { emitComplaintUpdated } = require("../../services/realtimeService");
+const User = require("../../models/User");
+const {
+  emitComplaintUpdated,
+  emitRealtimeEvent,
+} = require("../../services/realtimeService");
+
+async function emitAdminDashboardEvent(event, complaintId = null) {
+  const admins = await User.find({ role: "admin", isActive: true }).select("_id");
+  emitRealtimeEvent(
+    "admin-updated",
+    {
+      event,
+      complaintId: complaintId ? String(complaintId) : null,
+      updatedAt: new Date().toISOString(),
+    },
+    { userIds: admins.map((admin) => admin._id) },
+  );
+}
 
 exports.listDeletedComplaints = asyncHandler(async (req, res) => {
   const { department, page = 1, limit = 20 } = req.query;
@@ -71,6 +88,7 @@ exports.softDeleteComplaint = asyncHandler(async (req, res) => {
     note: "Soft-deleted by admin",
   });
   await complaint.save();
+  await emitAdminDashboardEvent("complaint-soft-deleted", complaint._id);
 
   sendSuccess(res, { message: "Complaint soft-deleted successfully" });
 });
@@ -90,6 +108,7 @@ exports.restoreComplaint = asyncHandler(async (req, res) => {
     note: "Restored by admin",
   });
   await complaint.save();
+  await emitAdminDashboardEvent("complaint-restored", complaint._id);
 
   sendSuccess(res, { message: "Complaint restored successfully" });
 });
@@ -103,6 +122,7 @@ exports.hardDeleteComplaint = asyncHandler(async (req, res) => {
   }
 
   await complaint.deleteOne();
+  await emitAdminDashboardEvent("complaint-purged", complaintId);
 
   sendSuccess(res, { message: "Complaint permanently deleted" });
 });

@@ -13,6 +13,7 @@ import {
   RESTORE_COMPLAINT_URL,
 } from "../../../url";
 import { useState } from "react";
+import { queryKeys } from "../../../utils/queryKeys";
 
 export default function AdminRecycleBinScreen() {
   const { colorScheme } = useTheme();
@@ -21,7 +22,7 @@ export default function AdminRecycleBinScreen() {
   const [actionDialog, setActionDialog] = useState(null);
 
   const { data, isRefetching, refetch } = useQuery({
-    queryKey: ["admin-recycle-bin"],
+    queryKey: queryKeys.adminRecycleBin,
     queryFn: async () => {
       const response = await apiCall({
         method: "GET",
@@ -35,8 +36,8 @@ export default function AdminRecycleBinScreen() {
   });
 
   const invalidateRecycleBin = () => {
-    queryClient.invalidateQueries({ queryKey: ["admin-recycle-bin"] });
-    queryClient.invalidateQueries({ queryKey: ["admin-dashboard-home"] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.adminRecycleBin });
+    queryClient.invalidateQueries({ queryKey: queryKeys.adminDashboardHome });
   };
 
   const mutation = useMutation({

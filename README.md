@@ -308,6 +308,17 @@ Important notes:
 - password policy is enforced in both backend and mobile auth UX
 - invite-based onboarding supports workers joining via HOD-issued invites
 
+Auth lifecycle flow:
+
+1. auth screens call shared mobile hooks in `mobile/utils/hooks/useAuthActions.js`
+2. successful auth funnels through `mobile/utils/authSession.js`
+3. `authSession` persists the user via `mobile/utils/userAuth.js`
+4. post-auth side effects run in one place:
+   - push token registration
+   - realtime reconnect
+   - role-based dashboard prefetch
+5. navigation then routes by role and account status instead of each screen re-owning that logic
+
 ## 7.2 Complaint Creation
 
 Implemented by:
@@ -560,6 +571,7 @@ Current analytics/report contract direction:
 
 - shared analytics filters normalize `timeframe`, date range, department, priority, bucket, and scope
 - shared report filters normalize department, status, priority, and date windows, and can fall back to analytics-style timeframe
+- citizen, worker, HOD, and report summary endpoints now rely on the shared complaint analytics service and expose `contractVersion: 1`
 - dashboard responses still preserve legacy fields for compatibility while the app completes contract cleanup
 
 ## 7.13 Offline Support
@@ -598,6 +610,38 @@ Current mobile notification routing supports:
 - complaint chat
 - HOD AI review queue
 - HOD worker assignment
+
+Notification delivery architecture:
+
+- `notificationDomainService` owns the canonical notification payload contract
+- `notificationDeliveryService` decides whether to persist, emit realtime, and/or send push
+- audience services decide who receives an event, not how that event is transported
+
+Canonical API envelope direction:
+
+- list payloads should expose `items`, `page`, `limit`, `total`, and `totalPages`
+- detail payloads should expose `item`
+- summary payloads should expose `summary`
+
+Compatibility rule:
+
+- legacy aliases such as `complaints`, `notifications`, `stats`, `statistics`, `worker`, and `schedule` are compatibility fields
+- new backend work should treat canonical fields as the primary contract
+- new mobile hooks should read canonical fields first
+
+Recommended next realtime expansion:
+
+- citizen complaint feed invalidation when complaint status changes
+- HOD queue invalidation for assignment, approval, rework, and cancellation events
+- worker assigned/completed list invalidation on live workflow changes
+- report schedule health events for run-now / scheduled execution results
+- admin dashboard and recycle-bin counters for restore/purge events
+
+Rule of thumb:
+
+- use WebSocket when users are actively watching a changing workflow or queue
+- use push notifications when the app is backgrounded or closed
+- use manual refresh or polling for low-frequency, low-collaboration screens
 
 ## 9. API Overview
 
@@ -948,6 +992,16 @@ The backend is significantly cleaner than earlier revisions, but duplication sti
 - report filter/schedule validation rules
 - response envelopes where legacy aliases still coexist with standardized shapes
 - notification typing and route contract ownership
+
+### 13.4 Remaining Frontend Duplication Hotspots
+
+The highest-signal remaining frontend duplication still lives in:
+
+- complaint feed and HOD complaint feed screens
+- heatmap screen orchestration
+- resolved/completed list screens
+- auth screens and auth boot utilities
+- some admin screens that still mix fetch, mutation, and rendering concerns
 
 ## 14. Feature Coverage Matrix
 

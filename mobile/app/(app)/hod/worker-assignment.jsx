@@ -33,6 +33,7 @@ import SearchBar from "../../../components/SearchBar";
 import { useTheme } from "../../../utils/context/theme";
 import { useHodWorkerAssignment } from "../../../utils/hooks/useHodWorkerAssignment";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
 import {
   formatStatusLabel,
   getStatusColor,
@@ -187,6 +188,13 @@ export default function WorkerAssignment() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [complaintId, t, refetchAssignment]),
   );
+
+  useRealtimeRefresh("complaint-updated", (payload) => {
+    if (String(payload?.complaintId || "") !== String(complaintId || "")) {
+      return;
+    }
+    load(false);
+  });
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const assignedIds = useMemo(

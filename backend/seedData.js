@@ -265,6 +265,27 @@ function getRequiredAgeHoursByStatus(status) {
   return 0;
 }
 
+async function clearSeedCollections() {
+  await User.deleteMany({});
+  await Complaint.deleteMany({});
+  await ComplaintMessage.deleteMany({});
+  await ComplaintSpecialRequest.deleteMany({});
+  await Department.deleteMany({});
+  await WorkerInvitation.deleteMany({});
+  await Notification.deleteMany({});
+  await ReportSchedule.deleteMany({});
+  await FestivalEvent.deleteMany({});
+}
+
+async function seedDepartments() {
+  return Department.insertMany(
+    SEED_DEPARTMENTS.map((department) => ({
+      ...department,
+      isActive: true,
+    })),
+  );
+}
+
 function getComplaintCreatedAt(status, now = new Date()) {
   const bucket = Math.random();
   let minDaysAgo = 0;
@@ -1510,24 +1531,11 @@ async function seedDatabase() {
 
     // Clear existing data
     console.log("\n🗑️  Clearing existing data...");
-    await User.deleteMany({});
-    await Complaint.deleteMany({});
-    await ComplaintMessage.deleteMany({});
-    await ComplaintSpecialRequest.deleteMany({});
-    await Department.deleteMany({});
-    await WorkerInvitation.deleteMany({});
-    await Notification.deleteMany({});
-    await ReportSchedule.deleteMany({});
-    await FestivalEvent.deleteMany({});
+    await clearSeedCollections();
     console.log("✅ Existing data cleared");
 
     console.log("\n🏢 Creating departments...");
-    const createdDepartments = await Department.insertMany(
-      SEED_DEPARTMENTS.map((department) => ({
-        ...department,
-        isActive: true,
-      })),
-    );
+    const createdDepartments = await seedDepartments();
     console.log(`✅ Created ${createdDepartments.length} departments`);
 
     // Create users

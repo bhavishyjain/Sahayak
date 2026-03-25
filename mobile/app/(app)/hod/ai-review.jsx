@@ -8,7 +8,6 @@ import {
   SlidersHorizontal,
   Square,
   Tag,
-  WandSparkles,
   X,
   Zap,
 } from "lucide-react-native";
@@ -32,6 +31,7 @@ import { useAiReviewActions } from "../../../utils/hooks/useAiReviewActions";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
 import { AI_REVIEW_URL } from "../../../url";
+import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
 
 const getSentimentConfig = (colors) => ({
   calm: { labelKey: "hod.aiReview.sentiments.calm", color: colors.success },
@@ -615,6 +615,10 @@ export default function AiReview() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pagination.limit, reviewType, t]),
   );
+
+  useRealtimeRefresh(["complaint-updated", "queue-updated"], () => {
+    load({ page: 1, showLoader: false });
+  });
 
   const applyOne = async (
     complaintId,

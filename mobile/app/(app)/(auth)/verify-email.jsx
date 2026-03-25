@@ -4,11 +4,9 @@ import { ActivityIndicator, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import PressableBlock from "../../../components/PressableBlock";
-import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import getUserAuth from "../../../utils/userAuth";
-import { RESEND_VERIFICATION_URL, VERIFY_EMAIL_URL } from "../../../url";
+import { useVerifyEmailActions } from "../../../utils/hooks/useAuthActions";
 
 export default function VerifyEmail() {
   const { colorScheme } = useTheme();
@@ -18,10 +16,11 @@ export default function VerifyEmail() {
   const { token, email } = useLocalSearchParams();
 
   const verifyToken = token ? String(token) : "";
+  const { verifyEmail, resendVerification, isResending } =
+    useVerifyEmailActions(t);
 
   const [verifying, setVerifying] = useState(!!verifyToken);
   const [verified, setVerified] = useState(false);
-  const [loadingResend, setLoadingResend] = useState(false);
   const [message, setMessage] = useState(
     verifyToken
       ? t("auth.verifyEmail.verifying")
@@ -33,10 +32,7 @@ export default function VerifyEmail() {
 
     (async () => {
       try {
-        const response = await apiCall({
-          method: "GET",
-          url: VERIFY_EMAIL_URL(verifyToken),
-        });
+        const response = await verifyEmail(verifyToken);
         setVerified(true);
         setMessage(response?.message || t("auth.verifyEmail.verifiedMessage"));
         Toast.show({
@@ -54,21 +50,11 @@ export default function VerifyEmail() {
         setVerifying(false);
       }
     })();
-  }, [verifyToken]);
+  }, [t, verifyEmail, verifyToken]);
 
   const handleResend = async () => {
     try {
-      setLoadingResend(true);
-      await getUserAuth();
-      const response = await apiCall({
-        method: "POST",
-        url: RESEND_VERIFICATION_URL,
-      });
-      Toast.show({
-        type: "success",
-        text1: t("auth.verifyEmail.resendSentTitle"),
-        text2: response?.message || t("auth.verifyEmail.resendSentMessage"),
-      });
+      await resendVerification();
     } catch (error) {
       Toast.show({
         type: "error",
@@ -77,9 +63,7 @@ export default function VerifyEmail() {
           error?.response?.data?.message ||
           t("auth.verifyEmail.resendFailedMessage"),
       });
-    } finally {
-      setLoadingResend(false);
-    }
+    } finally {}
   };
 
   return (
@@ -130,9 +114,9 @@ export default function VerifyEmail() {
           className="w-full py-4 rounded-lg items-center mb-4"
           style={{ backgroundColor: colors.primary }}
           onPress={handleResend}
-          disabled={loadingResend}
+          disabled={isResending}
         >
-          {loadingResend ? (
+          {isResending ? (
             <ActivityIndicator size="small" color={colors.dark} />
           ) : (
             <Text

@@ -15,11 +15,11 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import ComplaintCard from "../../../components/ComplaintCard";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import SearchBar from "../../../components/SearchBar";
-import { HOD_OVERVIEW_URL } from "../../../url";
-import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
+import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
+import { useHodResolvedList } from "../../../utils/hooks/useHodResolvedList";
 
 export default function HodResolvedComplaints() {
   const { t } = useTranslation();
@@ -27,61 +27,40 @@ export default function HodResolvedComplaints() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [complaints, setComplaints] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const LIMIT = 20;
+  const {
+    complaints,
+    isLoading: loading,
+    isRefetching: refreshing,
+    isFetchingNextPage: loadingMore,
+    refresh,
+    loadMore,
+    hasMore,
+    error,
+  } = useHodResolvedList({
+    search: debouncedSearchQuery,
+    startDate,
+    endDate,
+    limit: 20,
+  });
 
-  const load = async (isRefresh = false, requestedPage = 1) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else if (requestedPage > 1) setLoadingMore(true);
-      else if (complaints.length === 0) setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: HOD_OVERVIEW_URL,
-        params: {
-          page: requestedPage,
-          limit: LIMIT,
-          bucket: "resolved",
-          search: debouncedSearchQuery.trim() || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-        },
-      });
-      const resolvedOnly = res.data.complaints ?? [];
-      setComplaints((prev) =>
-        requestedPage === 1 ? resolvedOnly : [...prev, ...resolvedOnly],
-      );
-      setPage(requestedPage);
-      setHasMore(requestedPage < Number(res.data?.pagination?.totalPages ?? 1));
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.resolvedComplaints.failed"),
-        text2:
-          e?.response?.data?.message ||
-          t("hod.resolvedComplaints.loadingError"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  };
+  useRealtimeRefresh("complaint-updated", () => {
+    refresh();
+  });
 
   useEffect(() => {
-    load(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchQuery, startDate, endDate]);
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("hod.resolvedComplaints.failed"),
+      text2:
+        error?.response?.data?.message ||
+        t("hod.resolvedComplaints.loadingError"),
+    });
+  }, [error, t]);
 
   const renderItem = ({ item }) => (
     <ComplaintCard
@@ -166,7 +145,7 @@ export default function HodResolvedComplaints() {
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={() => load(true)}
+                onRefresh={() => refresh()}
                 colors={[colors.primary]}
                 tintColor={colors.primary}
               />
@@ -187,7 +166,7 @@ export default function HodResolvedComplaints() {
             ListFooterComponent={
               hasMore ? (
                 <TouchableOpacity
-                  onPress={() => load(false, page + 1)}
+                  onPress={() => loadMore()}
                   disabled={loadingMore}
                   className="mt-2 rounded-xl items-center justify-center py-3"
                   style={{

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppState } from "react-native";
 import { invalidateComplaintQueries } from "../utils/invalidateComplaintQueries";
 import { prependRealtimeNotification } from "../utils/notificationsCache";
+import { queryKeys } from "../utils/queryKeys";
 import {
   addRealtimeListener,
   ensureRealtimeConnection,
@@ -19,8 +20,14 @@ export default function RealtimeBridge() {
       (payload) => {
         invalidateComplaintQueries(queryClient, {
           complaintId: payload?.complaintId,
-          includeAiReview: payload?.event === "ai-suggestion-applied",
+          includeAiReview: true,
         }).catch(() => {});
+      },
+    );
+    const unsubscribeQueueUpdated = addRealtimeListener(
+      "queue-updated",
+      () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.aiReview });
       },
     );
     const unsubscribeNotification = addRealtimeListener(
@@ -29,6 +36,19 @@ export default function RealtimeBridge() {
         if (payload?.notification) {
           prependRealtimeNotification(queryClient, payload.notification);
         }
+      },
+    );
+    const unsubscribeReportSchedules = addRealtimeListener(
+      "report-schedule-updated",
+      () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.reportSchedules() });
+      },
+    );
+    const unsubscribeAdminUpdated = addRealtimeListener(
+      "admin-updated",
+      () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminRecycleBin });
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminDashboardHome });
       },
     );
 
@@ -40,7 +60,10 @@ export default function RealtimeBridge() {
 
     return () => {
       unsubscribeComplaintUpdated();
+      unsubscribeQueueUpdated();
       unsubscribeNotification();
+      unsubscribeReportSchedules();
+      unsubscribeAdminUpdated();
       appStateSubscription.remove();
     };
   }, [queryClient]);

@@ -9,7 +9,11 @@ const {
   getHodOrThrow,
   getRequestUserId,
 } = require("../../services/accessService");
-const { emitComplaintUpdated } = require("../../services/realtimeService");
+const User = require("../../models/User");
+const {
+  emitComplaintUpdated,
+  emitRealtimeEvent,
+} = require("../../services/realtimeService");
 
 function buildUpdateChangeNotes({
   currentDepartment,
@@ -162,6 +166,21 @@ exports.createSpecialRequest = asyncHandler(async (req, res) => {
     "fullName username email",
   );
 
+  const adminUsers = await User.find({ role: "admin", isActive: true }).select("_id");
+  emitRealtimeEvent(
+    "queue-updated",
+    {
+      queue: "special-requests",
+      event: "queue-item-entered",
+      itemId: String(savedRequest._id),
+      complaintId: String(complaint._id),
+      ticketId: complaint.ticketId,
+      status: savedRequest.status,
+      updatedAt: new Date().toISOString(),
+    },
+    { userIds: adminUsers.map((user) => user._id) },
+  );
+
   return sendSuccess(
     res,
     { data: serializeSpecialRequest(savedRequest) },
@@ -302,6 +321,22 @@ exports.reviewSpecialRequest = asyncHandler(async (req, res) => {
   const savedRequest = await ComplaintSpecialRequest.findById(request._id)
     .populate("requestedBy", "fullName username email")
     .populate("reviewedBy", "fullName username email");
+
+  emitRealtimeEvent(
+    "queue-updated",
+    {
+      queue: "special-requests",
+      event: "queue-item-resolved",
+      itemId: String(savedRequest._id),
+      complaintId: String(complaint._id),
+      ticketId: complaint.ticketId,
+      status: savedRequest.status,
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      userIds: [savedRequest.requestedBy?._id || savedRequest.requestedBy, adminId].filter(Boolean),
+    },
+  );
 
   return sendSuccess(
     res,

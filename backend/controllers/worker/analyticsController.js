@@ -18,8 +18,8 @@ const {
 } = require("../../services/filterContractService");
 const { listComplaints } = require("../../services/complaintListService");
 const {
-  buildComplaintFiltersForWorker,
-  buildWorkerComplaintAnalytics,
+  getWorkerDashboardSummary,
+  getWorkerAnalyticsSummary,
 } = require("../../services/complaintAnalyticsService");
 const {
   buildListPayload,
@@ -43,52 +43,10 @@ exports.getWorkerOverview = asyncHandler(async (req, res) => {
 });
 
 async function buildWorkerDashboardSummary(workerId) {
-  const todayStart = atStartOfToday();
-  const weekStart = atStartOfWeek();
-
-  const [
-    totalCompleted,
-    totalAssigned,
-    weekCompleted,
-    pendingApproval,
-    activeComplaints,
-    completedToday,
-  ] = await Promise.all([
-    Complaint.countDocuments({
-      "assignedWorkers.workerId": workerId,
-      status: "resolved",
-    }),
-    Complaint.countDocuments({ "assignedWorkers.workerId": workerId }),
-    Complaint.countDocuments({
-      "assignedWorkers.workerId": workerId,
-      status: "resolved",
-      updatedAt: { $gte: weekStart },
-    }),
-    Complaint.countDocuments({
-      "assignedWorkers.workerId": workerId,
-      status: "pending-approval",
-    }),
-    Complaint.countDocuments({
-      "assignedWorkers.workerId": workerId,
-      status: {
-        $in: ANALYTICS_STATUS_BUCKETS.workerActionable,
-      },
-    }),
-    Complaint.countDocuments({
-      "assignedWorkers.workerId": workerId,
-      status: "resolved",
-      updatedAt: { $gte: todayStart },
-    }),
-  ]);
-
-  return {
-    totalCompleted,
-    totalAssigned,
-    completedToday,
-    weekCompleted,
-    activeComplaints,
-    pendingApproval,
-  };
+  return getWorkerDashboardSummary(workerId, {
+    todayStart: atStartOfToday(),
+    weekStart: atStartOfWeek(),
+  });
 }
 
 async function buildWorkerActivePreview(workerId, limit = 5) {
@@ -423,7 +381,7 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
 
 exports.getWorkerAnalytics = asyncHandler(async (req, res) => {
   const isPrivileged = req.user.role === "head" || req.user.role === "admin";
-  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });
@@ -435,69 +393,8 @@ exports.getWorkerAnalytics = asyncHandler(async (req, res) => {
     workerId = String(req.user._id);
   }
 
-  const [worker, allComplaints] = await Promise.all([
-    User.findById(workerId)
-      .select("fullName department specializations rating performanceMetrics")
-      .lean(),
-    Complaint.find(
-      buildComplaintFiltersForWorker(workerId, analyticsFilters),
-      { status: 1, priority: 1, resolvedAt: 1, updatedAt: 1, createdAt: 1 },
-    ).lean(),
-  ]);
+  const analytics = await getWorkerAnalyticsSummary(workerId, analyticsFilters);
+  if (!analytics) throw new AppError("Worker not found", 404);
 
-  if (!worker) throw new AppError("Worker not found", 404);
-
-  const workerAnalytics = buildWorkerComplaintAnalytics(allComplaints);
-  const resolved = workerAnalytics.resolved;
-  const total = workerAnalytics.total;
-  const completionRate = workerAnalytics.completionRate;
-
-  // Weekly trend: last 8 weeks (oldest → newest)
-  const now = new Date();
-  const weeklyTrend = [];
-  for (let i = 7; i >= 0; i--) {
-    const wEnd = new Date(now);
-    wEnd.setDate(now.getDate() - i * 7);
-    wEnd.setHours(23, 59, 59, 999);
-    const wStart = new Date(wEnd);
-    wStart.setDate(wEnd.getDate() - 6);
-    wStart.setHours(0, 0, 0, 0);
-
-    const count = resolved.filter((c) => {
-      const d = new Date(c.resolvedAt || c.updatedAt);
-      return d >= wStart && d <= wEnd;
-    }).length;
-
-    weeklyTrend.push({
-      label: wStart.toLocaleDateString("en-IN", {
-        month: "short",
-        day: "numeric",
-      }),
-      count,
-    });
-  }
-
-  // Priority breakdown (all assigned complaints)
-  const { priorityBreakdown, statusDistribution } = workerAnalytics;
-
-  return sendSuccess(res, {
-    worker: {
-      fullName: worker.fullName,
-      department: worker.department,
-      specializations: worker.specializations || [],
-      rating: worker.rating || 4.5,
-      performanceMetrics: worker.performanceMetrics || {},
-    },
-    summary: {
-      totalAssigned: total,
-      totalCompleted: resolved.length,
-      completionRate,
-      avgCompletionTime: worker.performanceMetrics?.averageCompletionTime || 0,
-      weekCompleted: worker.performanceMetrics?.currentWeekCompleted || 0,
-      customerRating: worker.performanceMetrics?.customerRating || 4.5,
-    },
-    weeklyTrend,
-    priorityBreakdown,
-    statusDistribution,
-  });
+  return sendSuccess(res, analytics);
 });

@@ -265,6 +265,7 @@ async function emitComplaintUpdated({
       complaintId,
       ticketId: complaint.ticketId,
       status: complaint.status,
+      priority: complaint.priority,
       department: complaint.department,
       updatedAt: complaint.updatedAt || new Date(),
       event,
@@ -294,9 +295,19 @@ function emitNotification(userId, payload = {}) {
   );
 }
 
+function emitRealtimeEvent(type, payload = {}, { userIds = [], complaintId = null } = {}) {
+  if (!type) return;
+  broadcast(
+    collectTargetSockets({ complaintId, userIds }),
+    type,
+    payload,
+  );
+}
+
 module.exports = {
   setupRealtime,
   emitComplaintUpdated,
   emitComplaintMessage,
   emitNotification,
+  emitRealtimeEvent,
 };

@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import {
   AlertCircle,
   CheckCircle,
@@ -9,7 +9,7 @@ import {
   X,
   Search,
 } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -28,9 +28,7 @@ import ComplaintCard from "../../../components/ComplaintCard";
 import SearchBar from "../../../components/SearchBar";
 import FilterPanel from "../../../components/FilterPanel";
 import {
-  HOD_OVERVIEW_URL,
   HOD_ASSIGN_MULTIPLE_WORKERS_URL,
-  HOD_WORKERS_URL,
 } from "../../../url";
 import apiCall from "../../../utils/api";
 import { formatPriorityLabel } from "../../../data/complaintStatus";
@@ -39,6 +37,9 @@ import { isComplaintAssigned } from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
+import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
+import { useHodComplaintFeed } from "../../../utils/hooks/useHodComplaintFeed";
+import { useHodWorkersList } from "../../../utils/hooks/useHodWorkersList";
 
 export default function HodComplaints() {
   const { t } = useTranslation();
@@ -47,9 +48,6 @@ export default function HodComplaints() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const queryClient = useQueryClient();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [complaints, setComplaints] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -59,15 +57,37 @@ export default function HodComplaints() {
   const [selectedComplaints, setSelectedComplaints] = useState([]);
   const [selectMode, setSelectMode] = useState(false);
   const [bulkAssignModalVisible, setBulkAssignModalVisible] = useState(false);
-  const [workers, setWorkers] = useState([]);
   const [selectedWorker, setSelectedWorker] = useState("");
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const LIMIT = 20;
+
+  const {
+    complaints,
+    isLoading: loading,
+    isRefetching: refreshing,
+    isFetchingNextPage: loadingMore,
+    hasMore,
+    loadMore,
+    refresh,
+    error,
+  } = useHodComplaintFeed({
+    search: debouncedSearchQuery,
+    priority: priorityFilter,
+    sort: sortOrder,
+    startDate,
+    endDate,
+    status: statusFilter,
+    limit: LIMIT,
+  });
+
+  const {
+    workers,
+    isLoading: workersLoading,
+    error: workersError,
+    refresh: refreshWorkers,
+  } = useHodWorkersList({ search: workerSearchQuery, limit: 50 });
 
   const hasActiveFilters = () =>
     statusFilter !== "all" ||
@@ -84,99 +104,29 @@ export default function HodComplaints() {
     setEndDate("");
   };
 
-  const load = useCallback(async (isRefresh = false, requestedPage = 1) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else if (requestedPage > 1) setLoadingMore(true);
-      else if (complaints.length === 0) setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: HOD_OVERVIEW_URL,
-        params: {
-          page: requestedPage,
-          limit: LIMIT,
-          bucket: "open",
-          search: debouncedSearchQuery.trim() || undefined,
-          priority: priorityFilter !== "all" ? priorityFilter : undefined,
-          sort: sortOrder,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-          status:
-            statusFilter !== "all" ? statusFilter : undefined,
-        },
-      });
-
-      const payload = res?.data;
-      const fetchedComplaints = payload?.complaints || [];
-      setComplaints((prev) =>
-        requestedPage === 1 ? fetchedComplaints : [...prev, ...fetchedComplaints],
-      );
-      const totalPages = Number(payload?.pagination?.totalPages ?? 1);
-      setPage(requestedPage);
-      setHasMore(requestedPage < totalPages);
-    } catch (_error) {
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.failed"),
-        text2:
-          _error?.response?.data?.message ||
-          t("toast.error.loadComplaintsFailed"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  }, [
-    complaints.length,
-    debouncedSearchQuery,
-    endDate,
-    priorityFilter,
-    sortOrder,
-    startDate,
-    statusFilter,
-    t,
-  ]);
-
-  const loadWorkers = useCallback(async () => {
-    try {
-      const res = await apiCall({
-        method: "GET",
-        url: HOD_WORKERS_URL,
-      });
-      const payload = res?.data;
-      setWorkers(payload?.workers || []);
-    } catch (e) {
-      console.error(e);
-      Toast.show({
-        type: "error",
-        text1: t("toast.error.failed"),
-        text2: t("hod.complaints.couldNotLoadWorkers"),
-      });
-    }
-  }, [t]);
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.failed"),
+      text2:
+        error?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
+    });
+  }, [error, t]);
 
   useEffect(() => {
-    load(false);
-    loadWorkers();
-  }, [
-    load,
-    loadWorkers,
-    debouncedSearchQuery,
-    statusFilter,
-    priorityFilter,
-    sortOrder,
-    startDate,
-    endDate,
-  ]);
+    if (!workersError) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.failed"),
+      text2: t("hod.complaints.couldNotLoadWorkers"),
+    });
+  }, [workersError, t]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load(false, 1);
-      loadWorkers();
-    }, [load, loadWorkers]),
-  );
+  useRealtimeRefresh("complaint-updated", () => {
+    refresh();
+    refreshWorkers();
+  });
 
   const toggleSelectMode = () => {
     setSelectMode(!selectMode);
@@ -245,7 +195,7 @@ export default function HodComplaints() {
           invalidateComplaintQueries(queryClient, { complaintId }),
         ),
       );
-      load(true);
+      await Promise.all([refresh(), refreshWorkers()]);
     } catch (_error) {
       Toast.show({
         type: "error",
@@ -257,14 +207,10 @@ export default function HodComplaints() {
     }
   };
 
-  const onRefresh = () => {
-    load(true);
-  };
+  const onRefresh = () => Promise.all([refresh(), refreshWorkers()]);
 
   const handleLoadMore = () => {
-    if (hasMore && !loadingMore && !loading && !refreshing) {
-      load(false, page + 1);
-    }
+    if (hasMore && !loadingMore && !loading && !refreshing) loadMore();
   };
 
   const renderComplaintItem = ({ item }) => {
@@ -594,7 +540,11 @@ export default function HodComplaints() {
               showsVerticalScrollIndicator={false}
               style={{ maxHeight: 400 }}
             >
-              {workers.length === 0 ? (
+              {workersLoading ? (
+                <View className="py-8 items-center">
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
+              ) : workers.length === 0 ? (
                 <View className="py-8 items-center">
                   <AlertCircle size={48} color={colors.textSecondary} />
                   <Text

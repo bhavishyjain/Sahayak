@@ -22,15 +22,11 @@ import {
 } from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { API_BASE } from "../../../url";
 import { useNetworkStatus } from "../../../utils/useNetworkStatus";
-import {
-  cacheComplaints,
-  getCachedComplaints,
-} from "../../../utils/complaintsCache";
-import { getQueue, dequeue } from "../../../utils/offlineQueue";
+import { dequeue, getQueue } from "../../../utils/offlineQueue";
 import PressableBlock from "../../../components/PressableBlock";
 import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
+import { useCitizenComplaintFeed } from "../../../utils/hooks/useCitizenComplaintFeed";
 
 export default function Complaints() {
   const { t } = useTranslation();
@@ -39,9 +35,6 @@ export default function Complaints() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const { isOnline } = useNetworkStatus();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [complaints, setComplaints] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -50,160 +43,37 @@ export default function Complaints() {
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  const baseUrl = API_BASE;
-  const LIMIT = 10;
 
   const STATUS_OPTIONS = ALL_STATUS_OPTIONS.filter((s) => s !== "resolved");
-
-  const buildQuery = (currentPage) => {
-    const params = new URLSearchParams();
-    params.set("scope", "all");
-    params.set("excludeStatus", "resolved");
-    if (statusFilter !== "all") params.set("status", statusFilter);
-    if (departmentFilter !== "all") params.set("department", departmentFilter);
-    if (priorityFilter !== "all") params.set("priority", priorityFilter);
-    params.set("sort", sortOrder);
-    if (startDate) params.set("startDate", startDate);
-    if (endDate) params.set("endDate", endDate);
-    if (debouncedSearchQuery.trim()) {
-      params.set("search", debouncedSearchQuery.trim());
-    }
-    params.set("page", currentPage);
-    params.set("limit", LIMIT);
-    return params.toString();
-  };
-
-  const load = async (pull = false, reset = false, requestedPage = null) => {
-    const currentPage = requestedPage ?? (reset || pull ? 1 : page);
-    try {
-      if (pull) setRefreshing(true);
-      else if (reset) setLoading(true);
-      else setLoadingMore(true);
-
-      if (!isOnline) {
-        const cached = await getCachedComplaints(statusFilter);
-        if (cached) setComplaints(cached);
-        return;
-      }
-
-      const res = await apiCall({
-        method: "GET",
-        url: `${baseUrl}/complaints?${buildQuery(currentPage)}`,
-      });
-      const payload = res?.data;
-      const fetched = payload?.complaints || [];
-      const pages = payload?.pages ?? 1;
-
-      if (reset || pull) {
-        setComplaints(fetched);
-        setPage(1);
-      } else {
-        setComplaints((prev) => {
-          const merged = [...prev, ...fetched];
-          const seen = new Set();
-          return merged.filter((item) => {
-            const key = item?.id || item?._id || item?.ticketId;
-            if (!key) return true;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-        });
-        setPage(currentPage);
-      }
-      setHasMore(currentPage < pages);
-
-      if (reset || pull) {
-        await cacheComplaints(statusFilter, fetched);
-      }
-
-      const queue = await getQueue();
-      if (queue.length > 0 && (reset || pull)) {
-        for (const entry of queue) {
-          try {
-            const formData = new FormData();
-            formData.append("title", entry.title || "");
-            formData.append("description", entry.description || "");
-            formData.append("department", entry.department || "Other");
-            formData.append("locationName", entry.locationName || "");
-            formData.append("priority", entry.priority || "Medium");
-            if (entry.coordinates) {
-              formData.append("coordinates", JSON.stringify(entry.coordinates));
-            }
-            (entry.images || []).forEach((img) => {
-              const filename = img.uri?.split("/").pop();
-              const match = /\.(\w+)$/.exec(filename || "");
-              const type = match ? `image/${match[1]}` : "image/jpeg";
-              formData.append("images", { uri: img.uri, name: filename, type });
-            });
-            await apiCall({
-              method: "POST",
-              url: `${baseUrl}/complaints`,
-              data: formData,
-              headers: { "Content-Type": "multipart/form-data" },
-            });
-            await dequeue(entry.localId);
-            Toast.show({
-              type: "success",
-              text1: t("complaints.queuedSubmittedTitle"),
-              text2: `"${entry.title}" ${t("complaints.queuedSubmittedMessage")}`,
-            });
-          } catch {
-            // leave in queue for next retry
-          }
-        }
-
-        const res2 = await apiCall({
-          method: "GET",
-          url: `${baseUrl}/complaints?${buildQuery(1)}`,
-        });
-        const fresh = res2?.data?.complaints || [];
-        setComplaints(fresh);
-        setPage(1);
-        setHasMore(1 < (res2?.data?.pages ?? 1));
-        await cacheComplaints(statusFilter, fresh);
-      }
-    } catch (e) {
-      const cached = await getCachedComplaints(statusFilter);
-      if (cached) {
-        setComplaints(cached);
-      } else {
-        Toast.show({
-          type: "error",
-          text1: t("toast.error.failed"),
-          text2:
-            e?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
-        });
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  };
-
-  const loadMore = () => {
-    if (!hasMore || loadingMore || loading || refreshing) return;
-    const nextPage = page + 1;
-    load(false, false, nextPage);
-  };
-
-  useEffect(() => {
-    load(false, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    statusFilter,
-    departmentFilter,
-    priorityFilter,
-    sortOrder,
+  const {
+    complaints,
+    isLoading: loading,
+    isRefetching: refreshing,
+    isFetchingNextPage: loadingMore,
+    loadMore,
+    refresh,
+    error,
+  } = useCitizenComplaintFeed({
+    status: statusFilter,
+    department: departmentFilter,
+    priority: priorityFilter,
+    sort: sortOrder,
     startDate,
     endDate,
-    debouncedSearchQuery,
-  ]);
+    search: debouncedSearchQuery,
+    limit: 10,
+    enabled: isOnline,
+  });
+
+  useEffect(() => {
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.failed"),
+      text2:
+        error?.response?.data?.message || t("toast.error.loadComplaintsFailed"),
+    });
+  }, [error, t]);
 
   const hasActiveFilters =
     statusFilter !== "all" ||
@@ -220,6 +90,51 @@ export default function Complaints() {
     setSortOrder("new-to-old");
     setStartDate("");
     setEndDate("");
+  };
+
+  const syncQueuedComplaints = async () => {
+    if (!isOnline) return;
+    const queue = await getQueue();
+    if (queue.length === 0) return;
+
+    for (const entry of queue) {
+      try {
+        const formData = new FormData();
+        formData.append("title", entry.title || "");
+        formData.append("description", entry.description || "");
+        formData.append("department", entry.department || "Other");
+        formData.append("locationName", entry.locationName || "");
+        formData.append("priority", entry.priority || "Medium");
+        if (entry.coordinates) {
+          formData.append("coordinates", JSON.stringify(entry.coordinates));
+        }
+        (entry.images || []).forEach((img) => {
+          const filename = img.uri?.split("/").pop();
+          const match = /\.(\w+)$/.exec(filename || "");
+          const type = match ? `image/${match[1]}` : "image/jpeg";
+          formData.append("images", { uri: img.uri, name: filename, type });
+        });
+        await apiCall({
+          method: "POST",
+          url: "/complaints",
+          data: formData,
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        await dequeue(entry.localId);
+        Toast.show({
+          type: "success",
+          text1: t("complaints.queuedSubmittedTitle"),
+          text2: `"${entry.title}" ${t("complaints.queuedSubmittedMessage")}`,
+        });
+      } catch {
+        // keep it queued for the next online refresh
+      }
+    }
+  };
+
+  const handleRefresh = async () => {
+    await syncQueuedComplaints();
+    await refresh();
   };
 
   return (
@@ -319,7 +234,7 @@ export default function Complaints() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={handleRefresh}
           />
         }
         onEndReached={loadMore}

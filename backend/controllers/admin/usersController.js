@@ -16,8 +16,12 @@ const {
 const {
   ACTIVE_COMPLAINT_STATUSES,
   NOTIFICATION_TYPES,
+  ROLES,
 } = require("../../domain/constants");
-const { emitComplaintUpdated } = require("../../services/realtimeService");
+const {
+  emitComplaintUpdated,
+  emitRealtimeEvent,
+} = require("../../services/realtimeService");
 
 // admin cannot escalate anyone to admin via this endpoint
 const ASSIGNABLE_ROLES = ["user", "worker", "head"];
@@ -50,6 +54,26 @@ async function notifyDepartmentHeadsAboutMemberStatusChange(user, isActive) {
 
   await Promise.all(
     recipients.map((recipient) => persistNotification(recipient._id, payload)),
+  );
+}
+
+async function emitAdminUserStatusEvent(user, isActive) {
+  const admins = await User.find({
+    role: ROLES.ADMIN,
+    isActive: true,
+    _id: { $ne: user._id },
+  }).select("_id");
+
+  emitRealtimeEvent(
+    "admin-updated",
+    {
+      event: isActive ? "user-reactivated" : "user-deactivated",
+      userId: String(user._id),
+      role: user.role,
+      department: user.department,
+      updatedAt: new Date().toISOString(),
+    },
+    { userIds: admins.map((admin) => admin._id) },
   );
 }
 
@@ -224,6 +248,7 @@ exports.updateUser = asyncHandler(async (req, res) => {
       );
     }
     await notifyDepartmentHeadsAboutMemberStatusChange(user, isActive);
+    await emitAdminUserStatusEvent(user, isActive);
   }
 
   return sendSuccess(res, { data: user }, "User updated successfully");

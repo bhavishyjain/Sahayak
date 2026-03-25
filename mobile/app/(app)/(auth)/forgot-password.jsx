@@ -6,10 +6,9 @@ import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import PressableBlock from "../../../components/PressableBlock";
-import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { FORGOT_PASSWORD_URL } from "../../../url";
+import { useForgotPasswordAction } from "../../../utils/hooks/useAuthActions";
 
 export default function ForgotPassword() {
   const { colorScheme } = useTheme();
@@ -18,7 +17,7 @@ export default function ForgotPassword() {
   const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { submit, isLoading: loading } = useForgotPasswordAction(t);
 
   const handleSubmit = async () => {
     Keyboard.dismiss();
@@ -33,26 +32,13 @@ export default function ForgotPassword() {
     }
 
     try {
-      setLoading(true);
-      const response = await apiCall({
-        method: "POST",
-        url: FORGOT_PASSWORD_URL,
-        data: { email: email.trim().toLowerCase() },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("auth.forgotPassword.checkEmailTitle"),
-        text2: response?.message || t("auth.forgotPassword.checkEmailMessage"),
-      });
+      await submit(email.trim().toLowerCase());
     } catch (error) {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
         text2: error?.response?.data?.message || t("auth.forgotPassword.requestFailed"),
       });
-    } finally {
-      setLoading(false);
     }
   };
 

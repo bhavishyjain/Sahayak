@@ -31,27 +31,13 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import FilterPanel from "../../../components/FilterPanel";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import {
-  useDownloadReport,
-} from "../../../utils/hooks/useReports";
+import { useDownloadReport } from "../../../utils/hooks/useReports";
 import { useReportSchedules } from "../../../utils/hooks/useReportSchedules";
+import { useHodReportsDashboard } from "../../../utils/hooks/useHodReportsDashboard";
 import { formatStatusLabel } from "../../../data/complaintStatus";
 import getUserAuth from "../../../utils/userAuth";
 import { REPORT_EMAIL_URL } from "../../../url";
 import apiCall from "../../../utils/api";
-
-function normalizeFilters(filters) {
-  const normalized = {};
-  if (filters.department !== "" && filters.department !== "all") {
-    normalized.department = filters.department;
-  }
-  if (filters.status !== "" && filters.status !== "all") {
-    normalized.status = filters.status;
-  }
-  if (filters.startDate !== "") normalized.startDate = filters.startDate;
-  if (filters.endDate !== "") normalized.endDate = filters.endDate;
-  return normalized;
-}
 
 const DOWNLOAD_OPTIONS = [
   {
@@ -166,12 +152,9 @@ export default function HODReports() {
   const [emailFormat, setEmailFormat] = useState("pdf");
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  const normalizedFilters = useMemo(
-    () => normalizeFilters(appliedFilters),
-    [appliedFilters],
-  );
-
   const { download } = useDownloadReport();
+  const { normalizedFilters, error: reportsError } =
+    useHodReportsDashboard(appliedFilters);
   const {
     schedules: activeSchedules,
     isLoading: loadingSchedules,
@@ -208,6 +191,15 @@ export default function HODReports() {
   const filterSummary = [statusSummary, fromSummary, toSummary]
     .filter((value) => value != null)
     .join(", ");
+
+  useEffect(() => {
+    if (!reportsError) return;
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.title"),
+      text2: reportsError?.response?.data?.message ?? t("reports.generateFailed"),
+    });
+  }, [reportsError, t]);
 
   const scheduleEmailTrimmed = scheduleEmail.trim();
   const emailAddressTrimmed = emailAddress.trim();

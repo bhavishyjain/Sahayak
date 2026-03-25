@@ -16,11 +16,11 @@ import ComplaintCard from "../../../components/ComplaintCard";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import SearchBar from "../../../components/SearchBar";
 import PressableBlock from "../../../components/PressableBlock";
-import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { WORKER_COMPLETED_URL } from "../../../url";
 import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
+import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
+import { useWorkerCompletedList } from "../../../utils/hooks/useWorkerCompletedList";
 
 export default function WorkerCompleted() {
   const { t } = useTranslation();
@@ -28,59 +28,39 @@ export default function WorkerCompleted() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [complaints, setComplaints] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const LIMIT = 20;
+  const {
+    complaints,
+    isLoading: loading,
+    isFetchingNextPage: loadingMore,
+    isRefetching: refreshing,
+    refresh,
+    loadMore,
+    hasMore,
+    error,
+  } = useWorkerCompletedList({
+    search: debouncedSearchQuery,
+    startDate,
+    endDate,
+    limit: 20,
+  });
 
-  const load = async (isRefresh = false, requestedPage = 1) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else if (requestedPage > 1) setLoadingMore(true);
-      else if (complaints.length === 0) setLoading(true);
-
-      const res = await apiCall({
-        method: "GET",
-        url: WORKER_COMPLETED_URL,
-        params: {
-          page: requestedPage,
-          limit: LIMIT,
-          search: debouncedSearchQuery.trim() || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-        },
-      });
-
-      const payload = res.data;
-      const data = payload.complaints ?? [];
-      setComplaints((prev) => (requestedPage === 1 ? data : [...prev, ...data]));
-      setPage(requestedPage);
-      setHasMore(requestedPage < Number(payload.pages ?? 1));
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("worker.completedWork.failed"),
-        text2:
-          e?.response?.data?.message || t("worker.completedWork.loadingError"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  };
+  useRealtimeRefresh("complaint-updated", () => {
+    refresh();
+  });
 
   useEffect(() => {
-    load(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchQuery, startDate, endDate]);
+    if (!error) return;
+    Toast.show({
+      type: "error",
+      text1: t("worker.completedWork.failed"),
+      text2:
+        error?.response?.data?.message || t("worker.completedWork.loadingError"),
+    });
+  }, [error, t]);
 
   const hasActiveFilters = !!startDate || !!endDate || !!searchQuery.trim();
 
@@ -119,7 +99,7 @@ export default function WorkerCompleted() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refresh()}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />
@@ -213,7 +193,7 @@ export default function WorkerCompleted() {
         )}
         {hasMore && (
           <PressableBlock
-            onPress={() => load(false, page + 1)}
+            onPress={() => loadMore()}
             disabled={loadingMore}
             className="mt-2 mb-4 rounded-xl items-center justify-center py-3"
             style={{

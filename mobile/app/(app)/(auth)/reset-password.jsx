@@ -6,14 +6,13 @@ import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import PressableBlock from "../../../components/PressableBlock";
-import apiCall from "../../../utils/api";
 import {
   getPasswordStrengthMessage,
   isStrongPassword,
 } from "../../../utils/passwordStrength";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { RESET_PASSWORD_URL } from "../../../url";
+import { useResetPasswordAction } from "../../../utils/hooks/useAuthActions";
 
 export default function ResetPassword() {
   const { colorScheme } = useTheme();
@@ -26,7 +25,7 @@ export default function ResetPassword() {
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { resetPassword, isLoading: loading } = useResetPasswordAction(t);
 
   const handleReset = async () => {
     if (!resetToken) {
@@ -57,27 +56,13 @@ export default function ResetPassword() {
     }
 
     try {
-      setLoading(true);
-      const response = await apiCall({
-        method: "POST",
-        url: RESET_PASSWORD_URL(resetToken),
-        data: { password },
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("auth.resetPassword.updatedTitle"),
-        text2: response?.message || t("auth.resetPassword.updatedMessage"),
-      });
-      router.replace("/(app)/(auth)/login");
+      await resetPassword({ token: resetToken, password });
     } catch (error) {
       Toast.show({
         type: "error",
         text1: t("auth.resetPassword.failedTitle"),
         text2: error?.response?.data?.message || t("auth.resetPassword.failedMessage"),
       });
-    } finally {
-      setLoading(false);
     }
   };
 

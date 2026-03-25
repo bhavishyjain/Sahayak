@@ -1,6 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -10,13 +8,9 @@ import {
   Dimensions,
 } from "react-native";
 import { WebView } from "react-native-webview";
-import * as Location from "expo-location";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import CustomPicker from "../../../components/CustomPicker";
-import { GET_HEATMAP_URL } from "../../../url";
-import apiCall from "../../../utils/api";
-import { queryKeys } from "../../../utils/queryKeys";
 import useDepartments from "../../../utils/hooks/useDepartments";
 import {
   getSeverityColor,
@@ -26,12 +20,12 @@ import {
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useNetworkStatus } from "../../../utils/useNetworkStatus";
+import { useHeatmapData } from "../../../utils/hooks/useHeatmapData";
 
 export default function HeatMap() {
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
-  const webViewRef = useRef(null);
   const { isOnline } = useNetworkStatus();
   const { departmentOptions } = useDepartments();
 
@@ -41,7 +35,21 @@ export default function HeatMap() {
     timeframe: "30days",
   });
 
-  const [userLocation, setUserLocation] = useState(null);
+  const {
+    webViewRef,
+    userLocation,
+    requestUserLocation,
+    spots,
+    stats,
+    isLoading,
+    refetch,
+    isRefetching,
+  } = useHeatmapData(filters, colors, t);
+
+  const getUnresolvedCount = useCallback(
+    (spot) => Number(spot?.unresolvedComplaints ?? spot?.openComplaints ?? 0),
+    [],
+  );
 
   const formatCompactCount = useCallback((value) => {
     const number = Number(value || 0);
@@ -54,164 +62,20 @@ export default function HeatMap() {
     return `${compact.replace(/\.0$/, "")}M`;
   }, []);
 
-  // Function to fetch user's current location
-  const fetchUserLocation = useCallback(async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== "granted") {
-        return;
-      }
-
-      // Get current position with retry logic
-      let retries = 3;
-      let location = null;
-
-      while (retries > 0 && !location) {
-        try {
-          location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-            timeout: 15000,
-            maximumAge: 10000,
-          });
-
-          if (location) {
-            setUserLocation({
-              lat: location.coords.latitude,
-              lng: location.coords.longitude,
-            });
-            break;
-          }
-        } catch (_err) {
-          retries--;
-
-          if (retries > 0) {
-            // Wait 1 second before retrying
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          } else {
-            // Try last known position as fallback
-            const lastKnown = await Location.getLastKnownPositionAsync({
-              maxAge: 300000, // 5 minutes
-            });
-
-            if (lastKnown) {
-              setUserLocation({
-                lat: lastKnown.coords.latitude,
-                lng: lastKnown.coords.longitude,
-              });
-            }
-          }
-        }
-      }
-    } catch (_error) {
-      // Silent error handling
-    }
-  }, []);
-
-  // Fetch location whenever the screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      fetchUserLocation();
-    }, [fetchUserLocation]),
-  );
-
-  // Update map when user location changes
-  useEffect(() => {
-    if (userLocation && webViewRef.current) {
-      const userLocationLabel = JSON.stringify(t("heatmap.userLocation"));
-      const updateScript = `
-        if (typeof map !== 'undefined' && typeof userLocation !== 'undefined') {
-          userLocation = { lat: ${userLocation.lat}, lng: ${userLocation.lng} };
-          
-          // Remove old marker if exists
-          map.eachLayer(function(layer) {
-            if (layer instanceof L.Marker && layer.options.icon && layer.options.icon.options.className === 'user-location-marker') {
-              map.removeLayer(layer);
-            }
-          });
-          
-          // Add new marker
-          L.marker([${userLocation.lat}, ${userLocation.lng}], {
-            icon: L.divIcon({
-              className: 'user-location-marker',
-              html: '<div style="background-color: #3B82F6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>',
-              iconSize: [22, 22],
-              iconAnchor: [11, 11]
-            })
-          })
-          .addTo(map)
-          .bindPopup(${userLocationLabel});
-          
-          // Center map on user location
-          map.setView([${userLocation.lat}, ${userLocation.lng}], 15, {
-            animate: true,
-            duration: 0.5
-          });
-        }
-        true;
-      `;
-      webViewRef.current.injectJavaScript(updateScript);
-    }
-  }, [t, userLocation]);
-
-  // Fetch heatmap data
-  const {
-    data: heatmapData,
-    isLoading,
-    refetch,
-    isRefetching,
-  } = useQuery({
-    queryKey: queryKeys.heatmap(filters),
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (filters.department !== "all") {
-        params.append("department", filters.department);
-      }
-      if (filters.priority !== "all") {
-        params.append("priority", filters.priority);
-      }
-      if (filters.timeframe) {
-        params.append("timeframe", filters.timeframe);
-      }
-      params.append("granularity", "complaint");
-
-      const url = params.toString()
-        ? `${GET_HEATMAP_URL}?${params.toString()}`
-        : GET_HEATMAP_URL;
-
-      const response = await apiCall({
-        method: "GET",
-        url: url,
-      });
-      return response.data;
-    },
-    retry: 1,
-  });
-
-  const spots = heatmapData?.spots || [];
-
-  const getUnresolvedCount = (spot) =>
-    Number(spot?.unresolvedComplaints ?? spot?.openComplaints ?? 0);
-
-  const stats = {
-    total: spots.reduce((sum, s) => sum + Number(s.totalComplaints || 0), 0),
-    unresolved: spots.reduce((sum, s) => sum + getUnresolvedCount(s), 0),
-  };
-
   // Filter options
-  const departments = [
+  const departments = useMemo(() => [
     { label: t("heatmap.allDepartments"), value: "all" },
     ...departmentOptions,
-  ];
+  ], [departmentOptions, t]);
 
-  const priorities = [
+  const priorities = useMemo(() => [
     { label: t("heatmap.allPriorities"), value: "all" },
     { label: t("complaints.priority.high"), value: "High" },
     { label: t("complaints.priority.medium"), value: "Medium" },
     { label: t("complaints.priority.low"), value: "Low" },
-  ];
+  ], [t]);
 
-  const timeframes = [
+  const timeframes = useMemo(() => [
     { label: t("heatmap.timePeriods.7days"), value: "7days" },
     {
       label: t("heatmap.timePeriods.30days"),
@@ -225,7 +89,7 @@ export default function HeatMap() {
       label: t("heatmap.timePeriods.6months"),
       value: "6months",
     },
-  ];
+  ], [t]);
 
   // Generate Leaflet map HTML
   const generateMapHTML = () => {
@@ -557,13 +421,13 @@ export default function HeatMap() {
       try {
         const message = JSON.parse(event.nativeEvent.data);
         if (message.action === "requestLocation") {
-          await fetchUserLocation();
+          await requestUserLocation();
         }
       } catch (_error) {
         // Silent error handling
       }
     },
-    [fetchUserLocation],
+    [requestUserLocation],
   );
 
   return (

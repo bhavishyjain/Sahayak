@@ -4,19 +4,22 @@ const { sendSuccess } = require("../../core/response");
 const AppError = require("../../core/AppError");
 const emailService = require("../../services/emailService");
 const {
-  getCronExpressionForFrequency,
   generateReportBuffer,
   registerScheduleJob,
   executeSchedule,
+  isScheduleRunning,
 } = require("../../services/reportSchedulerService");
-const { normalizeString, buildFilters } = require("./helpers");
+const { buildFilters } = require("./helpers");
 const {
   serializeReportSchedule,
   serializeReportScheduleList,
 } = require("../../services/reportViewService");
+const { emitRealtimeEvent } = require("../../services/realtimeService");
 const {
-  normalizeSchedulePolicy,
-} = require("../../services/filterContractService");
+  buildSchedulePolicy,
+  buildActiveScheduleLookup,
+  assertScheduleCanRunNow,
+} = require("../../services/reportPolicyService");
 
 exports.getSchedules = asyncHandler(async (req, res) => {
   const schedules = await ReportSchedule.find({
@@ -43,6 +46,18 @@ exports.cancelSchedule = asyncHandler(async (req, res) => {
     throw new AppError("Schedule not found", 404);
   }
 
+  emitRealtimeEvent(
+    "report-schedule-updated",
+    {
+      scheduleId: String(schedule._id),
+      event: "schedule-cancelled",
+      status: "inactive",
+      schedule: serializeReportSchedule(schedule).item,
+      updatedAt: new Date().toISOString(),
+    },
+    { userIds: [req.user._id] },
+  );
+
   sendSuccess(
     res,
     serializeReportSchedule(schedule),
@@ -58,9 +73,7 @@ exports.runScheduleNow = asyncHandler(async (req, res) => {
     isActive: true,
   });
 
-  if (!schedule) {
-    throw new AppError("Schedule not found", 404);
-  }
+  assertScheduleCanRunNow(schedule, { isRunning: isScheduleRunning(id) });
 
   const updatedSchedule = await executeSchedule(schedule._id);
 
@@ -72,43 +85,20 @@ exports.runScheduleNow = asyncHandler(async (req, res) => {
 });
 
 exports.scheduleEmailReport = asyncHandler(async (req, res) => {
-  const { department } = req.body;
-  const {
-    email: normalizedEmail,
-    frequency,
-    format,
-    hour,
-  } = normalizeSchedulePolicy(req.body);
-
   const filters = await buildFilters(req, "body");
-  if (department && req.user?.role === "admin" && department !== "all") {
-    filters.department = department;
-  }
-  const cronExpression = getCronExpressionForFrequency(frequency, hour);
-  if (!cronExpression) {
-    throw new AppError("Invalid schedule frequency", 400);
-  }
-  const departmentFilter = normalizeString(filters.department) || "all";
+  const schedulePolicy = buildSchedulePolicy(req, filters);
 
   const scheduledReport = await ReportSchedule.findOneAndUpdate(
-    {
+    buildActiveScheduleLookup({
       userId: req.user._id,
-      email: normalizedEmail,
-      frequency,
-      format,
-      department: departmentFilter,
-      isActive: true,
-    },
+      email: schedulePolicy.email,
+      frequency: schedulePolicy.frequency,
+      format: schedulePolicy.format,
+      department: schedulePolicy.department,
+    }),
     {
       $set: {
-        email: normalizedEmail,
-        frequency,
-        format,
-        department: departmentFilter,
-        filters,
-        cronExpression,
-        timezone: process.env.REPORT_SCHEDULE_TIMEZONE || "Asia/Kolkata",
-        hour,
+        ...schedulePolicy,
         isActive: true,
       },
     },
@@ -120,6 +110,18 @@ exports.scheduleEmailReport = asyncHandler(async (req, res) => {
   );
   registerScheduleJob(scheduledReport);
 
+  emitRealtimeEvent(
+    "report-schedule-updated",
+    {
+      scheduleId: String(scheduledReport._id),
+      event: "schedule-saved",
+      status: scheduledReport.isActive ? "active" : "inactive",
+      schedule: serializeReportSchedule(scheduledReport).item,
+      updatedAt: new Date().toISOString(),
+    },
+    { userIds: [req.user._id] },
+  );
+
   sendSuccess(
     res,
     serializeReportSchedule(scheduledReport),
@@ -129,7 +131,7 @@ exports.scheduleEmailReport = asyncHandler(async (req, res) => {
 
 exports.sendEmailReport = asyncHandler(async (req, res) => {
   const { email, format = "pdf" } = req.body;
-  const normalizedEmail = normalizeString(email).toLowerCase();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
 
   if (!normalizedEmail) {
     throw new AppError("Email is required", 400);

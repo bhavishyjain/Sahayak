@@ -16,6 +16,7 @@ import {
   ADMIN_SPECIAL_REQUESTS_URL,
   HOD_SPECIAL_REQUESTS_URL,
 } from "../../../url";
+import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
 
 function RequestCard({ item, colors, mode, onApprove, onReject }) {
   const statusTone =
@@ -163,6 +164,10 @@ export default function SpecialRequestsScreen() {
   useEffect(() => {
     loadRequests();
   }, []);
+
+  useRealtimeRefresh("queue-updated", () => {
+    loadRequests();
+  });
 
   const filteredRequests = useMemo(
     () =>

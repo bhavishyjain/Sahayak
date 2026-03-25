@@ -1,6 +1,8 @@
 const Complaint = require("../models/Complaint");
 const User = require("../models/User");
-const { notifyUser } = require("../controllers/notificationController");
+const {
+  deliverNotificationToUser,
+} = require("../services/notificationDeliveryService");
 const cron = require("node-cron");
 const {
   NOTIFICATION_ROUTE_SCREENS,
@@ -80,7 +82,7 @@ async function checkAndEscalateOverdueComplaints() {
           escalatedTo: hod._id,
         });
 
-        await notifyUser(hod._id, {
+        await deliverNotificationToUser(hod._id, {
           title: "Complaint Escalated - Overdue",
           body: `Complaint ${complaint.ticketId} is overdue and has been escalated to you.`,
           data: {
@@ -99,7 +101,7 @@ async function checkAndEscalateOverdueComplaints() {
       }
 
       if (complaint.userId) {
-        await notifyUser(complaint.userId, {
+        await deliverNotificationToUser(complaint.userId, {
           title: "Complaint Escalated",
           body: `Your complaint ${complaint.ticketId} has been escalated due to delay.`,
           data: {

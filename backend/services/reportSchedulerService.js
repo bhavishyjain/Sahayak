@@ -2,22 +2,13 @@ const cron = require("node-cron");
 const ReportSchedule = require("../models/ReportSchedule");
 const reportService = require("./reportService");
 const { sendEmailWithAttachment } = require("./emailService");
+const {
+  getCronExpressionForFrequency,
+} = require("./reportPolicyService");
+const { emitRealtimeEvent } = require("./realtimeService");
 
 const activeJobs = new Map();
-
-function getCronExpressionForFrequency(frequency, hour = 9) {
-  const h = Math.max(0, Math.min(23, Number(hour) || 9));
-  switch (frequency) {
-    case "daily":
-      return `0 ${h} * * *`;
-    case "weekly":
-      return `0 ${h} * * 1`;
-    case "monthly":
-      return `0 ${h} 1 * *`;
-    default:
-      return null;
-  }
-}
+const runningSchedules = new Set();
 
 async function generateReportBuffer(format, filters, userId) {
   switch (format) {
@@ -246,26 +237,64 @@ function serializeScheduleHealth(schedule) {
 }
 
 async function executeSchedule(scheduleId) {
-  const schedule = await ReportSchedule.findById(scheduleId);
-  if (!schedule || !schedule.isActive) {
+  const normalizedScheduleId = String(scheduleId || "");
+  if (!normalizedScheduleId) {
     return null;
   }
-
-  schedule.lastAttemptAt = new Date();
-  try {
-    await sendScheduledReport(schedule);
-    schedule.lastSentAt = new Date();
-    schedule.lastFailureAt = null;
-    schedule.lastError = null;
-    schedule.lastErrorStage = null;
-  } catch (error) {
-    schedule.lastFailureAt = new Date();
-    schedule.lastError = error.message;
-    schedule.lastErrorStage = error.stage || "delivery";
-    console.error(`[report-scheduler] Schedule ${scheduleId} failed:`, error);
+  if (runningSchedules.has(normalizedScheduleId)) {
+    const error = new Error("Schedule is already running");
+    error.code = "SCHEDULE_RUNNING";
+    throw error;
   }
-  await schedule.save();
-  return serializeScheduleHealth(schedule);
+
+  runningSchedules.add(normalizedScheduleId);
+  try {
+    const schedule = await ReportSchedule.findById(scheduleId);
+    if (!schedule || !schedule.isActive) {
+      return null;
+    }
+
+    emitRealtimeEvent(
+      "report-schedule-updated",
+      {
+        scheduleId: String(schedule._id),
+        event: "schedule-run-started",
+        status: "running",
+        updatedAt: new Date().toISOString(),
+      },
+      { userIds: [schedule.userId] },
+    );
+
+    schedule.lastAttemptAt = new Date();
+    try {
+      await sendScheduledReport(schedule);
+      schedule.lastSentAt = new Date();
+      schedule.lastFailureAt = null;
+      schedule.lastError = null;
+      schedule.lastErrorStage = null;
+    } catch (error) {
+      schedule.lastFailureAt = new Date();
+      schedule.lastError = error.message;
+      schedule.lastErrorStage = error.stage || "delivery";
+      console.error(`[report-scheduler] Schedule ${scheduleId} failed:`, error);
+    }
+    await schedule.save();
+    const serialized = serializeScheduleHealth(schedule);
+    emitRealtimeEvent(
+      "report-schedule-updated",
+      {
+        scheduleId: String(schedule._id),
+        event: schedule.lastError ? "schedule-run-failed" : "schedule-run-succeeded",
+        status: schedule.lastError ? "failed" : "success",
+        schedule: serialized,
+        updatedAt: new Date().toISOString(),
+      },
+      { userIds: [schedule.userId] },
+    );
+    return serialized;
+  } finally {
+    runningSchedules.delete(normalizedScheduleId);
+  }
 }
 
 function stopScheduleJob(scheduleId) {
@@ -309,6 +338,7 @@ module.exports = {
   registerScheduleJob,
   initializeReportSchedulers,
   executeSchedule,
+  isScheduleRunning: (scheduleId) => runningSchedules.has(String(scheduleId || "")),
   getNextRunAt,
   serializeScheduleHealth,
 };

@@ -14,8 +14,12 @@ export async function invalidateComplaintQueries(
       queryKey: queryKeys.workerActivePreview,
     }),
     queryClient.invalidateQueries({ queryKey: queryKeys.workerOverview }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.workerAssignedLists }),
     queryClient.invalidateQueries({ queryKey: queryKeys.hodDashboardSummary }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.hodWorkersLists }),
     queryClient.invalidateQueries({ queryKey: ["heatmap"] }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.nearbyComplaints }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.aiReview }),
   ];
 
   if (complaintId) {
@@ -23,12 +27,9 @@ export async function invalidateComplaintQueries(
       queryClient.invalidateQueries({
         queryKey: queryKeys.complaintDetail(complaintId),
       }),
-    );
-  }
-
-  if (includeAiReview) {
-    invalidations.push(
-      queryClient.invalidateQueries({ queryKey: queryKeys.aiReview }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.hodWorkerAssignment(complaintId),
+      }),
     );
   }
 

@@ -8,13 +8,9 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import LanguagePicker from "../../../components/LanguagePicker";
 import PressableBlock from "../../../components/PressableBlock";
-import apiCall from "../../../utils/api";
-import { getPostLoginRoute } from "../../../utils/accountStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { setUserAuth } from "../../../utils/userAuth";
-import { LOGIN_URL } from "../../../url";
-import { registerPushToken } from "../../../utils/pushToken";
+import { useLoginAction } from "../../../utils/hooks/useAuthActions";
 
 export default function Login() {
   const { colorScheme } = useTheme();
@@ -25,7 +21,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const { login, isLoading: loading } = useLoginAction(t);
 
   useEffect(() => {
     Clarity.setCurrentScreenName("Login");
@@ -52,51 +48,11 @@ export default function Login() {
     }
 
     try {
-      setLoading(true);
-      const response = await apiCall({
-        method: "POST",
-        url: LOGIN_URL,
-        data: {
-          loginId: email.trim(),
-          password: password,
-        },
+      await login({
+        loginId: email.trim(),
+        password,
       });
-      const responseData = response?.data || {};
-      const authToken = responseData?.token;
-      const userData = responseData?.user || {};
-
-      if (authToken) {
-        const userToStore = {
-          ...userData,
-          auth_token: authToken,
-          token: authToken,
-          refresh_token: responseData?.refreshToken || null,
-        };
-
-        await setUserAuth(userToStore);
-
-        // Register device for push notifications (non-blocking)
-        registerPushToken();
-
-        Toast.show({
-          type: "success",
-          text1: t("toast.loginSuccess.title"),
-          text2: responseData?.message || t("toast.loginSuccess.message"),
-        });
-
-        router.replace(getPostLoginRoute(userToStore));
-      } else {
-        console.error("No auth token in response:", userData);
-        Toast.show({
-          type: "error",
-          text1: t("toast.loginError.title"),
-          text2: t("toast.loginError.invalidToken"),
-        });
-      }
     } catch (error) {
-      console.error("Login error:", error);
-      console.error("Error response:", error?.response?.data);
-
       const isUnverified =
         error?.response?.data?.details?.emailUnverified === true;
       if (isUnverified) {
@@ -111,8 +67,6 @@ export default function Login() {
         text1: t("toast.loginError.title"),
         text2: error?.response?.data?.message || t("toast.loginError.failed"),
       });
-    } finally {
-      setLoading(false);
     }
   };
 

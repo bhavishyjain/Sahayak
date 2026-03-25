@@ -31,15 +31,17 @@ import { TextInput as PaperTextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
-import apiCall from "../../../utils/api";
 import {
   getPasswordStrengthMessage,
   isStrongPassword,
 } from "../../../utils/passwordStrength";
 import { useTheme } from "../../../utils/context/theme";
-import getUserAuth, { setUserAuth } from "../../../utils/userAuth";
-import { ACCEPT_INVITE_URL, REGISTER_URL } from "../../../url";
+import getUserAuth from "../../../utils/userAuth";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import {
+  useAcceptInviteAction,
+  useRegisterAction,
+} from "../../../utils/hooks/useAuthActions";
 
 const WORKER_BENEFITS = [
   { Icon: ClipboardList, key: "manageAssignments" },
@@ -83,6 +85,8 @@ export default function AcceptInvite() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
+  const { acceptInvite } = useAcceptInviteAction(t);
+  const { register } = useRegisterAction(t);
 
   useEffect(() => {
     (async () => {
@@ -150,17 +154,7 @@ export default function AcceptInvite() {
     const handleAccept = async () => {
       setLoading(true);
       try {
-        const res = await apiCall({
-          method: "POST",
-          url: ACCEPT_INVITE_URL,
-          data: { inviteToken: token },
-        });
-        const { token: newJwt, user: updatedUser } = res.data || {};
-        if (newJwt && updatedUser) {
-          await setUserAuth({ ...updatedUser, auth_token: newJwt, token: newJwt });
-        }
-        Toast.show({ type: "success", text1: t("auth.acceptInvite.toast.welcomeTitle"), text2: `${t("auth.acceptInvite.toast.welcomeMessage")} ${department}` });
-        router.replace(updatedUser?.role === "head" ? "/(app)/(tabs)/hod-home" : "/(app)/(tabs)/worker-home");
+        await acceptInvite(token);
       } catch (err) {
         const msg = err?.response?.data?.message || err?.message || t("auth.acceptInvite.toast.acceptFailed");
         Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.acceptFailedTitle"), text2: msg });
@@ -289,10 +283,8 @@ export default function AcceptInvite() {
 
     setLoading(true);
     try {
-      const res = await apiCall({
-        method: "POST",
-        url: REGISTER_URL,
-        data: {
+      await register(
+        {
           fullName: fullName.trim(),
           username: username.trim().toLowerCase(),
           email: invitedEmail.trim().toLowerCase(),
@@ -300,13 +292,8 @@ export default function AcceptInvite() {
           password,
           inviteToken: token,
         },
-      });
-      const { token: newJwt, user: userData } = res.data || {};
-      if (newJwt && userData) {
-        await setUserAuth({ ...userData, auth_token: newJwt, token: newJwt });
-      }
-      Toast.show({ type: "success", text1: t("auth.acceptInvite.toast.accountCreatedTitle"), text2: `${t("auth.acceptInvite.toast.accountCreatedMessage")} ${department}` });
-      router.replace(userData?.role === "head" ? "/(app)/(tabs)/hod-home" : "/(app)/(tabs)/worker-home");
+        { invitationFlow: true },
+      );
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || t("auth.acceptInvite.toast.registerFailed");
       Toast.show({ type: "error", text1: t("auth.acceptInvite.toast.registerFailedTitle"), text2: msg });

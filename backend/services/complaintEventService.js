@@ -1,4 +1,6 @@
-const { notifyUser } = require("../controllers/notificationController");
+const {
+  deliverNotificationBatch,
+} = require("./notificationDeliveryService");
 const {
   NOTIFICATION_TYPES,
 } = require("../domain/constants");
@@ -193,9 +195,7 @@ async function deliverComplaintEventNotifications(
   payload,
   { saveHistory } = {},
 ) {
-  await Promise.all(
-    recipientIds.map((recipientId) => notifyUser(recipientId, payload, { saveHistory })),
-  );
+  await deliverNotificationBatch(recipientIds, payload, { saveHistory });
 }
 
 async function emitComplaintEventRealtime(

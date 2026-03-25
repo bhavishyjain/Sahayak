@@ -23,24 +23,20 @@ const {
   buildSummaryPayload,
 } = require("../../services/responseViewService");
 
-async function buildHodDashboardStats(department, analyticsFilters = {}) {
-  return getHodDashboardStats(department, analyticsFilters);
-}
-
 exports.getHodDashboardSummary = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
-  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });
-  const stats = await buildHodDashboardStats(hod.department, analyticsFilters);
+  const stats = await getHodDashboardStats(hod.department, analyticsFilters);
   return sendSuccess(res, buildSummaryPayload(stats, "stats", { stats }));
 });
 
 exports.getHodOverview = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { department } = hod;
-  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });

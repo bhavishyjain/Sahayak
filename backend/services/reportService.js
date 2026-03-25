@@ -9,6 +9,7 @@ const {
 const {
   getComplaintDepartmentBreakdown,
   getComplaintMetricSnapshot,
+  ANALYTICS_CONTRACT_VERSION,
 } = require("./complaintAnalyticsService");
 
 const REPORT_MAX_ROWS = Math.max(
@@ -219,6 +220,7 @@ class ReportService {
       );
 
       return {
+        contractVersion: ANALYTICS_CONTRACT_VERSION,
         total: snapshot.total,
         byStatus: snapshot.byStatus,
         byPriority: snapshot.byPriority,
@@ -232,8 +234,14 @@ class ReportService {
     return withCachedReportMetric(
       "department-breakdown",
       filters,
-      async () =>
-        getComplaintDepartmentBreakdown(normalizeReportQuery(filters)),
+      async () => ({
+        contractVersion: ANALYTICS_CONTRACT_VERSION,
+        ...(
+          await getComplaintDepartmentBreakdown(
+            normalizeReportQuery(filters),
+          )
+        ),
+      }),
     );
   }
 

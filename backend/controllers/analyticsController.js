@@ -6,8 +6,6 @@ const { sendSuccess } = require("../core/response");
 const { buildComplaintView } = require("../utils/complaintView");
 const {
   ANALYTICS_STATUS_BUCKETS,
-  getTimeframeWindowStart,
-  monthsAgoStart,
 } = require("../services/analyticsMetricsService");
 const {
   normalizeAnalyticsFilters,
@@ -15,7 +13,7 @@ const {
 } = require("../services/filterContractService");
 const { buildSummaryPayload } = require("../services/responseViewService");
 const {
-  getComplaintMetricSnapshot,
+  getCitizenAnalyticsSummary,
 } = require("../services/complaintAnalyticsService");
 
 function severityFromIntensity(intensity) {
@@ -27,72 +25,15 @@ function severityFromIntensity(intensity) {
 
 exports.summary = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const analyticsFilters = await normalizeAnalyticsFilters(req.query, {
+  const analyticsFilters = normalizeAnalyticsFilters(req.query, {
     allowDepartment: false,
     defaultTimeframe: null,
   });
-  const summaryQuery = { userId };
-  applyAnalyticsComplaintFilters(summaryQuery, analyticsFilters, "createdAt");
-  const trendStart =
-    summaryQuery.createdAt?.$gte ?? monthsAgoStart(5);
-
-  const [
-    snapshot,
-    recentComplaints,
-    monthlyData,
-  ] = await Promise.all([
-    getComplaintMetricSnapshot(summaryQuery),
-    Complaint.find(summaryQuery)
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select(
-        "ticketId rawText refinedText department priority status locationName createdAt",
-      ),
-    Complaint.aggregate([
-      { $match: { ...summaryQuery, createdAt: { $gte: trendStart } } },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-          },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1 } },
-    ]),
-  ]);
-  const avgResolutionTime = snapshot.avgResolutionTime || null;
-  const departmentBreakdown = snapshot.departmentRows;
-
-  const mostActiveDepartment = departmentBreakdown[0]?.department || null;
-
-  const monthlyTrend = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const year = d.getFullYear();
-    const month = d.getMonth() + 1;
-    const found = monthlyData.find(
-      (m) => m._id.year === year && m._id.month === month,
-    );
-    monthlyTrend.push({ year, month, count: found?.count || 0 });
-  }
-
-  const summary = {
-    stats: {
-      total: snapshot.total || 0,
-      pending: snapshot.byStatus.pending || 0,
-      assigned: snapshot.byStatus.assigned || 0,
-      inProgress: snapshot.byStatus["in-progress"] || 0,
-      resolved: snapshot.byStatus.resolved || 0,
-    },
-    avgResolutionTime,
-    mostActiveDepartment,
-    departmentBreakdown,
-    monthlyTrend,
-    recent: recentComplaints.map((item) => buildComplaintView(item)),
-  };
+  const summary = await getCitizenAnalyticsSummary({
+    userId,
+    filters: analyticsFilters,
+  });
+  summary.recent = (summary.recent || []).map((item) => buildComplaintView(item));
 
   return sendSuccess(res, buildSummaryPayload(summary, "summary", summary));
 });
@@ -102,14 +43,11 @@ exports.heatmap = asyncHandler(async (req, res) => {
     timeframe,
     granularity,
     ...analyticsFilters
-  } = await normalizeAnalyticsFilters(req.query, {
+  } = normalizeAnalyticsFilters(req.query, {
     allowDepartment: req.user?.role !== "head" && req.user?.role !== "worker",
   });
   const role = req.user?.role;
   const complaintLevel = granularity === "complaint";
-
-  // Calculate time window based on timeframe filter
-  const windowStart = getTimeframeWindowStart(timeframe);
 
   // Build query filters
   const query = {};

@@ -16,7 +16,7 @@ import {
   AlertTriangle,
   BarChart2,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -36,15 +36,12 @@ import StatusPill from "../../../components/StatusPill";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import apiCall from "../../../utils/api";
-import {
-  HOD_WORKER_DETAIL_URL,
-  HOD_WORKER_COMPLAINTS_URL,
-  HOD_REMOVE_WORKER_URL,
-} from "../../../url";
+import { HOD_REMOVE_WORKER_URL } from "../../../url";
 import {
   formatPriorityLabel,
   getPriorityColor,
 } from "../../../data/complaintStatus";
+import { useWorkerDetails } from "../../../utils/hooks/useWorkerDetails";
 
 export default function WorkerDetails() {
   const { t, locale } = useTranslation();
@@ -53,15 +50,19 @@ export default function WorkerDetails() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [worker, setWorker] = useState(null);
-  const [activeComplaints, setActiveComplaints] = useState([]);
-  const [completedComplaints, setCompletedComplaints] = useState([]);
   const [showActiveComplaints, setShowActiveComplaints] = useState(true);
   const [showPastWork, setShowPastWork] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const {
+    data,
+    isLoading: loading,
+    isRefetching: refreshing,
+    refetch,
+  } = useWorkerDetails(id);
+  const worker = data?.worker ?? null;
+  const activeComplaints = data?.activeComplaints ?? [];
+  const completedComplaints = data?.completedComplaints ?? [];
 
   const getWorkerName = (workerData) =>
     workerData?.fullName ??
@@ -83,57 +84,6 @@ export default function WorkerDetails() {
       day: "numeric",
     }).format(date);
   };
-
-  const load = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      // Fetch worker details and their complaints in parallel
-      const [workerRes, activeComplaintsRes, completedComplaintsRes] =
-        await Promise.all([
-          apiCall({
-            method: "GET",
-            url: HOD_WORKER_DETAIL_URL(id),
-          }),
-          apiCall({
-            method: "GET",
-            url: HOD_WORKER_COMPLAINTS_URL(id),
-            params: { status: "active" },
-          }),
-          apiCall({
-            method: "GET",
-            url: HOD_WORKER_COMPLAINTS_URL(id),
-            params: { status: "completed" },
-          }),
-        ]);
-
-      const activePayload = activeComplaintsRes?.data;
-      const completedPayload = completedComplaintsRes?.data;
-      setWorker(workerRes?.data?.worker ?? null);
-
-      // Set complaints from dedicated endpoints
-      setActiveComplaints(activePayload?.complaints ?? []);
-      setCompletedComplaints(completedPayload?.complaints ?? []);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workers.details.failed"),
-        text2:
-          e?.response?.data?.message ??
-          t("hod.workers.details.couldNotLoadDetails"),
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (id) {
-      load(false);
-    }
-  }, [id]);
 
   const handleRemoveWorker = async () => {
     try {
@@ -209,10 +159,12 @@ export default function WorkerDetails() {
   const workerUsername =
     worker.username ?? t("hod.workers.details.notAvailable");
   const activeCount =
+    data?.summary?.activeCount ??
     worker.activeComplaints ??
     worker.metrics?.activeComplaints ??
     activeComplaints.length;
   const completedCount =
+    data?.summary?.completedCount ??
     worker.completedCount ??
     worker.metrics?.completedCount ??
     worker.performanceMetrics?.totalCompleted ??
@@ -235,7 +187,7 @@ export default function WorkerDetails() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => load(true)}
+            onRefresh={() => refetch()}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />

@@ -4,19 +4,17 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Keyboard, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { TextInput as PaperTextInput } from "react-native-paper";
-import { REGISTER_URL } from "../../../url";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import LanguagePicker from "../../../components/LanguagePicker";
 import PressableBlock from "../../../components/PressableBlock";
-import apiCall from "../../../utils/api";
 import {
   getPasswordStrengthMessage,
   isStrongPassword,
 } from "../../../utils/passwordStrength";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
-import { setUserAuth } from "../../../utils/userAuth";
+import { useRegisterAction } from "../../../utils/hooks/useAuthActions";
 
 export default function Register() {
   const { colorScheme } = useTheme();
@@ -30,7 +28,7 @@ export default function Register() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const { register, isLoading: loading } = useRegisterAction(t);
 
   useEffect(() => {
     Clarity.setCurrentScreenName("Register");
@@ -64,54 +62,13 @@ export default function Register() {
     }
 
     try {
-      setLoading(true);
-
-      const response = await apiCall({
-        method: "POST",
-        url: REGISTER_URL,
-        data: {
-          fullName: fullName.trim(),
-          username: username.trim(),
-          email: email.trim().toLowerCase(),
-          phone: phone.trim(),
-          password,
-        },
+      await register({
+        fullName: fullName.trim(),
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        password,
       });
-
-      const responseData = response?.data || {};
-      const authToken = responseData?.token;
-      const userData = responseData?.user || {};
-
-      if (!authToken) {
-        Toast.show({
-          type: "error",
-          text1: t("toast.registerError.title"),
-          text2:
-            responseData?.message || t("toast.registerError.tokenNotReturned"),
-        });
-        return;
-      }
-
-      await setUserAuth({
-        ...userData,
-        auth_token: authToken,
-        token: authToken,
-      });
-
-      Toast.show({
-        type: "success",
-        text1: t("toast.registerSuccess.title"),
-        text2: responseData?.message || t("toast.registerSuccess.message"),
-      });
-
-      if (userData.role === "user") {
-        router.replace({
-          pathname: "/(app)/(auth)/verify-email",
-          params: { email: userData.email || email.trim().toLowerCase() },
-        });
-      } else {
-        router.replace("/(app)/(tabs)/home");
-      }
     } catch (error) {
       Toast.show({
         type: "error",
@@ -121,8 +78,6 @@ export default function Register() {
           error?.message ||
           t("toast.registerError.failed"),
       });
-    } finally {
-      setLoading(false);
     }
   };
 

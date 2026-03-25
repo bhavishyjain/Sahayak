@@ -1,5 +1,7 @@
 const User = require("../models/User");
-const { notifyUser } = require("../controllers/notificationController");
+const {
+  deliverNotificationBatch,
+} = require("./notificationDeliveryService");
 const {
   emitComplaintMessage,
   emitComplaintUpdated,
@@ -45,11 +47,7 @@ async function notifyComplaintParticipants(
   options = {},
 ) {
   const participantIds = await getComplaintParticipantIds(complaint, options);
-  await Promise.all(
-    participantIds.map((recipientId) =>
-      notifyUser(recipientId, payload, options),
-    ),
-  );
+  await deliverNotificationBatch(participantIds, payload, options);
   return participantIds;
 }
 
@@ -86,27 +84,23 @@ async function notifyComplaintChatParticipants(
     excludeUserIds: [actorId],
   });
 
-  await Promise.all(
-    recipientIds.map((recipientId) =>
-      notifyUser(
-        recipientId,
-        {
-          title: `New message on #${ticketId}`,
-          body: `${senderName}: ${preview}`,
-          data: {
-            type: "chat-message",
-            complaintId,
-            ticketId,
-            senderId: String(actorId || ""),
-            route: buildNotificationRoute(
-              NOTIFICATION_ROUTE_SCREENS.COMPLAINT_CHAT,
-              { complaintId, ticketId },
-            ),
-          },
-        },
-        { saveHistory: false },
-      ),
-    ),
+  await deliverNotificationBatch(
+    recipientIds,
+    {
+      title: `New message on #${ticketId}`,
+      body: `${senderName}: ${preview}`,
+      data: {
+        type: "chat-message",
+        complaintId,
+        ticketId,
+        senderId: String(actorId || ""),
+        route: buildNotificationRoute(
+          NOTIFICATION_ROUTE_SCREENS.COMPLAINT_CHAT,
+          { complaintId, ticketId },
+        ),
+      },
+    },
+    { saveHistory: false },
   );
 
   emitComplaintMessage({

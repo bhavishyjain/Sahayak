@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import apiCall from "../api";
 import { GET_NEARBY_COMPLAINTS_URL, UPVOTE_COMPLAINT_URL } from "../../url";
+import { queryKeys } from "../queryKeys";
 
 async function fetchNearbyComplaints() {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -29,7 +30,7 @@ async function fetchNearbyComplaints() {
 export function useNearbyComplaints() {
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: ["nearby-complaints"],
+    queryKey: queryKeys.nearbyComplaints,
     queryFn: fetchNearbyComplaints,
   });
 
@@ -42,7 +43,7 @@ export function useNearbyComplaints() {
       return { complaintId, ...(response?.data ?? {}) };
     },
     onSuccess: ({ complaintId, upvoteCount, hasUpvoted }) => {
-      queryClient.setQueryData(["nearby-complaints"], (previous) => ({
+      queryClient.setQueryData(queryKeys.nearbyComplaints, (previous) => ({
         ...(previous || {}),
         complaints: (previous?.complaints ?? []).map((complaint) =>
           complaint._id === complaintId

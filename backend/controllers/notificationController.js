@@ -4,15 +4,11 @@ const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
 const {
-  sendExpoPushNotifications,
   isValidExpoPushToken,
 } = require("../services/pushNotificationService");
 const {
-  buildNotificationPayload,
-  persistNotification,
-  shouldDeliverByPreference,
-  shouldPersistNotification,
-} = require("../services/notificationDomainService");
+  deliverNotificationToUser,
+} = require("../services/notificationDeliveryService");
 const {
   buildDetailPayload,
   buildListPayload,
@@ -137,24 +133,9 @@ exports.updatePreferences = asyncHandler(async (req, res) => {
 
 exports.notifyUser = async (userId, payload, options = {}) => {
   try {
-    const { saveHistory = true } = options;
-    const user = await User.findById(userId).select(
-      "pushTokens notificationPreferences",
-    );
-    if (!user) return;
-
-    const normalizedPayload = buildNotificationPayload(payload);
-    const type = normalizedPayload.data?.type;
-    const prefs = user.notificationPreferences || {};
-    if (!shouldDeliverByPreference(prefs, type)) return;
-
-    if (shouldPersistNotification({ saveHistory, type })) {
-      await persistNotification(userId, normalizedPayload);
-    }
-
-    if (!user.pushTokens?.length) return;
-    await sendExpoPushNotifications(user.pushTokens, normalizedPayload);
+    return await deliverNotificationToUser(userId, payload, options);
   } catch (error) {
     console.error("notify user error", error);
+    return null;
   }
 };
