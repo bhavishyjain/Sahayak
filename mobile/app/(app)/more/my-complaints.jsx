@@ -1,10 +1,10 @@
 import { useRouter } from "expo-router";
-import { ChevronDown, Inbox } from "lucide-react-native";
+import { Inbox } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   RefreshControl,
-  ScrollView,
   Text,
   View,
 } from "react-native";
@@ -14,12 +14,12 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import ComplaintCard from "../../../components/ComplaintCard";
 import FilterPanel from "../../../components/FilterPanel";
-import PressableBlock from "../../../components/PressableBlock";
 import SearchBar from "../../../components/SearchBar";
 import { formatPriorityLabel } from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import useComplaintList from "../../../utils/hooks/useComplaintList";
+import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
 
 export default function MyComplaints() {
   const { t } = useTranslation();
@@ -34,10 +34,10 @@ export default function MyComplaints() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const LIMIT = 10;
   const {
     complaints,
-    total,
     isLoading: loading,
     isFetching: refreshing,
     isFetchingNextPage: loadingMore,
@@ -53,7 +53,7 @@ export default function MyComplaints() {
     sort: sortOrder,
     startDate,
     endDate,
-    search: searchQuery,
+    search: debouncedSearchQuery,
     limit: LIMIT,
   });
 
@@ -94,8 +94,84 @@ export default function MyComplaints() {
         hasBackButton={true}
       />
 
-      <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+      <FlatList
+        data={complaints}
+        keyExtractor={(item, index) => String(item?._id ?? item?.id ?? index)}
+        renderItem={({ item }) => (
+          <ComplaintCard
+            complaint={item}
+            onOpen={() =>
+              router.push(
+                `/complaints/complaint-details?id=${item._id ?? item.id}`,
+              )
+            }
+          />
+        )}
+        ListHeaderComponent={
+          <View style={{ padding: 16, paddingBottom: 0 }}>
+            <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
+              <View className="flex-1">
+                <SearchBar
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder={t("complaints.searchPlaceholder")}
+                />
+              </View>
+              <FilterPanel
+                variant="icon"
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                departmentFilter={departmentFilter}
+                setDepartmentFilter={setDepartmentFilter}
+                priorityFilter={priorityFilter}
+                setPriorityFilter={setPriorityFilter}
+                sortOrder={sortOrder}
+                setSortOrder={setSortOrder}
+                startDate={startDate}
+                endDate={endDate}
+                setStartDate={setStartDate}
+                setEndDate={setEndDate}
+                hasActiveFilters={hasActiveFilters}
+                onClearFilters={clearFilters}
+                t={t}
+                formatPriorityLabel={formatPriorityLabel}
+              />
+            </View>
+
+            {loading ? (
+              <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </Card>
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <View style={{ paddingHorizontal: 16 }}>
+              <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
+                <View className="items-center py-1">
+                  <Inbox size={18} color={colors.textSecondary} />
+                  <Text
+                    className="mt-2 text-center"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("complaints.noComplaints")}
+                  </Text>
+                </View>
+              </Card>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : (
+            <View style={{ height: 24 }} />
+          )
+        }
+        contentContainerStyle={{ paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -104,98 +180,14 @@ export default function MyComplaints() {
             tintColor={colors.primary}
           />
         }
+        onEndReached={() => {
+          if (hasMore && !loadingMore && !loading && !refreshing) {
+            loadMore();
+          }
+        }}
+        onEndReachedThreshold={0.35}
         showsVerticalScrollIndicator={false}
-      >
-        <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
-          <View className="flex-1">
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={t("complaints.searchPlaceholder")}
-            />
-          </View>
-          <FilterPanel
-            variant="icon"
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            departmentFilter={departmentFilter}
-            setDepartmentFilter={setDepartmentFilter}
-            priorityFilter={priorityFilter}
-            setPriorityFilter={setPriorityFilter}
-            sortOrder={sortOrder}
-            setSortOrder={setSortOrder}
-            startDate={startDate}
-            endDate={endDate}
-            setStartDate={setStartDate}
-            setEndDate={setEndDate}
-            hasActiveFilters={hasActiveFilters}
-            onClearFilters={clearFilters}
-            t={t}
-            formatPriorityLabel={formatPriorityLabel}
-          />
-        </View>
-
-        {loading ? (
-          <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </Card>
-        ) : complaints.length === 0 ? (
-          <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
-            <View className="items-center py-1">
-              <Inbox size={18} color={colors.textSecondary} />
-              <Text
-                className="mt-2 text-center"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("complaints.noComplaints")}
-              </Text>
-            </View>
-          </Card>
-        ) : (
-          complaints.map((complaint, index) => (
-            <ComplaintCard
-              key={`${complaint._id ?? complaint.id ?? index}`}
-              complaint={complaint}
-              onOpen={() =>
-                router.push(
-                  `/complaints/complaint-details?id=${complaint._id ?? complaint.id}`,
-                )
-              }
-            />
-          ))
-        )}
-
-        {hasMore && (
-          <PressableBlock
-            onPress={() => loadMore()}
-            disabled={loadingMore}
-            className="mt-4 mb-2 rounded-xl items-center justify-center py-3"
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              borderWidth: 1,
-              borderColor: colors.border,
-              opacity: loadingMore ? 0.6 : 1,
-            }}
-          >
-            {loadingMore ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <View className="flex-row items-center" style={{ gap: 6 }}>
-                <ChevronDown size={14} color={colors.textSecondary} />
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t("complaints.loadMoreCount", {
-                    current: complaints.length,
-                    total,
-                  })}
-                </Text>
-              </View>
-            )}
-          </PressableBlock>
-        )}
-      </ScrollView>
+      />
     </View>
   );
 }

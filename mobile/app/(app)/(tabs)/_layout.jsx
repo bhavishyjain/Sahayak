@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+import { Tabs, router } from "expo-router";
 import {
   Home,
   ListChecks,
@@ -53,6 +53,10 @@ export default function TabsLayout() {
   useEffect(() => {
     async function checkUserRole() {
       const user = await getUserAuth();
+      if (user?.isActive === false) {
+        router.replace("/(app)/account-deactivated");
+        return;
+      }
       setUserRole(user?.role || "user");
       setLoading(false);
     }

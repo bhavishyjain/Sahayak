@@ -247,6 +247,13 @@
       "locationFallback": "आस-पास",
       "empty": "आस-पास कोई शिकायत नहीं मिली।",
       "upvoteFailed": "अपवोट करने में विफल"
+    },
+    "feedback": {
+      "title": "फीडबैक दें",
+      "reload": "रीलोड",
+      "action": "फीडबैक दें",
+      "emptyTitle": "कोई लंबित फीडबैक नहीं",
+      "emptySubtitle": "जिन पूर्ण शिकायतों पर आपकी रेटिंग बाकी है, वे यहां दिखाई देंगी।"
     }
   },
   "complaints": {
@@ -832,10 +839,13 @@
       },
       "labels": {
         "task": "कार्य: %{value}",
-        "notes": "नोट्स: %{value}"
+        "notes": "नोट्स: %{value}",
+        "leader": "लीडर",
+        "selectedLeader": "लीडर चुना गया"
       },
       "actions": {
         "addWorkers": "कर्मी जोड़ें",
+        "makeLeader": "लीडर बनाएं",
         "updateTask": "कार्य अपडेट करें",
         "remove": "हटाएं",
         "cancel": "रद्द करें",
@@ -875,6 +885,10 @@
         "removeSuccessTitle": "कर्मी हटा दिया गया",
         "removeFailedTitle": "हटाना विफल हुआ",
         "removeFailedMessage": "कर्मी को हटाया नहीं जा सका",
+        "leaderUpdatedTitle": "लीडर अपडेट हुआ",
+        "leaderUpdatedMessage": "%{name} अब लीडर है",
+        "leaderUpdatedFailedTitle": "लीडर अपडेट विफल हुआ",
+        "leaderUpdatedFailedMessage": "शिकायत लीडर अपडेट नहीं हो सका",
         "updateSuccessTitle": "कार्य अपडेट हुआ",
         "updateSuccessMessage": "%{name} का कार्य अपडेट कर दिया गया",
         "updateFailedTitle": "अपडेट विफल हुआ",
@@ -1558,7 +1572,10 @@
         "meta": {
           "sent": "भेजा गया %{date}",
           "expires": "समाप्ति %{date}",
-          "joined": "जुड़ा %{date}"
+          "joined": "जुड़ा %{date}",
+          "createdByAdmin": "बनाया गया: एडमिन",
+          "createdByHead": "बनाया गया: %{name}",
+          "createdByName": "बनाया गया: %{name}"
         },
         "form": {
           "title": "नया कर्मी आमंत्रित करें",
@@ -1636,7 +1653,10 @@
       "meta": {
         "sent": "भेजा गया %{date}",
         "expires": "समाप्ति %{date}",
-        "joined": "जुड़ा %{date}"
+        "joined": "जुड़ा %{date}",
+        "createdByAdmin": "बनाया गया: एडमिन",
+        "createdByHead": "बनाया गया: %{name}",
+        "createdByName": "बनाया गया: %{name}"
       },
       "form": {
         "title": "नया कर्मी आमंत्रित करें",

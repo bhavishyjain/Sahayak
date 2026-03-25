@@ -1,7 +1,11 @@
 const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 const Complaint = require("../models/Complaint");
-const { normalizeStatus, getResolvedAt } = require("../utils/normalize");
+const {
+  normalizeStatus,
+  getResolvedAt,
+  escapeRegex,
+} = require("../utils/normalize");
 const {
   getComplaintDepartmentBreakdown,
   getComplaintMetricSnapshot,
@@ -72,14 +76,25 @@ async function withCachedReportMetric(metricName, filters, factory) {
   return setCachedReportValue(cacheKey, value);
 }
 
-function toCsvCell(value) {
-  const normalized = value === null || value === undefined ? "" : String(value);
-  const escaped = normalized.replace(/"/g, '""');
-  return `"${escaped}"`;
+function normalizeReportQuery(filters = {}) {
+  const normalizedFilters = { ...(filters || {}) };
+
+  if (
+    typeof normalizedFilters.department === "string" &&
+    normalizedFilters.department.trim()
+  ) {
+    normalizedFilters.department = new RegExp(
+      `^${escapeRegex(normalizedFilters.department.trim())}$`,
+      "i",
+    );
+  }
+
+  return normalizedFilters;
 }
 
 async function fetchComplaintsForReport(filters, limit) {
-  return Complaint.find(filters)
+  const normalizedFilters = normalizeReportQuery(filters);
+  return Complaint.find(normalizedFilters)
     .populate("userId", "fullName username")
     .populate("assignedWorkers.workerId", "fullName username")
     .sort({ createdAt: -1 })
@@ -87,10 +102,121 @@ async function fetchComplaintsForReport(filters, limit) {
     .lean();
 }
 
+async function countComplaintsForReport(filters = {}) {
+  const normalizedFilters = normalizeReportQuery(filters);
+  return Complaint.countDocuments(normalizedFilters);
+}
+
+function getComplaintTitle(complaint) {
+  const rawTitle = String(complaint?.refinedText || complaint?.rawText || "")
+    .split(":")[0]
+    .trim();
+  return rawTitle || complaint?.ticketId || "Complaint";
+}
+
+function formatDate(value) {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/A";
+  return date.toLocaleDateString("en-GB");
+}
+
+function calculateResponseTime(complaint) {
+  if (!complaint?.assignedAt || !complaint?.createdAt) return "N/A";
+  const diffMs =
+    new Date(complaint.assignedAt).getTime() -
+    new Date(complaint.createdAt).getTime();
+  const hours = Math.round(diffMs / (1000 * 60 * 60));
+  return hours > 0 ? hours : "<1";
+}
+
+function buildAssignedWorkersLabel(complaint) {
+  const assignments = Array.isArray(complaint?.assignedWorkers)
+    ? complaint.assignedWorkers
+    : [];
+  if (assignments.length === 0) return "Unassigned";
+
+  const names = assignments
+    .map(
+      (assignment) =>
+        assignment?.workerId?.fullName || assignment?.workerId?.username || "",
+    )
+    .filter(Boolean);
+  return names.length > 0 ? names.join(", ") : "Unassigned";
+}
+
+function mapComplaintToReportRow(complaint) {
+  const resolvedAt = getResolvedAt(complaint);
+  const normalizedComplaintStatus = normalizeStatus(complaint?.status);
+
+  return {
+    ticketId: complaint?.ticketId || "N/A",
+    title: getComplaintTitle(complaint),
+    description: complaint?.refinedText || complaint?.rawText || "No description",
+    department: complaint?.department || "Other",
+    priority: complaint?.priority || "Medium",
+    status: normalizedComplaintStatus || "pending",
+    location: complaint?.locationName || "Not specified",
+    submittedBy:
+      complaint?.userId?.fullName || complaint?.userId?.username || "Unknown",
+    assignedTo: buildAssignedWorkersLabel(complaint),
+    createdAt: formatDate(complaint?.createdAt),
+    resolvedAt: resolvedAt ? formatDate(resolvedAt) : "Pending",
+    responseTime: calculateResponseTime(complaint),
+    upvotes: Number(complaint?.upvoteCount || 0),
+    rating: complaint?.feedback?.rating
+      ? `${complaint.feedback.rating}/5`
+      : "N/A",
+  };
+}
+
+function buildDepartmentStats(rows) {
+  return rows.reduce((acc, row) => {
+    const department = row.department || "Other";
+    if (!acc[department]) {
+      acc[department] = { total: 0, resolved: 0, pending: 0, inProgress: 0 };
+    }
+    acc[department].total += 1;
+    if (row.status === "resolved") acc[department].resolved += 1;
+    else if (row.status === "pending") acc[department].pending += 1;
+    else if (row.status === "in-progress") acc[department].inProgress += 1;
+    return acc;
+  }, {});
+}
+
+function calculateAverageResponseTime(rows) {
+  const numericHours = rows
+    .map((row) => {
+      if (row.responseTime === "N/A" || row.responseTime === "<1") {
+        return row.responseTime === "<1" ? 1 : null;
+      }
+      const parsed = Number(row.responseTime);
+      return Number.isFinite(parsed) ? parsed : null;
+    })
+    .filter((value) => value !== null);
+
+  if (numericHours.length === 0) return "N/A";
+  return Math.round(
+    numericHours.reduce((sum, value) => sum + value, 0) / numericHours.length,
+  );
+}
+
+async function getReportRows(filters = {}, limit = REPORT_MAX_ROWS) {
+  const complaints = await fetchComplaintsForReport(filters, limit);
+  return complaints.map(mapComplaintToReportRow);
+}
+
+function toCsvCell(value) {
+  const normalized = value === null || value === undefined ? "" : String(value);
+  return `"${normalized.replace(/"/g, '""')}"`;
+}
+
 class ReportService {
   async getDashboardStats(filters = {}) {
     return withCachedReportMetric("dashboard-stats", filters, async () => {
-      const snapshot = await getComplaintMetricSnapshot(filters);
+      const snapshot = await getComplaintMetricSnapshot(
+        normalizeReportQuery(filters),
+      );
 
       return {
         total: snapshot.total,
@@ -106,171 +232,95 @@ class ReportService {
     return withCachedReportMetric(
       "department-breakdown",
       filters,
-      async () => getComplaintDepartmentBreakdown(filters),
+      async () =>
+        getComplaintDepartmentBreakdown(normalizeReportQuery(filters)),
     );
   }
 
-  // Generate Excel Report
-  async generateExcelReport(filters = {}, userId) {
+  async generateExcelReport(filters = {}) {
     try {
+      const rows = await getReportRows(filters, EXCEL_MAX_ROWS);
       const workbook = new ExcelJS.Workbook();
-
-      // Set workbook properties
       workbook.creator = "Sahayak Municipal System";
       workbook.created = new Date();
       workbook.modified = new Date();
 
-      // Main Complaints Sheet
       const worksheet = workbook.addWorksheet("Complaints Report");
-
-      // Define columns
       worksheet.columns = [
-        { header: "Ticket ID", key: "ticketId", width: 15 },
-        { header: "Title", key: "title", width: 35 },
-        { header: "Department", key: "department", width: 15 },
-        { header: "Priority", key: "priority", width: 10 },
-        { header: "Status", key: "status", width: 15 },
-        { header: "Location", key: "location", width: 30 },
-        { header: "Submitted By", key: "submittedBy", width: 20 },
-        { header: "Assigned To", key: "assignedTo", width: 20 },
-        { header: "Created Date", key: "createdAt", width: 15 },
-        { header: "Resolved Date", key: "resolvedAt", width: 15 },
+        { header: "Ticket ID", key: "ticketId", width: 18 },
+        { header: "Title", key: "title", width: 34 },
+        { header: "Department", key: "department", width: 18 },
+        { header: "Priority", key: "priority", width: 12 },
+        { header: "Status", key: "status", width: 18 },
+        { header: "Location", key: "location", width: 28 },
+        { header: "Submitted By", key: "submittedBy", width: 22 },
+        { header: "Assigned To", key: "assignedTo", width: 28 },
+        { header: "Created Date", key: "createdAt", width: 16 },
+        { header: "Resolved Date", key: "resolvedAt", width: 16 },
         { header: "Response Time (hrs)", key: "responseTime", width: 18 },
-        { header: "Upvotes", key: "upvotes", width: 10 },
-        { header: "Rating", key: "rating", width: 10 },
+        { header: "Upvotes", key: "upvotes", width: 12 },
+        { header: "Rating", key: "rating", width: 12 },
       ];
 
-      // Style header row
-      worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-      worksheet.getRow(1).fill = {
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      headerRow.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FF4472C4" },
+        fgColor: { argb: "FF0F766E" },
       };
-      worksheet.getRow(1).alignment = {
+      headerRow.alignment = {
         vertical: "middle",
         horizontal: "center",
       };
-      worksheet.getRow(1).height = 25;
+      headerRow.height = 22;
 
-      // Fetch complaints data
-      const complaints = await fetchComplaintsForReport(
-        filters,
-        EXCEL_MAX_ROWS,
-      );
+      rows.forEach((row, index) => {
+        const worksheetRow = worksheet.addRow(row);
 
-      // Add data rows
-      complaints.forEach((complaint, index) => {
-        const resolvedAt = getResolvedAt(complaint);
-        const row = worksheet.addRow({
-          ticketId: complaint.ticketId || "N/A",
-          title: complaint.refinedText || complaint.rawText || "No title",
-          department: complaint.department || "N/A",
-          priority: complaint.priority || "Medium",
-          status: complaint.status || "pending",
-          location: complaint.locationName || "Not specified",
-          submittedBy:
-            complaint.userId?.fullName ||
-            complaint.userId?.username ||
-            "Unknown",
-          assignedTo:
-            complaint.assignedWorkers?.[0]?.workerId?.fullName ||
-            complaint.assignedWorkers?.[0]?.workerId?.username ||
-            "Unassigned",
-          createdAt: complaint.createdAt
-            ? new Date(complaint.createdAt).toLocaleDateString("en-GB")
-            : "N/A",
-          resolvedAt: resolvedAt
-            ? resolvedAt.toLocaleDateString("en-GB")
-            : "Pending",
-          responseTime: this.calculateResponseTime(complaint),
-          upvotes: complaint.upvoteCount || 0,
-          rating: complaint.feedback?.rating
-            ? `${complaint.feedback.rating}/5`
-            : "N/A",
-        });
-
-        // Alternate row colors
         if (index % 2 === 1) {
-          row.fill = {
+          worksheetRow.fill = {
             type: "pattern",
             pattern: "solid",
-            fgColor: { argb: "FFF2F2F2" },
+            fgColor: { argb: "FFF8FAFC" },
           };
         }
 
-        // Color code by status
-        const statusCell = row.getCell("status");
-        switch (normalizeStatus(complaint.status)) {
-          case "resolved":
-            statusCell.font = { color: { argb: "FF10B981" }, bold: true };
-            break;
-          case "in-progress":
-            statusCell.font = { color: { argb: "FF3B82F6" }, bold: true };
-            break;
-          case "pending":
-            statusCell.font = { color: { argb: "FFF59E0B" }, bold: true };
-            break;
-        }
-
-        // Color code by priority
-        const priorityCell = row.getCell("priority");
-        switch (complaint.priority?.toLowerCase()) {
-          case "high":
-            priorityCell.font = { color: { argb: "FFEF4444" }, bold: true };
-            break;
-          case "medium":
-            priorityCell.font = { color: { argb: "FFF59E0B" } };
-            break;
-          case "low":
-            priorityCell.font = { color: { argb: "FF10B981" } };
-            break;
+        const statusCell = worksheetRow.getCell("status");
+        if (row.status === "resolved") {
+          statusCell.font = { color: { argb: "FF059669" }, bold: true };
+        } else if (row.status === "in-progress") {
+          statusCell.font = { color: { argb: "FF2563EB" }, bold: true };
+        } else if (row.status === "pending") {
+          statusCell.font = { color: { argb: "FFD97706" }, bold: true };
         }
       });
 
-      // Add Summary Sheet
-      await this.addSummarySheet(workbook, complaints, filters);
-
-      // Generate buffer
+      await this.addSummarySheet(workbook, rows);
       const buffer = await workbook.xlsx.writeBuffer();
-      return buffer;
+      return Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
     } catch (error) {
       console.error("Excel generation error:", error);
       throw new Error("Failed to generate Excel report");
     }
   }
 
-  // Add Summary Sheet to workbook
-  async addSummarySheet(workbook, complaints, filters) {
+  async addSummarySheet(workbook, rows) {
     const summarySheet = workbook.addWorksheet("Summary");
+    const total = rows.length;
+    const resolved = rows.filter((row) => row.status === "resolved").length;
+    const pending = rows.filter((row) => row.status === "pending").length;
+    const inProgress = rows.filter((row) => row.status === "in-progress").length;
+    const cancelled = rows.filter((row) => row.status === "cancelled").length;
 
-    // Title
     summarySheet.mergeCells("A1:B1");
     summarySheet.getCell("A1").value = "Complaint Report Summary";
     summarySheet.getCell("A1").font = { bold: true, size: 16 };
     summarySheet.getCell("A1").alignment = { horizontal: "center" };
 
-    // Date range
-    summarySheet.getCell("A2").value = "Report Generated:";
+    summarySheet.getCell("A2").value = "Generated On";
     summarySheet.getCell("B2").value = new Date().toLocaleString();
-
     summarySheet.addRow([]);
-
-    // Overall Statistics
-    const total = complaints.length;
-    const resolved = complaints.filter(
-      (c) => normalizeStatus(c.status) === "resolved",
-    ).length;
-    const pending = complaints.filter(
-      (c) => normalizeStatus(c.status) === "pending",
-    ).length;
-    const inProgress = complaints.filter(
-      (c) => normalizeStatus(c.status) === "in-progress",
-    ).length;
-    const cancelled = complaints.filter(
-      (c) => normalizeStatus(c.status) === "cancelled",
-    ).length;
-
     summarySheet.addRow(["Overall Statistics", ""]);
     summarySheet.addRow(["Total Complaints", total]);
     summarySheet.addRow(["Resolved", resolved]);
@@ -278,207 +328,138 @@ class ReportService {
     summarySheet.addRow(["Pending", pending]);
     summarySheet.addRow(["Cancelled", cancelled]);
     summarySheet.addRow([
+      "Average Response Time (hrs)",
+      calculateAverageResponseTime(rows),
+    ]);
+    summarySheet.addRow([
       "Resolution Rate",
       `${total > 0 ? ((resolved / total) * 100).toFixed(1) : 0}%`,
     ]);
 
     summarySheet.addRow([]);
-
-    // Department-wise breakdown
     summarySheet.addRow(["Department Breakdown", "Count"]);
-    const deptStats = {};
-    complaints.forEach((c) => {
-      const dept = c.department || "Other";
-      deptStats[dept] = (deptStats[dept] || 0) + 1;
-    });
-
-    Object.entries(deptStats)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([dept, count]) => {
-        summarySheet.addRow([dept, count]);
+    Object.entries(buildDepartmentStats(rows))
+      .sort((a, b) => b[1].total - a[1].total)
+      .forEach(([department, stats]) => {
+        summarySheet.addRow([department, stats.total]);
       });
 
     summarySheet.addRow([]);
-
-    // Priority breakdown
     summarySheet.addRow(["Priority Breakdown", "Count"]);
-    const highPriority = complaints.filter((c) => c.priority === "High").length;
-    const mediumPriority = complaints.filter(
-      (c) => c.priority === "Medium",
-    ).length;
-    const lowPriority = complaints.filter((c) => c.priority === "Low").length;
+    ["High", "Medium", "Low"].forEach((priority) => {
+      summarySheet.addRow([
+        priority,
+        rows.filter((row) => row.priority === priority).length,
+      ]);
+    });
 
-    summarySheet.addRow(["High", highPriority]);
-    summarySheet.addRow(["Medium", mediumPriority]);
-    summarySheet.addRow(["Low", lowPriority]);
-
-    // Style column A
+    summarySheet.getColumn("A").width = 28;
+    summarySheet.getColumn("B").width = 18;
     summarySheet.getColumn("A").font = { bold: true };
-    summarySheet.getColumn("A").width = 25;
-    summarySheet.getColumn("B").width = 15;
   }
 
-  // Generate PDF Report
-  async generatePDFReport(filters = {}, userId) {
-    // Fetch data before touching the PDF stream so async errors propagate naturally
-    const complaints = await fetchComplaintsForReport(filters, PDF_MAX_ROWS);
+  async generatePDFReport(filters = {}) {
+    try {
+      const rows = await getReportRows(filters, PDF_MAX_ROWS);
+      const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+      const chunks = [];
 
-    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
-    const buffers = [];
-    // Wrap stream events in a clean Promise (no async executor)
-    const bufferReady = new Promise((resolve, reject) => {
-      doc.on("data", (chunk) => buffers.push(chunk));
-      doc.on("end", () => resolve(Buffer.concat(buffers)));
-      doc.on("error", reject);
-    });
-
-    // Header
-    doc
-      .fontSize(24)
-      .font("Helvetica-Bold")
-      .text("Complaint Management Report", { align: "center" });
-    doc.moveDown(0.5);
-    doc
-      .fontSize(10)
-      .font("Helvetica")
-      .text(`Generated on: ${new Date().toLocaleString()}`, {
-        align: "center",
+      const bufferReady = new Promise((resolve, reject) => {
+        doc.on("data", (chunk) => chunks.push(chunk));
+        doc.on("end", () => resolve(Buffer.concat(chunks)));
+        doc.on("error", reject);
       });
-    doc.moveDown(1);
 
-    // Summary Section
-    doc.fontSize(16).font("Helvetica-Bold").text("Executive Summary");
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-    doc.moveDown(0.5);
+      const total = rows.length;
+      const resolved = rows.filter((row) => row.status === "resolved").length;
+      const pending = rows.filter((row) => row.status === "pending").length;
+      const inProgress = rows.filter((row) => row.status === "in-progress").length;
 
-    const total = complaints.length;
-    const resolved = complaints.filter(
-      (c) => normalizeStatus(c.status) === "resolved",
-    ).length;
-    const pending = complaints.filter(
-      (c) => normalizeStatus(c.status) === "pending",
-    ).length;
-    const inProgress = complaints.filter(
-      (c) => normalizeStatus(c.status) === "in-progress",
-    ).length;
-    const avgResponseTime = this.calculateAverageResponseTime(complaints);
+      doc
+        .fontSize(22)
+        .font("Helvetica-Bold")
+        .text("Complaint Management Report", { align: "center" });
+      doc.moveDown(0.5);
+      doc
+        .fontSize(10)
+        .font("Helvetica")
+        .text(`Generated on ${new Date().toLocaleString()}`, { align: "center" });
+      doc.moveDown(1);
 
-    doc.fontSize(11).font("Helvetica");
-    doc.text(`Total Complaints: ${total}`, { continued: false });
-    doc.text(
-      `Resolved: ${resolved} (${total > 0 ? ((resolved / total) * 100).toFixed(1) : 0}%)`,
-    );
-    doc.text(`In Progress: ${inProgress}`);
-    doc.text(`Pending: ${pending}`);
-    doc.text(`Average Response Time: ${avgResponseTime} hours`);
-    doc.moveDown(1);
-
-    // Department Breakdown
-    doc.fontSize(14).font("Helvetica-Bold").text("Department-wise Breakdown");
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    const deptStats = this.getDepartmentStats(complaints);
-    doc.fontSize(10).font("Helvetica");
-    Object.entries(deptStats).forEach(([dept, stats]) => {
-      doc.text(
-        `${dept}: ${stats.total} complaints (${stats.resolved} resolved, ${stats.pending} pending)`,
-      );
-    });
-    doc.moveDown(1);
-
-    // Priority Distribution
-    doc.fontSize(14).font("Helvetica-Bold").text("Priority Distribution");
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    const highPriority = complaints.filter((c) => c.priority === "High").length;
-    const mediumPriority = complaints.filter(
-      (c) => c.priority === "Medium",
-    ).length;
-    const lowPriority = complaints.filter((c) => c.priority === "Low").length;
-
-    doc.fontSize(10).font("Helvetica");
-    doc.text(
-      `High Priority: ${highPriority} (${total > 0 ? ((highPriority / total) * 100).toFixed(1) : 0}%)`,
-    );
-    doc.text(
-      `Medium Priority: ${mediumPriority} (${total > 0 ? ((mediumPriority / total) * 100).toFixed(1) : 0}%)`,
-    );
-    doc.text(
-      `Low Priority: ${lowPriority} (${total > 0 ? ((lowPriority / total) * 100).toFixed(1) : 0}%)`,
-    );
-    doc.moveDown(1);
-
-    // Recent Complaints (Limited to first 30)
-    if (complaints.length > 0) {
-      doc.addPage();
-      doc.fontSize(14).font("Helvetica-Bold").text("Recent Complaints");
+      doc.fontSize(15).font("Helvetica-Bold").text("Executive Summary");
       doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
       doc.moveDown(0.5);
+      doc.fontSize(11).font("Helvetica");
+      doc.text(`Total Complaints: ${total}`);
+      doc.text(`Resolved: ${resolved}`);
+      doc.text(`In Progress: ${inProgress}`);
+      doc.text(`Pending: ${pending}`);
+      doc.text(`Average Response Time: ${calculateAverageResponseTime(rows)} hours`);
+      doc.moveDown(1);
 
-      doc.fontSize(9).font("Helvetica");
+      doc.fontSize(14).font("Helvetica-Bold").text("Department Breakdown");
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(0.5);
+      Object.entries(buildDepartmentStats(rows))
+        .sort((a, b) => b[1].total - a[1].total)
+        .forEach(([department, stats]) => {
+          doc
+            .fontSize(10)
+            .font("Helvetica")
+            .text(
+              `${department}: ${stats.total} complaints (${stats.resolved} resolved, ${stats.pending} pending, ${stats.inProgress} in progress)`,
+            );
+        });
 
-      complaints.forEach((complaint, index) => {
-        // Check if we need a new page
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.fontSize(9);
-        }
+      if (rows.length > 0) {
+        doc.addPage();
+        doc.fontSize(14).font("Helvetica-Bold").text("Recent Complaints");
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown(0.5);
+        rows.forEach((row, index) => {
+          if (doc.y > 700) {
+            doc.addPage();
+          }
+          doc.fontSize(10).font("Helvetica-Bold").text(
+            `${index + 1}. ${row.ticketId} - ${row.title}`,
+          );
+          doc.fontSize(9).font("Helvetica");
+          doc.text(
+            `Status: ${row.status} | Priority: ${row.priority} | Department: ${row.department}`,
+          );
+          doc.text(`Location: ${row.location}`);
+          doc.text(`Submitted By: ${row.submittedBy} | Assigned To: ${row.assignedTo}`);
+          doc.text(`Created: ${row.createdAt} | Resolved: ${row.resolvedAt}`);
+          doc.moveDown(0.5);
+        });
+      }
 
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i += 1) {
+        doc.switchToPage(pages.start + i);
         doc
-          .font("Helvetica-Bold")
-          .text(`${index + 1}. ${complaint.ticketId}`, { continued: true });
-        doc
+          .fontSize(8)
           .font("Helvetica")
           .text(
-            ` - ${complaint.refinedText || complaint.rawText || "No description"}`,
+            `Page ${i + 1} of ${pages.count}`,
+            50,
+            doc.page.height - 40,
+            { align: "center", width: doc.page.width - 100 },
           );
-        doc.text(
-          `   Status: ${complaint.status} | Priority: ${complaint.priority} | Department: ${complaint.department}`,
-        );
-        doc.text(`   Location: ${complaint.locationName || "Not specified"}`);
-        if (complaint.assignedWorkers?.[0]?.workerId) {
-          const worker = complaint.assignedWorkers[0].workerId;
-          doc.text(`   Assigned to: ${worker.fullName || worker.username}`);
-        }
-        doc.moveDown(0.3);
-      });
-    }
+      }
 
-    // Footer on each page
-    const pages = doc.bufferedPageRange();
-    for (let i = 0; i < pages.count; i++) {
-      doc.switchToPage(pages.start + i);
-      const footerY =
-        doc.page.height - Math.max(doc.page.margins.bottom, 40) - 12;
-      doc
-        .fontSize(8)
-        .font("Helvetica")
-        .text(
-          `Page ${i + 1} of ${pages.count}`,
-          doc.page.margins.left,
-          footerY,
-          {
-            width:
-              doc.page.width - doc.page.margins.left - doc.page.margins.right,
-            align: "center",
-            lineBreak: false,
-          },
-        );
+      doc.end();
+      return bufferReady;
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      throw new Error("Failed to generate PDF report");
     }
-
-    doc.end();
-    return bufferReady;
   }
 
-  // Generate CSV Report
-  async generateCSVReport(filters = {}, userId) {
+  async generateCSVReport(filters = {}) {
     try {
-      const complaints = await fetchComplaintsForReport(filters, CSV_MAX_ROWS);
-
-      // Prepare CSV data
-      const csvData = [
+      const rows = await getReportRows(filters, CSV_MAX_ROWS);
+      const csvRows = [
         [
           "Ticket ID",
           "Title",
@@ -494,37 +475,26 @@ class ReportService {
           "Upvotes",
           "Rating",
         ],
+        ...rows.map((row) => [
+          row.ticketId,
+          row.title,
+          row.department,
+          row.priority,
+          row.status,
+          row.location,
+          row.submittedBy,
+          row.assignedTo,
+          row.createdAt,
+          row.resolvedAt,
+          row.responseTime,
+          row.upvotes,
+          row.rating,
+        ]),
       ];
 
-      complaints.forEach((complaint) => {
-        const resolvedAt = getResolvedAt(complaint);
-        csvData.push([
-          complaint.ticketId || "N/A",
-          complaint.refinedText || complaint.rawText || "No title",
-          complaint.department || "N/A",
-          complaint.priority || "Medium",
-          complaint.status || "pending",
-          complaint.locationName || "Not specified",
-          complaint.userId?.fullName || complaint.userId?.username || "Unknown",
-          complaint.assignedWorkers?.[0]?.workerId?.fullName ||
-            complaint.assignedWorkers?.[0]?.workerId?.username ||
-            "Unassigned",
-          complaint.createdAt
-            ? new Date(complaint.createdAt).toLocaleDateString("en-GB")
-            : "N/A",
-          resolvedAt ? resolvedAt.toLocaleDateString("en-GB") : "Pending",
-          this.calculateResponseTime(complaint),
-          complaint.upvoteCount || 0,
-          complaint.feedback?.rating ? `${complaint.feedback.rating}/5` : "N/A",
-        ]);
-      });
-
-      // Convert to CSV string
-      let csvString = "";
-      csvData.forEach((row) => {
-        csvString += row.map((cell) => toCsvCell(cell)).join(",") + "\n";
-      });
-
+      const csvString = `\uFEFF${csvRows
+        .map((row) => row.map((cell) => toCsvCell(cell)).join(","))
+        .join("\n")}\n`;
       return Buffer.from(csvString, "utf-8");
     } catch (error) {
       console.error("CSV generation error:", error);
@@ -532,48 +502,9 @@ class ReportService {
     }
   }
 
-  // Helper: Calculate response time for a complaint
-  calculateResponseTime(complaint) {
-    if (!complaint.assignedAt || !complaint.createdAt) {
-      return "N/A";
-    }
-    const diffMs =
-      new Date(complaint.assignedAt) - new Date(complaint.createdAt);
-    const hours = Math.round(diffMs / (1000 * 60 * 60));
-    return hours > 0 ? hours : "<1";
-  }
-
-  // Helper: Calculate average response time
-  calculateAverageResponseTime(complaints) {
-    const withResponseTime = complaints.filter(
-      (c) => c.assignedAt && c.createdAt,
-    );
-    if (withResponseTime.length === 0) return "N/A";
-
-    const totalHours = withResponseTime.reduce((sum, c) => {
-      const diffMs = new Date(c.assignedAt) - new Date(c.createdAt);
-      const hours = diffMs / (1000 * 60 * 60);
-      return sum + hours;
-    }, 0);
-
-    return Math.round(totalHours / withResponseTime.length);
-  }
-
-  // Helper: Get department statistics
-  getDepartmentStats(complaints) {
-    const stats = {};
-    complaints.forEach((c) => {
-      const dept = c.department || "Other";
-      if (!stats[dept]) {
-        stats[dept] = { total: 0, resolved: 0, pending: 0, inProgress: 0 };
-      }
-      stats[dept].total++;
-      const status = normalizeStatus(c.status);
-      if (status === "resolved") stats[dept].resolved++;
-      else if (status === "pending") stats[dept].pending++;
-      else if (status === "in-progress") stats[dept].inProgress++;
-    });
-    return stats;
+  async getReportMetadata(filters = {}) {
+    const complaintCount = await countComplaintsForReport(filters);
+    return { complaintCount };
   }
 }
 

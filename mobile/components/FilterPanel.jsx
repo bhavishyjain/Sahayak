@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -73,13 +74,26 @@ export default function FilterPanel({
   const [draftSort, setDraftSort] = useState(sortOrder);
   const [draftStart, setDraftStart] = useState(startDate);
   const [draftEnd, setDraftEnd] = useState(endDate);
-  const { departmentOptions: fetchedDepartmentOptions = [] } = useDepartments({
+  const {
+    departmentOptions: fetchedDepartmentOptions = [],
+    isLoading: departmentsLoading,
+  } = useDepartments({
     enabled: Boolean(setDepartmentFilter),
   });
-  const resolvedDepartmentOptions =
-    departmentOptions && departmentOptions.length > 0
-      ? departmentOptions
-      : [{ value: "all", label: t("common.all") }, ...fetchedDepartmentOptions];
+  const mergedDepartmentOptions = [
+    ...fetchedDepartmentOptions,
+    ...((departmentOptions ?? []).filter(
+      (option) =>
+        option?.value &&
+        !fetchedDepartmentOptions.some(
+          (fetchedOption) => fetchedOption.value === option.value,
+        ),
+    ) || []),
+  ];
+  const resolvedDepartmentOptions = [
+    { value: "all", label: t("common.all") },
+    ...mergedDepartmentOptions,
+  ];
 
   const openPanel = () => {
     setDraftStatus(statusFilter);
@@ -195,54 +209,58 @@ export default function FilterPanel({
             onPress={() => {}}
           >
             <SafeAreaView edges={["bottom"]}>
-              <View className="p-5">
-                {/* Header */}
-                <View className="flex-row items-center justify-between mb-3">
-                  <Text
-                    className="text-base font-bold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {t("common.filters")}
-                  </Text>
-                  <TouchableOpacity onPress={() => setVisible(false)}>
-                    <X size={20} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <View
-                  className="h-[1px] mb-3"
-                  style={{ backgroundColor: colors.border }}
-                />
-
-                {/* Status */}
-                {statusOptions.length > 0 && (
-                  <>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View className="p-5">
+                  {/* Header */}
+                  <View className="flex-row items-center justify-between mb-3">
                     <Text
-                      className="text-xs font-semibold mb-2"
-                      style={{ color: colors.textSecondary }}
+                      className="text-base font-bold"
+                      style={{ color: colors.textPrimary }}
                     >
-                      {t("hod.complaints.filters.status")}
+                      {t("common.filters")}
                     </Text>
-                    <View
-                      className="flex-row flex-wrap mb-3"
-                      style={{ gap: 6 }}
-                    >
-                      {["all", ...statusOptions].map((s) => (
-                        <FilterChip
-                          key={s}
-                          label={
-                            s === "all"
-                              ? t("common.all")
-                              : formatStatusLabel(t, s)
-                          }
-                          isActive={draftStatus === s}
-                          onPress={() => setDraftStatus(s)}
-                          colors={colors}
-                        />
-                      ))}
-                    </View>
-                  </>
-                )}
+                    <TouchableOpacity onPress={() => setVisible(false)}>
+                      <X size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View
+                    className="h-[1px] mb-3"
+                    style={{ backgroundColor: colors.border }}
+                  />
+
+                  {/* Status */}
+                  {statusOptions.length > 0 && (
+                    <>
+                      <Text
+                        className="text-xs font-semibold mb-2"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {t("hod.complaints.filters.status")}
+                      </Text>
+                      <View
+                        className="flex-row flex-wrap mb-3"
+                        style={{ gap: 6 }}
+                      >
+                        {["all", ...statusOptions].map((s) => (
+                          <FilterChip
+                            key={s}
+                            label={
+                              s === "all"
+                                ? t("common.all")
+                                : formatStatusLabel(t, s)
+                            }
+                            isActive={draftStatus === s}
+                            onPress={() => setDraftStatus(s)}
+                            colors={colors}
+                          />
+                        ))}
+                      </View>
+                    </>
+                  )}
 
                 {/* Department — only shown when setter provided */}
                 {setDepartmentFilter && (
@@ -257,15 +275,26 @@ export default function FilterPanel({
                       className="flex-row flex-wrap mb-3"
                       style={{ gap: 6 }}
                     >
-                      {resolvedDepartmentOptions.map((department) => (
-                        <FilterChip
-                          key={department.value}
-                          label={department.label}
-                          isActive={draftDepartment === department.value}
-                          onPress={() => setDraftDepartment(department.value)}
-                          colors={colors}
-                        />
-                      ))}
+                      {departmentsLoading ? (
+                        <View className="py-2">
+                          <ActivityIndicator
+                            size="small"
+                            color={colors.primary}
+                          />
+                        </View>
+                      ) : (
+                        resolvedDepartmentOptions.map((department) => (
+                          <FilterChip
+                            key={department.value}
+                            label={department.label}
+                            isActive={draftDepartment === department.value}
+                            onPress={() =>
+                              setDraftDepartment(department.value)
+                            }
+                            colors={colors}
+                          />
+                        ))
+                      )}
                     </View>
                   </>
                 )}
@@ -358,46 +387,47 @@ export default function FilterPanel({
                   </View>
                 </View>
 
-                {/* Action buttons */}
-                <View className="flex-row" style={{ gap: 10 }}>
-                  <TouchableOpacity
-                    onPress={handleReset}
-                    className="flex-1 py-3 rounded-2xl items-center"
-                    style={{
-                      backgroundColor: colors.backgroundSecondary,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                  >
-                    <Text
-                      className="text-sm font-semibold"
-                      style={{ color: colors.textSecondary }}
+                  {/* Action buttons */}
+                  <View className="flex-row" style={{ gap: 10 }}>
+                    <TouchableOpacity
+                      onPress={handleReset}
+                      className="flex-1 py-3 rounded-2xl items-center"
+                      style={{
+                        backgroundColor: colors.backgroundSecondary,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                      }}
                     >
-                      {t("common.reset")}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleApply}
-                    disabled={applying}
-                    className="flex-1 py-3 rounded-2xl items-center"
-                    style={{
-                      backgroundColor: colors.primary,
-                      opacity: applying ? 0.8 : 1,
-                    }}
-                  >
-                    {applying ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
                       <Text
-                        className="text-sm font-bold"
-                        style={{ color: "#fff" }}
+                        className="text-sm font-semibold"
+                        style={{ color: colors.textSecondary }}
                       >
-                        {t("common.apply")}
+                        {t("common.reset")}
                       </Text>
-                    )}
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleApply}
+                      disabled={applying}
+                      className="flex-1 py-3 rounded-2xl items-center"
+                      style={{
+                        backgroundColor: colors.primary,
+                        opacity: applying ? 0.8 : 1,
+                      }}
+                    >
+                      {applying ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text
+                          className="text-sm font-bold"
+                          style={{ color: "#fff" }}
+                        >
+                          {t("common.apply")}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              </ScrollView>
             </SafeAreaView>
           </Pressable>
         </Pressable>

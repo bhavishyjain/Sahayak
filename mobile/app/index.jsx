@@ -1,4 +1,5 @@
 import getUserAuth from "@/utils/userAuth";
+import { getPostLoginRoute } from "@/utils/accountStatus";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -14,16 +15,7 @@ export default function Index() {
     (async () => {
       const user = await getUserAuth();
       if (user?.auth_token) {
-        // Redirect based on user role
-        const redirectPath =
-          user.role === "admin"
-            ? "/(app)/(tabs)/admin-home"
-            : user.role === "head"
-            ? "/(app)/(tabs)/hod-overview"
-            : user.role === "worker"
-              ? "/(app)/(tabs)/worker-home"
-              : "/(app)/(tabs)/home";
-        router.replace(redirectPath);
+        router.replace(getPostLoginRoute(user));
       } else {
         router.replace("/(app)/(auth)/login");
       }

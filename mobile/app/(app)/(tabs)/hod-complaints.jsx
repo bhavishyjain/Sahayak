@@ -1,16 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   AlertCircle,
   CheckCircle,
   CheckSquare,
-  ChevronDown,
   Square,
   Users,
   X,
   Search,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -39,6 +38,7 @@ import { invalidateComplaintQueries } from "../../../utils/invalidateComplaintQu
 import { isComplaintAssigned } from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
 
 export default function HodComplaints() {
   const { t } = useTranslation();
@@ -63,6 +63,7 @@ export default function HodComplaints() {
   const [selectedWorker, setSelectedWorker] = useState("");
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -83,11 +84,11 @@ export default function HodComplaints() {
     setEndDate("");
   };
 
-  const load = async (isRefresh = false, requestedPage = 1) => {
+  const load = useCallback(async (isRefresh = false, requestedPage = 1) => {
     try {
       if (isRefresh) setRefreshing(true);
       else if (requestedPage > 1) setLoadingMore(true);
-      else setLoading(true);
+      else if (complaints.length === 0) setLoading(true);
 
       const res = await apiCall({
         method: "GET",
@@ -96,7 +97,7 @@ export default function HodComplaints() {
           page: requestedPage,
           limit: LIMIT,
           bucket: "open",
-          search: searchQuery.trim() || undefined,
+          search: debouncedSearchQuery.trim() || undefined,
           priority: priorityFilter !== "all" ? priorityFilter : undefined,
           sort: sortOrder,
           startDate: startDate || undefined,
@@ -127,9 +128,18 @@ export default function HodComplaints() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  };
+  }, [
+    complaints.length,
+    debouncedSearchQuery,
+    endDate,
+    priorityFilter,
+    sortOrder,
+    startDate,
+    statusFilter,
+    t,
+  ]);
 
-  const loadWorkers = async () => {
+  const loadWorkers = useCallback(async () => {
     try {
       const res = await apiCall({
         method: "GET",
@@ -145,13 +155,28 @@ export default function HodComplaints() {
         text2: t("hod.complaints.couldNotLoadWorkers"),
       });
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     load(false);
     loadWorkers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter, priorityFilter, sortOrder, startDate, endDate]);
+  }, [
+    load,
+    loadWorkers,
+    debouncedSearchQuery,
+    statusFilter,
+    priorityFilter,
+    sortOrder,
+    startDate,
+    endDate,
+  ]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load(false, 1);
+      loadWorkers();
+    }, [load, loadWorkers]),
+  );
 
   const toggleSelectMode = () => {
     setSelectMode(!selectMode);
@@ -234,6 +259,12 @@ export default function HodComplaints() {
 
   const onRefresh = () => {
     load(true);
+  };
+
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore && !loading && !refreshing) {
+      load(false, page + 1);
+    }
   };
 
   const renderComplaintItem = ({ item }) => {
@@ -487,34 +518,14 @@ export default function HodComplaints() {
           </View>
         }
         ListFooterComponent={
-          hasMore ? (
-            <TouchableOpacity
-              onPress={() => load(false, page + 1)}
-              disabled={loadingMore}
-              className="mt-2 rounded-xl items-center justify-center py-3"
-              style={{
-                backgroundColor: colors.backgroundSecondary,
-                borderWidth: 1,
-                borderColor: colors.border,
-                opacity: loadingMore ? 0.6 : 1,
-              }}
-            >
-              {loadingMore ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <View className="flex-row items-center" style={{ gap: 6 }}>
-                  <ChevronDown size={14} color={colors.textSecondary} />
-                  <Text
-                    className="text-sm font-semibold"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {t("common.loadMore")}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+          loadingMore ? (
+            <View className="py-4">
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
           ) : null
         }
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.35}
       />
 
       {/* Bulk Assign Modal */}

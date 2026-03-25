@@ -70,13 +70,13 @@ export function openNotificationRoute(data = {}, navigation = router) {
       return true;
     case NOTIFICATION_ROUTE_SCREENS.AI_REVIEW:
       navigation.push({
-        pathname: "/(app)/hod/ai-review",
+        pathname: "/hod/ai-review",
       });
       return true;
     case NOTIFICATION_ROUTE_SCREENS.WORKER_ASSIGNMENT:
       if (!route.params?.complaintId) return false;
       navigation.push({
-        pathname: "/(app)/hod/worker-assignment",
+        pathname: "/hod/worker-assignment",
         params: { complaintId: route.params.complaintId },
       });
       return true;

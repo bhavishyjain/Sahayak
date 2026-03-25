@@ -7,11 +7,13 @@ import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../colors";
 import { useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
+import * as SystemUI from "expo-system-ui";
 import {
   initializePushNotifications,
   registerPushToken,
 } from "../utils/pushToken";
 import { openNotificationRoute } from "../utils/notificationNavigation";
+import { prepareReportsStorage } from "../utils/hooks/useReports";
 import RealtimeBridge from "../components/RealtimeBridge";
 import "../global.css";
 import "../utils/i18n/config";
@@ -41,8 +43,13 @@ function RootNavigator() {
   const lastHandledNotificationId = useRef(null);
 
   useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.backgroundPrimary).catch(() => {});
+  }, [colors.backgroundPrimary]);
+
+  useEffect(() => {
     initializePushNotifications().catch(() => {});
     registerPushToken().catch(() => {});
+    prepareReportsStorage().catch(() => {});
 
     const handleNotificationOpen = (response) => {
       const notificationId = response?.notification?.request?.identifier;

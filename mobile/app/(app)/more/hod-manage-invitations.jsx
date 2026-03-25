@@ -77,12 +77,27 @@ function InvitationCard({ item, colors, t, locale, onRevoke }) {
   const statusConfig = getStatusConfig(t, colors);
   const cfg = statusConfig[item.status] ?? statusConfig.pending;
   const { Icon } = cfg;
-  const canRevoke = item.status === "pending";
+  const canRevoke = item.status === "pending" && item.canRevoke !== false;
   const invitationEmail =
     item.email ?? t("more.manageInvitations.emailUnavailable");
   const sentDate = formatDate(item.sentAt, locale, t);
   const expiresDate = formatDate(item.expiresAt, locale, t);
   const acceptedDate = formatDate(item.acceptedAt, locale, t);
+  const invitedByRole = String(item?.invitedBy?.role || "").toLowerCase();
+  const invitedByName =
+    item?.invitedBy?.fullName || item?.invitedBy?.username || null;
+  const createdByLabel =
+    invitedByRole === "admin"
+      ? t("more.manageInvitations.meta.createdByAdmin")
+      : invitedByRole === "head"
+        ? t("more.manageInvitations.meta.createdByHead", {
+            name: invitedByName ?? t("more.manageInvitations.notAvailable"),
+          })
+        : invitedByName
+          ? t("more.manageInvitations.meta.createdByName", {
+              name: invitedByName,
+            })
+          : null;
 
   return (
     <Card style={{ margin: 0, marginBottom: 10, flex: 0 }}>
@@ -112,6 +127,14 @@ function InvitationCard({ item, colors, t, locale, onRevoke }) {
                   {t("more.manageInvitations.meta.sent", { date: sentDate })}
                 </Text>
               </View>
+              {createdByLabel ? (
+                <Text
+                  className="text-xs mt-1"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {createdByLabel}
+                </Text>
+              ) : null}
               {canRevoke && (
                 <View className="flex-row items-center mt-1">
                   <Calendar size={11} color={colors.textSecondary} />

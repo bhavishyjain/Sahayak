@@ -89,7 +89,8 @@ function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function buildUserPayload(user) {  const payload = {
+function buildUserPayload(user) {
+  const payload = {
     id: user._id,
     username: user.username,
     role: user.role,
@@ -98,6 +99,7 @@ function buildUserPayload(user) {  const payload = {
     phone: user.phone,
     department: user.department,
     preferredLanguage: user.preferredLanguage || "en",
+    isActive: user.isActive !== false,
   };
 
   if (user.role === "worker") {

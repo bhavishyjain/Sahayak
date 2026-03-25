@@ -22,7 +22,7 @@
         "NSPhotoLibraryUsageDescription": "We need photo library access so you can attach photos of civic issues and complaints when reporting problems to municipal authorities.",
         "NSMicrophoneUsageDescription": "Microphone access is required by certain libraries in the application. However, we do not use the microphone for any features in our app, and we do not access or collect any audio data from users."
       },
-      "associatedDomains": [],
+      "associatedDomains": ["applinks:sahayak.app"],
       "appleTeamId": "ZLV8X465V5"
     },
     "android": {
@@ -46,6 +46,7 @@
       },
       "intentFilters": [
         {
+          "autoVerify": true,
           "action": "VIEW",
           "category": ["DEFAULT", "BROWSABLE"],
           "data": [

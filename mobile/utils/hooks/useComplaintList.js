@@ -63,6 +63,7 @@ export default function useComplaintList({
     queryKey: queryKeys.complaintList(scope, baseParams),
     enabled,
     staleTime,
+    placeholderData: (previousData) => previousData,
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const response = await apiCall({

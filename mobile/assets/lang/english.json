@@ -248,6 +248,13 @@
       "locationFallback": "Nearby",
       "empty": "No nearby complaints found.",
       "upvoteFailed": "Failed to upvote"
+    },
+    "feedback": {
+      "title": "Give Feedback",
+      "reload": "Reload",
+      "action": "Give Feedback",
+      "emptyTitle": "No feedback pending",
+      "emptySubtitle": "Resolved complaints that still need your rating will appear here."
     }
   },
   "complaints": {
@@ -833,10 +840,13 @@
       },
       "labels": {
         "task": "Task: %{value}",
-        "notes": "Notes: %{value}"
+        "notes": "Notes: %{value}",
+        "leader": "Leader",
+        "selectedLeader": "Leader selected"
       },
       "actions": {
         "addWorkers": "Add Workers",
+        "makeLeader": "Make Leader",
         "updateTask": "Update Task",
         "remove": "Remove",
         "cancel": "Cancel",
@@ -876,6 +886,10 @@
         "removeSuccessTitle": "Worker removed",
         "removeFailedTitle": "Remove failed",
         "removeFailedMessage": "Could not remove worker",
+        "leaderUpdatedTitle": "Leader updated",
+        "leaderUpdatedMessage": "%{name} is now the leader",
+        "leaderUpdatedFailedTitle": "Leader update failed",
+        "leaderUpdatedFailedMessage": "Could not update complaint leader",
         "updateSuccessTitle": "Task updated",
         "updateSuccessMessage": "%{name}'s task has been updated",
         "updateFailedTitle": "Update failed",
@@ -1559,7 +1573,10 @@
         "meta": {
           "sent": "Sent %{date}",
           "expires": "Expires %{date}",
-          "joined": "Joined %{date}"
+          "joined": "Joined %{date}",
+          "createdByAdmin": "Created by: Admin",
+          "createdByHead": "Created by: %{name}",
+          "createdByName": "Created by: %{name}"
         },
         "form": {
           "title": "Invite New Worker",
@@ -1637,7 +1654,10 @@
       "meta": {
         "sent": "Sent %{date}",
         "expires": "Expires %{date}",
-        "joined": "Joined %{date}"
+        "joined": "Joined %{date}",
+        "createdByAdmin": "Created by: Admin",
+        "createdByHead": "Created by: %{name}",
+        "createdByName": "Created by: %{name}"
       },
       "form": {
         "title": "Invite New Worker",

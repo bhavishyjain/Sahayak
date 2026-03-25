@@ -3,6 +3,7 @@ const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const { assertDepartmentExists } = require("../../services/departmentService");
+const { emitComplaintUpdated } = require("../../services/realtimeService");
 
 exports.listDeletedComplaints = asyncHandler(async (req, res) => {
   const { department, page = 1, limit = 20 } = req.query;
@@ -165,6 +166,15 @@ exports.updateComplaintByAdmin = asyncHandler(async (req, res) => {
     note: `Complaint edited by admin - ${changeNotes.join(" and ")}`,
   });
   await complaint.save();
+  await emitComplaintUpdated({
+    complaint,
+    actorId: req.user?._id || req.user?.userId || null,
+    event: "complaint-updated-by-admin",
+    extra: {
+      departmentChanged: department !== undefined,
+      priorityChanged: priority !== undefined,
+    },
+  });
 
   sendSuccess(res, { data: complaint }, "Complaint updated successfully");
 });

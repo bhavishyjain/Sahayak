@@ -19,6 +19,7 @@ import { HOD_OVERVIEW_URL } from "../../../url";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
 
 export default function HodResolvedComplaints() {
   const { t } = useTranslation();
@@ -30,6 +31,7 @@ export default function HodResolvedComplaints() {
   const [refreshing, setRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
@@ -41,7 +43,7 @@ export default function HodResolvedComplaints() {
     try {
       if (isRefresh) setRefreshing(true);
       else if (requestedPage > 1) setLoadingMore(true);
-      else setLoading(true);
+      else if (complaints.length === 0) setLoading(true);
 
       const res = await apiCall({
         method: "GET",
@@ -50,7 +52,7 @@ export default function HodResolvedComplaints() {
           page: requestedPage,
           limit: LIMIT,
           bucket: "resolved",
-          search: searchQuery.trim() || undefined,
+          search: debouncedSearchQuery.trim() || undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
         },
@@ -79,7 +81,7 @@ export default function HodResolvedComplaints() {
   useEffect(() => {
     load(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, startDate, endDate]);
+  }, [debouncedSearchQuery, startDate, endDate]);
 
   const renderItem = ({ item }) => (
     <ComplaintCard

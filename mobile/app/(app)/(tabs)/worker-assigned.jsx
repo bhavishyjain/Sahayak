@@ -18,6 +18,7 @@ import FilterPanel from "../../../components/FilterPanel";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
 import {
   formatPriorityLabel,
 } from "../../../data/complaintStatus";
@@ -35,6 +36,7 @@ export default function WorkerAssigned() {
   const [selectedPriority, setSelectedPriority] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const {
     complaints,
     isLoading: loading,
@@ -45,7 +47,7 @@ export default function WorkerAssigned() {
     refresh,
     error,
   } = useWorkerAssignedList({
-    search: searchQuery,
+    search: debouncedSearchQuery,
     startDate,
     endDate,
     priority: selectedPriority,
@@ -83,6 +85,7 @@ export default function WorkerAssigned() {
     sortOrder !== "old-to-new",
     selectedPriority !== "all",
     selectedStatus !== "all",
+    Boolean(searchQuery.trim()),
   ].some(Boolean);
 
   if (loading) {
@@ -128,47 +131,32 @@ export default function WorkerAssigned() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* Search + Filter row */}
-        {complaints.length > 0 && (
-          <View className="mt-4 flex-row items-center" style={{ gap: 10 }}>
-            <View className="flex-1">
-              <SearchBar
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder={t("worker.assigned.searchPlaceholder")}
-              />
-            </View>
-            <FilterPanel
-              variant="icon"
-              statusFilter={selectedStatus}
-              setStatusFilter={setSelectedStatus}
-              priorityFilter={selectedPriority}
-              setPriorityFilter={setSelectedPriority}
-              sortOrder={sortOrder}
-              setSortOrder={setSortOrder}
-              startDate={startDate}
-              endDate={endDate}
-              setStartDate={setStartDate}
-              setEndDate={setEndDate}
-              hasActiveFilters={hasActiveFilters}
-              onClearFilters={clearFilters}
-              t={t}
-              formatPriorityLabel={formatPriorityLabel}
+        <View className="mt-4 flex-row items-center" style={{ gap: 10 }}>
+          <View className="flex-1">
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t("worker.assigned.searchPlaceholder")}
             />
           </View>
-        )}
-
-        {/* Active count chip */}
-        {complaints.length > 0 && (
-          <View className="mb-4 flex-row items-center" style={{ gap: 6 }}>
-            <Text className="text-xs" style={{ color: colors.textSecondary }}>
-              {t("worker.assigned.showingResults", {
-                count: complaints.length,
-                filtered: complaints.length,
-                total: complaints.length,
-              })}
-            </Text>
-          </View>
-        )}
+          <FilterPanel
+            variant="icon"
+            statusFilter={selectedStatus}
+            setStatusFilter={setSelectedStatus}
+            priorityFilter={selectedPriority}
+            setPriorityFilter={setSelectedPriority}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            startDate={startDate}
+            endDate={endDate}
+            setStartDate={setStartDate}
+            setEndDate={setEndDate}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+            t={t}
+            formatPriorityLabel={formatPriorityLabel}
+          />
+        </View>
 
         {complaints.length === 0 ? (
           <Card style={{ margin: 0, marginTop: 12 }}>

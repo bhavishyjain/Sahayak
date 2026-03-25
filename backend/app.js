@@ -72,6 +72,51 @@ app.use(cookieParser());
 // Strip MongoDB operators ($, .) from user-supplied query/body keys
 app.use(mongoSanitize());
 
+app.get("/.well-known/apple-app-site-association", (_req, res) => {
+  const iosAppId =
+    process.env.IOS_APP_APPLE_ID || "ZLV8X465V5.com.sahayak.mobile";
+
+  res.setHeader("Content-Type", "application/json");
+  res.send({
+    applinks: {
+      apps: [],
+      details: [
+        {
+          appIDs: [iosAppId],
+          paths: [
+            "/accept-invite",
+            "/verify-email",
+            "/reset-password",
+            "/complaints/complaint-details",
+          ],
+        },
+      ],
+    },
+  });
+});
+
+app.get("/.well-known/assetlinks.json", (_req, res) => {
+  const packageName = process.env.ANDROID_APP_PACKAGE || "com.sahayak.mobile";
+  const fingerprints = String(
+    process.env.ANDROID_APP_SHA256_CERT_FINGERPRINTS || "",
+  )
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  res.setHeader("Content-Type", "application/json");
+  res.send(
+    fingerprints.map((fingerprint) => ({
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: packageName,
+        sha256_cert_fingerprints: [fingerprint],
+      },
+    })),
+  );
+});
+
 app.get("/ping", (_req, res) => res.status(200).send("pong"));
 
 app.use("/api", require("./routes"));

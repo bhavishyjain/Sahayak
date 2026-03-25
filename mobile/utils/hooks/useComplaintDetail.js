@@ -7,16 +7,20 @@ import { queryKeys } from "../queryKeys";
 import getUserAuth from "../userAuth";
 
 export function useComplaintDetail(complaintId) {
+  const normalizedComplaintId = Array.isArray(complaintId)
+    ? String(complaintId[0] || "").trim()
+    : String(complaintId || "").trim();
+
   return useQuery({
-    queryKey: queryKeys.complaintDetail(complaintId),
-    enabled: Boolean(complaintId),
+    queryKey: queryKeys.complaintDetail(normalizedComplaintId),
+    enabled: Boolean(normalizedComplaintId),
     staleTime: 15 * 1000,
     retry: 1,
     queryFn: async () => {
       const [response, user] = await Promise.all([
         apiCall({
           method: "GET",
-          url: GET_COMPLAINT_BY_ID_URL(complaintId),
+          url: GET_COMPLAINT_BY_ID_URL(normalizedComplaintId),
         }),
         getUserAuth(),
       ]);
@@ -25,7 +29,7 @@ export function useComplaintDetail(complaintId) {
         response?.data?.complaint ?? null,
       );
       if (complaint) {
-        await cacheComplaintDetail(complaintId, complaint);
+        await cacheComplaintDetail(normalizedComplaintId, complaint);
       }
 
       return {

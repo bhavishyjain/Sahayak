@@ -6,6 +6,7 @@ const {
   buildComplaintListQuery,
   normalizeComplaintSort,
   parsePagination,
+  normalizeStatusFilter,
 } = require("./complaintQueryService");
 
 const COMPLAINT_POPULATION_PRESETS = Object.freeze({
@@ -286,6 +287,104 @@ async function listComplaints(options = {}) {
   });
 }
 
+async function listOwnerComplaintsWithDeleted(options = {}) {
+  const {
+    baseQuery = {},
+    actorRole,
+    actorId,
+    actorDepartment,
+    scope,
+    status,
+    excludeStatus,
+    department,
+    priority,
+    startDate,
+    endDate,
+    search,
+    ticketId,
+    dateField = "createdAt",
+    validateDepartment = false,
+    validatePriority = false,
+    includeAssignment = true,
+    currentUserId,
+    page: providedPage,
+    limit: providedLimit,
+    sort = "new-to-old",
+    populate = [],
+  } = options;
+
+  const query = await buildRoleAwareComplaintListQuery(baseQuery, {
+    actorRole,
+    actorId,
+    actorDepartment,
+    scope,
+    status: undefined,
+    excludeStatus: undefined,
+    department,
+    priority,
+    startDate,
+    endDate,
+    search,
+    ticketId,
+    dateField,
+    validateDepartment,
+    validatePriority,
+  });
+
+  const page = Math.max(Number(providedPage) || 1, 1);
+  const limit = Math.min(Math.max(Number(providedLimit) || 20, 1), 100);
+  const requestedStatus = normalizeStatusFilter(status);
+  const excludedStatuses = String(excludeStatus || "")
+    .split(",")
+    .map((item) => normalizeStatusFilter(item))
+    .filter(Boolean);
+
+  let complaintQuery = Complaint.find(query)
+    .setOptions({ withDeleted: true })
+    .sort(normalizeComplaintSort(sort, { createdAt: -1 }));
+
+  resolvePopulationEntries(populate).forEach((entry) => {
+    complaintQuery = complaintQuery.populate(entry);
+  });
+
+  const rows = await complaintQuery;
+  const views = rows.map((complaint) =>
+    buildComplaintView(complaint, {
+      includeAssignment,
+      currentUserId,
+      treatDeletedAsResolved: true,
+    }),
+  );
+
+  const filteredItems = views.filter((complaint) => {
+    const complaintStatus = String(complaint?.status || "").toLowerCase();
+    if (requestedStatus && complaintStatus !== requestedStatus) {
+      return false;
+    }
+    if (excludedStatuses.length > 0 && excludedStatuses.includes(complaintStatus)) {
+      return false;
+    }
+    return true;
+  });
+
+  const startIndex = (page - 1) * limit;
+  const items = filteredItems.slice(startIndex, startIndex + limit);
+
+  return {
+    items,
+    total: filteredItems.length,
+    page,
+    limit,
+    payload: buildListPayload({
+      items,
+      itemKey: "complaints",
+      page,
+      limit,
+      total: filteredItems.length,
+    }),
+  };
+}
+
 module.exports = {
   COMPLAINT_POPULATION_PRESETS,
   applyActorComplaintScope,
@@ -294,4 +393,5 @@ module.exports = {
   buildRoleAwareComplaintListQuery,
   executeComplaintListQuery,
   listComplaints,
+  listOwnerComplaintsWithDeleted,
 };

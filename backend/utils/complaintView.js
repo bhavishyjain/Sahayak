@@ -17,7 +17,12 @@ function buildComplaintView(complaint, options = {}) {
   const includeAssignment =
     options.includeAssignment === undefined ? true : options.includeAssignment;
   const viewerId = options.currentUserId ? String(options.currentUserId) : null;
-  const normalizedStatus = normalizeComplaintStatus(complaint.status);
+  const originalStatus = normalizeComplaintStatus(complaint.status);
+  const shouldTreatDeletedAsResolved =
+    options.treatDeletedAsResolved === true && complaint?.deleted === true;
+  const normalizedStatus = shouldTreatDeletedAsResolved
+    ? "resolved"
+    : originalStatus;
   const isTerminalStatus = ["resolved", "cancelled", "needs-rework"].includes(
     normalizedStatus,
   );
@@ -61,6 +66,9 @@ function buildComplaintView(complaint, options = {}) {
     department: complaint.department,
     priority: complaint.priority,
     status: normalizedStatus,
+    originalStatus,
+    deleted: Boolean(complaint.deleted),
+    deletedAt: complaint.deletedAt || null,
     locationName: complaint.locationName,
     coordinates: complaint.coordinates,
     proofImage: complaint.proofImage,

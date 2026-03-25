@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Toast from "react-native-toast-message";
 import apiCall from "../api";
@@ -23,10 +24,42 @@ function getWorkerName(worker, t) {
   );
 }
 
+function normalizeLeaderId(value) {
+  return String(value || "").trim();
+}
+
+function buildAssignmentPayload({
+  existingWorkers = [],
+  newWorkerIds = [],
+  taskDescs = {},
+  selectedLeaderId = "",
+}) {
+  const normalizedSelectedLeaderId = normalizeLeaderId(selectedLeaderId);
+  const currentLeaderId =
+    existingWorkers.find((worker) => worker?.isLeader)?.workerId ?? "";
+  const fallbackLeaderId =
+    currentLeaderId || String(newWorkerIds[0] || "").trim() || "";
+  const leaderId = normalizedSelectedLeaderId || fallbackLeaderId;
+
+  const existingPayload = existingWorkers.map((worker) => ({
+    workerId: worker.workerId,
+    taskDescription: worker.taskDescription ?? "",
+    isLeader: worker.workerId === leaderId,
+  }));
+
+  const newPayload = newWorkerIds.map((id) => ({
+    workerId: id,
+    taskDescription: taskDescs[id] ?? "",
+    isLeader: String(id) === leaderId,
+  }));
+
+  return [...existingPayload, ...newPayload];
+}
+
 export function useHodWorkerAssignment(complaintId, t) {
   const queryClient = useQueryClient();
 
-  const refetchAssignment = async () => {
+  const refetchAssignment = useCallback(async () => {
     const [complainRes, workersRes, allWorkersRes] = await Promise.all([
       queryClient.fetchQuery({
         queryKey: [...queryKeys.hodWorkerAssignment(complaintId), "complaint"],
@@ -61,121 +94,174 @@ export function useHodWorkerAssignment(complaintId, t) {
       })),
       allWorkers: allWorkersRes?.data?.workers ?? [],
     };
-  };
+  }, [complaintId, queryClient, t]);
 
   const assignMutation = useApiMutation({ method: "POST" });
   const updateTaskMutation = useApiMutation({ method: "PUT" });
 
-  const assignWorkers = async ({ selectedWorkerIds, assignedWorkers, taskDescs }) => {
-    if (selectedWorkerIds.size === 0) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.selectWorker"),
-      });
-      return false;
-    }
+  const assignWorkers = useCallback(
+    async ({
+      selectedWorkerIds,
+      assignedWorkers,
+      taskDescs,
+      selectedLeaderId,
+    }) => {
+      if (selectedWorkerIds.size === 0) {
+        Toast.show({
+          type: "error",
+          text1: t("hod.workerAssignment.toasts.selectWorker"),
+        });
+        return false;
+      }
 
-    const existingWorkers = assignedWorkers.map((w) => ({
-      workerId: w.workerId,
-      taskDescription: w.taskDescription ?? "",
-    }));
-    const newWorkers = [...selectedWorkerIds].map((id) => ({
-      workerId: id,
-      taskDescription: taskDescs[id] ?? "",
-    }));
+      try {
+        await assignMutation.mutateAsync({
+          urlOverride: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
+          data: {
+            workers: buildAssignmentPayload({
+              existingWorkers: assignedWorkers,
+              newWorkerIds: [...selectedWorkerIds],
+              taskDescs,
+              selectedLeaderId,
+            }),
+          },
+        });
+        Toast.show({
+          type: "success",
+          text1: t("hod.workerAssignment.toasts.assignSuccessTitle"),
+          text2: t("hod.workerAssignment.toasts.assignSuccessMessage", {
+            count: selectedWorkerIds.size,
+            plural: selectedWorkerIds.size > 1 ? "s" : "",
+          }),
+        });
+        await invalidateComplaintQueries(queryClient, { complaintId });
+        return true;
+      } catch (e) {
+        Toast.show({
+          type: "error",
+          text1: t("hod.workerAssignment.toasts.assignFailedTitle"),
+          text2:
+            e?.response?.data?.message ??
+            t("hod.workerAssignment.toasts.assignFailedMessage"),
+        });
+        return false;
+      }
+    },
+    [assignMutation, complaintId, queryClient, t],
+  );
 
-    try {
-      await assignMutation.mutateAsync({
-        urlOverride: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
-        data: { workers: [...existingWorkers, ...newWorkers] },
-      });
-      Toast.show({
-        type: "success",
-        text1: t("hod.workerAssignment.toasts.assignSuccessTitle"),
-        text2: t("hod.workerAssignment.toasts.assignSuccessMessage", {
-          count: selectedWorkerIds.size,
-          plural: selectedWorkerIds.size > 1 ? "s" : "",
-        }),
-      });
-      await invalidateComplaintQueries(queryClient, { complaintId });
-      return true;
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.assignFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("hod.workerAssignment.toasts.assignFailedMessage"),
-      });
-      return false;
-    }
-  };
+  const removeWorker = useCallback(
+    async ({ removeTarget, assignedWorkers }) => {
+      if (!removeTarget?.workerId) return false;
+      const remainingWorkers = assignedWorkers.filter(
+        (w) => w.workerId !== removeTarget.workerId,
+      );
 
-  const removeWorker = async ({ removeTarget, assignedWorkers }) => {
-    if (!removeTarget?.workerId) return false;
-    const remaining = assignedWorkers
-      .filter((w) => w.workerId !== removeTarget.workerId)
-      .map((w) => ({
-        workerId: w.workerId,
-        taskDescription: w.taskDescription ?? "",
-      }));
+      try {
+        await assignMutation.mutateAsync({
+          urlOverride: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
+          data: {
+            workers: buildAssignmentPayload({
+              existingWorkers: remainingWorkers,
+            }),
+          },
+        });
+        Toast.show({
+          type: "success",
+          text1: t("hod.workerAssignment.toasts.removeSuccessTitle"),
+        });
+        await invalidateComplaintQueries(queryClient, { complaintId });
+        return true;
+      } catch (e) {
+        Toast.show({
+          type: "error",
+          text1: t("hod.workerAssignment.toasts.removeFailedTitle"),
+          text2:
+            e?.response?.data?.message ??
+            t("hod.workerAssignment.toasts.removeFailedMessage"),
+        });
+        return false;
+      }
+    },
+    [assignMutation, complaintId, queryClient, t],
+  );
 
-    try {
-      await assignMutation.mutateAsync({
-        urlOverride: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
-        data: { workers: remaining },
-      });
-      Toast.show({
-        type: "success",
-        text1: t("hod.workerAssignment.toasts.removeSuccessTitle"),
-      });
-      await invalidateComplaintQueries(queryClient, { complaintId });
-      return true;
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.removeFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("hod.workerAssignment.toasts.removeFailedMessage"),
-      });
-      return false;
-    }
-  };
+  const updateTask = useCallback(
+    async ({ workerId, taskDescription, workerName }) => {
+      if (!workerId) return false;
+      try {
+        await updateTaskMutation.mutateAsync({
+          urlOverride: HOD_UPDATE_WORKER_TASK_URL(complaintId, workerId),
+          data: { taskDescription },
+        });
+        Toast.show({
+          type: "success",
+          text1: t("hod.workerAssignment.toasts.updateSuccessTitle"),
+          text2: t("hod.workerAssignment.toasts.updateSuccessMessage", {
+            name: workerName,
+          }),
+        });
+        await invalidateComplaintQueries(queryClient, { complaintId });
+        return true;
+      } catch (e) {
+        Toast.show({
+          type: "error",
+          text1: t("hod.workerAssignment.toasts.updateFailedTitle"),
+          text2:
+            e?.response?.data?.message ??
+            t("hod.workerAssignment.toasts.updateFailedMessage"),
+        });
+        return false;
+      }
+    },
+    [complaintId, queryClient, t, updateTaskMutation],
+  );
 
-  const updateTask = async ({ workerId, taskDescription, workerName }) => {
-    if (!workerId) return false;
-    try {
-      await updateTaskMutation.mutateAsync({
-        urlOverride: HOD_UPDATE_WORKER_TASK_URL(complaintId, workerId),
-        data: { taskDescription },
-      });
-      Toast.show({
-        type: "success",
-        text1: t("hod.workerAssignment.toasts.updateSuccessTitle"),
-        text2: t("hod.workerAssignment.toasts.updateSuccessMessage", {
-          name: workerName,
-        }),
-      });
-      await invalidateComplaintQueries(queryClient, { complaintId });
-      return true;
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: t("hod.workerAssignment.toasts.updateFailedTitle"),
-        text2:
-          e?.response?.data?.message ??
-          t("hod.workerAssignment.toasts.updateFailedMessage"),
-      });
-      return false;
-    }
-  };
+  const setLeader = useCallback(
+    async ({ workerId, assignedWorkers, workerName }) => {
+      if (!workerId || !Array.isArray(assignedWorkers) || assignedWorkers.length === 0) {
+        return false;
+      }
+
+      try {
+        await assignMutation.mutateAsync({
+          urlOverride: HOD_ASSIGN_MULTIPLE_WORKERS_URL(complaintId),
+          data: {
+            workers: buildAssignmentPayload({
+              existingWorkers: assignedWorkers,
+              selectedLeaderId: workerId,
+            }),
+          },
+        });
+        Toast.show({
+          type: "success",
+          text1: t("hod.workerAssignment.toasts.leaderUpdatedTitle"),
+          text2: t("hod.workerAssignment.toasts.leaderUpdatedMessage", {
+            name: workerName,
+          }),
+        });
+        await invalidateComplaintQueries(queryClient, { complaintId });
+        return true;
+      } catch (e) {
+        Toast.show({
+          type: "error",
+          text1: t("hod.workerAssignment.toasts.leaderUpdatedFailedTitle"),
+          text2:
+            e?.response?.data?.message ??
+            t("hod.workerAssignment.toasts.leaderUpdatedFailedMessage"),
+        });
+        return false;
+      }
+    },
+    [assignMutation, complaintId, queryClient, t],
+  );
 
   return {
     refetchAssignment,
     assignWorkers,
     removeWorker,
     updateTask,
+    setLeader,
     assigning: assignMutation.isPending,
     updatingTask: updateTaskMutation.isPending,
   };

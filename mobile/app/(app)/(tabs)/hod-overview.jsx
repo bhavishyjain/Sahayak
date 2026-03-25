@@ -1,3 +1,4 @@
+import { useFocusEffect } from "expo-router";
 import {
   Activity,
   AlertTriangle,
@@ -12,7 +13,7 @@ import {
   Users,
   X,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -133,6 +134,12 @@ export default function HodOverview() {
       text2: t("toast.error.loadFailed"),
     });
   }, [error, t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
 
   const completionRate = useMemo(() => {
     if (!stats?.total) return 0;
@@ -374,7 +381,7 @@ export default function HodOverview() {
         <MetricRow
           icon={AlertTriangle}
           label="Needs rework"
-          value={Number(stats?.needsRework)}
+          value={Number(stats?.needsRework || 0)}
           tone={reworkColor}
           colors={colors}
         />

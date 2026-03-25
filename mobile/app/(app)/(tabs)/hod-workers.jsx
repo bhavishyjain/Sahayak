@@ -16,6 +16,7 @@ import PressableBlock from "../../../components/PressableBlock";
 import SearchBar from "../../../components/SearchBar";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
 import { useHodWorkersList } from "../../../utils/hooks/useHodWorkersList";
 
 export default function HodWorkersTab() {
@@ -25,6 +26,7 @@ export default function HodWorkersTab() {
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const {
     workers,
     isLoading: loading,
@@ -34,7 +36,7 @@ export default function HodWorkersTab() {
     loadMore,
     refresh,
     error,
-  } = useHodWorkersList({ search: searchQuery, limit: 20 });
+  } = useHodWorkersList({ search: debouncedSearchQuery, limit: 20 });
 
   useEffect(() => {
     if (!error) return;
@@ -152,6 +154,27 @@ export default function HodWorkersTab() {
                         {worker.email}
                       </Text>
                     </View>
+                  </View>
+                  <View
+                    className="px-2.5 py-1 rounded-full ml-3"
+                    style={{
+                      backgroundColor:
+                        worker.isActive === false
+                          ? colors.danger + "18"
+                          : colors.success + "18",
+                    }}
+                  >
+                    <Text
+                      className="text-[11px] font-semibold"
+                      style={{
+                        color:
+                          worker.isActive === false
+                            ? colors.danger
+                            : colors.success,
+                      }}
+                    >
+                      {worker.isActive === false ? "Inactive" : "Active"}
+                    </Text>
                   </View>
                 </View>
 

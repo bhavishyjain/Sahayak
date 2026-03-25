@@ -1,4 +1,5 @@
 const User = require("../../models/User");
+const Complaint = require("../../models/Complaint");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
@@ -8,9 +9,98 @@ const {
   getWorkerMetrics,
   calculateWorkerPerformanceScore,
 } = require("../../services/workerMetricsService");
+const {
+  buildNotificationPayload,
+  persistNotification,
+} = require("../../services/notificationDomainService");
+const {
+  ACTIVE_COMPLAINT_STATUSES,
+  NOTIFICATION_TYPES,
+} = require("../../domain/constants");
+const { emitComplaintUpdated } = require("../../services/realtimeService");
 
 // admin cannot escalate anyone to admin via this endpoint
 const ASSIGNABLE_ROLES = ["user", "worker", "head"];
+
+async function notifyDepartmentHeadsAboutMemberStatusChange(user, isActive) {
+  if (!user?.department || !["worker", "head"].includes(user.role)) {
+    return;
+  }
+
+  const recipients = await User.find({
+    role: "head",
+    department: user.department,
+    isActive: true,
+    _id: { $ne: user._id },
+  }).select("_id");
+
+  if (!recipients.length) {
+    return;
+  }
+
+  const displayName = user.fullName || user.username || "A team member";
+  const statusLabel = isActive ? "reactivated" : "deactivated";
+  const payload = buildNotificationPayload({
+    title: `${displayName} ${statusLabel}`,
+    body: `${displayName} has been ${statusLabel} by admin in ${user.department} Department.`,
+    data: {
+      type: NOTIFICATION_TYPES.SYSTEM,
+    },
+  });
+
+  await Promise.all(
+    recipients.map((recipient) => persistNotification(recipient._id, payload)),
+  );
+}
+
+async function releaseWorkerComplaintsForReassignment(worker, actorId) {
+  if (!worker?._id || worker.role !== "worker") {
+    return 0;
+  }
+
+  const activeComplaints = await Complaint.find({
+    "assignedWorkers.workerId": worker._id,
+    status: { $in: ACTIVE_COMPLAINT_STATUSES },
+  }).select(
+    "_id ticketId status assignedWorkers department updatedAt history assignedAt assignedBy estimatedCompletionTime resolvedAt",
+  );
+
+  if (activeComplaints.length === 0) {
+    return 0;
+  }
+
+  const now = new Date();
+  const workerName = worker.fullName || worker.username || "Worker";
+
+  await Promise.all(
+    activeComplaints.map(async (complaint) => {
+      complaint.assignedWorkers = [];
+      complaint.status = "pending";
+      complaint.assignedAt = null;
+      complaint.assignedBy = null;
+      complaint.estimatedCompletionTime = undefined;
+      complaint.resolvedAt = null;
+      complaint.history.push({
+        status: "pending",
+        updatedBy: actorId,
+        timestamp: now,
+        note: `${workerName} was deactivated by admin. Complaint moved back to pending for reassignment.`,
+      });
+      await complaint.save();
+      await emitComplaintUpdated({
+        complaint,
+        actorId,
+        event: "worker-deactivated-reassignment",
+        extra: {
+          reason: "worker-deactivated",
+          requiresReassignment: true,
+        },
+      });
+    }),
+  );
+
+  return activeComplaints.length;
+}
 
 exports.listUsers = asyncHandler(async (req, res) => {
   const { role, department, includeStats = "false" } = req.query;
@@ -103,7 +193,9 @@ exports.updateUser = asyncHandler(async (req, res) => {
   if (phone !== undefined) update.phone = phone;
   if (typeof isActive === "boolean") update.isActive = isActive;
 
-  const existingUser = await User.findById(req.params.id).select("role department");
+  const existingUser = await User.findById(req.params.id).select(
+    "role department isActive fullName username",
+  );
   if (!existingUser) throw new AppError("User not found", 404);
 
   const nextRole = role !== undefined ? role : existingUser.role;
@@ -120,6 +212,19 @@ exports.updateUser = asyncHandler(async (req, res) => {
     new: true,
     runValidators: true,
   }).select("-password");
+
+  if (
+    typeof isActive === "boolean" &&
+    existingUser.isActive !== isActive
+  ) {
+    if (existingUser.role === "worker" && isActive === false) {
+      await releaseWorkerComplaintsForReassignment(
+        existingUser,
+        req.user?._id || req.user?.userId || null,
+      );
+    }
+    await notifyDepartmentHeadsAboutMemberStatusChange(user, isActive);
+  }
 
   return sendSuccess(res, { data: user }, "User updated successfully");
 });

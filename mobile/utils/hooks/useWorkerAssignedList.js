@@ -25,6 +25,7 @@ export function useWorkerAssignedList(filters = {}) {
 
   const query = useInfiniteQuery({
     queryKey: ["worker-assigned-list", baseParams],
+    placeholderData: (previousData) => previousData,
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const response = await apiCall({

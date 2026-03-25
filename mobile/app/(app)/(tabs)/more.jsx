@@ -1,6 +1,6 @@
 import * as Clarity from "@microsoft/react-native-clarity";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import {
   BarChart2,
   Bell,
@@ -143,18 +143,26 @@ export default function More() {
 
   const CLARITY_CONSENT_KEY = "clarity_analytics_consent";
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const authUser = await getUserAuth();
-        setUser(authUser);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+  const loadUser = React.useCallback(async () => {
+    try {
+      const authUser = await getUserAuth();
+      setUser(authUser);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUser();
+    }, [loadUser]),
+  );
 
   const toggleConsent = async (bool) => {
     await Clarity.consent(false, bool);
@@ -176,12 +184,6 @@ export default function More() {
             title: "more.menu.myComplaints.title",
             subtitle: "more.menu.myComplaints.description",
             route: "/(app)/more/my-complaints",
-          },
-          {
-            icon: CheckCircle,
-            title: "more.menu.resolvedComplaints.title",
-            subtitle: "more.menu.resolvedComplaints.description",
-            route: "/(app)/more/resolved-complaints",
           },
         ]
       : []),

@@ -2,8 +2,8 @@ import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
+  FlatList,
   RefreshControl,
-  ScrollView,
   Text,
   View,
   ActivityIndicator,
@@ -15,7 +15,6 @@ import Card from "../../../components/Card";
 import ComplaintCard from "../../../components/ComplaintCard";
 import FilterPanel from "../../../components/FilterPanel";
 import SearchBar from "../../../components/SearchBar";
-import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import {
   ALL_STATUS_OPTIONS,
@@ -30,6 +29,8 @@ import {
   getCachedComplaints,
 } from "../../../utils/complaintsCache";
 import { getQueue, dequeue } from "../../../utils/offlineQueue";
+import PressableBlock from "../../../components/PressableBlock";
+import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
 
 export default function Complaints() {
   const { t } = useTranslation();
@@ -48,10 +49,10 @@ export default function Complaints() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
 
   const baseUrl = API_BASE;
   const LIMIT = 10;
@@ -68,7 +69,9 @@ export default function Complaints() {
     params.set("sort", sortOrder);
     if (startDate) params.set("startDate", startDate);
     if (endDate) params.set("endDate", endDate);
-    if (searchQuery.trim()) params.set("search", searchQuery.trim());
+    if (debouncedSearchQuery.trim()) {
+      params.set("search", debouncedSearchQuery.trim());
+    }
     params.set("page", currentPage);
     params.set("limit", LIMIT);
     return params.toString();
@@ -112,7 +115,6 @@ export default function Complaints() {
         });
         setPage(currentPage);
       }
-      setTotalCount(payload?.total ?? 0);
       setHasMore(currentPage < pages);
 
       if (reset || pull) {
@@ -200,7 +202,7 @@ export default function Complaints() {
     sortOrder,
     startDate,
     endDate,
-    searchQuery,
+    debouncedSearchQuery,
   ]);
 
   const hasActiveFilters =
@@ -227,110 +229,103 @@ export default function Complaints() {
     >
       <BackButtonHeader title={t("complaints.title")} hasBackButton={false} />
 
-      <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+      <FlatList
+        data={complaints}
+        keyExtractor={(item, index) =>
+          String(item?.id || item?._id || item?.ticketId || index)
+        }
+        renderItem={({ item }) => (
+          <ComplaintCard
+            complaint={item}
+            onOpen={() =>
+              router.push(`/complaints/complaint-details?id=${item.id || item._id}`)
+            }
+          />
+        )}
+        ListHeaderComponent={
+          <View style={{ padding: 16, paddingBottom: 0 }}>
+            <PressableBlock
+              onPress={() => router.push("/(app)/more/new-complaint")}
+              className="rounded-xl items-center justify-center py-3.5 flex-row mb-3"
+              style={{ backgroundColor: colors.primary }}
+            >
+              <Plus size={20} color={colors.dark} />
+              <Text
+                className="text-base font-extrabold ml-2"
+                style={{ color: colors.dark }}
+              >
+                {t("complaints.newComplaint")}
+              </Text>
+            </PressableBlock>
+
+            <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
+              <View className="flex-1">
+                <SearchBar
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder={t("complaints.searchPlaceholder")}
+                />
+              </View>
+              <FilterPanel
+                variant="icon"
+                statusOptions={STATUS_OPTIONS}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                departmentFilter={departmentFilter}
+                setDepartmentFilter={setDepartmentFilter}
+                priorityFilter={priorityFilter}
+                setPriorityFilter={setPriorityFilter}
+                sortOrder={sortOrder}
+                setSortOrder={setSortOrder}
+                startDate={startDate}
+                endDate={endDate}
+                setStartDate={setStartDate}
+                setEndDate={setEndDate}
+                hasActiveFilters={hasActiveFilters}
+                onClearFilters={clearFilters}
+                t={t}
+                formatPriorityLabel={formatPriorityLabel}
+              />
+            </View>
+
+            {loading ? (
+              <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </Card>
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <View style={{ paddingHorizontal: 16 }}>
+              <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
+                <Text style={{ color: colors.textSecondary }}>
+                  {t("complaints.noComplaints")}
+                </Text>
+              </Card>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : (
+            <View style={{ height: 24 }} />
+          )
+        }
+        contentContainerStyle={{ paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => load(true)}
           />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
         showsVerticalScrollIndicator={false}
-      >
-        <PressableBlock
-          onPress={() => router.push("/(app)/more/new-complaint")}
-          className="rounded-xl items-center justify-center py-3.5 flex-row mb-3"
-          style={{ backgroundColor: colors.primary }}
-        >
-          <Plus size={20} color={colors.dark} />
-          <Text
-            className="text-base font-extrabold ml-2"
-            style={{ color: colors.dark }}
-          >
-            {t("complaints.newComplaint")}
-          </Text>
-        </PressableBlock>
-
-        <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
-          <View className="flex-1">
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={t("complaints.searchPlaceholder")}
-            />
-          </View>
-          <FilterPanel
-            variant="icon"
-            statusOptions={STATUS_OPTIONS}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            departmentFilter={departmentFilter}
-            setDepartmentFilter={setDepartmentFilter}
-            priorityFilter={priorityFilter}
-            setPriorityFilter={setPriorityFilter}
-            sortOrder={sortOrder}
-            setSortOrder={setSortOrder}
-            startDate={startDate}
-            endDate={endDate}
-            setStartDate={setStartDate}
-            setEndDate={setEndDate}
-            hasActiveFilters={hasActiveFilters}
-            onClearFilters={clearFilters}
-            t={t}
-            formatPriorityLabel={formatPriorityLabel}
-          />
-        </View>
-
-        {loading ? (
-          <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </Card>
-        ) : complaints.length === 0 ? (
-          <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
-            <Text style={{ color: colors.textSecondary }}>
-              {t("complaints.noComplaints")}
-            </Text>
-          </Card>
-        ) : (
-          complaints.map((c, index) => (
-            <ComplaintCard
-              key={`${c.id || c._id || c.ticketId || "complaint"}-${index}`}
-              complaint={c}
-              onOpen={() =>
-                router.push(`/complaints/complaint-details?id=${c.id || c._id}`)
-              }
-            />
-          ))
-        )}
-
-        {hasMore && (
-          <PressableBlock
-            onPress={loadMore}
-            disabled={loadingMore}
-            className="mt-4 mb-2 rounded-xl items-center justify-center py-3"
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              borderWidth: 1,
-              borderColor: colors.border,
-              opacity: loadingMore ? 0.6 : 1,
-            }}
-          >
-            {loadingMore ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Text
-                className="text-sm font-semibold"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("complaints.loadMoreCount", {
-                  current: complaints.length,
-                  total: totalCount,
-                })}
-              </Text>
-            )}
-          </PressableBlock>
-        )}
-      </ScrollView>
+      />
     </View>
   );
 }

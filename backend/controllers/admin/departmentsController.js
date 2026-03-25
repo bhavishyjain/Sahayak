@@ -13,11 +13,17 @@ const {
   normalizeDepartmentName,
   slugifyDepartmentName,
 } = require("../../services/departmentService");
+const { escapeRegex } = require("../../utils/normalize");
+const { emitComplaintUpdated } = require("../../services/realtimeService");
 
 async function assertDepartmentComplaintsResolved(departmentName) {
+  const departmentRegex = new RegExp(
+    `^${escapeRegex(String(departmentName || "").trim())}$`,
+    "i",
+  );
   const [totalComplaints, resolvedComplaints] = await Promise.all([
-    Complaint.countDocuments({ department: departmentName }),
-    Complaint.countDocuments({ department: departmentName, status: "resolved" }),
+    Complaint.countDocuments({ department: departmentRegex }),
+    Complaint.countDocuments({ department: departmentRegex, status: "resolved" }),
   ]);
 
   if (totalComplaints !== resolvedComplaints) {
@@ -77,21 +83,47 @@ exports.updateDepartment = asyncHandler(async (req, res) => {
   if (duplicate) throw new AppError("Department already exists", 409);
 
   const previousName = department.name;
+  const departmentRegex = new RegExp(
+    `^${escapeRegex(String(previousName || "").trim())}$`,
+    "i",
+  );
+  const affectedComplaints = await Complaint.find({
+    department: departmentRegex,
+  }).select("_id ticketId userId assignedWorkers department updatedAt");
   department.name = name;
   department.code = code;
   await department.save();
 
   await Promise.all([
-    User.updateMany({ department: previousName }, { $set: { department: name } }),
+    User.updateMany({ department: departmentRegex }, { $set: { department: name } }),
     Complaint.updateMany(
-      { department: previousName },
+      { department: departmentRegex },
       { $set: { department: name, "aiAnalysis.department": name } },
     ),
     WorkerInvitation.updateMany(
-      { department: previousName },
+      { department: departmentRegex },
       { $set: { department: name } },
     ),
   ]);
+
+  const updatedComplaints = affectedComplaints.map((complaint) => ({
+    ...complaint.toObject(),
+    department: name,
+    updatedAt: new Date(),
+  }));
+  await Promise.all(
+    updatedComplaints.map((complaint) =>
+      emitComplaintUpdated({
+        complaint,
+        actorId: req.user?._id || req.user?.userId || null,
+        event: "complaint-department-changed",
+        extra: {
+          previousDepartment: previousName,
+          departmentChanged: true,
+        },
+      }),
+    ),
+  );
 
   const payload = department.toObject();
   return sendSuccess(res, { data: payload, department: payload }, "Department updated successfully");
@@ -115,6 +147,25 @@ exports.deactivateDepartment = asyncHandler(async (req, res) => {
 
   const payload = department.toObject();
   return sendSuccess(res, { data: payload, department: payload }, "Department deactivated successfully");
+});
+
+exports.reactivateDepartment = asyncHandler(async (req, res) => {
+  const department = await Department.findById(req.params.id);
+  if (!department) throw new AppError("Department not found", 404);
+
+  department.isActive = true;
+  await department.save();
+  await User.updateMany(
+    { department: department.name, role: { $in: ["head", "worker"] } },
+    { $set: { isActive: true } },
+  );
+
+  const payload = department.toObject();
+  return sendSuccess(
+    res,
+    { data: payload, department: payload },
+    "Department reactivated successfully",
+  );
 });
 
 exports.deleteDepartment = asyncHandler(async (req, res) => {
@@ -210,6 +261,11 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
     );
   } catch (emailError) {
     console.error("Failed to send invitation email:", emailError);
+    await invitation.deleteOne();
+    throw new AppError(
+      emailError?.message || "Failed to send invitation email",
+      500,
+    );
   }
 
   return sendSuccess(

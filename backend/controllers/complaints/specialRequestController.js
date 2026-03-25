@@ -9,6 +9,7 @@ const {
   getHodOrThrow,
   getRequestUserId,
 } = require("../../services/accessService");
+const { emitComplaintUpdated } = require("../../services/realtimeService");
 
 function buildUpdateChangeNotes({
   currentDepartment,
@@ -276,6 +277,27 @@ exports.reviewSpecialRequest = asyncHandler(async (req, res) => {
 
   await complaint.save();
   await request.save();
+
+  if (normalizedDecision === "approve") {
+    await emitComplaintUpdated({
+      complaint,
+      actorId: adminId,
+      event:
+        request.requestType === "delete"
+          ? "complaint-deleted"
+          : "complaint-updated-by-admin",
+      extra: {
+        departmentChanged:
+          request.requestType === "update" &&
+          String(request.currentDepartment || "").trim() !==
+            String(request.requestedDepartment || "").trim(),
+        priorityChanged:
+          request.requestType === "update" &&
+          String(request.currentPriority || "").trim() !==
+            String(request.requestedPriority || "").trim(),
+      },
+    });
+  }
 
   const savedRequest = await ComplaintSpecialRequest.findById(request._id)
     .populate("requestedBy", "fullName username email")

@@ -77,6 +77,11 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
     );
   } catch (emailError) {
     console.error("Failed to send invitation email:", emailError);
+    await invitation.deleteOne();
+    throw new AppError(
+      emailError?.message || "Failed to send invitation email",
+      500,
+    );
   }
 
   return sendSuccess(
@@ -132,8 +137,8 @@ exports.listInvitations = asyncHandler(async (req, res) => {
 
   const invitations = await WorkerInvitation.find({
     department: hod.department,
-    invitedBy: hod._id,
   })
+    .populate("invitedBy", "fullName username role")
     .sort({ createdAt: -1 })
     .limit(100)
     .select("-tokenHash");
@@ -144,6 +149,14 @@ exports.listInvitations = asyncHandler(async (req, res) => {
     email: inv.email,
     department: inv.department,
     role: inv.role || "worker",
+    invitedBy: inv.invitedBy
+      ? {
+          id: inv.invitedBy._id,
+          fullName: inv.invitedBy.fullName,
+          username: inv.invitedBy.username,
+          role: inv.invitedBy.role,
+        }
+      : null,
     sentAt: inv.createdAt,
     expiresAt: inv.expiresAt,
     status: inv.acceptedAt
@@ -155,6 +168,11 @@ exports.listInvitations = asyncHandler(async (req, res) => {
           : "pending",
     acceptedAt: inv.acceptedAt,
     revokedAt: inv.revokedAt,
+    canRevoke:
+      String(inv.invitedBy?._id || inv.invitedBy || "") === String(hod._id) &&
+      !inv.acceptedAt &&
+      !inv.revokedAt &&
+      inv.expiresAt >= now,
   }));
 
   return sendSuccess(res, { invitations: formatted }, "Invitations retrieved");

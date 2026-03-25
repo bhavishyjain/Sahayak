@@ -5,7 +5,6 @@ const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const {
-  assertCanManageComplaintByDepartment,
   normalizeDepartment,
 } = require("../../policies/complaintPolicy");
 const { emitComplaintUpdated } = require("../../services/realtimeService");
@@ -30,6 +29,30 @@ function hasChangedValue(currentValue, suggestedValue) {
   );
 }
 
+async function assertCanApplyAISuggestion(reqUser, complaint) {
+  if (reqUser?.role === "admin") {
+    return;
+  }
+
+  const actor = await User.findById(reqUser?._id).select("role department");
+  if (!actor || actor.role !== "head") {
+    throw new AppError("Forbidden", 403);
+  }
+
+  const actorDepartment = normalizeDepartment(actor.department);
+  const currentDepartment = normalizeDepartment(complaint.department);
+  const suggestedDepartment = normalizeDepartment(
+    complaint.aiAnalysis?.department,
+  );
+
+  if (
+    actorDepartment !== currentDepartment &&
+    actorDepartment !== suggestedDepartment
+  ) {
+    throw new AppError("Forbidden", 403);
+  }
+}
+
 exports.applyAISuggestion = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
   const { applyDepartment, applyPriority } = req.body;
@@ -38,7 +61,7 @@ exports.applyAISuggestion = asyncHandler(async (req, res) => {
   if (!complaint) {
     throw new AppError("Complaint not found", 404);
   }
-  await assertCanManageComplaintByDepartment(req.user, complaint);
+  await assertCanApplyAISuggestion(req.user, complaint);
 
   if (
     !complaint.aiAnalysis?.department &&

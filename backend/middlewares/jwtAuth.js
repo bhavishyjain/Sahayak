@@ -13,6 +13,7 @@ function normalizeUser(userDoc) {
     phone: userDoc.phone,
     department: userDoc.department,
     preferredLanguage: userDoc.preferredLanguage || "en",
+    isActive: userDoc.isActive !== false,
   };
 }
 
@@ -38,8 +39,16 @@ async function attachAuth(req, res, next) {
     // DB fetch on every request: validates the token against current user state
     // (handles account deletion, deactivation, and forced token revocation)
     const user = await User.findById(payload.userId).select("-password");
-    if (!user || !user.isActive) {
+    if (!user) {
       return next(new AppError("Invalid or expired token", 401));
+    }
+
+    if (!user.isActive) {
+      return next(
+        new AppError("This account has been deactivated", 403, {
+          accountDeactivated: true,
+        }),
+      );
     }
 
     // Reject tokens issued before tokenValidFrom (password reset, forced logout, etc.)

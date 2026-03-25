@@ -66,7 +66,36 @@ async function getComplaintMetricSnapshot(filters = {}) {
       ]),
       Complaint.aggregate([
         { $match: filters },
-        { $group: { _id: "$priority", count: { $sum: 1 } } },
+        {
+          $project: {
+            normalizedPriority: {
+              $switch: {
+                branches: [
+                  {
+                    case: {
+                      $eq: [{ $toLower: { $ifNull: ["$priority", ""] } }, "high"],
+                    },
+                    then: "High",
+                  },
+                  {
+                    case: {
+                      $eq: [{ $toLower: { $ifNull: ["$priority", ""] } }, "medium"],
+                    },
+                    then: "Medium",
+                  },
+                  {
+                    case: {
+                      $eq: [{ $toLower: { $ifNull: ["$priority", ""] } }, "low"],
+                    },
+                    then: "Low",
+                  },
+                ],
+                default: "Low",
+              },
+            },
+          },
+        },
+        { $group: { _id: "$normalizedPriority", count: { $sum: 1 } } },
       ]),
       Complaint.aggregate([
         { $match: filters },
@@ -231,6 +260,7 @@ async function getHodDashboardStats(department, analyticsFilters = {}) {
     assigned: snapshot.byStatus.assigned || 0,
     inProgress: snapshot.byStatus["in-progress"] || 0,
     pendingApproval: snapshot.byStatus["pending-approval"] || 0,
+    needsRework: snapshot.byStatus["needs-rework"] || 0,
     resolved,
     cancelled,
     highPriority: snapshot.byPriority.High || 0,

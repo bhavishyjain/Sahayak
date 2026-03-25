@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Building2,
   ThumbsUp,
+  Star,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -38,6 +39,7 @@ import getUserAuth from "../../../utils/userAuth";
 import {
   useCitizenHomeSummary,
 } from "../../../utils/hooks/useDashboardData";
+import useComplaintList from "../../../utils/hooks/useComplaintList";
 import { useNearbyComplaints } from "../../../utils/hooks/useNearbyComplaints";
 import { invalidateComplaintQueries } from "../../../utils/invalidateComplaintQueries";
 
@@ -73,6 +75,25 @@ export default function Home() {
     refetch: refetchNearby,
     upvoteComplaint,
   } = useNearbyComplaints();
+  const {
+    complaints: resolvedComplaints,
+    isLoading: feedbackLoading,
+    isFetching: feedbackRefreshing,
+    refresh: refreshFeedbackComplaints,
+  } = useComplaintList({
+    scope: "mine",
+    status: "resolved",
+    sort: "new-to-old",
+    limit: 20,
+  });
+
+  const feedbackPendingComplaints = useMemo(
+    () =>
+      resolvedComplaints
+        .filter((item) => !item?.feedback?.rating)
+        .slice(0, 5),
+    [resolvedComplaints],
+  );
 
   const handleNearbyUpvote = async (complaintId) => {
     try {
@@ -164,7 +185,9 @@ export default function Home() {
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
-          onRefresh={() => Promise.all([loadData(), refetchNearby()])}
+          onRefresh={() =>
+            Promise.all([loadData(), refetchNearby(), refreshFeedbackComplaints()])
+          }
           colors={[colors.primary]}
           tintColor={colors.primary}
         />
@@ -259,6 +282,134 @@ export default function Home() {
               </Text>
             </View>
           ))}
+        </View>
+      </View>
+
+      <View className="mb-6">
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center">
+            <Star
+              size={20}
+              color={colors.warning}
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              className="text-xl font-extrabold"
+              style={{ color: colors.textPrimary }}
+            >
+              {t("home.feedback.title")}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => refreshFeedbackComplaints()}
+            disabled={feedbackRefreshing}
+            className="flex-row items-center px-2.5 py-1 rounded-full"
+            style={{ opacity: feedbackRefreshing ? 0.7 : 1 }}
+          >
+            <RefreshCw size={12} color={colors.primary} />
+            <Text
+              className="text-xs font-semibold ml-1"
+              style={{ color: colors.primary }}
+            >
+              {t("home.feedback.reload")}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View
+          className="rounded-2xl px-4 py-2"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          {feedbackLoading || feedbackRefreshing ? (
+            <View className="py-6 items-center">
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : feedbackPendingComplaints.length === 0 ? (
+            <View className="py-6 items-center">
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: colors.textPrimary }}
+              >
+                {t("home.feedback.emptyTitle")}
+              </Text>
+              <Text
+                className="text-sm mt-1 text-center"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("home.feedback.emptySubtitle")}
+              </Text>
+            </View>
+          ) : (
+            feedbackPendingComplaints.map((item, index) => (
+              <View
+                key={item.id || item._id}
+                className="py-3"
+                style={{
+                  borderBottomWidth:
+                    index < feedbackPendingComplaints.length - 1 ? 1 : 0,
+                  borderBottomColor: colors.border,
+                }}
+              >
+                <Pressable
+                  onPress={() =>
+                    router.push(
+                      `/complaints/complaint-details?id=${
+                        item.id || item._id
+                      }&openFeedback=1`,
+                    )
+                  }
+                >
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-1 pr-3">
+                      <View className="flex-row items-center mb-1">
+                        <ListChecks
+                          size={12}
+                          color={colors.primary}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text
+                          className="text-xs font-bold"
+                          style={{ color: colors.primary }}
+                        >
+                          {item.ticketId}
+                        </Text>
+                      </View>
+                      <Text
+                        className="text-sm font-semibold"
+                        style={{ color: colors.textPrimary }}
+                        numberOfLines={1}
+                      >
+                        {item.title || t("complaints.complaint")}
+                      </Text>
+                      <Text
+                        className="text-xs mt-1"
+                        style={{ color: colors.textSecondary }}
+                        numberOfLines={1}
+                      >
+                        {item.department || t("home.nearby.departmentFallback")}
+                      </Text>
+                    </View>
+
+                    <View
+                      className="rounded-xl px-3 py-2"
+                      style={{ backgroundColor: colors.primary }}
+                    >
+                      <Text
+                        className="text-xs font-bold"
+                        style={{ color: colors.dark }}
+                      >
+                        {t("home.feedback.action")}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              </View>
+            ))
+          )}
         </View>
       </View>
 

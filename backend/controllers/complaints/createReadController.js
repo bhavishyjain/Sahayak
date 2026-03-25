@@ -26,7 +26,10 @@ const { assertCanViewComplaint } = require("../../policies/complaintPolicy");
 const {
   getDepartmentNames,
 } = require("../../services/departmentService");
-const { listComplaints } = require("../../services/complaintListService");
+const {
+  listComplaints,
+  listOwnerComplaintsWithDeleted,
+} = require("../../services/complaintListService");
 const {
   buildDetailPayload,
 } = require("../../services/responseViewService");
@@ -214,7 +217,7 @@ exports.myComplaints = asyncHandler(async (req, res) => {
     limit = 10,
     page = 1,
   } = req.query;
-  const { payload } = await listComplaints({
+  const listOptions = {
     actorRole: req.user?.role,
     actorId: new mongoose.Types.ObjectId(req.user._id),
     scope,
@@ -233,25 +236,47 @@ exports.myComplaints = asyncHandler(async (req, res) => {
     limit,
     sort,
     includeAssignment: true,
-  });
+  };
+
+  const { payload } =
+    req.user?.role === "user" && String(scope || "mine").toLowerCase() === "mine"
+      ? await listOwnerComplaintsWithDeleted(listOptions)
+      : await listComplaints(listOptions);
 
   return sendSuccess(res, payload);
 });
 
 exports.getComplaintById = asyncHandler(async (req, res) => {
   const { complaintId } = req.params;
-  const complaint = await Complaint.findById(complaintId).populate(
+  let complaint = await Complaint.findById(complaintId).populate(
     "assignedWorkers.workerId",
     "fullName username phone",
   );
 
+  if (!complaint && req.user?.role === "user") {
+    complaint = await Complaint.findById(complaintId)
+      .setOptions({ withDeleted: true })
+      .populate("assignedWorkers.workerId", "fullName username phone");
+  }
+
   if (!complaint) {
+    throw new AppError("Complaint not found", 404);
+  }
+
+  const ownerId = String(
+    complaint.userId?._id || complaint.userId?.id || complaint.userId || "",
+  );
+  const canTreatDeletedAsResolved =
+    complaint.deleted === true && ownerId === String(req.user?._id || "");
+
+  if (complaint.deleted === true && !canTreatDeletedAsResolved) {
     throw new AppError("Complaint not found", 404);
   }
 
   await assertCanViewComplaint(req.user, complaint);
   const complaintView = buildComplaintView(complaint, {
     currentUserId: req.user._id,
+    treatDeletedAsResolved: canTreatDeletedAsResolved,
   });
   return sendSuccess(
     res,

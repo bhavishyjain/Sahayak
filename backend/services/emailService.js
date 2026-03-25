@@ -3,6 +3,37 @@ const { Resend } = require("resend");
 // Initialize Resend client
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+function getAppWebBaseUrl() {
+  return String(process.env.APP_LINK_BASE_URL || "https://sahayak.app")
+    .trim()
+    .replace(/\/+$/, "");
+}
+
+function buildAppUrl(pathname = "/", params = {}) {
+  const url = new URL(`${getAppWebBaseUrl()}${pathname}`);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    url.searchParams.set(key, String(value));
+  });
+  return url.toString();
+}
+
+function buildDeepLink(pathname = "", params = {}) {
+  const normalizedPath = String(pathname || "").replace(/^\/+/, "");
+  const url = new URL(`sahayak://${normalizedPath}`);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    url.searchParams.set(key, String(value));
+  });
+  return url.toString();
+}
+
+function assertEmailConfigured() {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error("Email service is not configured (missing RESEND_API_KEY)");
+  }
+}
+
 /**
  * Builds the shared HTML email shell.
  * @param {string} headerGradient - CSS gradient for the header background
@@ -79,7 +110,19 @@ const sendWorkerInvitation = async (
   invitedRole = "worker",
 ) => {
   try {
-    const inviteLink = `sahayak://accept-invite?token=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(email)}&department=${encodeURIComponent(department)}&role=${encodeURIComponent(invitedRole)}`;
+    assertEmailConfigured();
+    const inviteLink = buildAppUrl("/accept-invite", {
+      token: inviteToken,
+      email,
+      department,
+      role: invitedRole,
+    });
+    const inviteDeepLink = buildDeepLink("accept-invite", {
+      token: inviteToken,
+      email,
+      department,
+      role: invitedRole,
+    });
     const roleLabel = invitedRole === "head" ? "department head" : "worker";
 
     const headerHtml = `<h1>🎉 You're Invited!</h1>`;
@@ -124,7 +167,7 @@ const sendWorkerInvitation = async (
         If the button doesn't work, open the Sahayak app and tap "I have an invite" on the login screen, then paste this link:
       </p>
       <div class="link-box">
-        <a href="${inviteLink}">${inviteLink}</a>
+        <a href="${inviteDeepLink}">${inviteDeepLink}</a>
       </div>
 
       <p style="margin-top: 30px; font-size: 13px; color: #6b7280; text-align: center;">
@@ -204,9 +247,12 @@ const sendWorkerInvitation = async (
  */
 const sendComplaintRegistered = async (userEmail, userName, complaintData) => {
   try {
+    assertEmailConfigured();
     const { ticketId, title, department, priority, locationName } =
       complaintData;
-    const viewLink = `${process.env.APP_URL || "http://localhost:3000"}/complaints/${complaintData._id}`;
+    const viewLink = buildAppUrl("/complaints/complaint-details", {
+      id: complaintData._id,
+    });
 
     const headerHtml = `
       <h1>✅ Complaint Registered</h1>
@@ -352,8 +398,11 @@ const sendComplaintCompleted = async (
   feedbackLink,
 ) => {
   try {
+    assertEmailConfigured();
     const { ticketId, title, department, completedAt } = complaintData;
-    const viewLink = `${process.env.APP_URL || "http://localhost:3000"}/complaints/${complaintData._id}`;
+    const viewLink = buildAppUrl("/complaints/complaint-details", {
+      id: complaintData._id,
+    });
 
     const headerHtml = `
       <h1>🎉 Complaint Resolved!</h1>
@@ -516,6 +565,7 @@ const sendEmailWithAttachment = async ({
   html,
   attachments = [],
 }) => {
+  assertEmailConfigured();
   if (!to) {
     throw new Error("Recipient email is required");
   }
@@ -561,9 +611,9 @@ const sendEmailWithAttachment = async ({
  * Send email verification link
  */
 const sendEmailVerification = async (email, fullName, token) => {
-  const encodedToken = encodeURIComponent(token);
-  const verifyLink = `https://sahayak.app/verify-email?token=${encodedToken}`;
-  const verifyDeepLink = `sahayak://verify-email?token=${encodedToken}`;
+  assertEmailConfigured();
+  const verifyLink = buildAppUrl("/verify-email", { token });
+  const verifyDeepLink = buildDeepLink("verify-email", { token });
 
   const headerHtml = `<h1>✉️ Verify Your Email</h1>`;
   const bodyHtml = `
@@ -636,9 +686,9 @@ const sendEmailVerification = async (email, fullName, token) => {
  * Send password reset link
  */
 const sendPasswordResetEmail = async (email, fullName, token) => {
-  const encodedToken = encodeURIComponent(token);
-  const resetLink = `https://sahayak.app/reset-password?token=${encodedToken}`;
-  const resetDeepLink = `sahayak://reset-password?token=${encodedToken}`;
+  assertEmailConfigured();
+  const resetLink = buildAppUrl("/reset-password", { token });
+  const resetDeepLink = buildDeepLink("reset-password", { token });
 
   const headerHtml = `<h1>🔑 Reset Your Password</h1>`;
   const bodyHtml = `
@@ -708,6 +758,7 @@ const sendPasswordResetEmail = async (email, fullName, token) => {
 };
 
 module.exports = {
+  sendWorkerInvitation,
   sendComplaintRegistered,
   sendComplaintCompleted,
   sendEmailWithAttachment,

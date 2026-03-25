@@ -9,6 +9,7 @@ import { darkColors, lightColors } from "../../../colors";
 import LanguagePicker from "../../../components/LanguagePicker";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
+import { getPostLoginRoute } from "../../../utils/accountStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { setUserAuth } from "../../../utils/userAuth";
@@ -83,16 +84,7 @@ export default function Login() {
           text2: responseData?.message || t("toast.loginSuccess.message"),
         });
 
-        // Redirect based on user role
-        const redirectPath =
-          userData.role === "admin"
-            ? "/(app)/(tabs)/admin-home"
-            : userData.role === "head"
-            ? "/(app)/(tabs)/hod-overview"
-            : userData.role === "worker"
-              ? "/(app)/(tabs)/worker-home"
-              : "/(app)/(tabs)/home";
-        router.replace(redirectPath);
+        router.replace(getPostLoginRoute(userToStore));
       } else {
         console.error("No auth token in response:", userData);
         Toast.show({

@@ -1,8 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Linking, Platform } from "react-native";
 import useApiQuery from "./useApiQuery";
+import apiCall from "../api";
 import {
   REPORT_DEPARTMENT_BREAKDOWN_URL,
   REPORT_DOWNLOAD_URL,
@@ -13,7 +13,6 @@ import getUserAuth from "../userAuth";
 import { queryKeys } from "../queryKeys";
 
 const REPORTS_FOLDER_NAME = "Sahayak";
-const REPORTS_DIRECTORY_URI_KEY = "reportsDirectoryUri";
 
 async function getAuthToken() {
   // Try fast in-memory cache first
@@ -28,6 +27,7 @@ function buildReportQueryString(filters = {}) {
   const params = new URLSearchParams();
   if (filters.department) params.append("department", filters.department);
   if (filters.status) params.append("status", filters.status);
+  if (filters.priority) params.append("priority", filters.priority);
   if (filters.startDate) params.append("startDate", filters.startDate);
   if (filters.endDate) params.append("endDate", filters.endDate);
   const query = params.toString();
@@ -38,127 +38,94 @@ function getTimestampLabel() {
   return new Date().toISOString().replace(/[.:]/g, "-");
 }
 
-function stripExtension(fileName) {
-  return fileName.replace(/\.[^/.]+$/, "");
+async function ensureReportsDirectory() {
+  const reportsDir = `${FileSystem.documentDirectory}${REPORTS_FOLDER_NAME}/`;
+  await FileSystem.makeDirectoryAsync(reportsDir, { intermediates: true });
+  return reportsDir;
 }
 
-function getDirectoryNameFromUri(uri) {
-  const decoded = decodeURIComponent(uri);
-  const slashIdx = decoded.lastIndexOf("/");
-  return (slashIdx >= 0 ? decoded.slice(slashIdx + 1) : decoded).toLowerCase();
-}
-
-async function getAndroidFilesBaseUri() {
-  const cachedUri = await AsyncStorage.getItem(REPORTS_DIRECTORY_URI_KEY);
-
-  if (cachedUri) {
-    try {
-      await FileSystem.StorageAccessFramework.readDirectoryAsync(cachedUri);
-      return cachedUri;
-    } catch {
-      await AsyncStorage.removeItem(REPORTS_DIRECTORY_URI_KEY);
-    }
-  }
-
-  const initialUri =
-    FileSystem.StorageAccessFramework.getUriForDirectoryInRoot("Download");
-  const permission =
-    await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(
-      initialUri,
-    );
-
-  if (!permission.granted || !permission.directoryUri) {
-    throw new Error("Storage permission was not granted");
-  }
-
-  await AsyncStorage.setItem(
-    REPORTS_DIRECTORY_URI_KEY,
-    permission.directoryUri,
-  );
-  return permission.directoryUri;
-}
-
-async function ensureAndroidReportsDirectory() {
-  const baseUri = await getAndroidFilesBaseUri();
-  const existingItems =
-    await FileSystem.StorageAccessFramework.readDirectoryAsync(baseUri);
-
-  const existingReportsUri = existingItems.find(
-    (itemUri) =>
-      getDirectoryNameFromUri(itemUri) === REPORTS_FOLDER_NAME.toLowerCase(),
-  );
-
-  if (existingReportsUri) {
-    return existingReportsUri;
-  }
-
-  try {
-    return await FileSystem.StorageAccessFramework.makeDirectoryAsync(
-      baseUri,
-      REPORTS_FOLDER_NAME,
-    );
-  } catch {
-    const refreshedItems =
-      await FileSystem.StorageAccessFramework.readDirectoryAsync(baseUri);
-    const recoveredUri = refreshedItems.find(
-      (itemUri) =>
-        getDirectoryNameFromUri(itemUri) === REPORTS_FOLDER_NAME.toLowerCase(),
-    );
-    if (recoveredUri) {
-      return recoveredUri;
-    }
-    throw new Error("Could not create Sahayak folder in Files");
-  }
-}
-
-async function downloadToAndroidFiles({ url, fileName, mimeType, headers }) {
-  const reportsDirUri = await ensureAndroidReportsDirectory();
-  const tempUri = `${FileSystem.cacheDirectory}${fileName}`;
-
-  const downloadResult = await FileSystem.downloadAsync(url, tempUri, {
-    headers,
+async function downloadReportFile({ url, fileName, headers }) {
+  const reportsDir = await ensureReportsDirectory();
+  const fileUri = `${reportsDir}${fileName}`;
+  const response = await apiCall({
+    method: "GET",
+    url,
+    headers: {
+      ...headers,
+      Accept: "application/json",
+      "X-Report-Transport": "base64",
+    },
   });
-  if (downloadResult.status !== 200) {
-    throw new Error(`Download failed with status ${downloadResult.status}`);
+  const base64Content =
+    response?.data?.contentBase64 ?? response?.rawData?.contentBase64;
+
+  if (!base64Content) {
+    throw new Error(
+      response?.message || "Report download returned no file content",
+    );
   }
 
-  const safFileUri = await FileSystem.StorageAccessFramework.createFileAsync(
-    reportsDirUri,
-    stripExtension(fileName),
-    mimeType,
+  await FileSystem.writeAsStringAsync(
+    fileUri,
+    base64Content,
+    {
+      encoding: FileSystem.EncodingType.Base64,
+    },
   );
-
-  const base64Data = await FileSystem.readAsStringAsync(downloadResult.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  await FileSystem.writeAsStringAsync(safFileUri, base64Data, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  await FileSystem.deleteAsync(downloadResult.uri, { idempotent: true });
-
-  return safFileUri;
+  return fileUri;
 }
 
 async function openDownloadedFile(uri, mimeType) {
   try {
     if (Platform.OS === "android") {
-      if (uri.startsWith("content://")) {
-        await Linking.openURL(uri);
-        return;
-      }
-
       const contentUri = await FileSystem.getContentUriAsync(uri);
       await Linking.openURL(contentUri);
       return;
     }
 
     await Linking.openURL(uri);
+    return;
   } catch {
-    await Sharing.shareAsync(uri, {
-      mimeType,
-      dialogTitle: "Open Report",
-      UTI: mimeType === "application/pdf" ? "com.adobe.pdf" : "public.data",
-    });
+    if (Platform.OS === "android") {
+      try {
+        const contentUri = await FileSystem.getContentUriAsync(uri);
+        await Linking.openURL(contentUri);
+      } catch {
+        try {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType,
+              dialogTitle: "Open Report",
+              UTI:
+                mimeType === "application/pdf"
+                  ? "com.adobe.pdf"
+                  : "public.data",
+            });
+          }
+        } catch {
+          // Download succeeded; opening is best-effort on Android.
+        }
+      }
+    } else {
+      try {
+        await Linking.openURL(uri);
+      } catch {
+        try {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType,
+              dialogTitle: "Open Report",
+              UTI:
+                mimeType === "application/pdf"
+                  ? "com.adobe.pdf"
+                  : "public.data",
+            });
+          }
+        } catch {
+          // Download succeeded; opening is best-effort on iOS.
+        }
+      }
+    }
   }
 }
 
@@ -206,32 +173,20 @@ export function useDownloadReport() {
 
     const token = await getAuthToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    let savedFileUri = null;
-
-    if (Platform.OS === "android") {
-      savedFileUri = await downloadToAndroidFiles({
-        url,
-        fileName,
-        mimeType,
-        headers,
-      });
-    } else {
-      const reportsDir = `${FileSystem.documentDirectory}${REPORTS_FOLDER_NAME}/`;
-      const fileUri = `${reportsDir}${fileName}`;
-      await FileSystem.makeDirectoryAsync(reportsDir, { intermediates: true });
-      const result = await FileSystem.downloadAsync(url, fileUri, { headers });
-
-      if (result.status !== 200) {
-        throw new Error(`Download failed with status ${result.status}`);
-      }
-
-      savedFileUri = result.uri;
-    }
+    const savedFileUri = await downloadReportFile({
+      url,
+      fileName,
+      headers,
+    });
 
     await openDownloadedFile(savedFileUri, mimeType);
   };
 
   return { download };
+}
+
+export async function prepareReportsStorage() {
+  await ensureReportsDirectory();
 }
 
 export { buildReportQueryString };

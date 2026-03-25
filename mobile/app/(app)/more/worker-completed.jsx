@@ -20,6 +20,7 @@ import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { WORKER_COMPLETED_URL } from "../../../url";
+import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
 
 export default function WorkerCompleted() {
   const { t } = useTranslation();
@@ -33,6 +34,7 @@ export default function WorkerCompleted() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -42,7 +44,7 @@ export default function WorkerCompleted() {
     try {
       if (isRefresh) setRefreshing(true);
       else if (requestedPage > 1) setLoadingMore(true);
-      else setLoading(true);
+      else if (complaints.length === 0) setLoading(true);
 
       const res = await apiCall({
         method: "GET",
@@ -50,7 +52,7 @@ export default function WorkerCompleted() {
         params: {
           page: requestedPage,
           limit: LIMIT,
-          search: searchQuery.trim() || undefined,
+          search: debouncedSearchQuery.trim() || undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
         },
@@ -78,7 +80,7 @@ export default function WorkerCompleted() {
   useEffect(() => {
     load(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, startDate, endDate]);
+  }, [debouncedSearchQuery, startDate, endDate]);
 
   const hasActiveFilters = !!startDate || !!endDate || !!searchQuery.trim();
 

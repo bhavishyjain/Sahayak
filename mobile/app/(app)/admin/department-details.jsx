@@ -31,6 +31,7 @@ import {
   DEPARTMENT_INVITATION_DETAIL_URL,
   REPORT_DEPARTMENT_BREAKDOWN_URL,
   DEACTIVATE_DEPARTMENT_URL,
+  REACTIVATE_DEPARTMENT_URL,
   DEPARTMENT_DETAIL_URL,
   USER_DETAIL_URL,
   USERS_URL,
@@ -418,28 +419,34 @@ export default function DepartmentDetailsScreen() {
   });
 
   const deactivateDepartmentMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (nextActiveState) => {
       if (!departmentRecord?.id) {
         throw new Error("Department not found");
       }
       return apiCall({
         method: "POST",
-        url: DEACTIVATE_DEPARTMENT_URL(departmentRecord.id),
+        url: nextActiveState
+          ? REACTIVATE_DEPARTMENT_URL(departmentRecord.id)
+          : DEACTIVATE_DEPARTMENT_URL(departmentRecord.id),
       });
     },
-    onSuccess: () => {
+    onSuccess: (_response, nextActiveState) => {
       invalidateAdminQueries();
       setConfirmState(null);
       Toast.show({
         type: "success",
-        text1: "Department deactivated",
-        text2: "HOD and workers in this department are now inactive.",
+        text1: nextActiveState
+          ? "Department reactivated"
+          : "Department deactivated",
+        text2: nextActiveState
+          ? "HOD and workers in this department are now active again."
+          : "HOD and workers in this department are now inactive.",
       });
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: "Could not deactivate department",
+        text1: "Could not update department status",
         text2: mutationError?.response?.data?.message || "Please try again.",
       });
     },
@@ -582,12 +589,24 @@ export default function DepartmentDetailsScreen() {
           </PressableBlock>
 
           <PressableBlock
-            onPress={() => setConfirmState({ type: "department" })}
+            onPress={() =>
+              setConfirmState({
+                type: "department",
+                isActive: departmentRecord?.isActive === false,
+              })
+            }
             className="rounded-2xl py-4 items-center"
-            style={{ backgroundColor: colors.warning }}
+            style={{
+              backgroundColor:
+                departmentRecord?.isActive === false
+                  ? colors.success
+                  : colors.warning,
+            }}
           >
             <Text className="text-sm font-semibold" style={{ color: colors.dark }}>
-              Deactivate Department
+              {departmentRecord?.isActive === false
+                ? "Reactivate Department"
+                : "Deactivate Department"}
             </Text>
           </PressableBlock>
 
@@ -756,7 +775,9 @@ export default function DepartmentDetailsScreen() {
             : confirmState?.type === "delete"
               ? "Delete department"
             : confirmState?.type === "department"
-            ? "Deactivate department"
+            ? confirmState?.isActive
+              ? "Reactivate department"
+              : "Deactivate department"
             : confirmState?.isActive
               ? "Reactivate member"
               : "Deactivate member"
@@ -771,7 +792,9 @@ export default function DepartmentDetailsScreen() {
             : confirmState?.type === "delete"
               ? "This will remove the department and move linked users, complaints, and invitations to Other. This is only allowed when every complaint in the department is resolved."
             : confirmState?.type === "department"
-            ? "This will deactivate the HODs and all workers in this department. This is only allowed when every complaint in the department is resolved."
+            ? confirmState?.isActive
+              ? "This will reactivate the HODs and workers in this department."
+              : "This will deactivate the HODs and all workers in this department. This is only allowed when every complaint in the department is resolved."
             : confirmState?.isActive
               ? `Reactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`
               : `Deactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`
@@ -799,7 +822,9 @@ export default function DepartmentDetailsScreen() {
             : confirmState?.type === "delete"
               ? "Delete"
             : confirmState?.type === "department"
-            ? "Deactivate"
+            ? confirmState?.isActive
+              ? "Reactivate"
+              : "Deactivate"
             : confirmState?.isActive
               ? "Reactivate"
               : "Deactivate"
@@ -841,7 +866,7 @@ export default function DepartmentDetailsScreen() {
             return;
           }
           if (confirmState?.type === "department") {
-            deactivateDepartmentMutation.mutate();
+            deactivateDepartmentMutation.mutate(Boolean(confirmState.isActive));
             return;
           }
           if (confirmState?.member) {

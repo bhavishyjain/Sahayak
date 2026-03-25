@@ -2,6 +2,7 @@ import { USER_AGENT_STRING, REFRESH_URL } from "@/url";
 import axios from "axios";
 import { router } from "expo-router";
 import getUserAuth, { setUserAuth, clearUserAuth } from "./userAuth";
+import { markAccountDeactivated } from "./accountStatus";
 
 let cachedUser = null;
 let userCachePromise = null;
@@ -271,6 +272,18 @@ const apiCall = async ({
         e.response = response;
         throw e;
       }
+    }
+
+    if (
+      response.status === 403 &&
+      response.data?.details?.accountDeactivated === true
+    ) {
+      await markAccountDeactivated();
+      const error = new Error(
+        response.data?.message || "This account has been deactivated",
+      );
+      error.response = response;
+      throw error;
     }
 
     if (response.status >= 400) {

@@ -32,8 +32,10 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -89,7 +91,13 @@ import {
 } from "react-native-safe-area-context";
 
 function ComplaintDetailsInner() {
-  const { id } = useLocalSearchParams();
+  const { id, openFeedback } = useLocalSearchParams();
+  const complaintId = Array.isArray(id)
+    ? String(id[0] || "").trim()
+    : String(id || "").trim();
+  const shouldOpenFeedback = Array.isArray(openFeedback)
+    ? String(openFeedback[0] || "").trim() === "1"
+    : String(openFeedback || "").trim() === "1";
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colorScheme } = useTheme();
@@ -163,7 +171,7 @@ function ComplaintDetailsInner() {
     return () => clearInterval(interval);
   }, [complaint?.sla?.dueDate]);
 
-  const complaintQuery = useComplaintDetail(id);
+  const complaintQuery = useComplaintDetail(complaintId);
   const {
     data: complaintQueryData,
     error: complaintQueryError,
@@ -197,14 +205,45 @@ function ComplaintDetailsInner() {
       fetchSatisfactionVotes();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [complaint?.status, id]);
+  }, [complaint?.status, complaintId]);
+
+  useEffect(() => {
+    if (
+      shouldOpenFeedback &&
+      userRole === "user" &&
+      complaint?.status === "resolved" &&
+      !complaint?.feedback?.rating
+    ) {
+      setFeedbackModalVisible(true);
+    }
+  }, [
+    complaint?.feedback?.rating,
+    complaint?.status,
+    shouldOpenFeedback,
+    userRole,
+  ]);
 
   useEffect(() => {
     if (!complaintQueryError) return;
 
+    const statusCode = complaintQueryError?.response?.status;
+    if (statusCode === 403 || statusCode === 404) {
+      Toast.show({
+        type: statusCode === 403 ? "info" : "error",
+        text1: t("complaints.details.title"),
+        text2:
+          statusCode === 403
+            ? "You no longer have access to this complaint."
+            : complaintQueryError?.response?.data?.message ||
+              t("complaints.details.notFoundMessage"),
+      });
+      router.back();
+      return;
+    }
+
     let cancelled = false;
     const restoreCachedComplaint = async () => {
-      const cached = await getCachedComplaintDetail(id);
+      const cached = await getCachedComplaintDetail(complaintId);
       if (cached && !cancelled) {
         const user = await getUserAuth();
         setComplaint(cached);
@@ -221,9 +260,6 @@ function ComplaintDetailsInner() {
             complaintQueryError?.response?.data?.message ||
             t("complaints.details.couldNotLoad"),
         });
-        if (complaintQueryError?.response?.status === 404) {
-          setTimeout(() => router.back(), 1500);
-        }
       }
     };
 
@@ -231,7 +267,7 @@ function ComplaintDetailsInner() {
     return () => {
       cancelled = true;
     };
-  }, [complaintQueryError, id, router, t]);
+  }, [complaintId, complaintQueryError, router, t]);
 
   const refreshComplaint = useCallback(async () => {
     await refetchComplaintQuery();
@@ -245,7 +281,7 @@ function ComplaintDetailsInner() {
     submittingFeedback,
     votingInProgress,
   } = useComplaintCitizenActions({
-    complaintId: id,
+    complaintId,
     t,
     hasUpvoted,
     onUpvoteSuccess: async () => {
@@ -283,7 +319,7 @@ function ComplaintDetailsInner() {
     startingWork,
     uploadingPhotos,
   } = useComplaintWorkerActions({
-    complaintId: id,
+    complaintId,
     t,
     onStartWorkSuccess: refreshComplaint,
     onUploadSuccess: async () => {
@@ -301,7 +337,7 @@ function ComplaintDetailsInner() {
     sendingRework,
     cancelling,
   } = useComplaintHodActions({
-    complaintId: id,
+    complaintId,
     t,
     onApproveSuccess: refreshComplaint,
     onReworkSuccess: async () => {
@@ -322,31 +358,34 @@ function ComplaintDetailsInner() {
       (notification) => {
         const data = notification?.request?.content?.data;
         // Backend sends `complaintId` in the notification payload
-        if (data?.complaintId && String(data.complaintId) === String(id)) {
+        if (
+          data?.complaintId &&
+          String(data.complaintId) === String(complaintId)
+        ) {
           refreshComplaint();
         }
       },
     );
     return () => sub.remove();
-  }, [id, refreshComplaint]);
+  }, [complaintId, refreshComplaint]);
 
   useEffect(() => {
-    if (!id) return undefined;
+    if (!complaintId) return undefined;
 
-    subscribeToComplaint(id).catch(() => {});
+    subscribeToComplaint(complaintId).catch(() => {});
     const unsubscribeComplaintUpdated = addRealtimeListener(
       "complaint-updated",
       (payload) => {
-        if (String(payload?.complaintId || "") !== String(id)) return;
+        if (String(payload?.complaintId || "") !== String(complaintId)) return;
         refreshComplaint();
       },
     );
 
     return () => {
       unsubscribeComplaintUpdated();
-      unsubscribeFromComplaint(id);
+      unsubscribeFromComplaint(complaintId);
     };
-  }, [id, refreshComplaint]);
+  }, [complaintId, refreshComplaint]);
 
   // Citizen: Handle upvote
   const handleUpvote = async () => {
@@ -428,7 +467,7 @@ function ComplaintDetailsInner() {
       setSubmittingSpecialRequest(true);
       await apiCall({
         method: "POST",
-        url: HOD_COMPLAINT_SPECIAL_REQUEST_URL(id),
+        url: HOD_COMPLAINT_SPECIAL_REQUEST_URL(complaintId),
         data: {
           requestType,
           requestedDepartment:
@@ -527,7 +566,7 @@ function ComplaintDetailsInner() {
     try {
       const response = await apiCall({
         method: "GET",
-        url: GET_SATISFACTION_URL(id),
+        url: GET_SATISFACTION_URL(complaintId),
       });
 
       if (response?.data?.satisfactionVotes) {
@@ -573,7 +612,7 @@ function ComplaintDetailsInner() {
 
   const handleShare = async () => {
     try {
-      const link = `sahayak://complaints/complaint-details?id=${id}`;
+      const link = `sahayak://complaints/complaint-details?id=${complaintId}`;
       const shareMessage = [
         t("complaints.details.shareHeader", {
           ticketId: complaint.ticketId,
@@ -683,7 +722,7 @@ function ComplaintDetailsInner() {
     }
   };
 
-  if (loading) {
+  if (!complaintId || loading) {
     return (
       <View
         className="flex-1"
@@ -704,6 +743,20 @@ function ComplaintDetailsInner() {
   }
 
   if (!complaint) {
+    if (complaintQueryError) {
+      return (
+        <View
+          className="flex-1"
+          style={{ backgroundColor: colors.backgroundPrimary }}
+        >
+          <BackButtonHeader title={t("complaints.details.title")} />
+          <View className="flex-1 justify-center items-center">
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View
         className="flex-1"
@@ -1556,7 +1609,7 @@ function ComplaintDetailsInner() {
                   onPress={() =>
                     router.push({
                       pathname: "/complaints/complaint-chat",
-                      params: { id, ticketId: complaint.ticketId },
+                      params: { id: complaintId, ticketId: complaint.ticketId },
                     })
                   }
                   style={{ flex: 1 }}
@@ -1641,7 +1694,7 @@ function ComplaintDetailsInner() {
                   onPress={() =>
                     router.push({
                       pathname: "/complaints/complaint-chat",
-                      params: { id, ticketId: complaint.ticketId },
+                      params: { id: complaintId, ticketId: complaint.ticketId },
                     })
                   }
                   className="py-3 px-2 items-center justify-center"
@@ -2572,8 +2625,8 @@ function ComplaintDetailsInner() {
           <PressableBlock
             onPress={() =>
               router.push({
-                pathname: "/(app)/hod/worker-assignment",
-                params: { complaintId: id },
+                pathname: "/hod/worker-assignment",
+                params: { complaintId },
               })
             }
           >
@@ -2800,111 +2853,117 @@ function ComplaintDetailsInner() {
           animationType="slide"
           onRequestClose={() => setFeedbackModalVisible(false)}
         >
-          <View
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             className="flex-1 justify-end"
             style={{ backgroundColor: colors.dark + "80" }}
           >
-            <View
-              className="rounded-t-3xl p-6"
-              style={{ backgroundColor: colors.backgroundPrimary }}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}
             >
-              <Text
-                className="text-xl font-bold mb-2 text-center"
-                style={{ color: colors.textPrimary }}
+              <View
+                className="rounded-t-3xl p-6"
+                style={{ backgroundColor: colors.backgroundPrimary }}
               >
-                {t("complaints.details.rateThisResolution")}
-              </Text>
-              <Text
-                className="text-sm mb-6 text-center"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("complaints.details.howSatisfied")}
-              </Text>
-
-              <View className="flex-row justify-center mb-6">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Pressable
-                    key={star}
-                    onPress={() => setFeedbackRating(star)}
-                    style={{ padding: 8 }}
-                  >
-                    <Star
-                      size={40}
-                      color={colors.primary}
-                      fill={
-                        star <= feedbackRating ? colors.primary : "transparent"
-                      }
-                    />
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text
-                className="text-sm mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("complaints.details.additionalComments")}
-              </Text>
-              <TextInput
-                value={feedbackComment}
-                onChangeText={setFeedbackComment}
-                placeholder={t("complaints.details.shareYourExperience")}
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                numberOfLines={4}
-                className="rounded-xl p-4 mb-6"
-                style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  color: colors.textPrimary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  textAlignVertical: "top",
-                }}
-              />
-
-              <View className="flex-row">
-                <Pressable
-                  onPress={() => {
-                    setFeedbackModalVisible(false);
-                    setFeedbackRating(0);
-                    setFeedbackComment("");
-                  }}
-                  className="flex-1 mr-2 py-3 rounded-xl items-center"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
+                <Text
+                  className="text-xl font-bold mb-2 text-center"
+                  style={{ color: colors.textPrimary }}
                 >
-                  <Text
-                    className="text-base font-semibold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {t("common.cancel")}
-                  </Text>
-                </Pressable>
+                  {t("complaints.details.rateThisResolution")}
+                </Text>
+                <Text
+                  className="text-sm mb-6 text-center"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("complaints.details.howSatisfied")}
+                </Text>
 
-                <Pressable
-                  onPress={handleSubmitFeedback}
-                  disabled={submittingFeedback || !feedbackRating}
-                  className="flex-1 ml-2 py-3 rounded-xl items-center"
+                <View className="flex-row justify-center mb-6">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Pressable
+                      key={star}
+                      onPress={() => setFeedbackRating(star)}
+                      style={{ padding: 8 }}
+                    >
+                      <Star
+                        size={40}
+                        color={colors.primary}
+                        fill={
+                          star <= feedbackRating ? colors.primary : "transparent"
+                        }
+                      />
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text
+                  className="text-sm mb-2"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {t("complaints.details.additionalComments")}
+                </Text>
+                <TextInput
+                  value={feedbackComment}
+                  onChangeText={setFeedbackComment}
+                  placeholder={t("complaints.details.shareYourExperience")}
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                  numberOfLines={4}
+                  className="rounded-xl p-4 mb-6"
                   style={{
-                    backgroundColor: feedbackRating
-                      ? colors.primary
-                      : colors.backgroundSecondary,
-                    opacity: submittingFeedback || !feedbackRating ? 0.5 : 1,
+                    backgroundColor: colors.backgroundSecondary,
+                    color: colors.textPrimary,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    textAlignVertical: "top",
                   }}
-                >
-                  {submittingFeedback ? (
-                    <ActivityIndicator size="small" color={colors.light} />
-                  ) : (
+                />
+
+                <View className="flex-row">
+                  <Pressable
+                    onPress={() => {
+                      setFeedbackModalVisible(false);
+                      setFeedbackRating(0);
+                      setFeedbackComment("");
+                    }}
+                    className="flex-1 mr-2 py-3 rounded-xl items-center"
+                    style={{ backgroundColor: colors.backgroundSecondary }}
+                  >
                     <Text
                       className="text-base font-semibold"
-                      style={{ color: colors.light }}
+                      style={{ color: colors.textPrimary }}
                     >
-                      {t("common.submit")}
+                      {t("common.cancel")}
                     </Text>
-                  )}
-                </Pressable>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleSubmitFeedback}
+                    disabled={submittingFeedback || !feedbackRating}
+                    className="flex-1 ml-2 py-3 rounded-xl items-center"
+                    style={{
+                      backgroundColor: feedbackRating
+                        ? colors.primary
+                        : colors.backgroundSecondary,
+                      opacity: submittingFeedback || !feedbackRating ? 0.5 : 1,
+                    }}
+                  >
+                    {submittingFeedback ? (
+                      <ActivityIndicator size="small" color={colors.light} />
+                    ) : (
+                      <Text
+                        className="text-base font-semibold"
+                        style={{ color: colors.light }}
+                      >
+                        {t("common.submit")}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </Modal>
       )}
 
@@ -3100,184 +3159,192 @@ function ComplaintDetailsInner() {
             className="flex-1 justify-end"
             style={{ backgroundColor: colors.dark + "80" }}
           >
-            <SafeAreaView
-              edges={["bottom"]}
-              className="rounded-t-3xl"
-              style={{ backgroundColor: colors.backgroundPrimary }}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
             >
-              <View className="p-6">
-                <View className="flex-row items-center justify-between mb-2">
-                  <Text
-                    className="text-xl font-bold"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    Edit Complaint
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setSpecialRequestModalVisible(false)}
-                    className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: colors.backgroundSecondary }}
-                  >
-                    <X size={18} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <Text
-                  className="text-sm mb-5"
-                  style={{ color: colors.textSecondary }}
+              <SafeAreaView
+                edges={["bottom"]}
+                className="rounded-t-3xl"
+                style={{ backgroundColor: colors.backgroundPrimary }}
+              >
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ padding: 24, paddingBottom: 32 }}
                 >
-                  Send a special request to update this complaint&apos;s
-                  department or priority.
-                </Text>
-
-                <Text
-                  className="text-sm mb-2"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Department
-                </Text>
-                <View className="flex-row flex-wrap mb-5" style={{ gap: 10 }}>
-                  {departmentOptions.map((option) => {
-                    const isSelected =
-                      specialRequestDepartment === option.value;
-
-                    return (
-                      <TouchableOpacity
-                        key={option.value}
-                        onPress={() =>
-                          setSpecialRequestDepartment(option.value)
-                        }
-                        className="px-4 py-3 rounded-2xl"
-                        style={{
-                          backgroundColor: isSelected
-                            ? colors.primary + "22"
-                            : colors.backgroundSecondary,
-                          borderWidth: 1,
-                          borderColor: isSelected
-                            ? colors.primary
-                            : colors.border,
-                        }}
-                      >
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{
-                            color: isSelected
-                              ? colors.primary
-                              : colors.textPrimary,
-                          }}
-                        >
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <Text
-                  className="text-sm mb-2"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Priority
-                </Text>
-                <View className="flex-row flex-wrap mb-5" style={{ gap: 10 }}>
-                  {["Low", "Medium", "High"].map((priority) => {
-                    const isSelected = specialRequestPriority === priority;
-
-                    return (
-                      <TouchableOpacity
-                        key={priority}
-                        onPress={() => setSpecialRequestPriority(priority)}
-                        className="px-5 py-3 rounded-2xl"
-                        style={{
-                          backgroundColor: isSelected
-                            ? colors.primary + "22"
-                            : colors.backgroundSecondary,
-                          borderWidth: 1,
-                          borderColor: isSelected
-                            ? colors.primary
-                            : colors.border,
-                        }}
-                      >
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{
-                            color: isSelected
-                              ? colors.primary
-                              : colors.textPrimary,
-                          }}
-                        >
-                          {priority}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <Text
-                  className="text-sm mb-2"
-                  style={{ color: colors.textSecondary }}
-                >
-                  Reason
-                </Text>
-                <TextInput
-                  value={specialRequestReason}
-                  onChangeText={setSpecialRequestReason}
-                  placeholder="Explain why this complaint needs to be updated"
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={4}
-                  className="rounded-xl p-4 mb-6"
-                  style={{
-                    backgroundColor: colors.backgroundSecondary,
-                    color: colors.textPrimary,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    textAlignVertical: "top",
-                  }}
-                />
-
-                <View className="flex-row" style={{ gap: 12 }}>
-                  <Pressable
-                    onPress={() => setSpecialRequestModalVisible(false)}
-                    className="flex-1 py-3 rounded-xl items-center"
-                    style={{ backgroundColor: colors.backgroundSecondary }}
-                  >
+                  <View className="flex-row items-center justify-between mb-2">
                     <Text
-                      className="text-base font-semibold"
+                      className="text-xl font-bold"
                       style={{ color: colors.textPrimary }}
                     >
-                      Cancel
+                      Edit Complaint
                     </Text>
-                  </Pressable>
+                    <TouchableOpacity
+                      onPress={() => setSpecialRequestModalVisible(false)}
+                      className="w-8 h-8 rounded-full items-center justify-center"
+                      style={{ backgroundColor: colors.backgroundSecondary }}
+                    >
+                      <X size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
 
-                  <Pressable
-                    onPress={() => submitSpecialRequest("update")}
-                    disabled={
-                      submittingSpecialRequest || !specialRequestReason.trim()
-                    }
-                    className="flex-1 py-3 rounded-xl items-center"
-                    style={{
-                      backgroundColor: colors.primary,
-                      opacity:
-                        submittingSpecialRequest || !specialRequestReason.trim()
-                          ? 0.5
-                          : 1,
-                    }}
+                  <Text
+                    className="text-sm mb-5"
+                    style={{ color: colors.textSecondary }}
                   >
-                    {submittingSpecialRequest ? (
-                      <ActivityIndicator size="small" color={colors.light} />
-                    ) : (
+                    Send a special request to update this complaint&apos;s
+                    department or priority.
+                  </Text>
+
+                  <Text
+                    className="text-sm mb-2"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Department
+                  </Text>
+                  <View className="flex-row flex-wrap mb-5" style={{ gap: 10 }}>
+                    {departmentOptions.map((option) => {
+                      const isSelected =
+                        specialRequestDepartment === option.value;
+
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          onPress={() =>
+                            setSpecialRequestDepartment(option.value)
+                          }
+                          className="px-4 py-3 rounded-2xl"
+                          style={{
+                            backgroundColor: isSelected
+                              ? colors.primary + "22"
+                              : colors.backgroundSecondary,
+                            borderWidth: 1,
+                            borderColor: isSelected
+                              ? colors.primary
+                              : colors.border,
+                          }}
+                        >
+                          <Text
+                            className="text-sm font-semibold"
+                            style={{
+                              color: isSelected
+                                ? colors.primary
+                                : colors.textPrimary,
+                            }}
+                          >
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Text
+                    className="text-sm mb-2"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Priority
+                  </Text>
+                  <View className="flex-row flex-wrap mb-5" style={{ gap: 10 }}>
+                    {["Low", "Medium", "High"].map((priority) => {
+                      const isSelected = specialRequestPriority === priority;
+
+                      return (
+                        <TouchableOpacity
+                          key={priority}
+                          onPress={() => setSpecialRequestPriority(priority)}
+                          className="px-5 py-3 rounded-2xl"
+                          style={{
+                            backgroundColor: isSelected
+                              ? colors.primary + "22"
+                              : colors.backgroundSecondary,
+                            borderWidth: 1,
+                            borderColor: isSelected
+                              ? colors.primary
+                              : colors.border,
+                          }}
+                        >
+                          <Text
+                            className="text-sm font-semibold"
+                            style={{
+                              color: isSelected
+                                ? colors.primary
+                                : colors.textPrimary,
+                            }}
+                          >
+                            {priority}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Text
+                    className="text-sm mb-2"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Reason
+                  </Text>
+                  <TextInput
+                    value={specialRequestReason}
+                    onChangeText={setSpecialRequestReason}
+                    placeholder="Explain why this complaint needs to be updated"
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    numberOfLines={4}
+                    className="rounded-xl p-4 mb-6"
+                    style={{
+                      backgroundColor: colors.backgroundSecondary,
+                      color: colors.textPrimary,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      textAlignVertical: "top",
+                    }}
+                  />
+
+                  <View className="flex-row" style={{ gap: 12 }}>
+                    <Pressable
+                      onPress={() => setSpecialRequestModalVisible(false)}
+                      className="flex-1 py-3 rounded-xl items-center"
+                      style={{ backgroundColor: colors.backgroundSecondary }}
+                    >
                       <Text
                         className="text-base font-semibold"
-                        style={{ color: colors.light }}
+                        style={{ color: colors.textPrimary }}
                       >
-                        Send Request
+                        Cancel
                       </Text>
-                    )}
-                  </Pressable>
-                </View>
-              </View>
-            </SafeAreaView>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => submitSpecialRequest("update")}
+                      disabled={
+                        submittingSpecialRequest || !specialRequestReason.trim()
+                      }
+                      className="flex-1 py-3 rounded-xl items-center"
+                      style={{
+                        backgroundColor: colors.primary,
+                        opacity:
+                          submittingSpecialRequest || !specialRequestReason.trim()
+                            ? 0.5
+                            : 1,
+                      }}
+                    >
+                      {submittingSpecialRequest ? (
+                        <ActivityIndicator size="small" color={colors.light} />
+                      ) : (
+                        <Text
+                          className="text-base font-semibold"
+                          style={{ color: colors.light }}
+                        >
+                          Send Request
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </ScrollView>
+              </SafeAreaView>
+            </KeyboardAvoidingView>
           </View>
         </Modal>
       )}
@@ -3317,79 +3384,89 @@ function ComplaintDetailsInner() {
             className="flex-1 justify-end"
             style={{ backgroundColor: colors.dark + "80" }}
           >
-            <View
-              className="rounded-t-3xl p-6"
-              style={{ backgroundColor: colors.backgroundPrimary }}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
             >
-              <Text
-                className="text-xl font-bold mb-4 text-center"
-                style={{ color: colors.textPrimary }}
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}
               >
-                {t("complaints.details.requestReworkTitle")}
-              </Text>
-
-              <Text
-                className="text-sm mb-2"
-                style={{ color: colors.textSecondary }}
-              >
-                {t("complaints.details.reworkReasonRequired")}
-              </Text>
-              <TextInput
-                value={reworkReason}
-                onChangeText={setReworkReason}
-                placeholder={t("complaints.details.explainWhatNeedsFixing")}
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                numberOfLines={4}
-                className="rounded-xl p-4 mb-6"
-                style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  color: colors.textPrimary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  textAlignVertical: "top",
-                }}
-              />
-
-              <View className="flex-row">
-                <Pressable
-                  onPress={() => {
-                    setApprovalModalVisible(false);
-                    setReworkReason("");
-                  }}
-                  className="flex-1 mr-2 py-3 rounded-xl items-center"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
+                <View
+                  className="rounded-t-3xl p-6"
+                  style={{ backgroundColor: colors.backgroundPrimary }}
                 >
                   <Text
-                    className="text-base font-semibold"
+                    className="text-xl font-bold mb-4 text-center"
                     style={{ color: colors.textPrimary }}
                   >
-                    {t("common.cancel")}
+                    {t("complaints.details.requestReworkTitle")}
                   </Text>
-                </Pressable>
 
-                <Pressable
-                  onPress={handleRejectCompletion}
-                  disabled={sendingRework || !reworkReason.trim()}
-                  className="flex-1 ml-2 py-3 rounded-xl items-center"
-                  style={{
-                    backgroundColor: colors.danger,
-                    opacity: sendingRework || !reworkReason.trim() ? 0.5 : 1,
-                  }}
-                >
-                  {sendingRework ? (
-                    <ActivityIndicator size="small" color={colors.light} />
-                  ) : (
-                    <Text
-                      className="text-base font-semibold"
-                      style={{ color: colors.light }}
+                  <Text
+                    className="text-sm mb-2"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("complaints.details.reworkReasonRequired")}
+                  </Text>
+                  <TextInput
+                    value={reworkReason}
+                    onChangeText={setReworkReason}
+                    placeholder={t("complaints.details.explainWhatNeedsFixing")}
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    numberOfLines={4}
+                    className="rounded-xl p-4 mb-6"
+                    style={{
+                      backgroundColor: colors.backgroundSecondary,
+                      color: colors.textPrimary,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      textAlignVertical: "top",
+                    }}
+                  />
+
+                  <View className="flex-row">
+                    <Pressable
+                      onPress={() => {
+                        setApprovalModalVisible(false);
+                        setReworkReason("");
+                      }}
+                      className="flex-1 mr-2 py-3 rounded-xl items-center"
+                      style={{ backgroundColor: colors.backgroundSecondary }}
                     >
-                      {t("complaints.details.sendForRework")}
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-            </View>
+                      <Text
+                        className="text-base font-semibold"
+                        style={{ color: colors.textPrimary }}
+                      >
+                        {t("common.cancel")}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={handleRejectCompletion}
+                      disabled={sendingRework || !reworkReason.trim()}
+                      className="flex-1 ml-2 py-3 rounded-xl items-center"
+                      style={{
+                        backgroundColor: colors.danger,
+                        opacity: sendingRework || !reworkReason.trim() ? 0.5 : 1,
+                      }}
+                    >
+                      {sendingRework ? (
+                        <ActivityIndicator size="small" color={colors.light} />
+                      ) : (
+                        <Text
+                          className="text-base font-semibold"
+                          style={{ color: colors.light }}
+                        >
+                          {t("complaints.details.sendForRework")}
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
           </View>
         </Modal>
       )}

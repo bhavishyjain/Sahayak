@@ -73,7 +73,7 @@ function NotificationItem({ item, colors, onRead, t, typeConfig }) {
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      onPress={() => isUnread && onRead(item._id)}
+      onPress={() => onRead(item)}
     >
       <View
         className="flex-row items-start px-4 py-4"

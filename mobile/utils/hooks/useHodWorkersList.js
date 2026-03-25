@@ -6,6 +6,7 @@ export function useHodWorkersList({ search = "", limit = 20 } = {}) {
   const trimmedSearch = search.trim();
   const query = useInfiniteQuery({
     queryKey: ["hod-workers-list", { search: trimmedSearch, limit }],
+    placeholderData: (previousData) => previousData,
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const response = await apiCall({

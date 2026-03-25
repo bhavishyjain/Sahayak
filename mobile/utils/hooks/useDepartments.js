@@ -25,7 +25,9 @@ export default function useDepartments({
         method: "GET",
         url: `${DEPARTMENTS_URL}${querySuffix}`,
       });
-      return normalizeDepartmentRows(response?.data ?? []);
+      return normalizeDepartmentRows(
+        response?.rawData?.departments ?? response?.data ?? [],
+      );
     },
   });
 

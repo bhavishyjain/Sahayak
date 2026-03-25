@@ -109,7 +109,10 @@ export default function WorkerAssignment() {
   const insets = useSafeAreaInsets();
   const modalScrollRef = useRef(null);
   const router = useRouter();
-  const { complaintId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const complaintId = Array.isArray(params?.complaintId)
+    ? params.complaintId[0]
+    : params?.complaintId;
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
@@ -122,6 +125,7 @@ export default function WorkerAssignment() {
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(new Set()); // worker IDs to add
+  const [selectedLeaderId, setSelectedLeaderId] = useState("");
   const [taskDescs, setTaskDescs] = useState({}); // { workerId: string }
   const [modalKeyboardHeight, setModalKeyboardHeight] = useState(0);
 
@@ -138,8 +142,19 @@ export default function WorkerAssignment() {
     assignWorkers,
     removeWorker,
     updateTask,
+    setLeader,
     assigning,
   } = useHodWorkerAssignment(complaintId, t);
+
+  useEffect(() => {
+    if (complaintId) return;
+    Toast.show({
+      type: "error",
+      text1: t("hod.workerAssignment.toasts.loadFailedTitle"),
+      text2: t("hod.workerAssignment.toasts.loadFailedMessage"),
+    });
+    router.back();
+  }, [complaintId, router, t]);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   const load = async (isRefresh = false) => {
@@ -167,6 +182,7 @@ export default function WorkerAssignment() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!complaintId) return undefined;
       load(false);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [complaintId, t, refetchAssignment]),
@@ -205,8 +221,16 @@ export default function WorkerAssignment() {
           delete n[workerId];
           return n;
         });
+        setSelectedLeaderId((currentLeaderId) => {
+          if (currentLeaderId !== workerId) return currentLeaderId;
+          const remainingLeaderId = [...next][0];
+          return remainingLeaderId ? String(remainingLeaderId) : "";
+        });
       } else {
         next.add(workerId);
+        setSelectedLeaderId((currentLeaderId) =>
+          currentLeaderId ? currentLeaderId : String(workerId),
+        );
       }
       return next;
     });
@@ -216,6 +240,7 @@ export default function WorkerAssignment() {
     setShowAddPanel(true);
     setSearch("");
     setSelected(new Set());
+    setSelectedLeaderId("");
     setTaskDescs({});
   };
 
@@ -224,6 +249,7 @@ export default function WorkerAssignment() {
     setShowAddPanel(false);
     setSearch("");
     setSelected(new Set());
+    setSelectedLeaderId("");
     setTaskDescs({});
     setModalKeyboardHeight(0);
   };
@@ -258,9 +284,11 @@ export default function WorkerAssignment() {
       selectedWorkerIds: selected,
       assignedWorkers,
       taskDescs,
+      selectedLeaderId,
     });
     if (ok) {
       setSelected(new Set());
+      setSelectedLeaderId("");
       setTaskDescs({});
       setShowAddPanel(false);
       await load(true);
@@ -313,6 +341,17 @@ export default function WorkerAssignment() {
     } finally {
       setUpdatingWorkerId(null);
     }
+  };
+
+  const handleSetLeader = async (worker) => {
+    if (!worker?.workerId || worker?.isLeader || assignedWorkers.length < 2) return;
+    const ok = await setLeader({
+      workerId: worker.workerId,
+      assignedWorkers,
+      workerName: worker.workerName,
+    });
+    if (!ok) return;
+    await load(true);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -442,13 +481,28 @@ export default function WorkerAssignment() {
                 <WorkerAvatar name={w.workerName} colors={colors} t={t} />
                 <View className="flex-1">
                   <View className="mb-1">
-                    <Text
-                      className="text-sm font-semibold flex-1 mr-2"
-                      style={{ color: colors.textPrimary }}
-                      numberOfLines={1}
-                    >
-                      {w.workerName}
-                    </Text>
+                    <View className="flex-row items-center flex-wrap">
+                      <Text
+                        className="text-sm font-semibold flex-1 mr-2"
+                        style={{ color: colors.textPrimary }}
+                        numberOfLines={1}
+                      >
+                        {w.workerName}
+                      </Text>
+                      {assignedWorkers.length > 1 && w.isLeader ? (
+                        <View
+                          className="px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: colors.primary + "18" }}
+                        >
+                          <Text
+                            className="text-[10px] font-bold"
+                            style={{ color: colors.primary }}
+                          >
+                            {t("hod.workerAssignment.labels.leader")}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
 
                   {!!w.taskDescription && (
@@ -476,6 +530,22 @@ export default function WorkerAssignment() {
                   )}
 
                   <View className="flex-row mt-1">
+                    {assignedWorkers.length > 1 && !w.isLeader ? (
+                      <TouchableOpacity
+                        onPress={() => handleSetLeader(w)}
+                        disabled={assigning}
+                        className="flex-row items-center px-3 py-1.5 rounded-lg mr-2"
+                        style={{ backgroundColor: colors.warning + "20" }}
+                      >
+                        <Text
+                          className="text-xs font-semibold"
+                          style={{ color: colors.warning }}
+                        >
+                          {t("hod.workerAssignment.actions.makeLeader")}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+
                     <TouchableOpacity
                       onPress={() => openUpdateTaskDialog(w)}
                       disabled={Boolean(updatingWorkerId)}
@@ -609,6 +679,7 @@ export default function WorkerAssignment() {
                       filteredWorkers.map((w) => {
                         const id = String(w.id ?? w._id ?? "");
                         const isSelected = selected.has(id);
+                        const isLeader = selectedLeaderId === id;
                         const workerName = getWorkerDisplayName(w, t);
 
                         return (
@@ -658,6 +729,35 @@ export default function WorkerAssignment() {
 
                             {isSelected && (
                               <View className="mb-2 ml-11">
+                                {selected.size > 1 && assignedWorkers.length === 0 ? (
+                                  <TouchableOpacity
+                                    onPress={() => setSelectedLeaderId(id)}
+                                    className="self-start px-3 py-1.5 rounded-lg mb-2"
+                                    style={{
+                                      backgroundColor: isLeader
+                                        ? colors.primary + "22"
+                                        : colors.backgroundSecondary,
+                                      borderWidth: 1,
+                                      borderColor: isLeader
+                                        ? colors.primary
+                                        : colors.border,
+                                    }}
+                                  >
+                                    <Text
+                                      className="text-xs font-semibold"
+                                      style={{
+                                        color: isLeader
+                                          ? colors.primary
+                                          : colors.textSecondary,
+                                      }}
+                                    >
+                                      {isLeader
+                                        ? t("hod.workerAssignment.labels.selectedLeader")
+                                        : t("hod.workerAssignment.actions.makeLeader")}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ) : null}
+
                                 <PaperTextInput
                                   mode="outlined"
                                   dense
