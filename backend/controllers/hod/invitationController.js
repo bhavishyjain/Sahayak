@@ -11,6 +11,34 @@ const {
 } = require("../../services/accessService");
 const { sendWorkerInvitation } = require("../../services/emailService");
 
+function buildManualInviteLinks(
+  inviteToken,
+  email,
+  department,
+  role = "worker",
+) {
+  const baseUrl = String(process.env.APP_LINK_BASE_URL || "https://sahayak.app")
+    .trim()
+    .replace(/\/+$/, "");
+
+  const webInviteUrl = new URL(`${baseUrl}/accept-invite`);
+  webInviteUrl.searchParams.set("token", inviteToken);
+  webInviteUrl.searchParams.set("email", email);
+  webInviteUrl.searchParams.set("department", department);
+  webInviteUrl.searchParams.set("role", role);
+
+  const deepLink = new URL("sahayak://accept-invite");
+  deepLink.searchParams.set("token", inviteToken);
+  deepLink.searchParams.set("email", email);
+  deepLink.searchParams.set("department", department);
+  deepLink.searchParams.set("role", role);
+
+  return {
+    webInviteLink: webInviteUrl.toString(),
+    appInviteLink: deepLink.toString(),
+  };
+}
+
 exports.inviteWorker = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { email } = req.body;
@@ -77,10 +105,29 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
     );
   } catch (emailError) {
     console.error("Failed to send invitation email:", emailError);
-    await invitation.deleteOne();
-    throw new AppError(
-      emailError?.message || "Failed to send invitation email",
-      500,
+    const links = buildManualInviteLinks(
+      inviteToken,
+      normalizedEmail,
+      hod.department,
+      "worker",
+    );
+
+    return sendSuccess(
+      res,
+      {
+        invitation: {
+          id: invitation._id,
+          email: invitation.email,
+          department: invitation.department,
+          invitedBy: invitation.invitedBy,
+          expiresAt: invitation.expiresAt,
+        },
+        ...links,
+        emailDelivery: "failed",
+        message:
+          "Invitation created, but email could not be delivered automatically. Share the invite link manually.",
+      },
+      "Worker invitation created (manual share required)",
     );
   }
 

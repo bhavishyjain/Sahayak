@@ -1,5 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
+import * as IntentLauncher from "expo-intent-launcher";
 import { Linking, Platform } from "react-native";
 import useApiQuery from "./useApiQuery";
 import apiCall from "../api";
@@ -13,6 +13,10 @@ import getUserAuth from "../userAuth";
 import { queryKeys } from "../queryKeys";
 
 const REPORTS_FOLDER_NAME = "Sahayak";
+
+function logReportDebug(message, meta = {}) {
+  console.log(`[reports-download] ${message}`, meta);
+}
 
 async function getAuthToken() {
   // Try fast in-memory cache first
@@ -44,20 +48,95 @@ async function ensureReportsDirectory() {
   return reportsDir;
 }
 
-async function downloadReportFile({ url, fileName, headers }) {
-  const reportsDir = await ensureReportsDirectory();
-  const fileUri = `${reportsDir}${fileName}`;
+async function validateSavedReportFile(fileUri, ext) {
+  const savedInfo = await FileSystem.getInfoAsync(fileUri);
+  logReportDebug("validate-saved-file", {
+    fileUri,
+    ext,
+    exists: savedInfo?.exists,
+    size: savedInfo?.size,
+  });
+
+  if (!savedInfo?.exists || !savedInfo?.size) {
+    throw new Error("Report file was saved empty");
+  }
+
+  if (ext === "pdf") {
+    const pdfHeaderBase64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+      position: 0,
+      length: 12,
+    });
+
+    logReportDebug("pdf-header-check", {
+      fileUri,
+      headerBase64Prefix: pdfHeaderBase64.slice(0, 12),
+    });
+
+    if (!pdfHeaderBase64.startsWith("JVBERi0")) {
+      throw new Error("Downloaded PDF is invalid");
+    }
+
+    // Guard against tiny/truncated payloads while avoiding strict EOF checks
+    // that can be unreliable across platform file reads.
+    if (Number(savedInfo.size) < 1024) {
+      throw new Error("Downloaded PDF appears incomplete");
+    }
+  }
+}
+
+async function tryBinaryDownload({ url, fileUri, headers, ext }) {
+  logReportDebug("binary-download-start", { url, fileUri, ext });
+  const downloadResult = await FileSystem.downloadAsync(url, fileUri, {
+    headers: {
+      ...headers,
+      Accept: "application/octet-stream",
+    },
+  });
+
+  logReportDebug("binary-download-result", {
+    status: downloadResult?.status,
+    uri: downloadResult?.uri,
+    headers: downloadResult?.headers,
+  });
+
+  if (downloadResult?.status !== 200) {
+    throw new Error(`Download failed with status ${downloadResult?.status}`);
+  }
+
+  await validateSavedReportFile(fileUri, ext);
+  return fileUri;
+}
+
+async function tryBase64Download({ url, fileUri, headers, ext }) {
+  const hasQuery = url.includes("?");
+  const transportUrl = `${url}${hasQuery ? "&" : "?"}transport=base64`;
+
+  logReportDebug("base64-download-start", {
+    url: transportUrl,
+    fileUri,
+    ext,
+  });
+
   const response = await apiCall({
     method: "GET",
-    url,
+    url: transportUrl,
     headers: {
       ...headers,
       Accept: "application/json",
       "X-Report-Transport": "base64",
     },
   });
-  const base64Content =
-    response?.data?.contentBase64 ?? response?.rawData?.contentBase64;
+
+  const payload = response?.data || response?.rawData?.data || {};
+  const base64Content = payload?.contentBase64;
+  logReportDebug("base64-download-result", {
+    hasContent: Boolean(base64Content),
+    base64Length: base64Content?.length || 0,
+    byteLength: payload?.byteLength,
+    filename: payload?.filename,
+    contentType: payload?.contentType,
+  });
 
   if (!base64Content) {
     throw new Error(
@@ -65,67 +144,60 @@ async function downloadReportFile({ url, fileName, headers }) {
     );
   }
 
-  await FileSystem.writeAsStringAsync(
-    fileUri,
-    base64Content,
-    {
-      encoding: FileSystem.EncodingType.Base64,
-    },
-  );
+  await FileSystem.writeAsStringAsync(fileUri, base64Content, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  await validateSavedReportFile(fileUri, ext);
   return fileUri;
+}
+
+async function downloadReportFile({ url, fileName, headers, ext }) {
+  const reportsDir = await ensureReportsDirectory();
+  const fileUri = `${reportsDir}${fileName}`;
+
+  if (ext === "pdf") {
+    logReportDebug("pdf-base64-forced", { url, fileUri });
+    return tryBase64Download({ url, fileUri, headers, ext });
+  }
+
+  try {
+    return await tryBinaryDownload({ url, fileUri, headers, ext });
+  } catch (error) {
+    logReportDebug("binary-download-failed-falling-back", {
+      reason: error?.message || String(error),
+      fileUri,
+      ext,
+    });
+    // Some app/network stacks alter binary payload handling; base64 transport is a safe fallback.
+    return tryBase64Download({ url, fileUri, headers, ext });
+  }
 }
 
 async function openDownloadedFile(uri, mimeType) {
   try {
     if (Platform.OS === "android") {
       const contentUri = await FileSystem.getContentUriAsync(uri);
-      await Linking.openURL(contentUri);
-      return;
+      logReportDebug("open-android-intent", { uri, contentUri, mimeType });
+      await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+        data: contentUri,
+        type: mimeType,
+        flags: 1,
+      });
+      return true;
     }
 
+    logReportDebug("open-non-android", { uri, mimeType });
     await Linking.openURL(uri);
-    return;
-  } catch {
-    if (Platform.OS === "android") {
-      try {
-        const contentUri = await FileSystem.getContentUriAsync(uri);
-        await Linking.openURL(contentUri);
-      } catch {
-        try {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(uri, {
-              mimeType,
-              dialogTitle: "Open Report",
-              UTI:
-                mimeType === "application/pdf"
-                  ? "com.adobe.pdf"
-                  : "public.data",
-            });
-          }
-        } catch {
-          // Download succeeded; opening is best-effort on Android.
-        }
-      }
-    } else {
-      try {
-        await Linking.openURL(uri);
-      } catch {
-        try {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(uri, {
-              mimeType,
-              dialogTitle: "Open Report",
-              UTI:
-                mimeType === "application/pdf"
-                  ? "com.adobe.pdf"
-                  : "public.data",
-            });
-          }
-        } catch {
-          // Download succeeded; opening is best-effort on iOS.
-        }
-      }
-    }
+    return true;
+  } catch (error) {
+    logReportDebug("open-failed", {
+      uri,
+      mimeType,
+      reason: error?.message || String(error),
+    });
+    // Opening is best-effort only. Download should still be treated as successful.
+    return false;
   }
 }
 
@@ -158,6 +230,11 @@ export function useDepartmentBreakdown(filters, options = {}) {
 
 export function useDownloadReport() {
   const download = async ({ format, filters }) => {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("Authentication required. Please log in again.");
+    }
+
     const suffix = buildReportQueryString(filters);
     const url = `${REPORT_DOWNLOAD_URL(format)}${suffix}`;
 
@@ -171,15 +248,26 @@ export function useDownloadReport() {
     const timestamp = getTimestampLabel();
     const fileName = `sahayak_report_${timestamp}.${ext}`;
 
-    const token = await getAuthToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = { Authorization: `Bearer ${token}` };
+    logReportDebug("download-start", { format, ext, url });
     const savedFileUri = await downloadReportFile({
       url,
       fileName,
       headers,
+      ext,
     });
 
-    await openDownloadedFile(savedFileUri, mimeType);
+    const opened = await openDownloadedFile(savedFileUri, mimeType);
+
+    logReportDebug("download-complete", {
+      format,
+      ext,
+      fileName,
+      uri: savedFileUri,
+      opened,
+    });
+
+    return { uri: savedFileUri, fileName, opened };
   };
 
   return { download };

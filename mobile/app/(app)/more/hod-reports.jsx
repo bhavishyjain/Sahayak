@@ -211,17 +211,25 @@ export default function HODReports() {
   const downloadReport = async (format) => {
     try {
       setDownloadingFormat(format);
-      await download({ format, filters: normalizedFilters });
+      const result = await download({ format, filters: normalizedFilters });
       Toast.show({
         type: "success",
         text1: t("reports.reportGenerated"),
-        text2: t("reports.reportReady", { format: format.toUpperCase() }),
+        text2:
+          result?.opened === false
+            ? `${t("reports.reportReady", { format: format.toUpperCase() })}: ${result?.fileName || "file"}. Could not auto-open; open it from your file manager.`
+            : result?.fileName
+              ? `${t("reports.reportReady", { format: format.toUpperCase() })}: ${result.fileName}`
+              : t("reports.reportReady", { format: format.toUpperCase() }),
       });
     } catch (error) {
       Toast.show({
         type: "error",
         text1: t("toast.error.title"),
-        text2: error?.response?.data?.message ?? t("reports.generateFailed"),
+        text2:
+          error?.response?.data?.message ||
+          error?.message ||
+          t("reports.generateFailed"),
       });
     } finally {
       setDownloadingFormat(null);

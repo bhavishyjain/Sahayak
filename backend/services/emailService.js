@@ -32,6 +32,13 @@ function assertEmailConfigured() {
   if (!process.env.RESEND_API_KEY) {
     throw new Error("Email service is not configured (missing RESEND_API_KEY)");
   }
+  if (!process.env.EMAIL_FROM) {
+    throw new Error("Email service is not configured (missing EMAIL_FROM)");
+  }
+}
+
+function getEmailFrom() {
+  return String(process.env.EMAIL_FROM || "").trim();
 }
 
 /**
@@ -224,7 +231,7 @@ const sendWorkerInvitation = async (
     );
 
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
+      from: getEmailFrom(),
       to: [email],
       subject: `Invitation to Join ${department} Department as ${invitedRole === "head" ? "Department Head" : "Worker"}`,
       html,
@@ -369,7 +376,7 @@ const sendComplaintRegistered = async (userEmail, userName, complaintData) => {
     );
 
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
+      from: getEmailFrom(),
       to: [userEmail],
       subject: `Complaint Registered - Ticket #${ticketId}`,
       html,
@@ -526,7 +533,7 @@ const sendComplaintCompleted = async (
     );
 
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
+      from: getEmailFrom(),
       to: [userEmail],
       subject: `Complaint Resolved - Ticket #${ticketId}`,
       html,
@@ -588,7 +595,7 @@ const sendEmailWithAttachment = async ({
     .filter(Boolean);
 
   const { data, error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
+    from: getEmailFrom(),
     to: Array.isArray(to) ? to : [to],
     subject,
     text: text || undefined,
@@ -673,7 +680,7 @@ const sendEmailVerification = async (email, fullName, token) => {
   );
 
   const { data, error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
+    from: getEmailFrom(),
     to: [email],
     subject: "Verify your Sahayak email address",
     html,
@@ -748,7 +755,7 @@ const sendPasswordResetEmail = async (email, fullName, token) => {
   );
 
   const { data, error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM || "Sahayak <onboarding@resend.dev>",
+    from: getEmailFrom(),
     to: [email],
     subject: "Reset your Sahayak password",
     html,

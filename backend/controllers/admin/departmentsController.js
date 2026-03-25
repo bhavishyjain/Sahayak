@@ -16,6 +16,34 @@ const {
 const { escapeRegex } = require("../../utils/normalize");
 const { emitComplaintUpdated } = require("../../services/realtimeService");
 
+function buildManualInviteLinks(
+  inviteToken,
+  email,
+  department,
+  role = "worker",
+) {
+  const baseUrl = String(process.env.APP_LINK_BASE_URL || "https://sahayak.app")
+    .trim()
+    .replace(/\/+$/, "");
+
+  const webInviteUrl = new URL(`${baseUrl}/accept-invite`);
+  webInviteUrl.searchParams.set("token", inviteToken);
+  webInviteUrl.searchParams.set("email", email);
+  webInviteUrl.searchParams.set("department", department);
+  webInviteUrl.searchParams.set("role", role);
+
+  const deepLink = new URL("sahayak://accept-invite");
+  deepLink.searchParams.set("token", inviteToken);
+  deepLink.searchParams.set("email", email);
+  deepLink.searchParams.set("department", department);
+  deepLink.searchParams.set("role", role);
+
+  return {
+    webInviteLink: webInviteUrl.toString(),
+    appInviteLink: deepLink.toString(),
+  };
+}
+
 async function assertDepartmentComplaintsResolved(departmentName) {
   const departmentRegex = new RegExp(
     `^${escapeRegex(String(departmentName || "").trim())}$`,
@@ -23,7 +51,10 @@ async function assertDepartmentComplaintsResolved(departmentName) {
   );
   const [totalComplaints, resolvedComplaints] = await Promise.all([
     Complaint.countDocuments({ department: departmentRegex }),
-    Complaint.countDocuments({ department: departmentRegex, status: "resolved" }),
+    Complaint.countDocuments({
+      department: departmentRegex,
+      status: "resolved",
+    }),
   ]);
 
   if (totalComplaints !== resolvedComplaints) {
@@ -95,7 +126,10 @@ exports.updateDepartment = asyncHandler(async (req, res) => {
   await department.save();
 
   await Promise.all([
-    User.updateMany({ department: departmentRegex }, { $set: { department: name } }),
+    User.updateMany(
+      { department: departmentRegex },
+      { $set: { department: name } },
+    ),
     Complaint.updateMany(
       { department: departmentRegex },
       { $set: { department: name, "aiAnalysis.department": name } },
@@ -126,7 +160,11 @@ exports.updateDepartment = asyncHandler(async (req, res) => {
   );
 
   const payload = department.toObject();
-  return sendSuccess(res, { data: payload, department: payload }, "Department updated successfully");
+  return sendSuccess(
+    res,
+    { data: payload, department: payload },
+    "Department updated successfully",
+  );
 });
 
 exports.deactivateDepartment = asyncHandler(async (req, res) => {
@@ -146,7 +184,11 @@ exports.deactivateDepartment = asyncHandler(async (req, res) => {
   );
 
   const payload = department.toObject();
-  return sendSuccess(res, { data: payload, department: payload }, "Department deactivated successfully");
+  return sendSuccess(
+    res,
+    { data: payload, department: payload },
+    "Department deactivated successfully",
+  );
 });
 
 exports.reactivateDepartment = asyncHandler(async (req, res) => {
@@ -177,14 +219,24 @@ exports.deleteDepartment = asyncHandler(async (req, res) => {
 
   await assertDepartmentComplaintsResolved(department.name);
 
-  const fallback = await assertDepartmentExists("Other", { includeInactive: true });
+  const fallback = await assertDepartmentExists("Other", {
+    includeInactive: true,
+  });
   const fallbackName = fallback.name;
 
   await Promise.all([
-    User.updateMany({ department: department.name }, { $set: { department: fallbackName } }),
+    User.updateMany(
+      { department: department.name },
+      { $set: { department: fallbackName } },
+    ),
     Complaint.updateMany(
       { department: department.name },
-      { $set: { department: fallbackName, "aiAnalysis.department": fallbackName } },
+      {
+        $set: {
+          department: fallbackName,
+          "aiAnalysis.department": fallbackName,
+        },
+      },
     ),
     WorkerInvitation.updateMany(
       { department: department.name },
@@ -214,7 +266,10 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
-    if (existingUser.role === role && existingUser.department === department.name) {
+    if (
+      existingUser.role === role &&
+      existingUser.department === department.name
+    ) {
       throw new AppError(
         `This user is already a ${role === "head" ? "department head" : "worker"} in this department`,
         400,
@@ -227,7 +282,10 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
   }
 
   const inviteToken = crypto.randomBytes(32).toString("hex");
-  const tokenHash = crypto.createHash("sha256").update(inviteToken).digest("hex");
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(inviteToken)
+    .digest("hex");
   const inviteExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   await WorkerInvitation.updateMany(
@@ -261,10 +319,28 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
     );
   } catch (emailError) {
     console.error("Failed to send invitation email:", emailError);
-    await invitation.deleteOne();
-    throw new AppError(
-      emailError?.message || "Failed to send invitation email",
-      500,
+    const links = buildManualInviteLinks(
+      inviteToken,
+      email,
+      department.name,
+      role,
+    );
+
+    return sendSuccess(
+      res,
+      {
+        data: {
+          id: invitation._id,
+          email: invitation.email,
+          department: invitation.department,
+          role: invitation.role,
+          expiresAt: invitation.expiresAt,
+          ...links,
+          emailDelivery: "failed",
+        },
+      },
+      `${role === "head" ? "HOD" : "Worker"} invitation created (manual share required)`,
+      201,
     );
   }
 
@@ -330,5 +406,9 @@ exports.revokeDepartmentInvitation = asyncHandler(async (req, res) => {
   invitation.revokedAt = new Date();
   await invitation.save();
 
-  return sendSuccess(res, { data: { id: invitation._id } }, "Invitation revoked");
+  return sendSuccess(
+    res,
+    { data: { id: invitation._id } },
+    "Invitation revoked",
+  );
 });
