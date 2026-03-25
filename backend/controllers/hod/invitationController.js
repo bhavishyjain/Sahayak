@@ -17,7 +17,7 @@ function buildManualInviteLinks(
   department,
   role = "worker",
 ) {
-  const baseUrl = String(process.env.APP_LINK_BASE_URL || "https://sahayak.app")
+  const baseUrl = String(process.env.APP_LINK_BASE_URL)
     .trim()
     .replace(/\/+$/, "");
 

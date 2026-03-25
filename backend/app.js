@@ -97,9 +97,7 @@ app.get("/.well-known/apple-app-site-association", (_req, res) => {
 
 app.get("/.well-known/assetlinks.json", (_req, res) => {
   const packageName = process.env.ANDROID_APP_PACKAGE || "com.sahayak.mobile";
-  const fingerprints = String(
-    process.env.ANDROID_APP_SHA256_CERT_FINGERPRINTS || "",
-  )
+  const fingerprints = String(process.env.ANDROID_APP_SHA256_CERT_FINGERPRINTS)
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
@@ -116,6 +114,83 @@ app.get("/.well-known/assetlinks.json", (_req, res) => {
     })),
   );
 });
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildDeepLinkUrl(pathname, query = {}) {
+  const normalizedPath = String(pathname || "").replace(/^\/+/, "");
+  const url = new URL(`sahayak://${normalizedPath}`);
+  Object.entries(query).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    url.searchParams.set(key, String(value));
+  });
+  return url.toString();
+}
+
+function renderDeepLinkBridgePage({ deepLinkUrl, webUrl }) {
+  const safeDeepLink = escapeHtml(deepLinkUrl);
+  const safeWebUrl = escapeHtml(webUrl);
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Sahayak</title>
+    <style>
+      body { margin: 0; background: #f3f4f6; color: #111827; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; }
+      .card { max-width: 560px; margin: 48px auto; background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); }
+      h1 { margin: 0 0 8px; font-size: 24px; }
+      p { margin: 0 0 14px; color: #4b5563; }
+      .btn { display: inline-block; margin-top: 8px; margin-right: 8px; text-decoration: none; border-radius: 10px; padding: 12px 16px; font-weight: 600; }
+      .btn-primary { background: #111827; color: #fff; }
+      .btn-secondary { background: #e5e7eb; color: #111827; }
+      .meta { margin-top: 12px; font-size: 12px; color: #6b7280; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Opening Sahayak</h1>
+      <p>If the app does not open automatically, tap Open App.</p>
+      <a class="btn btn-primary" href="${safeDeepLink}">Open App</a>
+      <a class="btn btn-secondary" href="${safeWebUrl}">Open in Browser</a>
+      <div class="meta">Deep link: ${safeDeepLink}</div>
+    </div>
+    <script>
+      window.location.replace(${JSON.stringify(deepLinkUrl)});
+    </script>
+  </body>
+</html>`;
+}
+
+app.get(
+  [
+    "/home",
+    "/accept-invite",
+    "/verify-email",
+    "/reset-password",
+    "/complaints/complaint-details",
+  ],
+  (req, res) => {
+    const deepLinkUrl = buildDeepLinkUrl(req.path, req.query || {});
+    const webBase = String(
+      process.env.APP_LINK_BASE_URL || "https://sahayak-zqp7.onrender.com",
+    )
+      .trim()
+      .replace(/\/+$/, "");
+    const webUrl = `${webBase}${req.originalUrl}`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(200).send(renderDeepLinkBridgePage({ deepLinkUrl, webUrl }));
+  },
+);
 
 app.get("/ping", (_req, res) => res.status(200).send("pong"));
 

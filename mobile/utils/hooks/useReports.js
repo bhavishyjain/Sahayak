@@ -14,10 +14,6 @@ import { queryKeys } from "../queryKeys";
 
 const REPORTS_FOLDER_NAME = "Sahayak";
 
-function logReportDebug(message, meta = {}) {
-  console.log(`[reports-download] ${message}`, meta);
-}
-
 async function getAuthToken() {
   // Try fast in-memory cache first
   const cached = getCachedToken();
@@ -50,12 +46,6 @@ async function ensureReportsDirectory() {
 
 async function validateSavedReportFile(fileUri, ext) {
   const savedInfo = await FileSystem.getInfoAsync(fileUri);
-  logReportDebug("validate-saved-file", {
-    fileUri,
-    ext,
-    exists: savedInfo?.exists,
-    size: savedInfo?.size,
-  });
 
   if (!savedInfo?.exists || !savedInfo?.size) {
     throw new Error("Report file was saved empty");
@@ -66,11 +56,6 @@ async function validateSavedReportFile(fileUri, ext) {
       encoding: FileSystem.EncodingType.Base64,
       position: 0,
       length: 12,
-    });
-
-    logReportDebug("pdf-header-check", {
-      fileUri,
-      headerBase64Prefix: pdfHeaderBase64.slice(0, 12),
     });
 
     if (!pdfHeaderBase64.startsWith("JVBERi0")) {
@@ -86,18 +71,11 @@ async function validateSavedReportFile(fileUri, ext) {
 }
 
 async function tryBinaryDownload({ url, fileUri, headers, ext }) {
-  logReportDebug("binary-download-start", { url, fileUri, ext });
   const downloadResult = await FileSystem.downloadAsync(url, fileUri, {
     headers: {
       ...headers,
       Accept: "application/octet-stream",
     },
-  });
-
-  logReportDebug("binary-download-result", {
-    status: downloadResult?.status,
-    uri: downloadResult?.uri,
-    headers: downloadResult?.headers,
   });
 
   if (downloadResult?.status !== 200) {
@@ -112,12 +90,6 @@ async function tryBase64Download({ url, fileUri, headers, ext }) {
   const hasQuery = url.includes("?");
   const transportUrl = `${url}${hasQuery ? "&" : "?"}transport=base64`;
 
-  logReportDebug("base64-download-start", {
-    url: transportUrl,
-    fileUri,
-    ext,
-  });
-
   const response = await apiCall({
     method: "GET",
     url: transportUrl,
@@ -130,13 +102,6 @@ async function tryBase64Download({ url, fileUri, headers, ext }) {
 
   const payload = response?.data || response?.rawData?.data || {};
   const base64Content = payload?.contentBase64;
-  logReportDebug("base64-download-result", {
-    hasContent: Boolean(base64Content),
-    base64Length: base64Content?.length || 0,
-    byteLength: payload?.byteLength,
-    filename: payload?.filename,
-    contentType: payload?.contentType,
-  });
 
   if (!base64Content) {
     throw new Error(
@@ -157,18 +122,12 @@ async function downloadReportFile({ url, fileName, headers, ext }) {
   const fileUri = `${reportsDir}${fileName}`;
 
   if (ext === "pdf") {
-    logReportDebug("pdf-base64-forced", { url, fileUri });
     return tryBase64Download({ url, fileUri, headers, ext });
   }
 
   try {
     return await tryBinaryDownload({ url, fileUri, headers, ext });
-  } catch (error) {
-    logReportDebug("binary-download-failed-falling-back", {
-      reason: error?.message || String(error),
-      fileUri,
-      ext,
-    });
+  } catch {
     // Some app/network stacks alter binary payload handling; base64 transport is a safe fallback.
     return tryBase64Download({ url, fileUri, headers, ext });
   }
@@ -178,7 +137,6 @@ async function openDownloadedFile(uri, mimeType) {
   try {
     if (Platform.OS === "android") {
       const contentUri = await FileSystem.getContentUriAsync(uri);
-      logReportDebug("open-android-intent", { uri, contentUri, mimeType });
       await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
         data: contentUri,
         type: mimeType,
@@ -187,15 +145,9 @@ async function openDownloadedFile(uri, mimeType) {
       return true;
     }
 
-    logReportDebug("open-non-android", { uri, mimeType });
     await Linking.openURL(uri);
     return true;
-  } catch (error) {
-    logReportDebug("open-failed", {
-      uri,
-      mimeType,
-      reason: error?.message || String(error),
-    });
+  } catch {
     // Opening is best-effort only. Download should still be treated as successful.
     return false;
   }
@@ -249,7 +201,6 @@ export function useDownloadReport() {
     const fileName = `sahayak_report_${timestamp}.${ext}`;
 
     const headers = { Authorization: `Bearer ${token}` };
-    logReportDebug("download-start", { format, ext, url });
     const savedFileUri = await downloadReportFile({
       url,
       fileName,
@@ -258,14 +209,6 @@ export function useDownloadReport() {
     });
 
     const opened = await openDownloadedFile(savedFileUri, mimeType);
-
-    logReportDebug("download-complete", {
-      format,
-      ext,
-      fileName,
-      uri: savedFileUri,
-      opened,
-    });
 
     return { uri: savedFileUri, fileName, opened };
   };

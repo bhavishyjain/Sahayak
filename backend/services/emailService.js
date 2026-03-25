@@ -4,9 +4,7 @@ const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 function getAppWebBaseUrl() {
-  return String(process.env.APP_LINK_BASE_URL || "https://sahayak.app")
-    .trim()
-    .replace(/\/+$/, "");
+  return String(process.env.APP_LINK_BASE_URL).trim().replace(/\/+$/, "");
 }
 
 function buildAppUrl(pathname = "/", params = {}) {
