@@ -82,8 +82,10 @@ export function useComplaintCitizenActions({
       text2:
         error?.response?.data?.message || t("complaints.details.couldNotUpvote"),
     }),
-    onSuccess: async (_data) => {
-      if (onUpvoteSuccess) await onUpvoteSuccess();
+    onSuccess: async (response) => {
+      if (onUpvoteSuccess) {
+        await onUpvoteSuccess(response?.data ?? null);
+      }
     },
   });
 

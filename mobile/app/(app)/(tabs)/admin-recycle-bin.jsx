@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshControl, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import DialogBox from "../../../components/DialogBox";
+import FilterPanel from "../../../components/FilterPanel";
 import PressableBlock from "../../../components/PressableBlock";
+import SearchBar from "../../../components/SearchBar";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import {
@@ -12,16 +20,24 @@ import {
   PURGE_COMPLAINT_URL,
   RESTORE_COMPLAINT_URL,
 } from "../../../url";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { queryKeys } from "../../../utils/queryKeys";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import { formatPriorityLabel } from "../../../data/complaintStatus";
 
 export default function AdminRecycleBinScreen() {
+  const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const queryClient = useQueryClient();
   const [actionDialog, setActionDialog] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("new-to-old");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  const { data, isRefetching, refetch } = useQuery({
+  const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: queryKeys.adminRecycleBin,
     queryFn: async () => {
       const response = await apiCall({
@@ -76,6 +92,92 @@ export default function AdminRecycleBinScreen() {
 
   const complaints = data?.complaints ?? [];
 
+  const departmentOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(
+        complaints
+          .map((complaint) => String(complaint?.department || "").trim())
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+
+    return values.map((value) => ({
+      value,
+      label: value,
+    }));
+  }, [complaints]);
+
+  const hasActiveFilters =
+    departmentFilter !== "all" ||
+    sortOrder !== "new-to-old" ||
+    Boolean(startDate) ||
+    Boolean(endDate);
+
+  const filterSummary = useMemo(() => {
+    const tokens = [];
+    if (departmentFilter !== "all") tokens.push(departmentFilter);
+    if (startDate || endDate) tokens.push("date");
+    if (sortOrder === "old-to-new") tokens.push("oldest first");
+    return tokens.join(" • ");
+  }, [departmentFilter, endDate, sortOrder, startDate]);
+
+  const filteredComplaints = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    const startMs = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
+    const endMs = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
+
+    const list = complaints.filter((complaint) => {
+      if (
+        departmentFilter !== "all" &&
+        String(complaint?.department || "") !== departmentFilter
+      ) {
+        return false;
+      }
+
+      const deletedAtMs = complaint?.deletedAt
+        ? new Date(complaint.deletedAt).getTime()
+        : null;
+
+      if (startMs != null && deletedAtMs != null && deletedAtMs < startMs) {
+        return false;
+      }
+      if (endMs != null && deletedAtMs != null && deletedAtMs > endMs) {
+        return false;
+      }
+
+      if (!normalizedSearch) return true;
+
+      const haystack = [
+        complaint?.ticketId,
+        complaint?.rawText,
+        complaint?.department,
+        complaint?.owner?.fullName,
+        complaint?.owner?.username,
+        complaint?.deletedReason,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+
+    list.sort((a, b) => {
+      const timeA = a?.deletedAt ? new Date(a.deletedAt).getTime() : 0;
+      const timeB = b?.deletedAt ? new Date(b.deletedAt).getTime() : 0;
+      return sortOrder === "old-to-new" ? timeA - timeB : timeB - timeA;
+    });
+
+    return list;
+  }, [
+    complaints,
+    departmentFilter,
+    endDate,
+    searchQuery,
+    sortOrder,
+    startDate,
+  ]);
+
   return (
     <View
       className="flex-1"
@@ -93,7 +195,45 @@ export default function AdminRecycleBinScreen() {
           />
         }
       >
-        {complaints.length === 0 ? (
+        <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search deleted complaints"
+            style={{ flex: 1 }}
+          />
+          <FilterPanel
+            variant="icon"
+            summary={filterSummary}
+            statusOptions={[]}
+            statusFilter="all"
+            setStatusFilter={() => {}}
+            departmentFilter={departmentFilter}
+            setDepartmentFilter={setDepartmentFilter}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            startDate={startDate}
+            endDate={endDate}
+            setStartDate={setStartDate}
+            setEndDate={setEndDate}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={() => {
+              setDepartmentFilter("all");
+              setSortOrder("new-to-old");
+              setStartDate("");
+              setEndDate("");
+            }}
+            t={t}
+            formatPriorityLabel={formatPriorityLabel}
+            departmentOptions={departmentOptions}
+          />
+        </View>
+
+        {isLoading ? (
+          <View className="py-10 items-center">
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : filteredComplaints.length === 0 ? (
           <View
             className="rounded-2xl p-5"
             style={{
@@ -117,7 +257,7 @@ export default function AdminRecycleBinScreen() {
             </Text>
           </View>
         ) : (
-          complaints.map((complaint) => (
+          filteredComplaints.map((complaint) => (
             <View
               key={complaint._id}
               className="rounded-2xl p-4 mb-3"

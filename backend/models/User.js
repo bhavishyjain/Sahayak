@@ -57,12 +57,12 @@ const userSchema = new mongoose.Schema({
     lng: { type: Number },
     address: { type: String },
   },
-  rating: { type: Number, default: 4.5, min: 0, max: 5 },
+  rating: { type: Number, default: null, min: 0, max: 5 },
   performanceMetrics: {
     totalCompleted: { type: Number, default: 0 },
     averageCompletionTime: { type: Number, default: 0 }, // in hours
     currentWeekCompleted: { type: Number, default: 0 },
-    customerRating: { type: Number, default: 4.5 },
+    customerRating: { type: Number, default: null },
   },
   pushTokens: [{ type: String }],
   notificationPreferences: {

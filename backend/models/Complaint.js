@@ -12,6 +12,41 @@ const {
   COMPLAINT_STATUSES,
 } = require("../domain/constants");
 
+function normalizeComplaintStatusValue(status) {
+  return String(status || "").trim().toLowerCase();
+}
+
+function shouldClearAiPriority(status) {
+  const normalizedStatus = normalizeComplaintStatusValue(status);
+  return Boolean(normalizedStatus) && normalizedStatus !== "pending";
+}
+
+function applyAiPriorityCleanupForUpdate(update = {}) {
+  if (!update || Array.isArray(update)) return update;
+
+  const nextStatus =
+    update?.$set?.status !== undefined ? update.$set.status : update.status;
+
+  if (!shouldClearAiPriority(nextStatus)) {
+    return update;
+  }
+
+  if (!update.$unset || typeof update.$unset !== "object") {
+    update.$unset = {};
+  }
+  update.$unset["aiAnalysis.suggestedPriority"] = 1;
+
+  if (update.$set && typeof update.$set === "object") {
+    delete update.$set["aiAnalysis.suggestedPriority"];
+  }
+
+  if (update.aiAnalysis && typeof update.aiAnalysis === "object") {
+    delete update.aiAnalysis.suggestedPriority;
+  }
+
+  return update;
+}
+
 const complaintSchema = new mongoose.Schema(
   {
     ticketId: {
@@ -108,6 +143,11 @@ complaintSchema.pre("save", function (next) {
     this.ticketId = generateTicketId();
   }
 
+  if (shouldClearAiPriority(this.status)) {
+    if (!this.aiAnalysis) this.aiAnalysis = {};
+    this.aiAnalysis.suggestedPriority = null;
+  }
+
   // Calculate SLA due date based on priority
   if (this.isNew && (!this.sla || !this.sla.dueDate)) {
     if (!this.sla) this.sla = {};
@@ -136,6 +176,12 @@ complaintSchema.pre("save", function (next) {
     this.sla.isOverdue = false;
   }
 
+  next();
+});
+
+complaintSchema.pre(["findOneAndUpdate", "updateOne", "updateMany"], function (next) {
+  const update = this.getUpdate() || {};
+  this.setUpdate(applyAiPriorityCleanupForUpdate(update));
   next();
 });
 

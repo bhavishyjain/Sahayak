@@ -6,9 +6,11 @@ import PressableBlock from "../../components/PressableBlock";
 import { useTheme } from "../../utils/context/theme";
 import { clearUserAuth } from "../../utils/userAuth";
 import { useState } from "react";
+import { useTranslation } from "../../utils/i18n/LanguageProvider";
 
 export default function AccountDeactivatedScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const [loggingOut, setLoggingOut] = useState(false);
@@ -39,22 +41,21 @@ export default function AccountDeactivatedScreen() {
         className="text-2xl font-bold text-center"
         style={{ color: colors.textPrimary }}
       >
-        Account Deactivated
+        {t("accountDeactivated.title")}
       </Text>
 
       <Text
         className="text-sm text-center mt-3 leading-6"
         style={{ color: colors.textSecondary }}
       >
-        This account has been deactivated by an administrator. You cannot use
-        the app until the account is reactivated.
+        {t("accountDeactivated.messagePrimary")}
       </Text>
 
       <Text
         className="text-sm text-center mt-2 leading-6"
         style={{ color: colors.textSecondary }}
       >
-        Please contact your administrator or department owner for access.
+        {t("accountDeactivated.messageSecondary")}
       </Text>
 
       <PressableBlock
@@ -77,7 +78,7 @@ export default function AccountDeactivatedScreen() {
               className="text-sm font-semibold ml-2"
               style={{ color: colors.textPrimary }}
             >
-              Logout
+              {t("accountDeactivated.logout")}
             </Text>
           </>
         )}

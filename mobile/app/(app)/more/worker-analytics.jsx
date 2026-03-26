@@ -360,6 +360,7 @@ export default function WorkerAnalytics() {
     0,
   );
   const totalAssigned = Number(data?.summary?.totalAssigned ?? 0);
+  const hasAssignedHistory = totalAssigned > 0;
   const avgCompletionTime = data?.summary?.avgCompletionTime;
   const workerRating = Number.isFinite(data?.worker?.rating)
     ? data.worker.rating.toFixed(1)
@@ -401,17 +402,17 @@ export default function WorkerAnalytics() {
         <View className="mb-5" style={{ gap: 12 }}>
           <View className="flex-row" style={{ gap: 12 }}>
             <SummaryTile
-              label="Worker Rating"
+              label={t("more.workerAnalyticsScreen.summary.workerRatingLabel")}
               value={workerRating}
-              hint="Current service rating"
+              hint={t("more.workerAnalyticsScreen.summary.workerRatingHint")}
               icon={Star}
               tone={colors.warning}
               colors={colors}
             />
             <SummaryTile
-              label="Active Assigned"
+              label={t("more.workerAnalyticsScreen.summary.activeAssignedLabel")}
               value={totalAssigned}
-              hint="Current assigned complaints"
+              hint={t("more.workerAnalyticsScreen.summary.activeAssignedHint")}
               icon={Target}
               tone={colors.info}
               colors={colors}
@@ -421,13 +422,13 @@ export default function WorkerAnalytics() {
           <MetricPanel
             label={t("more.workerAnalyticsScreen.metrics.avgCompletion")}
             value={
-              typeof avgCompletionTime === "number"
+              hasAssignedHistory && typeof avgCompletionTime === "number"
                 ? t("more.workerAnalyticsScreen.hoursValue", {
                     value: avgCompletionTime.toFixed(1),
                   })
                 : t("more.workerAnalyticsScreen.noValue")
             }
-            hint="Average time taken to close work after assignment."
+            hint={t("more.workerAnalyticsScreen.metrics.avgCompletionHint")}
             icon={Clock3}
             tone={colors.warning}
             colors={colors}

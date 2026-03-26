@@ -383,7 +383,7 @@ export default function Home() {
                         style={{ color: colors.textPrimary }}
                         numberOfLines={1}
                       >
-                        {item.title || t("complaints.complaint")}
+                        {item.title || t("home.nearby.complaintFallback")}
                       </Text>
                       <Text
                         className="text-xs mt-1"
@@ -525,7 +525,7 @@ export default function Home() {
                   >
                     {item.refinedText ??
                       item.rawText ??
-                      t("home.nearby.complaintFallback")}
+                        t("home.nearby.complaintFallback")}
                   </Text>
                   <View className="flex-row items-center">
                     <Building2
@@ -566,7 +566,7 @@ export default function Home() {
                       className="text-[10px] font-semibold"
                       style={{ color: colors.textSecondary }}
                     >
-                      km
+                        {t("home.nearby.distanceUnit")}
                     </Text>
                   </View>
 

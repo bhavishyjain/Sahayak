@@ -7,10 +7,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { TextInput as PaperTextInput } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
@@ -295,21 +295,36 @@ export default function ComplaintChat() {
               paddingBottom: Math.max(insets.bottom, 16),
             }}
           >
-            <TextInput
+            <PaperTextInput
+              mode="flat"
+              dense
               value={text}
               onChangeText={setText}
               placeholder={t("complaintChat.inputPlaceholder")}
-              placeholderTextColor={colors.placeholder}
               multiline
               maxLength={2000}
-              className="flex-1 rounded-2xl px-4 py-3 text-sm"
               style={{
+                flex: 1,
                 backgroundColor: colors.backgroundSecondary,
                 color: colors.textPrimary,
                 borderWidth: 1,
                 borderColor: colors.border,
                 maxHeight: 120,
+                borderRadius: 16,
                 textAlignVertical: "top",
+              }}
+              contentStyle={{
+                color: colors.textPrimary,
+                fontSize: 14,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+              }}
+              underlineStyle={{ display: "none" }}
+              theme={{
+                colors: {
+                  text: colors.textPrimary,
+                  placeholder: colors.placeholder,
+                },
               }}
               onSubmitEditing={handleSend}
               blurOnSubmit={false}

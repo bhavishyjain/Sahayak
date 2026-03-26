@@ -1,6 +1,5 @@
 import {
   AlertCircle,
-  ArrowLeft,
   AtSign,
   BarChart2,
   CheckCircle2,
@@ -20,13 +19,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  Image,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { TextInput as PaperTextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -38,6 +37,7 @@ import {
 import { useTheme } from "../../../utils/context/theme";
 import getUserAuth from "../../../utils/userAuth";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import BackButtonHeader from "../../../components/BackButtonHeader";
 import {
   useAcceptInviteAction,
   useRegisterAction,
@@ -165,20 +165,29 @@ export default function AcceptInvite() {
 
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+        <BackButtonHeader
+          title={t(
+            isHeadInvite
+              ? "auth.acceptInvite.hodInvitationTitle"
+              : "auth.acceptInvite.workerInvitationTitle"
+          )}
+          fallbackHref="/(app)/(tabs)/home"
+        />
         <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
-
-          {/* Header */}
-          <View className="flex-row items-center gap-3 mb-6">
-            <TouchableOpacity onPress={() => router.back()} hitSlop={16} className="p-1">
-              <ArrowLeft size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>
-              {isHeadInvite ? "Department Head Invitation" : t("auth.acceptInvite.workerInvitationTitle")}
-            </Text>
+          <View className="w-full items-start mb-4">
+            <Image
+              source={require("../../../assets/images/mono-logo.png")}
+              style={{
+                width: 120,
+                height: 40,
+                tintColor: colorScheme === "dark" ? undefined : colors.textPrimary,
+              }}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Hero */}
-          <View className="items-center mb-6">
+          <View className="items-center mb-5">
             <View
               className="w-24 h-24 rounded-full justify-center items-center mb-4"
               style={{ backgroundColor: colors.backgroundSecondary, borderWidth: 2, borderColor: colors.primary }}
@@ -187,7 +196,7 @@ export default function AcceptInvite() {
             </View>
             <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>{t("auth.acceptInvite.youreInvited")}</Text>
             <Text className="text-base font-semibold mb-3" style={{ color: colors.primary }}>
-              {department} {isHeadInvite ? "Department HOD Role" : t("auth.acceptInvite.departmentLabel")}
+              {department} {isHeadInvite ? t("auth.acceptInvite.departmentLabel") : t("auth.acceptInvite.departmentLabel")}
             </Text>
             <View
               className="flex-row items-center gap-2 rounded-full px-4 py-2 max-w-xs"
@@ -206,14 +215,14 @@ export default function AcceptInvite() {
             style={{ backgroundColor: colors.backgroundSecondary, borderLeftWidth: 4, borderLeftColor: colors.primary }}
           >
             <Text className="text-sm leading-6" style={{ color: colors.textPrimary }}>
-              {t("auth.acceptInvite.hodInviteMessage")}
+              {t(isHeadInvite ? "auth.acceptInvite.hodInviteMessage" : "auth.acceptInvite.workerInviteMessage")}
             </Text>
           </View>
 
           {/* Benefits */}
           <View className="rounded-xl p-4 mb-4" style={{ backgroundColor: colors.backgroundSecondary }}>
             <Text className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: colors.textSecondary }}>
-              {t("auth.acceptInvite.benefitsTitle")}
+              {t(isHeadInvite ? "auth.acceptInvite.benefitsHeadTitle" : "auth.acceptInvite.benefitsWorkerTitle")}
             </Text>
             {benefits.map(({ Icon, key, label }, i) => (
               <View key={i} className="flex-row items-center gap-3 mb-3">
@@ -304,25 +313,36 @@ export default function AcceptInvite() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Header */}
-          <View className="flex-row items-center gap-3 mb-6">
-            <TouchableOpacity onPress={() => router.back()} hitSlop={16} className="p-1">
-              <ArrowLeft size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <Text className="text-xl font-bold" style={{ color: colors.textPrimary }}>
-              {isHeadInvite ? "Create Department Head Account" : t("auth.acceptInvite.workerRegistrationTitle")}
-            </Text>
+      <BackButtonHeader
+        title={t(
+          isHeadInvite
+            ? "auth.acceptInvite.hodRegistrationTitle"
+            : "auth.acceptInvite.workerRegistrationTitle"
+        )}
+        fallbackHref="/(app)/(auth)/login"
+      />
+      <KeyboardAwareScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={30}
+      >
+          <View className="w-full items-start mb-4">
+            <Image
+              source={require("../../../assets/images/mono-logo.png")}
+              style={{
+                width: 120,
+                height: 40,
+                tintColor: colorScheme === "dark" ? undefined : colors.textPrimary,
+              }}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Hero */}
-          <View className="items-center mb-4">
+          <View className="items-center mb-3">
             <View
               className="w-24 h-24 rounded-full justify-center items-center mb-4"
               style={{ backgroundColor: colors.backgroundSecondary, borderWidth: 2, borderColor: colors.primary }}
@@ -330,7 +350,7 @@ export default function AcceptInvite() {
               <HardHat size={48} color={colors.primary} />
             </View>
             <Text className="text-3xl font-extrabold mb-1" style={{ color: colors.textPrimary }}>
-              {isHeadInvite ? "Join as Department Head" : t("auth.acceptInvite.joinAsWorker")}
+              {t(isHeadInvite ? "auth.acceptInvite.joinAsHead" : "auth.acceptInvite.joinAsWorker")}
             </Text>
             <Text className="text-base font-semibold" style={{ color: colors.primary }}>
               {department} {t("auth.acceptInvite.departmentLabel")}
@@ -340,7 +360,7 @@ export default function AcceptInvite() {
           <Text className="text-sm text-center mb-6 leading-5" style={{ color: colors.textSecondary }}>
             {t("auth.acceptInvite.createAccountTo")}{" "}
             <Text className="font-bold" style={{ color: colors.primary }}>{department}</Text>
-            {" "}{isHeadInvite ? "as a department head" : t("auth.acceptInvite.asAWorker")}
+            {" "}{t(isHeadInvite ? "auth.acceptInvite.asHead" : "auth.acceptInvite.asAWorker")}
           </Text>
 
           {/* Form */}
@@ -426,7 +446,7 @@ export default function AcceptInvite() {
             ) : (
               <>
                 <HardHat size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text className="text-white text-base font-bold">{t("auth.acceptInvite.registerButton")}</Text>
+                <Text className="text-white text-base font-bold">{t(isHeadInvite ? "auth.acceptInvite.registerHeadButton" : "auth.acceptInvite.registerButton")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -437,8 +457,7 @@ export default function AcceptInvite() {
             </Text>
           </TouchableOpacity>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

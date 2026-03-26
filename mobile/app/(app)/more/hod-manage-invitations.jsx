@@ -15,15 +15,13 @@ import {
 import { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   RefreshControl,
-  ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
@@ -241,11 +239,7 @@ export default function ManageInvitations() {
   const isSendDisabled = sending ? true : email.trim().length === 0;
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1"
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ backgroundColor: colors.backgroundPrimary }}
-    >
+    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
       <BackButtonHeader
         title={t("more.manageInvitations.title")}
         onBack={() => router.back()}
@@ -256,9 +250,12 @@ export default function ManageInvitations() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <ScrollView
+        <KeyboardAwareScrollView
           className="flex-1 px-4"
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid
+          extraScrollHeight={30}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -297,11 +294,29 @@ export default function ManageInvitations() {
               }}
             >
               <Mail size={16} color={colors.textSecondary} />
-              <TextInput
-                className="flex-1 ml-2 text-sm"
-                style={{ color: colors.textPrimary }}
+              <PaperTextInput
+                mode="flat"
+                dense
+                style={{
+                  flex: 1,
+                  marginLeft: 8,
+                  backgroundColor: "transparent",
+                  color: colors.textPrimary,
+                }}
+                contentStyle={{
+                  color: colors.textPrimary,
+                  fontSize: 14,
+                  paddingHorizontal: 0,
+                  paddingVertical: 8,
+                }}
+                underlineStyle={{ display: "none" }}
+                theme={{
+                  colors: {
+                    text: colors.textPrimary,
+                    placeholder: colors.textSecondary,
+                  },
+                }}
                 placeholder={t("more.manageInvitations.form.emailPlaceholder")}
-                placeholderTextColor={colors.textSecondary}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -422,7 +437,7 @@ export default function ManageInvitations() {
                 ))}
             </>
           )}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
 
       <DialogBox
@@ -441,6 +456,6 @@ export default function ManageInvitations() {
         onConfirm={handleRevoke}
         onCancel={() => setRevokeTarget(null)}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }

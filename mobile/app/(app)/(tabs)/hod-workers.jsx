@@ -173,7 +173,9 @@ export default function HodWorkersTab() {
                             : colors.success,
                       }}
                     >
-                      {worker.isActive === false ? "Inactive" : "Active"}
+                      {worker.isActive === false
+                        ? t("hod.workers.inactive")
+                        : t("hod.workers.active")}
                     </Text>
                   </View>
                 </View>

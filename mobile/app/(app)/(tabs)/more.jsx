@@ -215,8 +215,8 @@ export default function More() {
           },
           {
             icon: ShieldCheck,
-            title: "Special requests",
-            subtitle: "Send and track complaint edit or delete requests.",
+            title: "more.menu.specialRequests.hod.title",
+            subtitle: "more.menu.specialRequests.hod.subtitle",
             route: "/(app)/more/special-requests",
           },
         ]
@@ -248,20 +248,20 @@ export default function More() {
       ? [
           {
             icon: SearchCheck,
-            title: "Edit complaint",
-            subtitle: "Search by complaint ID, update department or priority, and delete complaints.",
+            title: "more.menu.adminEditComplaint.title",
+            subtitle: "more.menu.adminEditComplaint.subtitle",
             route: "/(app)/more/admin-edit-complaint",
           },
           {
             icon: Send,
-            title: "Send notification",
-            subtitle: "Draft admin notifications and review notification history in one place.",
+            title: "more.menu.adminSendNotification.title",
+            subtitle: "more.menu.adminSendNotification.subtitle",
             route: "/(app)/more/admin-send-notification",
           },
           {
             icon: ShieldCheck,
-            title: "Special requests",
-            subtitle: "Accept or reject HOD complaint edit and delete requests.",
+            title: "more.menu.specialRequests.admin.title",
+            subtitle: "more.menu.specialRequests.admin.subtitle",
             route: "/(app)/more/special-requests",
           },
         ]

@@ -5,9 +5,9 @@ import {
   ActivityIndicator,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
@@ -26,6 +26,16 @@ export default function UpdateProfile() {
   const colors = useMemo(
     () => (colorScheme === "dark" ? darkColors : lightColors),
     [colorScheme],
+  );
+  const inputTheme = useMemo(
+    () => ({
+      colors: {
+        text: colors.textPrimary,
+        placeholder: colors.placeholder,
+      },
+      roundness: 12,
+    }),
+    [colors],
   );
   // Form fields consolidated into single object
   const [formData, setFormData] = useState({
@@ -141,19 +151,27 @@ export default function UpdateProfile() {
           >
             {t("settings.profile.email")}
           </Text>
-          <TextInput
-            className="rounded-xl px-4 py-3"
+          <PaperTextInput
+            mode="flat"
+            dense
             style={{
               backgroundColor: colors.backgroundSecondary,
               color: colors.textSecondary,
               fontSize: 16,
               borderWidth: 1,
               borderColor: colors.border,
+              borderRadius: 12,
             }}
+            contentStyle={{
+              color: colors.textSecondary,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+            }}
+            underlineStyle={{ display: "none" }}
             value={formData.email}
             editable={false}
             placeholder={t("settings.profile.emailPlaceholder")}
-            placeholderTextColor={colors.placeholder}
+            theme={inputTheme}
           />
         </View>
 
@@ -165,19 +183,27 @@ export default function UpdateProfile() {
           >
             {t("settings.profile.fullName")}
           </Text>
-          <TextInput
-            className="rounded-xl px-4 py-3"
+          <PaperTextInput
+            mode="flat"
+            dense
             style={{
               backgroundColor: colors.backgroundSecondary,
               color: colors.textPrimary,
               fontSize: 16,
               borderWidth: 1,
               borderColor: colors.border,
+              borderRadius: 12,
             }}
+            contentStyle={{
+              color: colors.textPrimary,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+            }}
+            underlineStyle={{ display: "none" }}
             value={formData.fullName}
             onChangeText={(text) => updateFormField("fullName", text)}
             placeholder={t("settings.profile.fullNamePlaceholder")}
-            placeholderTextColor={colors.placeholder}
+            theme={inputTheme}
           />
         </View>
 
@@ -189,20 +215,28 @@ export default function UpdateProfile() {
           >
             {t("settings.profile.phone")}
           </Text>
-          <TextInput
-            className="rounded-xl px-4 py-3"
+          <PaperTextInput
+            mode="flat"
+            dense
             style={{
               backgroundColor: colors.backgroundSecondary,
               color: colors.textPrimary,
               fontSize: 16,
               borderWidth: 1,
               borderColor: colors.border,
+              borderRadius: 12,
             }}
+            contentStyle={{
+              color: colors.textPrimary,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+            }}
+            underlineStyle={{ display: "none" }}
             value={formData.phone}
             onChangeText={(text) => updateFormField("phone", text)}
             placeholder={t("settings.profile.phonePlaceholder")}
-            placeholderTextColor={colors.placeholder}
             keyboardType="phone-pad"
+            theme={inputTheme}
           />
         </View>
 
@@ -215,20 +249,29 @@ export default function UpdateProfile() {
             {t("settings.profile.newPassword")}
           </Text>
           <View className="flex-row items-center">
-            <TextInput
-              className="flex-1 rounded-xl px-4 py-3"
+            <PaperTextInput
+              mode="flat"
+              dense
               style={{
+                flex: 1,
                 backgroundColor: colors.backgroundSecondary,
                 color: colors.textPrimary,
                 fontSize: 16,
                 borderWidth: 1,
                 borderColor: colors.border,
+                borderRadius: 12,
               }}
+              contentStyle={{
+                color: colors.textPrimary,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+              }}
+              underlineStyle={{ display: "none" }}
               value={formData.password}
               onChangeText={(text) => updateFormField("password", text)}
               placeholder={t("settings.profile.passwordPlaceholder")}
-              placeholderTextColor={colors.placeholder}
               secureTextEntry={!uiState.showPassword}
+              theme={inputTheme}
             />
             <PressableBlock
               className="absolute right-3"

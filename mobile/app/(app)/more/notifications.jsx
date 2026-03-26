@@ -100,7 +100,7 @@ export default function NotificationsScreen() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title={t("more.menu.notifications.title")} />
+      <BackButtonHeader title={t("more.notificationsScreen.title")} />
 
       {loadingPreferences ? (
         <View className="flex-1 items-center justify-center">

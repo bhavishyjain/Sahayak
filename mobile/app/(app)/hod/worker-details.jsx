@@ -86,6 +86,18 @@ export default function WorkerDetails() {
   };
 
   const handleRemoveWorker = async () => {
+    if (activeComplaints.length > 0) {
+      Toast.show({
+        type: "error",
+        text1: t("hod.workers.details.failed"),
+        text2: t("hod.workers.details.removeWarning", {
+          count: activeComplaints.length,
+          plural: activeComplaints.length === 1 ? "" : "s",
+        }),
+      });
+      return;
+    }
+
     try {
       setRemoving(true);
       await apiCall({
@@ -698,12 +710,9 @@ export default function WorkerDetails() {
 
               <TouchableOpacity
                 className="flex-1 rounded-xl py-3 flex-row items-center justify-center"
-                style={{
-                  backgroundColor:
-                    activeComplaints.length > 0 ? colors.border : colors.danger,
-                }}
+                style={{ backgroundColor: colors.danger }}
                 onPress={handleRemoveWorker}
-                disabled={removing ? true : activeComplaints.length > 0}
+                disabled={removing}
               >
                 {removing ? (
                   <ActivityIndicator size="small" color={colors.light} />

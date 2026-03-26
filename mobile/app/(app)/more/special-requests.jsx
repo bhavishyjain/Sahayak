@@ -18,7 +18,7 @@ import {
 } from "../../../url";
 import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
 
-function RequestCard({ item, colors, mode, onApprove, onReject }) {
+function RequestCard({ item, colors, mode, onApprove, onReject, t }) {
   const statusTone =
     item.status === "approved"
       ? colors.success
@@ -44,24 +44,30 @@ function RequestCard({ item, colors, mode, onApprove, onReject }) {
             style={{ color: colors.textSecondary }}
           >
             {item.requestType === "delete"
-              ? "Delete complaint request"
-              : "Edit complaint request"}
+              ? t("more.specialRequestsScreen.card.deleteRequest")
+              : t("more.specialRequestsScreen.card.editRequest")}
           </Text>
           {item.requestType === "update" ? (
             <Text
               className="text-xs mt-1"
               style={{ color: colors.textSecondary }}
             >
-              {item.currentDepartment !== item.requestedDepartment
-                ? `Department: ${item.currentDepartment} -> ${item.requestedDepartment}`
-                : null}
-              {item.currentDepartment !== item.requestedDepartment &&
-              item.currentPriority !== item.requestedPriority
-                ? " | "
-                : ""}
-              {item.currentPriority !== item.requestedPriority
-                ? `Priority: ${item.currentPriority} -> ${item.requestedPriority}`
-                : null}
+              {[
+                item.currentDepartment !== item.requestedDepartment
+                  ? t("more.specialRequestsScreen.card.departmentChange", {
+                      from: item.currentDepartment,
+                      to: item.requestedDepartment,
+                    })
+                  : null,
+                item.currentPriority !== item.requestedPriority
+                  ? t("more.specialRequestsScreen.card.priorityChange", {
+                      from: item.currentPriority,
+                      to: item.requestedPriority,
+                    })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(t("more.specialRequestsScreen.card.changeSeparator"))}
             </Text>
           ) : null}
           {item.reason ? (
@@ -77,7 +83,9 @@ function RequestCard({ item, colors, mode, onApprove, onReject }) {
               className="text-xs mt-1"
               style={{ color: colors.textSecondary }}
             >
-              By {item.requestedBy.fullName || item.requestedBy.username}
+              {t("more.specialRequestsScreen.card.requestedBy", {
+                name: item.requestedBy.fullName || item.requestedBy.username,
+              })}
             </Text>
           ) : null}
         </View>
@@ -89,7 +97,7 @@ function RequestCard({ item, colors, mode, onApprove, onReject }) {
             className="text-[11px] font-semibold"
             style={{ color: statusTone }}
           >
-            {formatStatusLabel(undefined, item.status)}
+            {formatStatusLabel(t, item.status)}
           </Text>
         </View>
       </View>
@@ -105,7 +113,7 @@ function RequestCard({ item, colors, mode, onApprove, onReject }) {
               className="text-sm font-semibold"
               style={{ color: colors.light }}
             >
-              Approve
+              {t("more.specialRequestsScreen.actions.approve")}
             </Text>
           </PressableBlock>
           <PressableBlock
@@ -117,7 +125,7 @@ function RequestCard({ item, colors, mode, onApprove, onReject }) {
               className="text-sm font-semibold"
               style={{ color: colors.light }}
             >
-              Reject
+              {t("more.specialRequestsScreen.actions.reject")}
             </Text>
           </PressableBlock>
         </View>
@@ -203,8 +211,16 @@ export default function SpecialRequestsScreen() {
         ? t("common.all")
         : formatStatusLabel(t, statusFilter)
       : null,
-    requestStartDate ? `From ${requestStartDate}` : null,
-    requestEndDate ? `To ${requestEndDate}` : null,
+    requestStartDate
+      ? t("more.specialRequestsScreen.filters.fromDate", {
+          date: requestStartDate,
+        })
+      : null,
+    requestEndDate
+      ? t("more.specialRequestsScreen.filters.toDate", {
+          date: requestEndDate,
+        })
+      : null,
   ]
     .filter(Boolean)
     .join(" • ");
@@ -225,8 +241,8 @@ export default function SpecialRequestsScreen() {
         type: "success",
         text1:
           reviewState.decision === "approve"
-            ? "Request approved"
-            : "Request rejected",
+            ? t("more.specialRequestsScreen.toasts.requestApproved")
+            : t("more.specialRequestsScreen.toasts.requestRejected"),
       });
       setReviewState(null);
       setReviewNote("");
@@ -234,8 +250,10 @@ export default function SpecialRequestsScreen() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Could not review request",
-        text2: error?.response?.data?.message || "Please try again.",
+        text1: t("more.specialRequestsScreen.toasts.reviewFailedTitle"),
+        text2:
+          error?.response?.data?.message ||
+          t("more.specialRequestsScreen.toasts.reviewFailedMessage"),
       });
     } finally {
       setSubmitting(false);
@@ -247,7 +265,7 @@ export default function SpecialRequestsScreen() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Special Requests" />
+      <BackButtonHeader title={t("more.specialRequestsScreen.title")} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
         <FilterPanel
@@ -269,11 +287,15 @@ export default function SpecialRequestsScreen() {
 
         {loading ? (
           <Text className="text-sm" style={{ color: colors.textSecondary }}>
-            Loading requests...
+            {t("more.specialRequestsScreen.loading")}
           </Text>
         ) : filteredRequests.length === 0 ? (
           <Text className="text-sm" style={{ color: colors.textSecondary }}>
-            No {statusFilter} requests.
+            {statusFilter === "all"
+              ? t("more.specialRequestsScreen.emptyAll")
+              : t("more.specialRequestsScreen.emptyForStatus", {
+                  status: formatStatusLabel(t, statusFilter),
+                })}
           </Text>
         ) : (
           filteredRequests.map((item) => (
@@ -282,6 +304,7 @@ export default function SpecialRequestsScreen() {
               item={item}
               colors={colors}
               mode={mode}
+              t={t}
               onApprove={() =>
                 setReviewState({ request: item, decision: "approve" })
               }
@@ -298,19 +321,23 @@ export default function SpecialRequestsScreen() {
         onClose={() => setReviewState(null)}
         title={
           reviewState?.decision === "approve"
-            ? "Approve request"
-            : "Reject request"
+            ? t("more.specialRequestsScreen.dialog.approveTitle")
+            : t("more.specialRequestsScreen.dialog.rejectTitle")
         }
         message={
           reviewState?.decision === "approve"
-            ? "Approve this special request and apply it to the complaint?"
-            : "Reject this special request?"
+            ? t("more.specialRequestsScreen.dialog.approveMessage")
+            : t("more.specialRequestsScreen.dialog.rejectMessage")
         }
         showInput={true}
-        inputPlaceholder="Optional note"
+        inputPlaceholder={t("more.specialRequestsScreen.dialog.optionalNote")}
         inputValue={reviewNote}
         onInputChange={setReviewNote}
-        confirmText={reviewState?.decision === "approve" ? "Approve" : "Reject"}
+        confirmText={
+          reviewState?.decision === "approve"
+            ? t("more.specialRequestsScreen.actions.approve")
+            : t("more.specialRequestsScreen.actions.reject")
+        }
         onConfirm={handleReview}
         onCancel={() => setReviewState(null)}
         loading={submitting}

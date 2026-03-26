@@ -170,7 +170,9 @@ exports.getComplaintsNeedingReview = asyncHandler(async (req, res) => {
   const formatted = complaints.map((c) => {
     const view = buildComplaintView(c);
     const suggestedDepartment = c.aiAnalysis?.department;
-    const suggestedPriority = c.aiAnalysis?.suggestedPriority;
+    const suggestedPriority = c.status === "pending"
+      ? c.aiAnalysis?.suggestedPriority
+      : null;
     const departmentChanged = hasChangedValue(c.department, suggestedDepartment);
     const priorityChanged = hasChangedValue(c.priority, suggestedPriority);
 

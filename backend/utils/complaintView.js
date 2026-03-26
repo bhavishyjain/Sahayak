@@ -23,6 +23,10 @@ function buildComplaintView(complaint, options = {}) {
   const normalizedStatus = shouldTreatDeletedAsResolved
     ? "resolved"
     : originalStatus;
+  const aiSuggestedPriority =
+    normalizedStatus === "pending"
+      ? complaint.aiAnalysis?.suggestedPriority || null
+      : null;
   const isTerminalStatus = ["resolved", "cancelled", "needs-rework"].includes(
     normalizedStatus,
   );
@@ -92,7 +96,12 @@ function buildComplaintView(complaint, options = {}) {
             : Boolean(complaint.sla.isOverdue),
         }
       : complaint.sla,
-    aiAnalysis: complaint.aiAnalysis || null,
+    aiAnalysis: complaint.aiAnalysis
+      ? {
+          ...complaint.aiAnalysis,
+          suggestedPriority: aiSuggestedPriority,
+        }
+      : null,
     aiSuggestedDepartment:
       complaint.aiAnalysis?.department ||
       complaint.aiSuggestedDepartment ||
@@ -100,7 +109,7 @@ function buildComplaintView(complaint, options = {}) {
     aiSuggestion: complaint.aiAnalysis
       ? {
           department: complaint.aiAnalysis.department || null,
-          priority: complaint.aiAnalysis.suggestedPriority || null,
+          priority: aiSuggestedPriority,
           confidence: complaint.aiAnalysis.confidence ?? null,
           reasoning: complaint.aiAnalysis.reasoning || null,
           sentiment: complaint.aiAnalysis.sentiment || null,

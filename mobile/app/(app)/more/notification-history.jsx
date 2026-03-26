@@ -65,22 +65,39 @@ function formatRelativeTime(t, dateStr) {
   return new Date(dateStr).toLocaleDateString();
 }
 
-function NotificationItem({ item, colors, onRead, t, typeConfig }) {
+function formatAbsoluteTime(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function NotificationItem({ item, colors, onPress, t, typeConfig }) {
   const cfg = typeConfig[item.type] || typeConfig.other;
   const { Icon } = cfg;
   const isUnread = !item.readAt;
+  const title = item.title || t("more.notificationsScreen.history.title");
+  const body = item.body || t("more.notificationsScreen.history.noBody");
 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      onPress={() => onRead(item)}
+      onPress={() => onPress(item)}
+      style={{ marginHorizontal: 16 }}
     >
       <View
         className="flex-row items-start px-4 py-4"
         style={{
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
-          backgroundColor: isUnread ? cfg.color + "14" : "transparent",
+          backgroundColor: colors.backgroundPrimary,
+          borderLeftWidth: isUnread ? 2 : 0,
+          borderLeftColor: isUnread ? cfg.color + "B0" : "transparent",
         }}
       >
         <View
@@ -89,33 +106,44 @@ function NotificationItem({ item, colors, onRead, t, typeConfig }) {
         >
           <Icon size={16} color={cfg.color} />
         </View>
+
         <View className="flex-1">
           <View className="flex-row items-start justify-between mb-1">
             <Text
-              className="text-base font-bold flex-1 mr-3"
+              className="text-base font-bold flex-1 mr-2"
               style={{ color: colors.textPrimary }}
               numberOfLines={1}
             >
-              {item.title}
+              {title}
             </Text>
-            <Text className="text-xs" style={{ color: colors.textSecondary }}>
-              {formatRelativeTime(t, item.createdAt)}
-            </Text>
+
+            {isUnread && (
+              <View
+                className="w-2.5 h-2.5 rounded-full mt-1"
+                style={{ backgroundColor: cfg.color }}
+              />
+            )}
           </View>
+
+          <Text
+            className="text-xs mb-1.5"
+            style={{ color: colors.textSecondary }}
+            numberOfLines={1}
+          >
+            {formatRelativeTime(t, item.createdAt)}
+            {formatAbsoluteTime(item.createdAt)
+              ? ` · ${formatAbsoluteTime(item.createdAt)}`
+              : ""}
+          </Text>
+
           <Text
             className="text-sm leading-5"
             style={{ color: colors.textSecondary }}
             numberOfLines={3}
           >
-            {item.body}
+            {body}
           </Text>
         </View>
-        {isUnread && (
-          <View
-            className="w-2 h-2 rounded-full ml-2 mt-1.5"
-            style={{ backgroundColor: cfg.color }}
-          />
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -156,8 +184,7 @@ export default function NotificationHistoryScreen() {
       if (!item?.readAt) {
         try {
           await markRead(item._id);
-        } catch {
-        }
+        } catch {}
       }
 
       openNotificationRoute(item?.data, router);
@@ -188,55 +215,44 @@ export default function NotificationHistoryScreen() {
 
   const ListHeader = useMemo(
     () => (
-      <View>
+      <View className="px-4 pt-3 pb-2">
         <View
-          className="flex-row items-center justify-between px-4 py-3"
+          className="flex-row items-center justify-between px-3 py-3 rounded-xl"
           style={{
-            borderTopWidth: 1,
-            borderBottomWidth: 1,
+            borderWidth: 1,
             borderColor: colors.border,
-            backgroundColor: colors.backgroundPrimary,
+            backgroundColor: colors.backgroundSecondary,
           }}
         >
-          <View className="flex-row items-center">
+          <View className="flex-row items-center flex-1 mr-2">
+            <Bell size={16} color={colors.primary} />
             <Text
-              className="text-xs font-semibold uppercase"
-              style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
+              className="text-sm font-semibold ml-2"
+              style={{ color: colors.textPrimary }}
             >
-              {t("more.notificationsScreen.history.title")}
-            </Text>
-            {unreadCount > 0 && (
-              <View
-                className="ml-2 px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: colors.danger + "20" }}
-              >
-                <Text
-                  className="text-xs font-semibold"
-                  style={{ color: colors.danger }}
-                >
-                  {t("more.notificationsScreen.history.unread", {
+              {unreadCount > 0
+                ? t("more.notificationsScreen.history.unread", {
                     count: unreadCount,
-                  })}
-                </Text>
-              </View>
-            )}
+                  })
+                : t("more.notificationsScreen.empty")}
+            </Text>
           </View>
 
-          {unreadCount > 0 && (
+          {unreadCount > 0 ? (
             <TouchableOpacity
               className="flex-row items-center"
               onPress={handleMarkAllRead}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <CheckCheck size={13} color={colors.primary} />
+              <CheckCheck size={14} color={colors.primary} />
               <Text
-                className="text-xs font-medium ml-1"
+                className="text-xs font-semibold ml-1.5"
                 style={{ color: colors.primary }}
               >
                 {t("more.notificationsScreen.history.markAllRead")}
               </Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
     ),
@@ -263,7 +279,7 @@ export default function NotificationHistoryScreen() {
             <NotificationItem
               item={item}
               colors={colors}
-              onRead={() => handleOpenNotification(item)}
+              onPress={handleOpenNotification}
               t={t}
               typeConfig={typeConfig}
             />

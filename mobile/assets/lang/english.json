@@ -57,6 +57,12 @@
     "evening": "Good Evening",
     "night": "Good Night"
   },
+  "accountDeactivated": {
+    "title": "Account Deactivated",
+    "messagePrimary": "This account has been deactivated by an administrator. You cannot use the app until the account is reactivated.",
+    "messageSecondary": "Please contact your administrator or department owner for access.",
+    "logout": "Logout"
+  },
   "auth": {
     "login": {
       "title": "Welcome Back",
@@ -83,7 +89,6 @@
       "passwordPlaceholder": "Password",
       "confirmPasswordPlaceholder": "Confirm Password",
       "button": "Register",
-      "registerButton": "Register",
       "loading": "Registering...",
       "backToLogin": "Back to Login",
       "alreadyHaveAccount": "Already have an account?",
@@ -121,11 +126,8 @@
       "invalidLinkTitle": "Invalid link",
       "invalidLinkMessage": "Password reset token is missing.",
       "weakPasswordTitle": "Weak password",
-      "weakPasswordMessage": "Password must be at least 8 characters.",
       "passwordMismatchTitle": "Password mismatch",
       "passwordMismatchMessage": "Passwords do not match.",
-      "updatedTitle": "Password updated",
-      "updatedMessage": "Please log in with your new password.",
       "failedTitle": "Reset failed",
       "failedMessage": "Reset link is invalid or expired."
     },
@@ -143,8 +145,6 @@
       "invalidMessage": "Verification link is invalid or expired.",
       "sentTo": "Verification mail was sent to",
       "resendButton": "Resend Verification Email",
-      "resendSentTitle": "Verification sent",
-      "resendSentMessage": "Please check your inbox.",
       "resendFailedTitle": "Could not resend",
       "resendFailedMessage": "Please login and try again in a moment.",
       "continueToLogin": "Continue to Login",
@@ -153,17 +153,25 @@
     "acceptInvite": {
       "workerRegistrationTitle": "Worker Registration",
       "workerInvitationTitle": "Worker Invitation",
+      "hodRegistrationTitle": "Department Head Registration",
+      "hodInvitationTitle": "Department Head Invitation",
       "joinAsWorker": "Join as Worker",
+      "joinAsHead": "Join as Department Head",
       "youreInvited": "You're Invited!",
       "departmentLabel": "Department",
       "createAccountTo": "Create your account to join",
       "asAWorker": "as a worker.",
-      "hodInviteMessage": "Your Head of Department has invited you to join as a Worker in the Sahayak system.",
-      "benefitsTitle": "As a worker, you can:",
+      "asHead": "as a department head.",
+      "workerInviteMessage": "Your Head of Department has invited you to join as a Worker in the Sahayak system.",
+      "hodInviteMessage": "You have been invited to join as a Department Head in the Sahayak system.",
+      "benefitsTitle": "Benefits:",
+      "benefitsWorkerTitle": "As a worker, you can:",
+      "benefitsHeadTitle": "As a department head, you can:",
       "expiryWarning": "This invitation expires in 7 days. Accept before then.",
       "acceptButton": "Accept Invitation",
       "decline": "Decline",
       "registerButton": "Register as Worker",
+      "registerHeadButton": "Register as Department Head",
       "alreadyHaveAccount": "Already have an account? Log in",
       "invalidTitle": "Invalid Invitation",
       "invalidMessage": "This invitation link is missing required information. Please ask your Head of Department to resend the invite.",
@@ -182,18 +190,13 @@
         "password": "Password"
       },
       "toast": {
-        "welcomeTitle": "Welcome to the team!",
-        "welcomeMessage": "You're now a worker for",
         "acceptFailedTitle": "Could not accept invite",
         "acceptFailed": "Failed to accept invitation",
-        "accountCreatedTitle": "Account created!",
-        "accountCreatedMessage": "Welcome to",
         "registerFailedTitle": "Could not register",
         "registerFailed": "Registration failed",
         "fullNameRequired": "Full name is required",
         "usernameRequired": "Username is required",
-        "phoneRequired": "Phone number is required",
-        "passwordTooShort": "Password must be at least 6 characters"
+        "phoneRequired": "Phone number is required"
       }
     }
   },
@@ -243,6 +246,7 @@
       "title": "Nearby Open Issues",
       "reload": "Reload",
       "distanceAway": "%{distance} km away",
+      "distanceUnit": "km",
       "complaintFallback": "Complaint",
       "departmentFallback": "Unknown department",
       "locationFallback": "Nearby",
@@ -386,6 +390,11 @@
       "shareHeader": "Complaint #%{ticketId} — %{department}",
       "shareStatusLine": "Status: %{status} | Priority: %{priority}",
       "shareOpenInApp": "Open in Sahayak: %{link}",
+      "shareFailed": "Share failed",
+      "pdfDownloaded": "PDF downloaded",
+      "pdfSavedAs": "Saved as complaint_%{ticketId}.pdf",
+      "exportFailed": "Export failed",
+      "couldNotGeneratePdf": "Could not generate PDF",
       "currentlyAssigned": "Currently Assigned",
       "assignedWorkersTitle": "Assigned Workers (%{count})",
       "assignedWorkersCount": "Assigned Workers (%{count})",
@@ -446,6 +455,10 @@
       "sentForRework": "Sent for Rework",
       "requestFailed": "Request Failed",
       "couldNotSendRework": "Could not send for rework",
+      "deleteRequestSent": "Delete request sent",
+      "editRequestSent": "Edit request sent",
+      "specialRequestFailed": "Could not send special request",
+      "specialRequestSent": "Your special request was sent to admin.",
       "cancelled": "Cancelled",
       "complaintCancelled": "Complaint has been cancelled",
       "cancelFailed": "Cancel Failed",
@@ -692,6 +705,9 @@
       "recentActivity": "Recent Activity",
       "trends": "Trends",
       "activeWorkRate": "Active Work Rate",
+      "snapshotTitle": "Snapshot",
+      "workloadFlow": "Workload Flow",
+      "signalsTitle": "Signals",
       "priorityDistribution": "Priority Distribution",
       "noAnalyticsData": "No analytics data available",
       "awaitingApproval": "Awaiting Approval",
@@ -700,6 +716,23 @@
       "hoursToAssign": "hours to assign",
       "noData": "No data",
       "publicEngagement": "Public Engagement",
+      "cards": {
+        "activeComplaints": "Active complaints",
+        "totalCases": "%{count} Total cases",
+        "communitySupport": "Community support",
+        "totalComplaintUpvotes": "Total complaint upvotes",
+        "citizenFeedback": "Citizen feedback"
+      },
+      "priorityHints": {
+        "urgentCases": "Urgent cases",
+        "standardQueue": "Standard queue",
+        "lowerUrgency": "Lower urgency"
+      },
+      "metrics": {
+        "pendingComplaints": "Pending complaints",
+        "assignedInProgress": "Assigned and in progress",
+        "resolvedComplaints": "Resolved complaints"
+      },
       "engagement": {
         "totalUpvotes": "Total Upvotes",
         "avgPerComplaint": "Avg per Complaint",
@@ -759,6 +792,7 @@
       "noWorkers": "No workers found",
       "loadingWorkers": "Loading workers...",
       "active": "Active",
+      "inactive": "Inactive",
       "completed": "Completed",
       "rating": "Rating",
       "notAvailable": "N/A",
@@ -906,6 +940,26 @@
       "affected": "%{count} affected",
       "suggestionsTitle": "AI Suggestions",
       "priorityOnly": "Priority suggestion only",
+      "queueLabel": "AI review queue",
+      "reviewQueueTitle": "Review Queue",
+      "itemsWaiting": "%{count} items waiting",
+      "loadingMore": "Loading more...",
+      "departmentShiftsLabel": "Department shifts",
+      "routingChangesHint": "Routing changes",
+      "priorityShiftsLabel": "Priority shifts",
+      "urgencyChangesHint": "Urgency changes",
+      "reviewTypes": {
+        "all": "All",
+        "department": "Dept",
+        "priority": "Priority",
+        "both": "Both"
+      },
+      "queueSubtitles": {
+        "all": "All AI-suggested changes",
+        "department": "Department-only changes",
+        "priority": "Priority-only changes",
+        "both": "Department and priority changes"
+      },
       "labels": {
         "department": "Dept",
         "priority": "Priority"
@@ -1019,6 +1073,7 @@
       "loading": "Loading assigned complaints...",
       "searchPlaceholder": "Search by ID, title, location...",
       "noComplaints": "No assigned complaints",
+      "allCaughtUp": "You're all caught up! New assignments will appear here.",
       "noResults": "No complaints found",
       "tryAdjusting": "Try adjusting your filters",
       "showingResults": "Showing %{count} of %{total} complaints",
@@ -1198,7 +1253,6 @@
       "description": "Start the conversation. Citizens, workers and the department head can all reply here."
     },
     "toasts": {
-      "loadFailedTitle": "Failed to load messages",
       "sendFailedTitle": "Failed to send",
       "tryAgain": "Please try again"
     }
@@ -1459,6 +1513,11 @@
     "emailAddressLabel": "Email Address",
     "emailPlaceholder": "Enter email address",
     "formatLabel": "Format",
+    "formats": {
+      "pdf": "PDF",
+      "excel": "Excel",
+      "csv": "CSV"
+    },
     "schedule": {
       "dailyLabel": "Daily",
       "dailyDesc": "Every day at 9:00 AM",
@@ -1624,6 +1683,24 @@
         "title": "Rating & Feedback",
         "subtitle": "See your rating and all citizen feedback"
       },
+      "specialRequests": {
+        "hod": {
+          "title": "Special Requests",
+          "subtitle": "Send and track complaint edit or delete requests"
+        },
+        "admin": {
+          "title": "Special Requests",
+          "subtitle": "Accept or reject HOD complaint edit and delete requests"
+        }
+      },
+      "adminEditComplaint": {
+        "title": "Edit Complaint",
+        "subtitle": "Search by complaint ID, update department or priority, and delete complaints"
+      },
+      "adminSendNotification": {
+        "title": "Send Notification",
+        "subtitle": "Draft admin notifications and review notification history in one place"
+      },
       "deleteAccount": {
         "title": "Delete Account",
         "description": "Permanently delete your account",
@@ -1706,6 +1783,7 @@
       "darkDesc": "Dark theme for nighttime"
     },
     "notificationsScreen": {
+      "title": "Notifications",
       "empty": "No notifications yet",
       "preferences": {
         "title": "Preferences",
@@ -1729,13 +1807,49 @@
       "history": {
         "title": "History",
         "unread": "%{count} unread",
-        "markAllRead": "Mark all read"
+        "markAllRead": "Mark all read",
+        "noBody": "No details available"
       },
       "toasts": {
         "markReadFailed": "Failed to mark as read",
         "markAllReadSuccess": "All marked as read",
         "markAllReadFailed": "Failed to mark all as read",
         "savePreferenceFailed": "Failed to save preference"
+      }
+    },
+    "specialRequestsScreen": {
+      "title": "Special Requests",
+      "loading": "Loading requests...",
+      "emptyAll": "No requests.",
+      "emptyForStatus": "No %{status} requests.",
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject"
+      },
+      "filters": {
+        "fromDate": "From %{date}",
+        "toDate": "To %{date}"
+      },
+      "card": {
+        "deleteRequest": "Delete complaint request",
+        "editRequest": "Edit complaint request",
+        "departmentChange": "Department: %{from} -> %{to}",
+        "priorityChange": "Priority: %{from} -> %{to}",
+        "changeSeparator": " | ",
+        "requestedBy": "By %{name}"
+      },
+      "toasts": {
+        "requestApproved": "Request approved",
+        "requestRejected": "Request rejected",
+        "reviewFailedTitle": "Could not review request",
+        "reviewFailedMessage": "Please try again."
+      },
+      "dialog": {
+        "approveTitle": "Approve request",
+        "rejectTitle": "Reject request",
+        "approveMessage": "Approve this special request and apply it to the complaint?",
+        "rejectMessage": "Reject this special request?",
+        "optionalNote": "Optional note"
       }
     },
     "workerAnalyticsScreen": {
@@ -1747,11 +1861,18 @@
       "noValue": "N/A",
       "percentValue": "%{value}%",
       "hoursValue": "%{value}h",
+      "summary": {
+        "workerRatingLabel": "Worker Rating",
+        "workerRatingHint": "Current service rating",
+        "activeAssignedLabel": "Active Assigned",
+        "activeAssignedHint": "Current assigned complaints"
+      },
       "metrics": {
         "totalAssigned": "Total Assigned",
         "completed": "Completed",
         "completionRate": "Completion Rate",
-        "avgCompletion": "Avg Completion"
+        "avgCompletion": "Avg Completion",
+        "avgCompletionHint": "Average time taken to close work after assignment."
       },
       "weeklyTrend": {
         "title": "Weekly Completion Trend",

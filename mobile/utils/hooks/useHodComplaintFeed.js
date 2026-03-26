@@ -20,7 +20,10 @@ function buildParams({
     priority: priority && priority !== "all" ? priority : undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
-    status: status && status !== "all" ? status : undefined,
+    status:
+      status && status !== "all" && status !== "resolved"
+        ? status
+        : undefined,
   };
 }
 
@@ -49,7 +52,9 @@ export function useHodComplaintFeed(filters = {}) {
   const pages = query.data?.pages ?? [];
   return {
     ...query,
-    complaints: pages.flatMap((page) => page?.complaints ?? []),
+    complaints: pages
+      .flatMap((page) => page?.complaints ?? [])
+      .filter((complaint) => complaint?.status !== "resolved"),
     total: Number(pages[0]?.total ?? pages[0]?.pagination?.total ?? 0),
     hasMore: Boolean(query.hasNextPage),
     loadMore: query.fetchNextPage,

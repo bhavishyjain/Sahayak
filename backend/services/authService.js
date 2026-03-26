@@ -103,12 +103,12 @@ function buildUserPayload(user) {
   };
 
   if (user.role === "worker") {
-    payload.rating = user.rating || 4.5;
+    payload.rating = Number.isFinite(user.rating) ? user.rating : null;
     payload.performanceMetrics = user.performanceMetrics || {
       totalCompleted: 0,
       averageCompletionTime: 0,
       currentWeekCompleted: 0,
-      customerRating: 4.5,
+      customerRating: null,
     };
   }
 

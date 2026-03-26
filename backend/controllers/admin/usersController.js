@@ -148,7 +148,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
         activeCases: metrics.activeComplaints,
         completedCases: metrics.completedCount,
         completedToday: metrics.completedToday,
-        rating: user.rating || 4.5,
+        rating: Number.isFinite(user.rating) ? user.rating : null,
         status: user.isActive ? "active" : "offline",
         performanceScore: calculateWorkerPerformanceScore(metrics),
       };

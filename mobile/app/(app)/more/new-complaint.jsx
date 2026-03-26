@@ -5,11 +5,13 @@ import { useEffect, useState } from "react";
 import {
   ScrollView,
   Text,
-  TextInput,
   View,
   Image,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -34,20 +36,34 @@ function ComplaintInput({
   colors,
 }) {
   return (
-    <TextInput
+    <PaperTextInput
+      mode="flat"
+      dense
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      placeholderTextColor={colors.placeholder}
       multiline={multiline}
-      className="rounded-xl border px-3 py-2.5"
+      underlineStyle={{ display: "none" }}
       style={{
-        borderColor: colors.border,
-        color: colors.textPrimary,
         backgroundColor: colors.backgroundSecondary,
         minHeight: multiline ? 110 : 48,
-        height: multiline ? undefined : 48,
+        borderWidth: 1,
+        borderColor: colors.border,
+        color: colors.textPrimary,
+        borderRadius: 12,
         textAlignVertical: multiline ? "top" : "center",
+      }}
+      contentStyle={{
+        color: colors.textPrimary,
+        fontSize: 14,
+        paddingHorizontal: 12,
+        paddingVertical: multiline ? 10 : 8,
+      }}
+      theme={{
+        colors: {
+          text: colors.textPrimary,
+          placeholder: colors.placeholder,
+        },
       }}
     />
   );
@@ -286,10 +302,16 @@ export default function NewComplaintPage() {
     >
       <BackButtonHeader title={t("complaints.newComplaint")} />
 
-      <ScrollView
-        contentContainerStyle={{ padding: 16 }}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
       >
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <View className="mb-2.5">
           <Text
             className="text-base font-bold mb-1"
@@ -473,20 +495,25 @@ export default function NewComplaintPage() {
           )}
         </View>
 
-        <PressableBlock
-          onPress={onSubmit}
-          disabled={saving}
-          className="mt-1 rounded-xl items-center justify-center py-3.5"
-          style={{ backgroundColor: colors.primary }}
-        >
-          <Text
-            className="text-base font-extrabold"
-            style={{ color: colors.dark }}
+          <PressableBlock
+            onPress={onSubmit}
+            disabled={saving}
+            className="mt-1 rounded-xl items-center justify-center py-3.5"
+            style={{ backgroundColor: colors.primary }}
           >
-            {saving ? t("complaints.saving") : t("complaints.submitComplaint")}
-          </Text>
-        </PressableBlock>
-      </ScrollView>
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.dark} />
+            ) : (
+              <Text
+                className="text-base font-extrabold"
+                style={{ color: colors.dark }}
+              >
+                {t("complaints.submitComplaint")}
+              </Text>
+            )}
+          </PressableBlock>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

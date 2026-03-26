@@ -41,12 +41,11 @@ function getEmailFrom() {
 
 /**
  * Builds the shared HTML email shell.
- * @param {string} headerGradient - CSS gradient for the header background
  * @param {string} headerHtml    - HTML content inside the header div
  * @param {string} bodyHtml      - HTML content inside the content div
  * @param {string} extraCss      - Additional CSS rules specific to this email
  */
-function buildEmailBase(headerGradient, headerHtml, bodyHtml, extraCss = "") {
+function buildEmailBase(headerHtml, bodyHtml, extraCss = "") {
   return `
     <!DOCTYPE html>
     <html>
@@ -57,36 +56,37 @@ function buildEmailBase(headerGradient, headerHtml, bodyHtml, extraCss = "") {
         body {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
           line-height: 1.6;
-          color: #333;
+          color: #1f2937;
           margin: 0;
           padding: 0;
-          background-color: #f5f5f5;
+          background-color: #f9fafb;
         }
         .container {
           max-width: 600px;
-          margin: 40px auto;
+          margin: 20px auto;
           background: white;
-          border-radius: 12px;
+          border-radius: 6px;
           overflow: hidden;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          border: 1px solid #e5e7eb;
         }
         .header {
-          background: ${headerGradient};
-          color: white;
-          padding: 40px 20px;
+          background: white;
+          color: #1f2937;
+          padding: 32px 20px;
           text-align: center;
+          border-bottom: 1px solid #e5e7eb;
         }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
-        .content { padding: 40px 30px; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+        .content { padding: 32px; }
         .footer {
           text-align: center;
-          padding: 30px;
+          padding: 24px;
           background: #f9fafb;
           color: #6b7280;
-          font-size: 13px;
+          font-size: 12px;
           border-top: 1px solid #e5e7eb;
         }
-        .footer p { margin: 5px 0; }
+        .footer p { margin: 4px 0; }
         ${extraCss}
       </style>
     </head>
@@ -130,99 +130,58 @@ const sendWorkerInvitation = async (
     });
     const roleLabel = invitedRole === "head" ? "department head" : "worker";
 
-    const headerHtml = `<h1>🎉 You're Invited!</h1>`;
+    const headerHtml = `<h1>You're Invited</h1>`;
 
     const bodyHtml = `
-      <h2 style="color: #1f2937; font-size: 24px; margin-top: 0;">Join ${department} Department</h2>
       <p>Hello,</p>
       <p><strong>${hodName}</strong> has invited you to join the <strong>${department} Department</strong> as a <strong>${roleLabel}</strong> in the Sahayak system.</p>
 
-      <div class="benefits">
-        <p><strong>As a ${roleLabel}, you'll be able to:</strong></p>
-        <ul>
-          ${
-            invitedRole === "head"
-              ? `
-          <li>✅ Review and manage department complaints</li>
-          <li>👷 Assign and supervise workers</li>
-          <li>📊 Track department performance metrics</li>
-          <li>💬 Coordinate with citizens and workers</li>
-          <li>📌 Approve, rework, or escalate complaint actions</li>
-          `
-              : `
-          <li>✅ Receive and manage complaint assignments</li>
-          <li>📱 Update complaint status in real-time</li>
-          <li>📊 Track your performance metrics</li>
-          <li>💬 Communicate with citizens and department heads</li>
-          <li>🏆 Compete in leaderboards and earn recognition</li>
-          `
-          }
-        </ul>
+      <p style="margin-top: 20px; margin-bottom: 8px;"><strong>Responsibilities:</strong></p>
+      <ul style="margin: 8px 0; padding-left: 20px;">
+        ${
+          invitedRole === "head"
+            ? `
+        <li>Review and manage department complaints</li>
+        <li>Assign and supervise workers</li>
+        <li>Track department performance metrics</li>
+        <li>Coordinate with citizens and workers</li>
+        <li>Approve, rework, or escalate complaint actions</li>
+        `
+            : `
+        <li>Receive and manage complaint assignments</li>
+        <li>Update complaint status in real-time</li>
+        <li>Track your performance metrics</li>
+        <li>Communicate with citizens and department heads</li>
+        <li>Help resolve citizen complaints effectively</li>
+        `
+        }
+      </ul>
+
+      <p style="margin-top: 20px;">To accept this invitation, tap the button below:</p>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${inviteLink}" class="button">Accept Invitation</a>
       </div>
 
-      <div style="text-align: center;">
-        <a href="${inviteLink}" class="button">Open Sahayak App &amp; Accept</a>
-      </div>
-
-      <div class="warning">
-        <p>⏰ <strong>This invitation expires in 7 days.</strong> Please register before then.</p>
-      </div>
-
-      <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
-        If the button doesn't work, open the Sahayak app and tap "I have an invite" on the login screen, then paste this link:
-      </p>
-      <div class="link-box">
-        <a href="${inviteDeepLink}">${inviteDeepLink}</a>
-      </div>
-
-      <p style="margin-top: 30px; font-size: 13px; color: #6b7280; text-align: center;">
-        This is an automated email. Please do not reply.
+      <p style="margin-top: 24px; color: #6b7280; font-size: 13px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+        This invitation expires in 7 days. This is an automated email. Please do not reply.
       </p>
     `;
 
     const extraCss = `
-      .content h2 { color: #1f2937; font-size: 24px; margin-top: 0; }
-      .benefits {
-        background: #f9fafb;
-        border-left: 4px solid #667eea;
-        padding: 20px;
-        margin: 20px 0;
-        border-radius: 4px;
-      }
-      .benefits ul { margin: 10px 0; padding-left: 20px; }
-      .benefits li { margin: 8px 0; color: #4b5563; }
       .button {
         display: inline-block;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #1f2937;
         color: white;
-        padding: 16px 40px;
+        padding: 12px 32px;
         text-decoration: none;
-        border-radius: 8px;
-        margin: 30px 0;
-        font-weight: 600;
-        font-size: 16px;
-        box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);
-      }
-      .warning {
-        background: #fef3c7;
-        border-left: 4px solid #f59e0b;
-        padding: 15px;
-        margin: 20px 0;
         border-radius: 4px;
+        font-weight: 600;
+        font-size: 15px;
       }
-      .warning p { margin: 0; color: #92400e; font-size: 14px; }
-      .link-box {
-        background: #f3f4f6;
-        padding: 15px;
-        border-radius: 6px;
-        margin: 20px 0;
-        word-break: break-all;
-      }
-      .link-box a { color: #667eea; font-size: 13px; }
     `;
 
     const html = buildEmailBase(
-      "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
       headerHtml,
       bodyHtml,
       extraCss,
@@ -260,8 +219,8 @@ const sendComplaintRegistered = async (userEmail, userName, complaintData) => {
     });
 
     const headerHtml = `
-      <h1>✅ Complaint Registered</h1>
-      <div class="ticket-id">Ticket #${ticketId}</div>
+      <h1>Complaint Registered</h1>
+      <p style="margin: 8px 0 0 0; color: #6b7280; font-weight: 500;">Ticket #${ticketId}</p>
     `;
 
     const bodyHtml = `
@@ -297,77 +256,53 @@ const sendComplaintRegistered = async (userEmail, userName, complaintData) => {
         }
       </div>
 
-      <div style="text-align: center;">
+      <p style="margin-top: 24px; margin-bottom: 8px;"><strong>What happens next:</strong></p>
+      <ol style="margin: 8px 0; padding-left: 20px; color: #4b5563;">
+        <li style="margin-bottom: 6px;">Your complaint will be reviewed by the department head</li>
+        <li style="margin-bottom: 6px;">A worker will be assigned to resolve the issue</li>
+        <li style="margin-bottom: 6px;">You'll receive updates via email and in-app notifications</li>
+        <li>You can track progress in real-time in the app</li>
+      </ol>
+
+      <div style="text-align: center; margin: 24px 0;">
         <a href="${viewLink}" class="button">Track Your Complaint</a>
       </div>
-
-      <div class="next-steps">
-        <h3>📋 What Happens Next?</h3>
-        <ol style="margin: 10px 0; padding-left: 20px;">
-          <li>Your complaint will be reviewed by the department head</li>
-          <li>A worker will be assigned to resolve the issue</li>
-          <li>You'll receive updates via notifications and email</li>
-          <li>You can track progress in real-time in the app</li>
-        </ol>
-      </div>
-
-      <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-        <strong>Need help?</strong> Track your complaint status anytime in the Sahayak app.
-      </p>
     `;
 
     const extraCss = `
-      .ticket-id {
-        background: rgba(255, 255, 255, 0.2);
-        display: inline-block;
-        padding: 8px 16px;
-        border-radius: 20px;
-        margin-top: 10px;
-        font-size: 14px;
-        font-weight: 600;
-      }
       .info-box {
         background: #f9fafb;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
+        border-radius: 4px;
+        padding: 16px;
+        margin: 16px 0;
+        border: 1px solid #e5e7eb;
       }
       .info-row {
         display: flex;
         justify-content: space-between;
-        padding: 10px 0;
+        padding: 8px 0;
         border-bottom: 1px solid #e5e7eb;
+        font-size: 14px;
       }
       .info-row:last-child { border-bottom: none; }
       .label { font-weight: 600; color: #6b7280; }
       .value { color: #1f2937; text-align: right; }
-      .priority-high { color: #dc2626; font-weight: 600; }
-      .priority-medium { color: #f59e0b; font-weight: 600; }
-      .priority-low { color: #10b981; font-weight: 600; }
+      .priority-high { font-weight: 600; }
+      .priority-medium { font-weight: 600; }
+      .priority-low { font-weight: 600; }
       .button {
         display: inline-block;
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        background: #1f2937;
         color: white;
-        padding: 16px 40px;
+        padding: 12px 32px;
         text-decoration: none;
-        border-radius: 8px;
-        margin: 30px 0;
-        font-weight: 600;
-        font-size: 16px;
-        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.4);
-      }
-      .next-steps {
-        background: #eff6ff;
-        border-left: 4px solid #3b82f6;
-        padding: 20px;
-        margin: 20px 0;
         border-radius: 4px;
+        font-weight: 600;
+        font-size: 15px;
       }
-      .next-steps h3 { margin-top: 0; color: #1e40af; }
     `;
 
     const html = buildEmailBase(
-      "linear-gradient(135deg, #10b981 0%, #059669 100%)",
       headerHtml,
       bodyHtml,
       extraCss,
@@ -410,18 +345,13 @@ const sendComplaintCompleted = async (
     });
 
     const headerHtml = `
-      <h1>🎉 Complaint Resolved!</h1>
-      <div class="ticket-id">Ticket #${ticketId}</div>
+      <h1>Complaint Resolved</h1>
+      <p style="margin: 8px 0 0 0; color: #6b7280; font-weight: 500;">Ticket #${ticketId}</p>
     `;
 
     const bodyHtml = `
-      <p>Dear <strong>${userName}</strong>,</p>
-
-      <div style="text-align: center;">
-        <div class="success-badge">✅ Issue Resolved</div>
-      </div>
-
-      <p>Great news! Your complaint has been successfully resolved by the ${department} Department.</p>
+      <p>Hello,</p>
+      <p>Your complaint has been successfully resolved by the ${department} Department.</p>
 
       <div class="info-box">
         <div class="info-row">
@@ -448,83 +378,48 @@ const sendComplaintCompleted = async (
         }
       </div>
 
-      <div class="feedback-box">
-        <h3>⭐ We Value Your Feedback!</h3>
-        <p style="margin: 10px 0;">Your opinion helps us improve our services. Please take a moment to rate your experience and let us know how we did.</p>
-      </div>
-
-      <div style="text-align: center;">
-        <a href="${feedbackLink || viewLink}" class="button button-secondary">Rate &amp; Provide Feedback</a>
+      <div style="text-align: center; margin: 24px 0;">
         <a href="${viewLink}" class="button">View Complaint Details</a>
       </div>
 
-      <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-        Thank you for using Sahayak. We hope the issue has been resolved to your satisfaction.
+      <p style="color: #6b7280; font-size: 13px; border-top: 1px solid #e5e7eb; margin-top: 24px; padding-top: 16px;">
+        If you need further assistance, you can access your complaint details through the Sahayak app.
       </p>
     `;
 
     const extraCss = `
-      .ticket-id {
-        background: rgba(255, 255, 255, 0.2);
-        display: inline-block;
-        padding: 8px 16px;
-        border-radius: 20px;
-        margin-top: 10px;
-        font-size: 14px;
-        font-weight: 600;
-      }
-      .success-badge {
-        background: #d1fae5;
-        color: #065f46;
-        padding: 12px 24px;
-        border-radius: 8px;
-        display: inline-block;
-        font-weight: 600;
-        margin: 20px 0;
-      }
       .info-box {
         background: #f9fafb;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
+        border-radius: 4px;
+        padding: 16px;
+        margin: 16px 0;
+        border: 1px solid #e5e7eb;
       }
       .info-row {
         display: flex;
         justify-content: space-between;
-        padding: 10px 0;
+        padding: 8px 0;
         border-bottom: 1px solid #e5e7eb;
+        font-size: 14px;
       }
       .info-row:last-child { border-bottom: none; }
       .label { font-weight: 600; color: #6b7280; }
       .value { color: #1f2937; text-align: right; }
       .button {
         display: inline-block;
-        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+        background: #1f2937;
         color: white;
-        padding: 16px 40px;
+        padding: 12px 32px;
         text-decoration: none;
-        border-radius: 8px;
-        margin: 10px 5px;
+        border-radius: 4px;
         font-weight: 600;
-        font-size: 16px;
-        box-shadow: 0 4px 6px rgba(139, 92, 246, 0.4);
-      }
-      .button-secondary {
-        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        box-shadow: 0 4px 6px rgba(245, 158, 11, 0.4);
-      }
-      .feedback-box {
-        background: #fef3c7;
-        border-left: 4px solid #f59e0b;
-        padding: 20px;
-        margin: 20px 0;
+        font-size: 15px;
         border-radius: 4px;
       }
       .feedback-box h3 { margin-top: 0; color: #92400e; }
     `;
 
     const html = buildEmailBase(
-      "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)",
       headerHtml,
       bodyHtml,
       extraCss,

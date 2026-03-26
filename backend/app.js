@@ -134,37 +134,32 @@ function buildDeepLinkUrl(pathname, query = {}) {
   return url.toString();
 }
 
-function renderDeepLinkBridgePage({ deepLinkUrl, webUrl }) {
-  const safeDeepLink = escapeHtml(deepLinkUrl);
-  const safeWebUrl = escapeHtml(webUrl);
-
+function renderDeepLinkBridgePage({ deepLinkUrl }) {
   return `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Open Sahayak</title>
+    <title>Sahayak</title>
     <style>
-      body { margin: 0; background: #f3f4f6; color: #111827; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; }
-      .card { max-width: 560px; margin: 48px auto; background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); }
-      h1 { margin: 0 0 8px; font-size: 24px; }
-      p { margin: 0 0 14px; color: #4b5563; }
-      .btn { display: inline-block; margin-top: 8px; margin-right: 8px; text-decoration: none; border-radius: 10px; padding: 12px 16px; font-weight: 600; }
-      .btn-primary { background: #111827; color: #fff; }
-      .btn-secondary { background: #e5e7eb; color: #111827; }
-      .meta { margin-top: 12px; font-size: 12px; color: #6b7280; word-break: break-all; }
+      body { margin: 0; background: #f9fafb; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; }
+      .card { max-width: 420px; margin: 64px auto; background: #fff; border-radius: 6px; padding: 32px; border: 1px solid #e5e7eb; text-align: center; }
+      h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
+      p { margin: 0 0 24px; color: #6b7280; font-size: 14px; }
+      .btn { display: inline-block; text-decoration: none; border-radius: 4px; padding: 10px 24px; font-weight: 600; font-size: 14px; }
+      .btn-primary { background: #1f2937; color: #fff; }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>Opening Sahayak</h1>
-      <p>If the app does not open automatically, tap Open App.</p>
-      <a class="btn btn-primary" href="${safeDeepLink}">Open App</a>
-      <a class="btn btn-secondary" href="${safeWebUrl}">Open in Browser</a>
-      <div class="meta">Deep link: ${safeDeepLink}</div>
+      <h1>Redirecting...</h1>
+      <p>If the app does not open automatically, tap the button below.</p>
+      <a class="btn btn-primary" href="${escapeHtml(deepLinkUrl)}">Open App</a>
     </div>
     <script>
-      window.location.replace(${JSON.stringify(deepLinkUrl)});
+      setTimeout(() => {
+        window.location.replace(${JSON.stringify(deepLinkUrl)});
+      }, 100);
     </script>
   </body>
 </html>`;
@@ -180,15 +175,9 @@ app.get(
   ],
   (req, res) => {
     const deepLinkUrl = buildDeepLinkUrl(req.path, req.query || {});
-    const webBase = String(
-      process.env.APP_LINK_BASE_URL || "https://sahayak-zqp7.onrender.com",
-    )
-      .trim()
-      .replace(/\/+$/, "");
-    const webUrl = `${webBase}${req.originalUrl}`;
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.status(200).send(renderDeepLinkBridgePage({ deepLinkUrl, webUrl }));
+    res.status(200).send(renderDeepLinkBridgePage({ deepLinkUrl }));
   },
 );
 

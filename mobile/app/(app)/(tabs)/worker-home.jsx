@@ -84,16 +84,14 @@ export default function WorkerHome() {
   }, [error, t]);
 
   const activeComplaints = dashboardData?.activeComplaints ?? [];
-  const completionPercent =
-    dashboardData?.activeCount > 0
-      ? Math.round(
-          (dashboardData.completedCount /
-            (dashboardData.completedCount + dashboardData.activeCount)) *
-            100,
-        )
-      : 100;
+  const completedCount = Number(dashboardData?.completedCount ?? 0);
+  const activeCount = Number(dashboardData?.activeCount ?? 0);
+  const hasAssignmentHistory = completedCount + activeCount > 0;
+  const completionPercent = hasAssignmentHistory
+    ? Math.round((completedCount / (completedCount + activeCount)) * 100)
+    : 0;
   const ratingValue = Number(user?.rating ?? 0);
-  const hasRating = Number.isFinite(ratingValue) && ratingValue > 0;
+  const hasRating = hasAssignmentHistory && Number.isFinite(ratingValue) && ratingValue > 0;
   const ratingPercent = Math.max(0, Math.min((ratingValue / 5) * 100, 100));
   const pendingApprovalColor =
     getStatusColor("pending-approval", colors) ?? colors.warning;
@@ -342,7 +340,9 @@ export default function WorkerHome() {
                     className="text-xl font-bold"
                     style={{ color: colors.success }}
                   >
-                    {completionPercent}%
+                    {hasAssignmentHistory
+                      ? `${completionPercent}%`
+                      : t("worker.dashboard.notAvailable")}
                   </Text>
                 </View>
                 <View

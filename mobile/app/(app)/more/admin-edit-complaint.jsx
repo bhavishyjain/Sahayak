@@ -6,6 +6,7 @@ import { Search, FilePenLine, Trash2 } from "lucide-react-native";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import PressableBlock from "../../../components/PressableBlock";
+import SearchBar from "../../../components/SearchBar";
 import { formatStatusLabel } from "../../../data/complaintStatus";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
@@ -252,11 +253,10 @@ export default function AdminEditComplaintScreen() {
             </View>
           </View>
 
-          <SimpleInput
+          <SearchBar
             value={ticketId}
             onChangeText={setTicketId}
             placeholder="Complaint ID"
-            colors={colors}
           />
 
           <PressableBlock

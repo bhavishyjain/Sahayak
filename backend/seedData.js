@@ -1292,17 +1292,20 @@ function generateComplaint(userId, allUsers) {
         ? 5 + Math.floor(Math.random() * 20)
         : 1 + Math.floor(Math.random() * 5);
 
-  // ~30% chance AI disagrees on priority
+  // AI priority suggestion is only stored while complaint is pending.
+  // ~30% chance AI disagrees on priority for pending complaints.
   const priorityOptions = ["Low", "Medium", "High"];
   const aiSuggestedPriority =
-    Math.random() < 0.3
-      ? priorityOptions[
-          (priorityOptions.indexOf(priority) +
-            1 +
-            Math.floor(Math.random() * 2)) %
-            3
-        ]
-      : priority;
+    status === "pending"
+      ? Math.random() < 0.3
+        ? priorityOptions[
+            (priorityOptions.indexOf(priority) +
+              1 +
+              Math.floor(Math.random() * 2)) %
+              3
+          ]
+        : priority
+      : null;
 
   complaint.aiAnalysis = {
     sentiment: aiSentiment,
@@ -2146,11 +2149,16 @@ async function seedDatabase() {
           complaint.assignedWorkers.length === 0),
     );
 
-    const addComplaintHistoryUpdate = (complaint, historyEntries, updates = {}) => {
+    const addComplaintHistoryUpdate = (
+      complaint,
+      historyEntries,
+      updates = {},
+    ) => {
       complaint.history = [...(complaint.history || []), ...historyEntries];
       Object.assign(complaint, updates);
       complaint.updatedAt =
-        historyEntries[historyEntries.length - 1]?.timestamp || complaint.updatedAt;
+        historyEntries[historyEntries.length - 1]?.timestamp ||
+        complaint.updatedAt;
       complaintUpdateOps.push({
         updateOne: {
           filter: { _id: complaint._id },
@@ -2255,7 +2263,10 @@ async function seedDatabase() {
         const nextFields = {};
         if (requestedDepartment !== complaint.department) {
           nextFields.department = requestedDepartment;
-          if (complaint.aiAnalysis && typeof complaint.aiAnalysis === "object") {
+          if (
+            complaint.aiAnalysis &&
+            typeof complaint.aiAnalysis === "object"
+          ) {
             nextFields.aiAnalysis = {
               ...complaint.aiAnalysis,
               department: requestedDepartment,

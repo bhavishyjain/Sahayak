@@ -465,7 +465,7 @@ async function getWorkerAnalyticsSummary(workerId, analyticsFilters = {}) {
       fullName: worker.fullName,
       department: worker.department,
       specializations: worker.specializations || [],
-      rating: worker.rating || 4.5,
+      rating: Number.isFinite(worker.rating) ? worker.rating : null,
       performanceMetrics: worker.performanceMetrics || {},
     },
     summary: {
@@ -474,7 +474,9 @@ async function getWorkerAnalyticsSummary(workerId, analyticsFilters = {}) {
       completionRate: analytics.completionRate,
       avgCompletionTime: worker.performanceMetrics?.averageCompletionTime || 0,
       weekCompleted: worker.performanceMetrics?.currentWeekCompleted || 0,
-      customerRating: worker.performanceMetrics?.customerRating || 4.5,
+      customerRating: Number.isFinite(worker.performanceMetrics?.customerRating)
+        ? worker.performanceMetrics.customerRating
+        : null,
     },
     weeklyTrend,
     priorityBreakdown: analytics.priorityBreakdown,

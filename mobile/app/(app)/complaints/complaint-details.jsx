@@ -177,7 +177,14 @@ function ComplaintDetailsInner() {
     error: complaintQueryError,
     refetch: refetchComplaintQuery,
   } = complaintQuery;
-  const loading = complaintQuery.isLoading && !complaint;
+  const isInitialQueryPending =
+    !complaint &&
+    !complaintQueryData &&
+    !complaintQueryError &&
+    (complaintQuery.isPending ||
+      complaintQuery.isLoading ||
+      complaintQuery.isFetching);
+  const loading = isInitialQueryPending;
   const refreshing = complaintQuery.isRefetching && !loading;
 
   useEffect(() => {
@@ -190,13 +197,16 @@ function ComplaintDetailsInner() {
     setUserRole(nextUserRole);
     setCurrentUserId(userIdString);
 
-    if (
-      nextUserRole === "user" &&
-      complaintData?.upvotes &&
-      userIdString &&
-      userIdString !== "undefined"
-    ) {
-      setHasUpvoted(complaintData.upvotes.includes(userIdString));
+    if (nextUserRole === "user") {
+      const nextHasUpvoted =
+        typeof complaintData?.hasUpvoted === "boolean"
+          ? complaintData.hasUpvoted
+          : complaintData?.upvotes &&
+              userIdString &&
+              userIdString !== "undefined"
+            ? complaintData.upvotes.includes(userIdString)
+            : false;
+      setHasUpvoted(Boolean(nextHasUpvoted));
     }
   }, [complaintQueryData]);
 
@@ -284,19 +294,28 @@ function ComplaintDetailsInner() {
     complaintId,
     t,
     hasUpvoted,
-    onUpvoteSuccess: async () => {
-      setHasUpvoted((prev) => !prev);
+    onUpvoteSuccess: async (upvotePayload) => {
+      const nextHasUpvoted =
+        typeof upvotePayload?.hasUpvoted === "boolean"
+          ? upvotePayload.hasUpvoted
+          : !hasUpvoted;
+      const nextUpvoteCount =
+        typeof upvotePayload?.upvoteCount === "number"
+          ? upvotePayload.upvoteCount
+          : nextHasUpvoted
+            ? Number(complaint?.upvoteCount || 0) + 1
+            : Math.max(0, Number(complaint?.upvoteCount || 0) - 1);
+
+      setHasUpvoted(nextHasUpvoted);
       setComplaint((prev) =>
         prev
           ? {
               ...prev,
-              upvoteCount: hasUpvoted
-                ? Math.max(0, Number(prev.upvoteCount || 0) - 1)
-                : Number(prev.upvoteCount || 0) + 1,
+              hasUpvoted: nextHasUpvoted,
+              upvoteCount: nextUpvoteCount,
             }
           : prev,
       );
-      await refreshComplaint();
     },
     onFeedbackSuccess: async () => {
       setFeedbackModalVisible(false);
@@ -313,20 +332,16 @@ function ComplaintDetailsInner() {
     },
   });
 
-  const {
-    startWork,
-    uploadCompletionPhotos,
-    startingWork,
-    uploadingPhotos,
-  } = useComplaintWorkerActions({
-    complaintId,
-    t,
-    onStartWorkSuccess: refreshComplaint,
-    onUploadSuccess: async () => {
-      setSelectedPhotos([]);
-      await refreshComplaint();
-    },
-  });
+  const { startWork, uploadCompletionPhotos, startingWork, uploadingPhotos } =
+    useComplaintWorkerActions({
+      complaintId,
+      t,
+      onStartWorkSuccess: refreshComplaint,
+      onUploadSuccess: async () => {
+        setSelectedPhotos([]);
+        await refreshComplaint();
+      },
+    });
 
   const {
     approveCompletion,
@@ -484,9 +499,9 @@ function ComplaintDetailsInner() {
         type: "success",
         text1:
           requestType === "delete"
-            ? "Delete request sent"
-            : "Edit request sent",
-        text2: "Your special request was sent to admin.",
+            ? t("complaints.details.deleteRequestSent")
+            : t("complaints.details.editRequestSent"),
+        text2: t("complaints.details.specialRequestSent"),
       });
       setSpecialRequestModalVisible(false);
       setDeleteRequestModalVisible(false);
@@ -496,8 +511,8 @@ function ComplaintDetailsInner() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Could not send special request",
-        text2: error?.response?.data?.message || "Please try again.",
+        text1: t("complaints.details.specialRequestFailed"),
+        text2: error?.response?.data?.message || t("common.tryAgain"),
       });
     } finally {
       setSubmittingSpecialRequest(false);
@@ -612,7 +627,9 @@ function ComplaintDetailsInner() {
 
   const handleShare = async () => {
     try {
-      const link = `sahayak://complaints/complaint-details?id=${complaintId}`;
+      const encodedComplaintId = encodeURIComponent(String(complaintId || ""));
+      const deepLink = `sahayak://complaints/complaint-details?id=${encodedComplaintId}`;
+      const appLink = `https://sahayak-zqp7.onrender.com/complaints/complaint-details?id=${encodedComplaintId}`;
       const shareMessage = [
         t("complaints.details.shareHeader", {
           ticketId: complaint.ticketId,
@@ -622,15 +639,16 @@ function ComplaintDetailsInner() {
           status: complaint.status,
           priority: complaint.priority,
         }),
-        t("complaints.details.shareOpenInApp", { link }),
+        t("complaints.details.shareOpenInApp", { link: deepLink }),
+        appLink,
       ].join("\n\n");
 
       await Share.share({
         message: shareMessage,
-        url: link,
+        url: deepLink,
       });
     } catch (_) {
-      Toast.show({ type: "error", text1: "Share failed" });
+      Toast.show({ type: "error", text1: t("complaints.details.shareFailed") });
     }
   };
 
@@ -640,66 +658,239 @@ function ComplaintDetailsInner() {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
+  const capitalize = (s) => {
+    if (!s) return "-";
+    const str = String(s).toLowerCase();
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
   const handleExport = async () => {
     if (exporting) return;
     setExporting(true);
     try {
-      const optionalImport = new Function(
-        "moduleName",
-        "return import(moduleName);",
-      );
-      const Print = await optionalImport("expo-print").catch(() => null);
-      const Sharing = await optionalImport("expo-sharing").catch(() => null);
-      if (!Print?.printToFileAsync || !Sharing?.shareAsync) {
+      let Print = null;
+      let FileSystem = null;
+      let IntentLauncher = null;
+      try {
+        Print = require("expo-print");
+        FileSystem = require("expo-file-system/legacy");
+        IntentLauncher = require("expo-intent-launcher");
+      } catch (_) {
+        Print = null;
+        FileSystem = null;
+        IntentLauncher = null;
+      }
+
+      if (!Print?.printToFileAsync || !FileSystem?.documentDirectory) {
         throw new Error("Export dependencies are unavailable");
       }
 
+      const formatDateTime = (value) => {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "-";
+        return date.toLocaleString();
+      };
+
+      // Translation strings for PDF
+      const yesLabel = t("common.yes");
+      const noLabel = t("common.no");
+      const noWorkersAssignedLabel = t(
+        "complaints.details.empty.noAssignedWorkers",
+      );
+      const noDescriptionLabel = t("complaints.details.noDescription");
+      const notSpecifiedLabel = t("complaints.details.notSpecified");
+
+      const assignedWorkersHtml = (complaint.assignedWorkers || []).length
+        ? `<table><thead><tr><th>Worker</th><th>Leader</th><th>Phone</th><th>Task</th></tr></thead><tbody>${(
+            complaint.assignedWorkers || []
+          )
+            .map(
+              (assignment) => `<tr>
+                <td>${escHtml(
+                  assignment?.workerName ||
+                    assignment?.workerId?.fullName ||
+                    assignment?.workerId?.username ||
+                    "Assigned worker",
+                )}</td>
+                <td>${assignment?.isLeader ? yesLabel : noLabel}</td>
+                <td>${escHtml(assignment?.workerPhone || "-")}</td>
+                <td>${escHtml(assignment?.taskDescription || "-")}</td>
+              </tr>`,
+            )
+            .join("")}</tbody></table>`
+        : `<p class="muted">${noWorkersAssignedLabel}</p>`;
+
+      const timelineHtml = (complaint.history || []).length
+        ? `<table><thead><tr><th>When</th><th>Status</th><th>Note</th></tr></thead><tbody>${(
+            complaint.history || []
+          )
+            .map(
+              (entry) => `<tr>
+                <td>${escHtml(
+                  formatDateTime(
+                    entry?.timestamp ||
+                      entry?.updatedAt ||
+                      entry?.createdAt ||
+                      entry?.at,
+                  ),
+                )}</td>
+                <td>${capitalize(
+                  entry?.status || entry?.toStatus || entry?.action || "-",
+                )}</td>
+                <td>${escHtml(
+                  entry?.note || entry?.remarks || entry?.reason || "-",
+                )}</td>
+              </tr>`,
+            )
+            .join("")}</tbody></table>`
+        : `<p class="muted">No timeline entries</p>`;
+
+      const escalationHtml = (complaint.sla?.escalationHistory || []).length
+        ? `<table><thead><tr><th>Level</th><th>Escalated At</th></tr></thead><tbody>${(
+            complaint.sla?.escalationHistory || []
+          )
+            .map(
+              (entry) => `<tr>
+                <td>L${escHtml(entry?.level)}</td>
+                <td>${escHtml(formatDateTime(entry?.escalatedAt))}</td>
+              </tr>`,
+            )
+            .join("")}</tbody></table>`
+        : `<p class="muted">No SLA escalations</p>`;
+
+      const feedbackRating = complaint.feedback?.rating || null;
+
+      const feedbackHtml = () => {
+        const hasFeedback =
+          complaint.feedback &&
+          (complaint.feedback.rating || complaint.feedback.comment);
+        const hasSatisfactionVotes =
+          satisfactionVotes &&
+          (satisfactionVotes.thumbsUpCount > 0 ||
+            satisfactionVotes.thumbsDownCount > 0);
+        if (!hasFeedback && !hasSatisfactionVotes) return "";
+        return `<div class="section">
+    <h2>Feedback</h2>
+    <p><span class="label">Rating:</span> <span class="value normal">${escHtml(
+      feedbackRating != null ? `${feedbackRating}/5` : "-",
+    )}</span></p>
+    <p><span class="label">Comment:</span> <span class="value normal">${escHtml(complaint.feedback?.comment || "-")}</span></p>
+    <p><span class="label">Worker Notes:</span> <span class="value normal">${escHtml(complaint.workerNotes || "-")}</span></p>
+    <p><span class="label">Satisfaction Votes:</span> <span class="value normal">${escHtml(
+      satisfactionVotes
+        ? `Up: ${Number(satisfactionVotes.thumbsUpCount || 0)}, Down: ${Number(satisfactionVotes.thumbsDownCount || 0)}`
+        : "-",
+    )}</span></p>
+  </div>`;
+      };
+
       const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}
-  h1{color:#2563EB;font-size:22px;margin-bottom:4px}
-  .sub{color:#6B7280;font-size:13px;margin-bottom:20px}
-  hr{border:none;border-top:1px solid #E5E7EB;margin:16px 0}
-  .label{color:#6B7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-top:12px}
-  .value{font-size:15px;font-weight:bold;margin-top:3px}
-  .normal{font-weight:normal}
-  .row{display:flex;gap:32px}
-  .col{flex:1}
-  .footer{color:#9CA3AF;font-size:10px;margin-top:32px}
-</style></head><body>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; color: #111827; line-height: 1.45; }
+    h1 { margin: 0 0 2px 0; color: #1D4ED8; font-size: 24px; }
+    h2 { margin: 22px 0 8px 0; font-size: 14px; color: #374151; text-transform: uppercase; letter-spacing: 0.4px; }
+    p { margin: 4px 0; }
+    .sub { color: #6B7280; font-size: 12px; margin-bottom: 14px; }
+    .grid { display: table; width: 100%; border-collapse: separate; border-spacing: 8px; margin-top: 6px; }
+    .cell { display: table-cell; width: 33.33%; border: 1px solid #E5E7EB; border-radius: 8px; padding: 8px; vertical-align: top; }
+    .label { color: #6B7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .value { color: #111827; font-size: 14px; font-weight: 700; margin-top: 3px; word-break: break-word; }
+    .normal { font-weight: 400; }
+    .badge { display: inline-block; border: 1px solid #D1D5DB; border-radius: 999px; padding: 2px 8px; font-size: 11px; margin: 2px 4px 0 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th, td { border: 1px solid #E5E7EB; padding: 6px 8px; text-align: left; font-size: 12px; vertical-align: top; }
+    th { background: #F9FAFB; font-size: 11px; text-transform: uppercase; letter-spacing: 0.35px; color: #4B5563; }
+    .muted { color: #6B7280; font-size: 12px; }
+    .section { border-top: 1px solid #E5E7EB; padding-top: 10px; margin-top: 10px; page-break-inside: avoid; }
+    .footer { margin-top: 20px; color: #9CA3AF; font-size: 10px; }
+    .mono { font-family: Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body>
   <h1>Complaint Report</h1>
-  <p class="sub">Ticket #${escHtml(complaint.ticketId)} &bull; Generated ${new Date().toLocaleString()}</p>
-  <hr/>
-  <div class="row">
-    <div class="col"><p class="label">Status</p><p class="value">${escHtml(complaint.status)}</p></div>
-    <div class="col"><p class="label">Priority</p><p class="value">${escHtml(complaint.priority)}</p></div>
-    <div class="col"><p class="label">Department</p><p class="value">${escHtml(complaint.department)}</p></div>
+  <p class="sub">Ticket #${escHtml(complaint.ticketId || complaintId)} • Generated ${escHtml(formatDateTime(new Date()))}</p>
+
+  <div class="grid">
+    <div class="cell"><div class="label">Status</div><div class="value">${capitalize(complaint.status || "-")}</div></div>
+    <div class="cell"><div class="label">Priority</div><div class="value">${escHtml(complaint.priority || "-")}</div></div>
+    <div class="cell"><div class="label">Department</div><div class="value">${escHtml(complaint.department || "-")}</div></div>
   </div>
-  <hr/>
-  <p class="label">Location</p>
-  <p class="value normal">${escHtml(complaint.locationName || "Not specified")}</p>
-  <p class="label">Date Submitted</p>
-  <p class="value">${new Date(complaint.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>
-  ${complaint.sla?.dueDate ? `<p class="label">SLA Due Date</p><p class="value">${new Date(complaint.sla.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>` : ""}
-  <hr/>
-  <p class="label">Description</p>
-  <p class="value normal">${escHtml(complaint.refinedText || complaint.rawText || "No description provided")}</p>
-  ${complaint.workerNotes ? `<hr/><p class="label">Worker Notes</p><p class="value normal">${escHtml(complaint.workerNotes)}</p>` : ""}
-  ${complaint.feedback?.rating ? `<hr/><p class="label">Citizen Feedback</p><p class="value">${complaint.feedback.rating} / 5 ★</p>${complaint.feedback.comment ? `<p class="value normal">${escHtml(complaint.feedback.comment)}</p>` : ""}` : ""}
-  <hr/>
-  <p class="footer">Generated by Sahayak &bull; Ticket #${escHtml(complaint.ticketId)}</p>
-</body></html>`;
+
+  <div class="section">
+    <h2>Core Details</h2>
+    <p><span class="label">Title:</span> <span class="value normal">${escHtml(complaint.title || "-")}</span></p>
+    <p><span class="label">Description:</span> <span class="value normal">${escHtml(complaint.refinedText || complaint.rawText || noDescriptionLabel)}</span></p>
+    <p><span class="label">Location:</span> <span class="value normal">${escHtml(complaint.locationName || notSpecifiedLabel)}</span></p>
+    <p><span class="label">Coordinates:</span> <span class="value normal mono">${escHtml(
+      Number.isFinite(Number(complaint?.coordinates?.lat)) &&
+        Number.isFinite(Number(complaint?.coordinates?.lng))
+        ? `${Number(complaint.coordinates.lat).toFixed(6)}, ${Number(complaint.coordinates.lng).toFixed(6)}`
+        : "-",
+    )}</span></p>
+    <p><span class="label">Created At:</span> <span class="value normal">${escHtml(formatDateTime(complaint.createdAt))}</span></p>
+    <p><span class="label">Updated At:</span> <span class="value normal">${escHtml(formatDateTime(complaint.updatedAt))}</span></p>
+    <p><span class="label">Upvotes:</span> <span class="value normal">${escHtml(String(complaint.upvoteCount || 0))}</span></p>
+  </div>
+
+  <div class="section">
+    <h2>Assignment</h2>
+    ${assignedWorkersHtml}
+  </div>
+
+  ${feedbackHtml()}
+
+  <div class="section">
+    <h2>Timeline</h2>
+    ${timelineHtml}
+  </div>
+
+  <p class="footer">Generated by Sahayak • Ticket #${escHtml(complaint.ticketId || complaintId)}</p>
+</body>
+</html>`;
       const { uri } = await Print.printToFileAsync({ html, base64: false });
-      await Sharing.shareAsync(uri, {
-        mimeType: "application/pdf",
-        UTI: "com.adobe.pdf",
-        dialogTitle: `Complaint ${complaint.ticketId}.pdf`,
+      const safeTicketId = String(
+        complaint.ticketId || complaintId || "complaint",
+      )
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 64);
+      const targetDir = `${FileSystem.documentDirectory}Sahayak/Complaints/`;
+      const targetFile = `${targetDir}complaint_${safeTicketId}.pdf`;
+
+      await FileSystem.makeDirectoryAsync(targetDir, { intermediates: true });
+      await FileSystem.copyAsync({ from: uri, to: targetFile });
+
+      if (Platform.OS === "android") {
+        const contentUri = await FileSystem.getContentUriAsync(targetFile);
+        if (IntentLauncher?.startActivityAsync) {
+          await IntentLauncher.startActivityAsync(
+            "android.intent.action.VIEW",
+            {
+              data: contentUri,
+              type: "application/pdf",
+              flags: 1,
+            },
+          );
+        } else {
+          await Linking.openURL(contentUri);
+        }
+      } else {
+        await Linking.openURL(targetFile);
+      }
+
+      Toast.show({
+        type: "success",
+        text1: t("complaints.details.pdfDownloaded"),
+        text2: t("complaints.details.pdfSavedAs", { ticketId: safeTicketId }),
       });
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "Export failed",
-        text2: e?.message || "Could not generate PDF",
+        text1: t("complaints.details.exportFailed"),
+        text2: e?.message || t("complaints.details.couldNotGeneratePdf"),
       });
     } finally {
       setExporting(false);
@@ -743,6 +934,40 @@ function ComplaintDetailsInner() {
   }
 
   if (!complaint) {
+    const awaitingHydration =
+      Boolean(complaintQueryData?.complaint) ||
+      complaintQuery.isPending ||
+      complaintQuery.isLoading ||
+      complaintQuery.isFetching;
+
+    if (awaitingHydration) {
+      return (
+        <View
+          className="flex-1"
+          style={{ backgroundColor: colors.backgroundPrimary }}
+        >
+          <BackButtonHeader title={t("complaints.details.title")} />
+          <View className="flex-1 justify-center items-center">
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </View>
+      );
+    }
+
+    if (isInitialQueryPending) {
+      return (
+        <View
+          className="flex-1"
+          style={{ backgroundColor: colors.backgroundPrimary }}
+        >
+          <BackButtonHeader title={t("complaints.details.title")} />
+          <View className="flex-1 justify-center items-center">
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </View>
+      );
+    }
+
     if (complaintQueryError) {
       return (
         <View
@@ -837,23 +1062,25 @@ function ComplaintDetailsInner() {
     userRole === "worker" &&
     (assignedWorkerCount === 0 ||
       (complaint.assignedWorkers || []).some((assignment) => {
-        return String(assignment?.workerId || "") === String(currentUserId || "");
+        return (
+          String(assignment?.workerId || "") === String(currentUserId || "")
+        );
       }));
   const hasExplicitLeader = (complaint.assignedWorkers || []).some(
     (assignment) => assignment?.isLeader,
   );
   const currentWorkerAssignment = (complaint.assignedWorkers || []).find(
-    (assignment) => String(assignment?.workerId || "") === String(currentUserId || ""),
+    (assignment) =>
+      String(assignment?.workerId || "") === String(currentUserId || ""),
   );
   const isCurrentWorkerLeader =
     userRole === "worker" &&
     Boolean(
       currentWorkerAssignment &&
-        (currentWorkerAssignment?.isLeader ||
-          (!hasExplicitLeader &&
-            String(
-              complaint.assignedWorkers?.[0]?.workerId || "",
-            ) === String(currentUserId || ""))),
+      (currentWorkerAssignment?.isLeader ||
+        (!hasExplicitLeader &&
+          String(complaint.assignedWorkers?.[0]?.workerId || "") ===
+            String(currentUserId || ""))),
     );
 
   const showHeadReviewAction =
@@ -1073,7 +1300,9 @@ function ComplaintDetailsInner() {
         {userRole === "head" &&
           complaint.aiSuggestedDepartment &&
           (complaint.aiSuggestedDepartment !== complaint.department ||
-            complaint.aiAnalysis?.suggestedPriority !== complaint.priority) && (
+            (complaintStatus === "pending" &&
+              complaint.aiAnalysis?.suggestedPriority !==
+                complaint.priority)) && (
             <Card
               style={{
                 margin: 0,
@@ -1170,7 +1399,8 @@ function ComplaintDetailsInner() {
               )}
 
               {/* Priority Suggestion */}
-              {complaint.aiAnalysis?.suggestedPriority &&
+              {complaintStatus === "pending" &&
+                complaint.aiAnalysis?.suggestedPriority &&
                 complaint.aiAnalysis.suggestedPriority !==
                   complaint.priority && (
                   <View className="mb-3">
@@ -1413,7 +1643,8 @@ function ComplaintDetailsInner() {
                         className="text-base font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        {assignment.workerName || t("complaints.details.assignedWorker")}
+                        {assignment.workerName ||
+                          t("complaints.details.assignedWorker")}
                       </Text>
                       {assignedWorkerCount > 1 && assignment.isLeader && (
                         <View
@@ -1575,19 +1806,13 @@ function ComplaintDetailsInner() {
                           style={{ color: colors.textSecondary }}
                         >
                           {upvoteCount}{" "}
-                          {(complaint.upvoteCount || 0) === 1
+                          {upvoteCount === 1
                             ? t("complaints.details.personAffected")
                             : t("complaints.details.peopleAffected")}
                         </Text>
                       </View>
                     </View>
                     <View className="flex-row items-center">
-                      {upvoting && (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.primary}
-                        />
-                      )}
                       <TouchableOpacity
                         onPress={(e) => {
                           e?.stopPropagation?.();
@@ -1670,7 +1895,7 @@ function ComplaintDetailsInner() {
                 style={{ color: colors.textSecondary }}
               >
                 {upvoteCount}{" "}
-                {(complaint.upvoteCount || 0) === 1
+                {upvoteCount === 1
                   ? t("complaints.details.personAffected")
                   : t("complaints.details.peopleAffected")}
               </Text>
@@ -1992,35 +2217,35 @@ function ComplaintDetailsInner() {
 
         {/* Proof Image */}
         {complaint.proofImage && complaint.proofImage.length > 0 && (
-            <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
-              <View className="flex-row items-center mb-3">
-                <ImageIcon size={20} color={colors.primary} />
-                <Text
-                  className="text-base font-semibold ml-2"
-                  style={{ color: colors.textPrimary }}
+          <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
+            <View className="flex-row items-center mb-3">
+              <ImageIcon size={20} color={colors.primary} />
+              <Text
+                className="text-base font-semibold ml-2"
+                style={{ color: colors.textPrimary }}
+              >
+                {complaint.proofImage.length > 1
+                  ? t("complaints.details.proofImages")
+                  : t("complaints.details.proofImage")}
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {complaint.proofImage.map((img, idx) => (
+                <Pressable
+                  key={`${idx}-${img}`}
+                  onPress={() => openImagePreview(img)}
+                  style={{ marginRight: 8 }}
                 >
-                  {complaint.proofImage.length > 1
-                    ? t("complaints.details.proofImages")
-                    : t("complaints.details.proofImage")}
-                </Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {complaint.proofImage.map((img, idx) => (
-                  <Pressable
-                    key={`${idx}-${img}`}
-                    onPress={() => openImagePreview(img)}
-                    style={{ marginRight: 8 }}
-                  >
-                    <Image
-                      source={{ uri: img }}
-                      className="w-32 h-32 rounded-xl"
-                      resizeMode="cover"
-                    />
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </Card>
-          )}
+                  <Image
+                    source={{ uri: img }}
+                    className="w-32 h-32 rounded-xl"
+                    resizeMode="cover"
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Card>
+        )}
 
         {/* Completion Photos (Before/After) - Visible to all roles */}
         {complaint.completionPhotos &&
@@ -2078,7 +2303,8 @@ function ComplaintDetailsInner() {
                     satisfactionVotes.userVote === "up"
                       ? colors.success
                       : colors.backgroundSecondary,
-                  opacity: votingInProgress || !showSatisfactionActions ? 0.5 : 1,
+                  opacity:
+                    votingInProgress || !showSatisfactionActions ? 0.5 : 1,
                 }}
               >
                 <ThumbsUp
@@ -2122,7 +2348,8 @@ function ComplaintDetailsInner() {
                     satisfactionVotes.userVote === "down"
                       ? colors.danger
                       : colors.backgroundSecondary,
-                  opacity: votingInProgress || !showSatisfactionActions ? 0.5 : 1,
+                  opacity:
+                    votingInProgress || !showSatisfactionActions ? 0.5 : 1,
                 }}
               >
                 <ThumbsDown
@@ -2159,7 +2386,10 @@ function ComplaintDetailsInner() {
             </View>
 
             {!showSatisfactionActions && (
-              <Text className="text-xs mb-3" style={{ color: colors.textSecondary }}>
+              <Text
+                className="text-xs mb-3"
+                style={{ color: colors.textSecondary }}
+              >
                 Satisfaction voting is available only for citizens.
               </Text>
             )}
@@ -2860,7 +3090,10 @@ function ComplaintDetailsInner() {
           >
             <ScrollView
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "flex-end",
+              }}
             >
               <View
                 className="rounded-t-3xl p-6"
@@ -2890,7 +3123,9 @@ function ComplaintDetailsInner() {
                         size={40}
                         color={colors.primary}
                         fill={
-                          star <= feedbackRating ? colors.primary : "transparent"
+                          star <= feedbackRating
+                            ? colors.primary
+                            : "transparent"
                         }
                       />
                     </Pressable>
@@ -3325,7 +3560,8 @@ function ComplaintDetailsInner() {
                       style={{
                         backgroundColor: colors.primary,
                         opacity:
-                          submittingSpecialRequest || !specialRequestReason.trim()
+                          submittingSpecialRequest ||
+                          !specialRequestReason.trim()
                             ? 0.5
                             : 1,
                       }}
@@ -3390,7 +3626,10 @@ function ComplaintDetailsInner() {
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}
+                contentContainerStyle={{
+                  flexGrow: 1,
+                  justifyContent: "flex-end",
+                }}
               >
                 <View
                   className="rounded-t-3xl p-6"
@@ -3449,7 +3688,8 @@ function ComplaintDetailsInner() {
                       className="flex-1 ml-2 py-3 rounded-xl items-center"
                       style={{
                         backgroundColor: colors.danger,
-                        opacity: sendingRework || !reworkReason.trim() ? 0.5 : 1,
+                        opacity:
+                          sendingRework || !reworkReason.trim() ? 0.5 : 1,
                       }}
                     >
                       {sendingRework ? (

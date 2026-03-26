@@ -93,8 +93,22 @@ const FREQUENCY_LABEL_KEYS = {
   monthly: "reports.schedule.frequency.monthly",
 };
 
+const FORMAT_LABEL_KEYS = {
+  pdf: "reports.formats.pdf",
+  excel: "reports.formats.excel",
+  csv: "reports.formats.csv",
+};
+
 function getFrequencyLabel(t, frequency) {
   const key = FREQUENCY_LABEL_KEYS[frequency];
+  if (key == null) {
+    return t("reports.notAvailable");
+  }
+  return t(key);
+}
+
+function getFormatLabel(t, format) {
+  const key = FORMAT_LABEL_KEYS[format];
   if (key == null) {
     return t("reports.notAvailable");
   }
@@ -893,7 +907,7 @@ export default function HODReports() {
                           : colors.textSecondary,
                     }}
                   >
-                    {fmt}
+                    {getFormatLabel(t, fmt)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -1014,7 +1028,7 @@ export default function HODReports() {
                           : colors.textSecondary,
                     }}
                   >
-                    {fmt}
+                    {getFormatLabel(t, fmt)}
                   </Text>
                 </TouchableOpacity>
               ))}

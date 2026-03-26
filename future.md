@@ -24,3 +24,4 @@ What to do:
 1. add delivery result views
 2. add failed push/email visibility
 3. add notification template previews
+1. Add microphone button to `assistant.jsx` with audio recording

@@ -6,6 +6,7 @@ import { queryKeys } from "../queryKeys";
 function buildParams({ search, startDate, endDate, limit = 20 }) {
   return {
     bucket: "resolved",
+    status: "resolved",
     limit,
     search: search?.trim() || undefined,
     startDate: startDate || undefined,
@@ -40,7 +41,9 @@ export function useHodResolvedList(filters = {}) {
   const pages = query.data?.pages ?? [];
   return {
     ...query,
-    complaints: pages.flatMap((page) => page?.complaints ?? []),
+    complaints: pages
+      .flatMap((page) => page?.complaints ?? [])
+      .filter((complaint) => complaint?.status === "resolved"),
     total: Number(pages[0]?.total ?? pages[0]?.pagination?.total ?? 0),
     hasMore: Boolean(query.hasNextPage),
     loadMore: query.fetchNextPage,

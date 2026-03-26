@@ -7,7 +7,6 @@ import {
   Square,
   Users,
   X,
-  Search,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -15,7 +14,6 @@ import {
   FlatList,
   RefreshControl,
   Text,
-  TextInput,
   View,
   TouchableOpacity,
   Modal,
@@ -27,11 +25,9 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import ComplaintCard from "../../../components/ComplaintCard";
 import SearchBar from "../../../components/SearchBar";
 import FilterPanel from "../../../components/FilterPanel";
-import {
-  HOD_ASSIGN_MULTIPLE_WORKERS_URL,
-} from "../../../url";
+import { HOD_ASSIGN_MULTIPLE_WORKERS_URL } from "../../../url";
 import apiCall from "../../../utils/api";
-import { formatPriorityLabel } from "../../../data/complaintStatus";
+import { ALL_STATUS_OPTIONS, formatPriorityLabel } from "../../../data/complaintStatus";
 import { invalidateComplaintQueries } from "../../../utils/invalidateComplaintQueries";
 import { isComplaintAssigned } from "../../../utils/complaintHelpers";
 import { useTheme } from "../../../utils/context/theme";
@@ -60,8 +56,17 @@ export default function HodComplaints() {
   const [selectedWorker, setSelectedWorker] = useState("");
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
+  const manageStatusOptions = ALL_STATUS_OPTIONS.filter(
+    (status) => status !== "resolved",
+  );
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 350);
   const LIMIT = 20;
+
+  useEffect(() => {
+    if (statusFilter === "resolved") {
+      setStatusFilter("all");
+    }
+  }, [statusFilter]);
 
   const {
     complaints,
@@ -264,28 +269,11 @@ export default function HodComplaints() {
 
         {/* Search Bar */}
         <View className="px-4 pb-4 pt-4">
-          <View
-            className="flex-row items-center px-4 py-1 rounded-2xl"
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              borderWidth: 1.5,
-              borderColor: colors.border,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 4,
-              elevation: 2,
-            }}
-          >
-            <Search size={20} color={colors.textSecondary} />
-            <TextInput
-              className="flex-1 ml-3 text-base"
-              style={{ color: colors.textPrimary }}
-              placeholder={t("hod.complaints.searchPlaceholder")}
-              placeholderTextColor={colors.textSecondary}
-              editable={false}
-            />
-          </View>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t("hod.complaints.searchPlaceholder")}
+          />
         </View>
 
         <View className="flex-1 justify-center items-center">
@@ -409,6 +397,7 @@ export default function HodComplaints() {
             )}
 
             <FilterPanel
+              statusOptions={manageStatusOptions}
               statusFilter={statusFilter}
               setStatusFilter={setStatusFilter}
               priorityFilter={priorityFilter}
@@ -449,7 +438,7 @@ export default function HodComplaints() {
               className="text-base mt-3 text-center"
               style={{ color: colors.textSecondary }}
             >
-            {searchQuery || hasActiveFilters()
+              {searchQuery || hasActiveFilters()
                 ? t("hod.complaints.noComplaintsFound")
                 : t("hod.complaints.noDepartmentComplaints")}
             </Text>
@@ -596,7 +585,7 @@ export default function HodComplaints() {
                             >
                               {worker.fullName ??
                                 worker.username ??
-                                t("complaints.details.notAvailable")}
+                                t("hod.workers.notAvailable")}
                             </Text>
                             <Text
                               className="text-xs"

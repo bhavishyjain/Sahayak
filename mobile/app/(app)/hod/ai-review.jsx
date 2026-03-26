@@ -727,16 +727,16 @@ export default function AiReview() {
   );
   const queueCount = Number(pagination.total || 0);
   const reviewTypeOptions = [
-    { key: "all", label: "All" },
-    { key: "department", label: "Dept" },
-    { key: "priority", label: "Priority" },
-    { key: "both", label: "Both" },
+    { key: "all", label: t("hod.aiReview.reviewTypes.all") },
+    { key: "department", label: t("hod.aiReview.reviewTypes.department") },
+    { key: "priority", label: t("hod.aiReview.reviewTypes.priority") },
+    { key: "both", label: t("hod.aiReview.reviewTypes.both") },
   ];
   const queueSubtitleByType = {
-    all: "All AI-suggested changes",
-    department: "Department-only changes",
-    priority: "Priority-only changes",
-    both: "Department and priority changes",
+    all: t("hod.aiReview.queueSubtitles.all"),
+    department: t("hod.aiReview.queueSubtitles.department"),
+    priority: t("hod.aiReview.queueSubtitles.priority"),
+    both: t("hod.aiReview.queueSubtitles.both"),
   };
   const handleLoadMore = () => {
     if (loading || refreshing || loadingMore || !pagination.hasNextPage) {
@@ -759,7 +759,7 @@ export default function AiReview() {
               className="text-xs font-semibold uppercase"
               style={{ color: colors.textSecondary }}
             >
-              AI review queue
+              {t("hod.aiReview.queueLabel")}
             </Text>
             <Text
               className="text-3xl font-bold mt-1"
@@ -779,16 +779,16 @@ export default function AiReview() {
 
       <View className="flex-row mb-4" style={{ gap: 10 }}>
         <StatPanel
-          label="Department shifts"
+          label={t("hod.aiReview.departmentShiftsLabel")}
           value={displayedDepartmentShiftCount}
-          hint="Routing changes"
+          hint={t("hod.aiReview.routingChangesHint")}
           accent={colors.info}
           colors={colors}
         />
         <StatPanel
-          label="Priority shifts"
+          label={t("hod.aiReview.priorityShiftsLabel")}
           value={displayedPriorityShiftCount}
-          hint="Urgency changes"
+          hint={t("hod.aiReview.urgencyChangesHint")}
           accent={colors.warning}
           colors={colors}
         />
@@ -843,7 +843,7 @@ export default function AiReview() {
                 className="text-base font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                Review Queue
+                {t("hod.aiReview.reviewQueueTitle")}
               </Text>
               <Text
                 className="text-xs mt-1"
@@ -853,7 +853,7 @@ export default function AiReview() {
                   ? t("hod.aiReview.bulk.selectedCount", {
                       count: selected.size,
                     })
-                  : `${queueCount} items waiting`}
+                  : t("hod.aiReview.itemsWaiting", { count: queueCount })}
               </Text>
             </View>
             <TouchableOpacity
@@ -983,7 +983,7 @@ export default function AiReview() {
                   className="text-xs mt-2"
                   style={{ color: colors.textSecondary }}
                 >
-                  Loading more...
+                  {t("hod.aiReview.loadingMore")}
                 </Text>
               </View>
             ) : null

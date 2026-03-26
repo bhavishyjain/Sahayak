@@ -171,7 +171,7 @@ export default function WorkerAssigned() {
                 className="text-sm mt-2 text-center"
                 style={{ color: colors.textSecondary }}
               >
-                {t("worker.dashboard.allCaughtUp")}
+                {t("worker.assigned.allCaughtUp")}
               </Text>
             </View>
           </Card>

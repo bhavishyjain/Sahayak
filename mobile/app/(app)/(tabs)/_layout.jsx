@@ -233,6 +233,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="hod-overview" options={{ href: null }} />
         <Tabs.Screen name="hod-workers" options={{ href: null }} />
         <Tabs.Screen name="hod-complaints" options={{ href: null }} />
+        <Tabs.Screen name="admin-home" options={{ href: null }} />
+        <Tabs.Screen name="admin-departments" options={{ href: null }} />
         <Tabs.Screen name="admin-recycle-bin" options={{ href: null }} />
       </Tabs>
     );

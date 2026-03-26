@@ -255,13 +255,13 @@ export default function HodOverview() {
               className="text-sm font-semibold"
               style={{ color: colors.textPrimary }}
             >
-              Overall Performance
+              {t("hod.dashboard.performance.overallPerformance")}
             </Text>
             <Text
               className="text-xs mt-0.5"
               style={{ color: colors.textSecondary }}
             >
-              Tap to see score breakdown
+              {t("hod.dashboard.performance.tapToSeeDetails")}
             </Text>
           </View>
           <Text
@@ -297,20 +297,22 @@ export default function HodOverview() {
           className="text-xs uppercase mb-3"
           style={{ color: colors.textSecondary }}
         >
-          Snapshot
+          {t("hod.dashboard.snapshotTitle")}
         </Text>
         <View className="flex-row mb-3" style={{ gap: 10 }}>
           <InfoTile
-            label="Active complaints"
+            label={t("hod.dashboard.cards.activeComplaints")}
             value={Number(activeCount || 0)}
-            hint={`${stats?.total} Total cases`}
+            hint={t("hod.dashboard.cards.totalCases", {
+              count: Number(stats?.total || 0),
+            })}
             colors={colors}
           />
 
           <InfoTile
-            label="Community support"
+            label={t("hod.dashboard.cards.communitySupport")}
             value={Number(stats?.totalUpvotes || 0)}
-            hint="Total complaint upvotes"
+            hint={t("hod.dashboard.cards.totalComplaintUpvotes")}
             colors={colors}
           />
         </View>
@@ -320,25 +322,25 @@ export default function HodOverview() {
           className="text-xs uppercase mb-3"
           style={{ color: colors.textSecondary }}
         >
-          Priority Mix
+          {t("hod.dashboard.priorityDistribution")}
         </Text>
         <View className="flex-row" style={{ gap: 10 }}>
           <InfoTile
-            label="High"
+            label={t("complaints.priority.high")}
             value={Number(stats?.highPriority || 0)}
-            hint="Urgent cases"
+            hint={t("hod.dashboard.priorityHints.urgentCases")}
             colors={colors}
           />
           <InfoTile
-            label="Medium"
+            label={t("complaints.priority.medium")}
             value={Number(stats?.mediumPriority || 0)}
-            hint="Standard queue"
+            hint={t("hod.dashboard.priorityHints.standardQueue")}
             colors={colors}
           />
           <InfoTile
-            label="Low"
+            label={t("complaints.priority.low")}
             value={Number(stats?.lowPriority || 0)}
-            hint="Lower urgency"
+            hint={t("hod.dashboard.priorityHints.lowerUrgency")}
             colors={colors}
           />
         </View>
@@ -348,39 +350,39 @@ export default function HodOverview() {
           className="text-xs uppercase mb-3"
           style={{ color: colors.textSecondary }}
         >
-          Workload Flow
+          {t("hod.dashboard.workloadFlow")}
         </Text>
         <MetricRow
           icon={AlertTriangle}
-          label="Pending complaints"
+          label={t("hod.dashboard.metrics.pendingComplaints")}
           value={Number(stats?.pending || 0)}
           tone={pendingColor}
           colors={colors}
         />
         <MetricRow
           icon={Activity}
-          label="Assigned and in progress"
+          label={t("hod.dashboard.metrics.assignedInProgress")}
           value={activeCount}
           tone={activeColor}
           colors={colors}
         />
         <MetricRow
           icon={Timer}
-          label="Pending approval"
+          label={t("hod.dashboard.awaitingApproval")}
           value={Number(stats?.pendingApproval || 0)}
           tone={approvalColor}
           colors={colors}
         />
         <MetricRow
           icon={CheckCircle}
-          label="Resolved complaints"
+          label={t("hod.dashboard.metrics.resolvedComplaints")}
           value={Number(stats?.resolved || 0)}
           tone={resolvedColor}
           colors={colors}
         />
         <MetricRow
           icon={AlertTriangle}
-          label="Needs rework"
+          label={t("hod.complaints.needsRework")}
           value={Number(stats?.needsRework || 0)}
           tone={reworkColor}
           colors={colors}
@@ -399,7 +401,7 @@ export default function HodOverview() {
           className="text-xs uppercase mb-3"
           style={{ color: colors.textSecondary }}
         >
-          Signals
+          {t("hod.dashboard.signalsTitle")}
         </Text>
         <View className="flex-row items-center justify-between mb-4">
           <View className="flex-row items-center">
@@ -408,13 +410,13 @@ export default function HodOverview() {
               className="text-sm font-semibold ml-2"
               style={{ color: colors.textPrimary }}
             >
-              Response time
+              {t("hod.dashboard.performance.responseTimeTitle")}
             </Text>
           </View>
           <Text className="text-sm font-bold" style={{ color: colors.info }}>
             {typeof stats?.avgResponseTime === "number"
               ? `${stats.avgResponseTime.toFixed(1)}h`
-              : "-"}
+              : t("hod.dashboard.noData")}
           </Text>
         </View>
         <View className="flex-row items-center justify-between mb-4">
@@ -424,7 +426,7 @@ export default function HodOverview() {
               className="text-sm font-semibold ml-2"
               style={{ color: colors.textPrimary }}
             >
-              Citizen feedback
+              {t("hod.dashboard.cards.citizenFeedback")}
             </Text>
           </View>
           <View className="flex-row items-center">
@@ -435,7 +437,7 @@ export default function HodOverview() {
             >
               {stats?.avgFeedbackRating
                 ? stats.avgFeedbackRating.toFixed(1)
-                : "-"}
+                : t("hod.dashboard.noData")}
             </Text>
           </View>
         </View>
@@ -446,7 +448,7 @@ export default function HodOverview() {
               className="text-sm font-semibold ml-2"
               style={{ color: colors.textPrimary }}
             >
-              Active workers
+              {t("hod.dashboard.workers.active")}
             </Text>
           </View>
           <Text className="text-sm font-bold" style={{ color: colors.success }}>
@@ -463,7 +465,7 @@ export default function HodOverview() {
               className="text-sm font-semibold ml-2"
               style={{ color: colors.textPrimary }}
             >
-              Completion rate
+              {t("hod.dashboard.performance.completionRate")}
             </Text>
           </View>
           <Text
@@ -509,7 +511,7 @@ export default function HodOverview() {
                   className="text-lg font-bold ml-3"
                   style={{ color: colors.textPrimary }}
                 >
-                  Performance Calculation
+                  {t("hod.dashboard.performance.calculationTitle")}
                 </Text>
               </View>
               <TouchableOpacity
@@ -534,7 +536,7 @@ export default function HodOverview() {
                     className="text-xs font-semibold uppercase mb-1"
                     style={{ color: performanceTone }}
                   >
-                    Current Score
+                    {t("hod.dashboard.performance.currentScore")}
                   </Text>
                   <View className="flex-row items-end">
                     <Text
@@ -570,7 +572,7 @@ export default function HodOverview() {
                   className="text-xs font-semibold uppercase mb-2"
                   style={{ color: colors.textSecondary }}
                 >
-                  Formula
+                  {t("hod.dashboard.performance.calculationFormula")}
                 </Text>
                 <View
                   className="rounded-xl px-4 py-3"
@@ -584,8 +586,7 @@ export default function HodOverview() {
                     className="text-sm"
                     style={{ color: colors.textPrimary, lineHeight: 22 }}
                   >
-                    Performance = (Completion Rate x 50%) + (Response Time x
-                    30%) + (Pending Load x 20%)
+                    {t("hod.dashboard.performance.formulaText")}
                   </Text>
                 </View>
               </View>
@@ -593,21 +594,21 @@ export default function HodOverview() {
               <View className="mx-5 mb-4">
                 <MetricRow
                   icon={CheckCircle}
-                  label="Completion score"
+                  label={t("hod.dashboard.performance.completionRateTitle")}
                   value={`${completionRate}%`}
                   tone={colors.success}
                   colors={colors}
                 />
                 <MetricRow
                   icon={Timer}
-                  label="Response score"
+                  label={t("hod.dashboard.performance.responseTimeTitle")}
                   value={`${responseScore}%`}
                   tone={colors.warning}
                   colors={colors}
                 />
                 <MetricRow
                   icon={AlertTriangle}
-                  label="Pending load score"
+                  label={t("hod.dashboard.performance.pendingStatusTitle")}
                   value={`${pendingScore}%`}
                   tone={colors.danger}
                   colors={colors}
@@ -624,7 +625,7 @@ export default function HodOverview() {
                     className="text-center font-semibold text-base"
                     style={{ color: colors.light }}
                   >
-                    Got it
+                    {t("hod.dashboard.performance.gotIt")}
                   </Text>
                 </Pressable>
               </View>
