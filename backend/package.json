@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "nodemon ./bin/www",
-    "dev": "nodemon ./bin/www"
+    "dev": "nodemon ./bin/www",
+    "seed": "node ./seedData.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

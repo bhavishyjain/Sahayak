@@ -12,6 +12,11 @@ const CACHE_TTL = 5000; // 5 seconds cache
 // Track in-flight refresh to prevent parallel refresh storms
 let refreshPromise = null;
 
+// Ensure session-expiry logout flow runs once when many requests fail together
+let sessionExpiryPromise = null;
+let sessionExpiredAt = 0;
+const SESSION_EXPIRY_COOLDOWN_MS = 4000;
+
 // Set during intentional logout to suppress spurious 401 handling
 let isLoggingOut = false;
 
@@ -25,6 +30,25 @@ export function clearApiCache() {
   setTimeout(() => {
     isLoggingOut = false;
   }, 3000);
+}
+
+async function handleSessionExpired(response) {
+  if (!sessionExpiryPromise) {
+    sessionExpiryPromise = (async () => {
+      clearApiCache();
+      await clearUserAuth();
+      router.replace("/(app)/(auth)/login");
+    })().finally(() => {
+      sessionExpiredAt = Date.now();
+      sessionExpiryPromise = null;
+    });
+  }
+
+  await sessionExpiryPromise;
+  const e = new Error("Session expired. Please log in again.");
+  e.name = "SessionExpiredError";
+  e.response = response;
+  throw e;
 }
 
 async function attemptTokenRefresh() {
@@ -168,6 +192,13 @@ const apiCall = async ({
     e.name = "LogoutError";
     throw e;
   }
+
+  // If session was just expired, avoid repeated refresh/logout attempts.
+  if (Date.now() - sessionExpiredAt < SESSION_EXPIRY_COOLDOWN_MS) {
+    const e = new Error("Session expired. Please log in again.");
+    e.name = "SessionExpiredError";
+    throw e;
+  }
   try {
     const authHeaders = auth
       ? {
@@ -236,14 +267,8 @@ const apiCall = async ({
           headers: retryHeaders,
         });
         if (retryResponse.status === 401) {
-          // Refresh didn't help — force logout
-          cachedUser = null;
-          lastCacheTime = 0;
-          await clearUserAuth();
-          router.replace("/(app)/(auth)/login");
-          const e = new Error("Session expired. Please log in again.");
-          e.response = retryResponse;
-          throw e;
+          // Refresh didn't help — force logout once
+          await handleSessionExpired(retryResponse);
         }
         if (retryResponse.status >= 400) {
           const e = new Error(
@@ -264,14 +289,8 @@ const apiCall = async ({
           message: retryRaw?.message,
         };
       } else {
-        // No refresh token or refresh failed — force logout
-        cachedUser = null;
-        lastCacheTime = 0;
-        await clearUserAuth();
-        router.replace("/(app)/(auth)/login");
-        const e = new Error("Session expired. Please log in again.");
-        e.response = response;
-        throw e;
+        // No refresh token or refresh failed — force logout once
+        await handleSessionExpired(response);
       }
     }
 
@@ -315,7 +334,12 @@ const apiCall = async ({
           : undefined,
     };
   } catch (error) {
-    if (!suppressErrorLog) {
+    const isExpectedLogoutError =
+      error?.name === "LogoutError" ||
+      error?.name === "SessionExpiredError" ||
+      error?.message === "Session expired. Please log in again.";
+
+    if (!suppressErrorLog && !isExpectedLogoutError) {
       console.error("API Call Error:", error.message);
       console.error(error);
     }

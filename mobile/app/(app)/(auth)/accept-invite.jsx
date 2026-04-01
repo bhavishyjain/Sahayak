@@ -26,10 +26,10 @@ import {
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import {
   getPasswordStrengthMessage,
   isStrongPassword,
@@ -95,16 +95,6 @@ export default function AcceptInvite() {
       setCheckingAuth(false);
     })();
   }, []);
-
-  const inputTheme = {
-    colors: {
-      primary: colors.primary,
-      onSurfaceVariant: colors.placeholder,
-      surface: colors.backgroundSecondary,
-      onSurface: colors.textPrimary,
-      outline: colors.border,
-    },
-  };
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (checkingAuth) {
@@ -365,64 +355,47 @@ export default function AcceptInvite() {
 
           {/* Form */}
           <View className="gap-3 mb-6">
-            <PaperTextInput
+            <AppTextInput
               label={t("auth.acceptInvite.form.fullName")}
               value={fullName}
               onChangeText={setFullName}
-              mode="outlined"
-              style={{ backgroundColor: colors.backgroundSecondary }}
-              theme={inputTheme}
-              textColor={colors.textPrimary}
-              left={<PaperTextInput.Icon icon={() => <User size={18} color={colors.placeholder} />} />}
+              left={<User size={18} color={colors.placeholder} />}
             />
-            <PaperTextInput
+            <AppTextInput
               label={t("auth.acceptInvite.form.username")}
               value={username}
               onChangeText={(v) => setUsername(v.replace(/\s/g, "").toLowerCase())}
-              mode="outlined"
-              style={{ backgroundColor: colors.backgroundSecondary }}
-              theme={inputTheme}
-              textColor={colors.textPrimary}
               autoCapitalize="none"
-              left={<PaperTextInput.Icon icon={() => <AtSign size={18} color={colors.placeholder} />} />}
+              left={<AtSign size={18} color={colors.placeholder} />}
             />
-            <PaperTextInput
+            <AppTextInput
               label={t("auth.acceptInvite.form.emailFromInvite")}
               value={invitedEmail}
-              mode="outlined"
-              style={{ backgroundColor: colors.backgroundSecondary }}
-              theme={inputTheme}
-              textColor={colors.textSecondary}
               editable={false}
-              left={<PaperTextInput.Icon icon={() => <Mail size={18} color={colors.placeholder} />} />}
-              right={<PaperTextInput.Icon icon={() => <Lock size={18} color={colors.placeholder} />} />}
+              left={<Mail size={18} color={colors.placeholder} />}
+              right={<Lock size={18} color={colors.placeholder} />}
             />
-            <PaperTextInput
+            <AppTextInput
               label={t("auth.acceptInvite.form.phone")}
               value={phone}
               onChangeText={setPhone}
-              mode="outlined"
-              style={{ backgroundColor: colors.backgroundSecondary }}
-              theme={inputTheme}
-              textColor={colors.textPrimary}
               keyboardType="phone-pad"
-              left={<PaperTextInput.Icon icon={() => <Phone size={18} color={colors.placeholder} />} />}
+              left={<Phone size={18} color={colors.placeholder} />}
             />
-            <PaperTextInput
+            <AppTextInput
               label={t("auth.acceptInvite.form.password")}
               value={password}
               onChangeText={setPassword}
-              mode="outlined"
-              style={{ backgroundColor: colors.backgroundSecondary }}
-              theme={inputTheme}
-              textColor={colors.textPrimary}
               secureTextEntry={secure}
-              left={<PaperTextInput.Icon icon={() => <Lock size={18} color={colors.placeholder} />} />}
+              left={<Lock size={18} color={colors.placeholder} />}
               right={
-                <PaperTextInput.Icon
-                  icon={() => secure ? <Eye size={18} color={colors.placeholder} /> : <EyeOff size={18} color={colors.placeholder} />}
-                  onPress={() => setSecure((v) => !v)}
-                />
+                <TouchableOpacity onPress={() => setSecure((v) => !v)}>
+                  {secure ? (
+                    <Eye size={18} color={colors.placeholder} />
+                  ) : (
+                    <EyeOff size={18} color={colors.placeholder} />
+                  )}
+                </TouchableOpacity>
               }
             />
             <Text

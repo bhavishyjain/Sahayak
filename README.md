@@ -1,105 +1,92 @@
 # Sahayak
 
-Sahayak is a multi-role municipal grievance management platform with a Node/Express backend and an Expo React Native mobile app. Citizens create complaints with media and location, workers execute field tasks, Heads of Department coordinate operations, and administrators manage platform-wide data and user operations.
+Sahayak is a multi-role municipal grievance management platform with a Node/Express backend and an Expo React Native mobile app. Citizens raise civic complaints with text, photos, and location; workers execute field tasks; Heads of Department route and supervise work; and admins manage departments, special requests, deleted complaints, broadcasts, and platform health.
 
-This README is intentionally deep. It is meant to work as:
+This README is written from the current backend implementation, not from a wishlist. It is meant to help with:
 
-- product documentation
-- onboarding for new developers
-- architecture reference
-- feature reference
-- API orientation guide
-- roadmap entry point
+- local setup
+- backend onboarding
+- data model orientation
+- role and workflow understanding
+- seeding and test account usage
+- route and service discovery
 
-For the audit backlog and future improvements, see [`FUTURE.md`](./FUTURE.md).
+For backlog and product gaps, see [`FUTURE.md`](/Users/bhavishyjain/Documents/GitHub/Sahayak/FUTURE.md).
 
-## 1. Product Purpose
+## What The System Does
 
-Sahayak manages the end-to-end lifecycle of municipal complaints:
+At a high level, Sahayak manages the complaint lifecycle end to end:
 
-1. A citizen files a complaint with text, images, and location.
-2. The backend enriches the complaint with AI-derived metadata such as suggested department, priority, urgency, and sentiment.
-3. The complaint enters a departmental workflow.
-4. HOD users review, assign workers, and supervise execution.
-5. Workers update progress, upload completion photos, and submit work for approval.
-6. Citizens track status, receive notifications, give feedback, and vote on satisfaction.
-7. Departments and admins use analytics, reports, schedules, and escalation views to monitor system health.
+1. A citizen submits a complaint with description, proof images, and location.
+2. The backend stores AI analysis such as department suggestion, urgency, confidence, and priority hints.
+3. A complaint enters departmental workflow.
+4. HOD users assign one or more workers.
+5. Workers move work forward, upload completion photos, and submit for approval.
+6. HOD users approve, reject for rework, or otherwise update routing.
+7. Citizens track updates, use complaint chat, upvote nearby complaints, submit feedback, and vote on satisfaction.
+8. Admins supervise special requests, deleted complaints, departments, reports, and system-wide notification flows.
 
-At a product level, Sahayak is both:
+## Roles
 
-- a citizen service platform
-- an internal municipal operations system
+### Citizen (`user`)
 
-## 2. Role Model
+Citizens can:
 
-### 2.1 Citizen
+- register, log in, refresh auth, reset password, and verify email
+- create complaints with media and coordinates
+- view their own complaints
+- browse nearby complaints
+- upvote complaints
+- open complaint detail, history, feedback, assignment, and SLA views
+- send complaint messages
+- submit post-resolution feedback
+- vote thumbs up/down on resolved complaints
+- use the assistant/chat flow for complaint registration and complaint lookup
 
-Citizen users can:
+### Worker (`worker`)
 
-- register, log in, reset password, and verify email
-- submit complaints with text, media, and coordinates
-- browse the public complaint feed with filters and pagination
-- browse dedicated self-owned complaint and resolved complaint views
-- view complaint detail, history, worker assignment state, SLA state, and escalation state
-- chat inside complaint threads
-- upvote nearby complaints
-- submit feedback after resolution
-- vote on satisfaction after a complaint is resolved
-- receive push notifications and in-app notifications
+Workers can:
 
-### 2.2 Worker
-
-Worker users can:
-
-- accept an invitation or be provisioned by backend/admin flows
-- access a dashboard summary and active assignment preview
-- browse assigned complaints and completed complaints
-- start work and move complaints through worker-allowed transitions
+- view assigned and completed complaint queues
+- start work and update complaint status where policy allows
 - upload completion photos
-- submit work for HOD approval
 - participate in complaint chat
-- view leaderboard metrics
-- view individual worker analytics
-- view rating and citizen feedback history
+- view worker dashboard and analytics
+- see ratings/performance metrics
 
-Important workflow note:
+Important workflow rule:
 
-- when multiple workers are assigned, one worker acts as the leader
-- only the leader can update complaint status
-- other workers stay visible in complaint detail for field coordination
+- when multiple workers are assigned, one worker is the leader
+- only the leader is intended to drive shared status transitions
 
-### 2.3 Head Of Department
+### Head Of Department (`head`)
 
 HOD users can:
 
-- access a department dashboard summary
-- browse department complaint queues and resolved queues
-- assign one or multiple workers
-- update worker task descriptions
+- review department complaints and analytics
+- assign one or more workers
+- update task descriptions
 - approve completion
-- send complaints for rework
-- cancel complaints when policy allows
+- send work back for rework
+- cancel complaints where policy allows
 - review AI suggestions
-- invite workers and manage invitations
-- remove workers
-- export reports
-- email reports
-- schedule recurring reports
-- inspect report schedule health and run schedules manually
+- manage worker invitations
+- send special requests to admin
+- export reports, email reports, and schedule recurring reports
 
-### 2.4 Admin
+### Admin (`admin`)
 
-Admin users have backend support for:
+Admins can:
 
-- user CRUD
-- deleted complaint recovery and purge
-- festival event management
-- report access
-- worker creation and maintenance
+- manage users
+- manage departments
+- review special requests from HODs
+- soft delete, restore, and purge complaints
+- manage festival events
+- broadcast notifications
+- access admin dashboards, recycle bin flows, and reports
 
-The mobile app currently exposes only limited admin-grade UI. Several admin capabilities remain backend-only. Those are documented in [`FUTURE.md`](./FUTURE.md).
-
-## 3. Repository Structure
+## Repository Layout
 
 ```text
 Sahayak/
@@ -116,7 +103,8 @@ Sahayak/
 │   ├── routes/
 │   ├── services/
 │   ├── utils/
-│   └── validators/
+│   ├── validators/
+│   └── seedData.js
 ├── mobile/
 │   ├── app/
 │   ├── assets/
@@ -128,526 +116,278 @@ Sahayak/
 └── FUTURE.md
 ```
 
-## 4. Tech Stack
+## Tech Stack
 
-### 4.1 Backend
+### Backend
 
 - Node.js
 - Express
-- MongoDB
-- Mongoose
-- JWT access tokens plus refresh token rotation
-- Cloudinary for media storage
-- Resend for email delivery
-- Gemini/OpenAI integrations for AI assistance
+- MongoDB with Mongoose
+- JWT auth with refresh-token rotation
+- Cloudinary for media uploads
+- Resend for email
+- Gemini / AI-assisted analysis and assistant flows
 - Expo push notifications
-- WebSocket realtime using `ws`
-- `node-cron` for background scheduled work
+- WebSocket realtime with `ws`
+- `node-cron` for background jobs
+- Excel / PDF / CSV report generation
 
-### 4.2 Mobile
+### Mobile
 
 - Expo
 - React Native
 - Expo Router
-- TanStack React Query
-- NativeWind
+- TanStack Query
 - AsyncStorage
 - Expo Notifications
-- Expo Image Picker
-- Expo Sharing
-- Expo Print
-- i18n-driven localization
-
-## 5. Backend Architecture
-
-### 5.1 Boot And Infrastructure
-
-- `backend/app.js`: Express setup, middleware, routes, error handling
-- `backend/bin/www`: HTTP server boot, database connection, realtime server setup, cron initialization
-- `backend/core/*`: app errors, async wrappers, response helpers, error middleware
-
-### 5.2 Routing Model
-
-Major route groups:
-
-- `backend/routes/authRoutes.js`
-- `backend/routes/complaintRoutes.js`
-- `backend/routes/workerRoutes.js`
-- `backend/routes/hodRoutes.js`
-- `backend/routes/reportRoutes.js`
-- `backend/routes/notificationRoutes.js`
-- `backend/routes/chatRoutes.js`
-- `backend/routes/analyticsRoutes.js`
-- `backend/routes/festivalEventRoutes.js`
-- `backend/routes/users.js`
-
-### 5.3 Domain Layers
-
-The backend is partially service-oriented. Important layers are:
-
-- controllers: HTTP boundary and role-level orchestration
-- services: reusable business logic
-- policies: access and complaint-management rules
-- models: persistence schema and indexes
-- utils: view mappers, schedulers, normalization, metrics helpers
-- validators: input validation
-
-### 5.4 Core Services
-
-Key services currently in use:
-
-- `authService.js`
-- `complaintAssignmentService.js`
-- `complaintAudienceService.js`
-- `complaintWorkflowService.js`
-- `complaintQueryService.js`
-- `notificationDomainService.js`
-- `realtimeService.js`
-- `reportSchedulerService.js`
-- `reportService.js`
-- `mediaUploadService.js`
-- `completionPhotoService.js`
-- `accessService.js`
-- `workerMetricsService.js`
-- `geminiService.js`
-- `chatAssistantService.js`
-
-### 5.5 Data Model
-
-Primary Mongo models:
-
-- `User`
-- `Complaint`
-- `Notification`
-- `ReportSchedule`
-- `WorkerInvitation`
-- `FestivalEvent`
-
-Complaint data is split into sub-schemas for:
-
-- assignments
-- AI analysis
-- history
-- feedback
-- SLA
-- messages
-- satisfaction votes
-
-## 6. Mobile Architecture
-
-### 6.1 Router Layout
-
-The mobile app is route-first.
-
-- `mobile/app/_layout.jsx`: root providers, React Query client, push setup, realtime bridge
-- `mobile/app/(app)/_layout.jsx`: authenticated layout
-- `mobile/app/(app)/(auth)`: authentication screens
-- `mobile/app/(app)/(tabs)`: role dashboards and primary routes
-- `mobile/app/(app)/complaints`: complaint detail and complaint chat
-- `mobile/app/(app)/hod`: HOD-specific operational screens
-- `mobile/app/(app)/more`: secondary screens such as profile, reports, notifications, resolved complaints
-
-### 6.2 Shared Client Layers
-
-Important utilities and hooks:
-
-- `mobile/utils/api.js`
-- `mobile/utils/queryKeys.js`
-- `mobile/utils/hooks/useApiQuery.js`
-- `mobile/utils/hooks/useApiMutation.js`
-- `mobile/utils/hooks/useComplaintList.js`
-- `mobile/utils/hooks/useComplaintDetail.js`
-- `mobile/utils/hooks/useComplaintActions.js`
-- `mobile/utils/hooks/useDashboardData.js`
-- `mobile/utils/hooks/useNotifications.js`
-- `mobile/utils/hooks/useReports.js`
-- `mobile/utils/hooks/useProfileActions.js`
-- `mobile/utils/hooks/useAiReviewActions.js`
-- `mobile/utils/realtime/socket.js`
-- `mobile/utils/notificationNavigation.js`
-- `mobile/utils/invalidateComplaintQueries.js`
-- `mobile/utils/offlineQueue.js`
-
-Important shared components:
-
-- `ComplaintCard.jsx`
-- `ComplaintTimeline.jsx`
-- `FilterPanel.jsx`
-- `NotificationBellButton.jsx`
-- `RealtimeBridge.jsx`
-- `BackButtonHeader.jsx`
-- `SlaStatusBadge.jsx`
-- `MetricCard.jsx`
-
-## 7. Major Features
-
-## 7.1 Authentication And Account Lifecycle
-
-Implemented by:
-
-- `backend/controllers/authController.js`
-- `backend/services/authService.js`
-- `backend/validators/authValidators.js`
-- auth screens in `mobile/app/(app)/(auth)`
-
-Current behavior:
-
-- citizen registration
-- login/logout
-- refresh rotation
-- forgot password
-- reset password
-- email verification
-- invite-based onboarding
-- profile update
-- account deletion
-
-Important notes:
-
-- refresh tokens are hashed server-side
-- password policy is enforced in both backend and mobile auth UX
-- invite-based onboarding supports workers joining via HOD-issued invites
-
-Auth lifecycle flow:
+- Expo Image Picker / camera flows
+- i18n-backed localization
 
-1. auth screens call shared mobile hooks in `mobile/utils/hooks/useAuthActions.js`
-2. successful auth funnels through `mobile/utils/authSession.js`
-3. `authSession` persists the user via `mobile/utils/userAuth.js`
-4. post-auth side effects run in one place:
-   - push token registration
-   - realtime reconnect
-   - role-based dashboard prefetch
-5. navigation then routes by role and account status instead of each screen re-owning that logic
-
-## 7.2 Complaint Creation
+## Backend Boot Flow
 
-Implemented by:
+### `backend/app.js`
 
-- `backend/controllers/complaints/createReadController.js`
-- `backend/services/geminiService.js`
-- `mobile/app/(app)/more/new-complaint.jsx`
+The Express app is responsible for:
 
-What it does:
+- security middleware via `helmet`
+- CORS and allowed-origin handling
+- cookie parsing
+- JSON / URL-encoded body parsing
+- Mongo query sanitization
+- deep-link bridge routes for mobile app handoff
+- API route mounting under `/api`
+- not-found and centralized error middleware
 
-- captures complaint title/description
-- uploads proof images
-- stores location and address labels
-- generates a ticket ID
-- applies AI enrichment
-- persists complaint history
-- triggers notifications
+It also supports:
 
-## 7.3 Complaint Listing
-
-Implemented by:
+- Render keepalive self-ping when `SELF_PING_URL` is configured
+- Apple App Site Association and Android Asset Links endpoints
 
-- `backend/services/complaintQueryService.js`
-- `backend/controllers/complaints/createReadController.js`
-- worker/HOD list endpoints
-- `mobile/utils/hooks/useComplaintList.js`
+### `backend/bin/www`
 
-Current behavior:
+The server bootstrap file:
 
-- citizen public complaint feed
-- citizen self-owned complaint list
-- worker assigned/completed lists
-- HOD complaint queues
-- pagination support on main list endpoints
-- shared filtering for status, department, priority, search, and date ranges
+- connects MongoDB
+- starts the realtime WebSocket server
+- starts event-priority background updates
+- starts SLA escalation job
+- initializes report schedules
+- starts the HTTP server
 
-## 7.4 Complaint Detail
+## Environment Variables
 
-Implemented by:
+The backend currently reads these environment variables:
 
-- `backend/utils/complaintView.js`
-- `backend/controllers/complaints/createReadController.js`
-- `mobile/utils/hooks/useComplaintDetail.js`
-- `mobile/utils/complaintDetailViewModel.js`
-- `mobile/app/(app)/complaints/complaint-details.jsx`
+### Required for core backend
 
-Current behavior:
+- `MONGO_URI`
+- `JWT_SECRET`
 
-- normalized complaint detail read path
-- status, priority, department, timeline, location, and SLA rendering
-- proof image and completion photo display
-- upvote state
-- feedback rendering
-- satisfaction state
-- worker assignment preview
-- AI suggestion rendering
+### Auth / tokens
 
-Important state notes:
+- `JWT_ACCESS_EXPIRES_IN` (default `15m`)
+- `REFRESH_TOKEN_DAYS` (default `30`)
 
-- authenticated citizens can open complaint detail from the public feed and upvote complaints there
-- satisfaction vote actions are citizen-only even though resolved vote counts remain visible
-- multi-worker complaints expose leader/non-leader assignment state in detail UI
+### CORS / runtime
 
-## 7.5 Complaint Workflow
+- `NODE_ENV`
+- `PORT`
+- `ALLOWED_ORIGINS`
+- `SELF_PING_URL`
 
-Implemented by:
+### Deep links / mobile linking
 
-- `backend/services/complaintWorkflowService.js`
-- `backend/controllers/worker/statusController.js`
-- `backend/controllers/hod/workflowController.js`
-- `backend/controllers/complaints/aiReviewController.js`
-
-Worker transitions currently supported:
-
-- `assigned -> in-progress`
-- `assigned -> pending-approval`
-- `needs-rework -> in-progress`
-- `needs-rework -> pending-approval`
-- `in-progress -> pending-approval`
+- `APP_LINK_BASE_URL`
+- `IOS_APP_APPLE_ID`
+- `ANDROID_APP_PACKAGE`
+- `ANDROID_APP_SHA256_CERT_FINGERPRINTS`
 
-HOD transitions currently supported:
+### Email
 
-- `pending-approval -> resolved`
-- `pending-approval -> needs-rework`
-- active states -> `cancelled` where policy allows
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `EMAIL_REPLY_TO`
 
-## 7.6 AI Review
+### Media
 
-Implemented by:
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
 
-- `backend/controllers/complaints/aiReviewController.js`
-- `backend/services/geminiService.js`
-- `mobile/app/(app)/hod/ai-review.jsx`
+### AI / assistant
 
-What it does:
+- `GEMINI_API_KEY`
+- `OPENAI_API_KEY`
+- `STT_PROVIDER`
 
-- compares current department/priority with AI suggestions
-- filters for complaints with strong enough AI confidence
-- lets HOD apply department and/or priority suggestions
-- updates complaint history and realtime state
+### Reports / scheduled jobs
 
-## 7.7 Assignment And Worker Coordination
+- `REPORT_SCHEDULE_TIMEZONE`
+- `REPORT_MAX_ROWS`
+- `PDF_REPORT_MAX_ROWS`
+- `EXCEL_REPORT_MAX_ROWS`
+- `CSV_REPORT_MAX_ROWS`
+- `REPORT_CACHE_TTL_MS`
 
-Implemented by:
+### SLA / recurring jobs
 
-- `backend/services/complaintAssignmentService.js`
-- `backend/controllers/hod/assignmentController.js`
-- `mobile/app/(app)/hod/worker-assignment.jsx`
-- `mobile/app/(app)/(tabs)/hod-workers.jsx`
-- `mobile/app/(app)/hod/worker-details.jsx`
+- `ENABLE_SLA_ESCALATION_JOB`
+- `SLA_ESCALATION_RUN_ON_STARTUP`
+- `EVENT_TIMEZONE`
 
-What it does:
-
-- assign one or more workers
-- make one worker the effective leader for status control in multi-worker flows
-- update task descriptions
-- fetch workers in department
-- fetch complaint worker list
-- view worker complaint drill-down
-- surface worker feedback history in worker-facing UX
+### Optional seed controls
 
-## 7.8 Chat
+The seed script now supports:
 
-Implemented by:
-
-- `backend/controllers/complaints/messageController.js`
-- `backend/controllers/chat/chatController.js`
-- `backend/services/chatAssistantService.js`
-- `mobile/app/(app)/complaints/complaint-chat.jsx`
-- `mobile/app/(app)/(tabs)/assistant.jsx`
+- `SEED_ADMIN_COUNT`
+- `SEED_WORKERS_PER_DEPARTMENT`
+- `SEED_CITIZEN_COUNT`
+- `SEED_TOTAL_COMPLAINTS`
 
-There are two chat-related experiences:
-
-- complaint chat between complaint participants
-- assistant chat for status/help flows
-
-Complaint chat supports realtime updates through WebSockets. Assistant chat supports message-based help flows and backend speech-to-text support exists, though voice capture UI is still missing on mobile.
+## Local Setup
 
-## 7.9 Notifications
-
-Implemented by:
-
-- `backend/controllers/notificationController.js`
-- `backend/services/notificationDomainService.js`
-- `backend/services/pushNotificationService.js`
-- `backend/services/realtimeService.js`
-- `mobile/utils/hooks/useNotifications.js`
-- `mobile/utils/notificationsCache.js`
-- `mobile/utils/notificationNavigation.js`
-- `mobile/app/(app)/more/notifications.jsx`
-- `mobile/app/(app)/more/notification-history.jsx`
-
-Current behavior:
-
-- device push token registration
-- notification preference storage
-- persisted in-app notification history
-- realtime notification updates
-- unread count badge
-- deep-link routing from notifications into complaint detail/chat and HOD action contexts
-
-Current complaint event contract:
+### Backend
 
-| Domain event | Trigger | Notification type | Default route |
-| --- | --- | --- | --- |
-| `complaint_created` | citizen creates a complaint | `complaint-update` | complaint detail |
-| `complaint_assigned` | HOD assigns one or more workers | `assignment` | complaint detail |
-| `worker_started` | leader worker moves complaint into active work | `complaint-update` | complaint detail |
-| `submitted_for_approval` | leader worker submits completion for approval | `complaint-update` | complaint detail |
-| `rework_requested` | HOD sends work back | `complaint-update` | complaint detail |
-| `complaint_resolved` | HOD approves completion | `complaint-update` | complaint detail |
-| `complaint_cancelled` | HOD/admin cancels complaint | `complaint-update` | complaint detail |
-| `complaint_chat_message` | citizen, worker, or HOD posts chat message | `chat-message` | complaint chat |
+```bash
+cd /Users/bhavishyjain/Documents/GitHub/Sahayak/backend
+npm install
+```
 
-## 7.10 SLA And Escalation
-
-Implemented by:
-
-- complaint SLA schema
-- `backend/utils/slaEscalation.js`
-- complaint detail UI
-
-Current behavior:
-
-- due dates are derived from complaint priority
-- overdue complaints are escalated by scheduled job
-- escalation level is recorded
-- priority can be increased when SLA is breached
-- notifications are sent to HOD and citizen
-- complaint detail shows due date, overdue state, and escalation history
-
-## 7.11 Reports
-
-Implemented by:
-
-- `backend/services/reportService.js`
-- `backend/services/reportSchedulerService.js`
-- `backend/controllers/reports/exportController.js`
-- `backend/controllers/reports/scheduleController.js`
-- `mobile/app/(app)/more/hod-reports.jsx`
-- `mobile/utils/hooks/useReports.js`
-
-Current behavior:
-
-- PDF/Excel/CSV export
-- email report on demand
-- dashboard report stats
-- department breakdown analytics
-- recurring schedules
-- schedule health view
-- schedule cancellation
-- manual `run now`
-
-## 7.12 Analytics And Heatmap
-
-Implemented by:
-
-- `backend/controllers/analyticsController.js`
-- `backend/controllers/hod/analyticsController.js`
-- `backend/controllers/worker/analyticsController.js`
-- `mobile/app/(app)/(tabs)/heatmap.jsx`
-- `mobile/utils/hooks/useDashboardData.js`
-- `mobile/app/(app)/(tabs)/hod-overview.jsx`
-- `mobile/app/(app)/(tabs)/worker-home.jsx`
-- `mobile/app/(app)/(tabs)/home.jsx`
-
-Current behavior:
-
-- citizen analytics summary
-- complaint heatmap
-- HOD dashboard summary
-- worker dashboard summary
-- worker analytics and leaderboard
-
-Metric semantics used across analytics and reports:
-
-| Metric / Bucket | Meaning |
-| --- | --- |
-| `active` | complaints in active lifecycle states defined by `ACTIVE_COMPLAINT_STATUSES` |
-| `backlog` | complaints waiting for department or field progress: `pending`, `assigned`, `in-progress`, `pending-approval`, `needs-rework` |
-| `workerActionable` | complaints a worker can actively work on or respond to: `assigned`, `in-progress`, `needs-rework`, `pending-approval` |
-| `workerOpen` | worker complaints still in execution flow: `assigned`, `in-progress`, `needs-rework` |
-| `final` | complaints in terminal states: `resolved`, `cancelled` |
-| `resolved` | complaints with final successful completion state |
-| `pendingApproval` | complaints submitted by workers and waiting for HOD approval |
-| `timeframe` | analytics/report date window when explicit `startDate` / `endDate` are not provided |
-| explicit date range | overrides timeframe window when `startDate` and/or `endDate` are supplied |
-
-Current analytics/report contract direction:
-
-- shared analytics filters normalize `timeframe`, date range, department, priority, bucket, and scope
-- shared report filters normalize department, status, priority, and date windows, and can fall back to analytics-style timeframe
-- citizen, worker, HOD, and report summary endpoints now rely on the shared complaint analytics service and expose `contractVersion: 1`
-- dashboard responses still preserve legacy fields for compatibility while the app completes contract cleanup
-
-## 7.13 Offline Support
-
-Implemented by:
-
-- `mobile/utils/offlineQueue.js`
-- complaint-related mobile screens
-
-Current behavior:
-
-- some mutation flows survive offline or poor network state
-- cached complaint detail/list data can be used as fallback
-
-Offline support exists, but it is not yet universal across all mutation domains.
-
-## 8. Realtime Model
-
-Sahayak now uses both push notifications and WebSockets.
-
-Use WebSockets for:
-
-- live complaint chat
-- live complaint updates while app is open
-- live notification cache updates
-
-Use push notifications for:
-
-- background and closed-app delivery
-- operating-system notification banners
-- deep-link entry into complaint or workflow screens
-
-Current mobile notification routing supports:
-
-- complaint detail
-- complaint chat
-- HOD AI review queue
-- HOD worker assignment
-
-Notification delivery architecture:
-
-- `notificationDomainService` owns the canonical notification payload contract
-- `notificationDeliveryService` decides whether to persist, emit realtime, and/or send push
-- audience services decide who receives an event, not how that event is transported
-
-Canonical API envelope direction:
-
-- list payloads should expose `items`, `page`, `limit`, `total`, and `totalPages`
-- detail payloads should expose `item`
-- summary payloads should expose `summary`
-
-Compatibility rule:
-
-- legacy aliases such as `complaints`, `notifications`, `stats`, `statistics`, `worker`, and `schedule` are compatibility fields
-- new backend work should treat canonical fields as the primary contract
-- new mobile hooks should read canonical fields first
-
-Recommended next realtime expansion:
-
-- citizen complaint feed invalidation when complaint status changes
-- HOD queue invalidation for assignment, approval, rework, and cancellation events
-- worker assigned/completed list invalidation on live workflow changes
-- report schedule health events for run-now / scheduled execution results
-- admin dashboard and recycle-bin counters for restore/purge events
-
-Rule of thumb:
-
-- use WebSocket when users are actively watching a changing workflow or queue
-- use push notifications when the app is backgrounded or closed
-- use manual refresh or polling for low-frequency, low-collaboration screens
-
-## 9. API Overview
-
-This is a high-level route map, not a full OpenAPI document.
-
-### 9.1 Auth
+Create a `.env` file with at least:
+
+```env
+MONGO_URI=mongodb://127.0.0.1:27017/sahayak
+JWT_SECRET=replace_me
+NODE_ENV=development
+PORT=3000
+APP_LINK_BASE_URL=http://localhost:3000
+REPORT_SCHEDULE_TIMEZONE=Asia/Kolkata
+```
+
+Run the backend:
+
+```bash
+npm run dev
+```
+
+### Mobile
+
+The mobile app lives in [`mobile`](/Users/bhavishyjain/Documents/GitHub/Sahayak/mobile). It expects the backend URLs configured in the mobile project and Expo environment to point to your running API.
+
+## Seeding The Database
+
+The backend includes a large realism-oriented seed script at [`backend/seedData.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/seedData.js).
+
+Run it with:
+
+```bash
+cd /Users/bhavishyjain/Documents/GitHub/Sahayak/backend
+npm run seed
+```
+
+### What the seed creates
+
+The seed currently creates:
+
+- departments
+- admins
+- HODs
+- workers with performance data and work locations
+- citizens with varied preferred languages and notification preferences
+- complaints across realistic statuses and departments
+- AI complaint analysis metadata
+- proof images and completion photos
+- complaint history timelines
+- feedback and satisfaction votes
+- complaint chat threads
+- soft-deleted complaints for recycle-bin flows
+- special requests in pending / approved / rejected states
+- worker invitations in pending / accepted / revoked / expired states
+- festival events
+- report schedules
+- notification history
+- admin broadcast history
+
+### Default seed credentials
+
+```text
+Admin:    admin1         / password123
+HOD:      hod_road       / password123
+Worker:   worker_road_1  / password123
+Citizen:  user1          / password123
+```
+
+### Optional seed scaling
+
+Example:
+
+```bash
+SEED_TOTAL_COMPLAINTS=500 SEED_CITIZEN_COUNT=80 npm run seed
+```
+
+## Data Model Overview
+
+### `User`
+
+Key fields:
+
+- auth identity: `username`, `email`, `password`
+- role: `user`, `worker`, `head`, `admin`
+- profile/contact: `fullName`, `phone`
+- activation/auth control: `isActive`, `tokenValidFrom`
+- email verification and password reset token hashes
+- refresh tokens per device/session
+- push tokens
+- role-aware notification preferences
+- `preferredLanguage`
+- worker-specific metrics and work location
+
+### `Complaint`
+
+Key fields:
+
+- `ticketId`
+- `userId`
+- `rawText`, `refinedText`
+- `department`
+- `coordinates`, `locationName`
+- `priority`, `status`
+- `assignedWorkers`, `assignedAt`, `assignedBy`
+- `completionPhotos`, `proofImage`
+- `upvotes`, `upvoteCount`
+- `feedback`
+- `satisfactionVotes`
+- `sla`
+- `history`
+- `chatHistory`
+- `messages`
+- soft-delete flags: `deleted`, `deletedAt`
+
+The complaint model also:
+
+- auto-generates `ticketId`
+- auto-computes initial SLA due date
+- clears AI suggested priority once a complaint leaves pending state
+- hides soft-deleted complaints from normal `find` and `aggregate` queries unless opted in
+
+### Other Important Models
+
+- [`Notification`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/Notification.js)
+- [`AdminNotificationBroadcast`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/AdminNotificationBroadcast.js)
+- [`ComplaintSpecialRequest`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/ComplaintSpecialRequest.js)
+- [`ComplaintMessage`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/ComplaintMessage.js)
+- [`ReportSchedule`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/ReportSchedule.js)
+- [`WorkerInvitation`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/WorkerInvitation.js)
+- [`Department`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/Department.js)
+- [`FestivalEvent`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/models/FestivalEvent.js)
+
+## Route Map
+
+All backend routes are mounted under `/api`.
+
+### Authentication
+
+Mounted from [`backend/routes/authRoutes.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/authRoutes.js)
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
@@ -656,445 +396,295 @@ This is a high-level route map, not a full OpenAPI document.
 - `GET /api/auth/me`
 - `PUT /api/auth/me`
 - `DELETE /api/auth/me`
+- `POST /api/auth/accept-invite`
 - `POST /api/auth/forgot-password`
 - `POST /api/auth/reset-password/:token`
 - `GET /api/auth/verify-email/:token`
 - `POST /api/auth/resend-verification`
-- `POST /api/auth/accept-invite`
-
-### 9.2 Complaints
-
-- `POST /api/complaints`
-- `GET /api/complaints`
-- `GET /api/complaints/nearby`
-- `GET /api/complaints/:complaintId`
-- `POST /api/complaints/:complaintId/upvote`
-- `POST /api/complaints/:complaintId/feedback`
-- `POST /api/complaints/:id/completion-photos`
-- `POST /api/complaints/:id/satisfaction-vote`
-- `GET /api/complaints/:id/satisfaction`
-- `GET /api/complaints/:id/messages`
-- `POST /api/complaints/:id/messages`
-- `GET /api/complaints/ai-review/pending`
-- `POST /api/complaints/:complaintId/apply-ai-suggestion`
-
-Admin-only complaint operations:
-
-- `GET /api/complaints/deleted`
-- `DELETE /api/complaints/:complaintId`
-- `POST /api/complaints/:complaintId/restore`
-- `DELETE /api/complaints/:complaintId/purge`
-
-### 9.3 Worker
-
-- `GET /api/workers/dashboard-summary`
-- `GET /api/workers/active-preview`
-- `GET /api/workers/assigned-complaints`
-- `GET /api/workers/completed-complaints`
-- `GET /api/workers/feedback`
-- `GET /api/workers/leaderboard`
-- `GET /api/workers/analytics`
-- `PUT /api/workers/complaint/:complaintId/status`
-
-Worker/admin management routes:
-
-- `POST /api/workers/create`
-- `PUT /api/workers/:workerId`
-- `GET /api/workers`
-- `GET /api/workers/available/:department`
-
-### 9.4 HOD
-
-- `GET /api/hod/dashboard-summary`
-- `GET /api/hod/overview`
-- `GET /api/hod/workers`
-- `GET /api/hod/workers/:workerId`
-- `GET /api/hod/workers/:workerId/complaints`
-- `POST /api/hod/invite-worker`
-- `GET /api/hod/invitations`
-- `DELETE /api/hod/invitations/:invitationId`
-- `DELETE /api/hod/workers/:workerId`
-- `POST /api/hod/approve-completion/:complaintId`
-- `POST /api/hod/needs-rework/:complaintId`
-- `POST /api/hod/cancel-complaint/:complaintId`
-- `POST /api/hod/complaints/:complaintId/assign-workers`
-- `PUT /api/hod/complaints/:complaintId/workers/:workerId`
-- `GET /api/hod/complaints/:complaintId/workers`
-
-### 9.5 Reports
-
-- `GET /api/reports/pdf`
-- `GET /api/reports/excel`
-- `GET /api/reports/csv`
-- `GET /api/reports/stats`
-- `GET /api/reports/department-breakdown`
-- `POST /api/reports/email`
-- `POST /api/reports/schedule`
-- `GET /api/reports/schedule`
-- `POST /api/reports/schedule/:id/run-now`
-- `DELETE /api/reports/schedule/:id`
-
-### 9.6 Notifications
-
-- `POST /api/notifications/register-token`
-- `GET /api/notifications/history`
-- `PUT /api/notifications/read-all`
-- `PUT /api/notifications/:id/read`
-- `GET /api/notifications/preferences`
-- `PUT /api/notifications/preferences`
-
-### 9.7 Analytics And Assistant
-
-- `GET /api/analytics/summary`
-- `GET /api/analytics/heatmap`
-- `POST /api/chat/message`
-- `POST /api/chat/speech-to-text`
-
-### 9.8 Admin-Only Domains
-
-- admin user CRUD under `/api/users`
-- festival event CRUD under `/api/festival-events`
-
-## 10. Complaint List Filter Contract
-
-The backend complaint list layer is increasingly standardized.
-
-Supported shared query parameters:
-
-- `page`: 1-based page
-- `limit`: page size
-- `status`: complaint status
-- `excludeStatus`: comma-separated excluded statuses
-- `priority`: `Low`, `Medium`, `High`
-- `department`: `Road`, `Water`, `Electricity`, `Waste`, `Drainage`, `Other`
-- `search`: text search
-- `startDate`: lower date bound
-- `endDate`: upper date bound
-- `sort`: normalized sort preset
-
-Public date contract:
-
-- use `YYYY-MM-DD`
-
-Role-aware behavior:
-
-- citizen feeds can use `scope=all` for public discovery and `scope=mine` for self-owned queues
-- dedicated "my complaints" flows still rely on self scope for focused tracking
-- worker and HOD endpoints add assignment or department constraints on top of common filters
-
-## 11. Reports Filter Contract
-
-Supported report filters:
-
-- `department`
-- `status`
-- `priority`
-- `startDate`
-- `endDate`
-
-Public date contract:
-
-- use `YYYY-MM-DD`
-
-Important semantics:
-
-- HOD requests are automatically scoped to the HOD department
-- admin requests may query across departments
-
-Example `GET /api/reports/stats` response:
-
-```json
-{
-  "success": true,
-  "message": "Dashboard statistics retrieved successfully",
-  "data": {
-    "total": 128,
-    "byStatus": {
-      "pending": 21,
-      "assigned": 34,
-      "in-progress": 18,
-      "resolved": 49,
-      "cancelled": 6
-    },
-    "byPriority": {
-      "Low": 20,
-      "Medium": 74,
-      "High": 34
-    },
-    "byDepartment": {
-      "Road": 42,
-      "Water": 28,
-      "Electricity": 18,
-      "Waste": 23,
-      "Drainage": 10,
-      "Other": 7
-    },
-    "avgResolutionTime": 31
-  }
-}
-```
-
-Example `GET /api/reports/department-breakdown` response:
-
-```json
-{
-  "success": true,
-  "message": "Department breakdown retrieved successfully",
-  "data": {
-    "Road": {
-      "total": 42,
-      "pending": 7,
-      "inProgress": 8,
-      "resolved": 24,
-      "cancelled": 3,
-      "highPriority": 9,
-      "mediumPriority": 22,
-      "lowPriority": 11
-    }
-  }
-}
-```
-
-## 12. Setup
-
-### 12.1 Prerequisites
-
-- Node.js 18+
-- MongoDB
-- Cloudinary account
-- Expo development environment
-- Resend account
-- AI provider keys if AI functionality is enabled
-
-### 12.2 Backend Setup
-
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-Suggested environment variables:
-
-```env
-PORT=3000
-NODE_ENV=development
-MONGO_URI=
-JWT_SECRET=
-JWT_ACCESS_EXPIRES_IN=15m
-REFRESH_TOKEN_DAYS=30
-ALLOWED_ORIGINS=http://localhost:8081,http://localhost:5173
-
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
-
-GEMINI_API_KEY=
-OPENAI_API_KEY=
-
-RESEND_API_KEY=
-EMAIL_FROM="Sahayak <noreply@example.com>"
-APP_URL=http://localhost:8081
-
-REPORT_SCHEDULE_TIMEZONE=Asia/Kolkata
-REPORT_CACHE_TTL_MS=60000
-ENABLE_SLA_ESCALATION_JOB=true
-SLA_ESCALATION_RUN_ON_STARTUP=false
-```
-
-### 12.3 Mobile Setup
-
-```bash
-cd mobile
-npm install
-npx expo start
-```
-
-Expected public env variables:
-
-```env
-EXPO_PUBLIC_API_URL_DEV=http://localhost:3000/api
-EXPO_PUBLIC_API_URL_PROD=
-```
-
-### 12.4 Push Notifications
-
-To receive background or closed-app notifications:
-
-- configure Expo notifications correctly
-- configure Android FCM credentials
-- configure iOS APNs if building for iOS
-- ensure the device grants notification permission
-- ensure the app successfully registers the Expo push token
-
-Foreground notification presentation is also configured in mobile code.
-
-### 12.5 Realtime
-
-Realtime requires:
-
-- backend WebSocket server boot from `backend/bin/www`
-- valid authenticated token on mobile socket connection
-- complaint room subscriptions for complaint chat/detail flows
-
-## 13. Current Known Gaps
-
-The following are intentionally not presented as hidden problems. They are current realities of the codebase:
-
-- some backend admin capabilities are still backend-only
-- speech-to-text exists in backend but has no mobile voice capture UI
-- festival event CRUD exists but has no mobile event-management surface
-- recycle-bin flows exist but have no admin mobile UI
-- several mobile screens still use raw `apiCall(...)` flows instead of shared query/mutation hooks
-- some backend analytics/reporting paths are still more controller-heavy than ideal
-
-These are broken down in detail in [`FUTURE.md`](./FUTURE.md).
-
-### 13.1 Backend Capabilities Still Ahead Of Frontend
-
-Backend functionality already exists for:
-
-- speech-to-text complaint or assistant inputs
-- festival event CRUD
-- admin user CRUD
-- deleted complaint restore and purge
-- notification-preference APIs and hooks that still need stronger UX exposure
-- report stats and department breakdown endpoints that currently exist beyond the latest HOD reports screen
-- deeper operational telemetry for scheduled work and delivery surfaces
-
-That means the system is functionally richer on the server than what the mobile UI currently exposes.
-
-### 13.2 Remaining Frontend Duplication Hotspots
-
-The highest-signal mobile screens still needing deeper hook extraction are:
-
-- `mobile/app/(app)/(tabs)/complaints.jsx`
-- `mobile/app/(app)/(tabs)/home.jsx`
-- `mobile/app/(app)/(tabs)/hod-complaints.jsx`
-- `mobile/app/(app)/(tabs)/worker-assigned.jsx`
-- `mobile/app/(app)/(tabs)/heatmap.jsx`
-- `mobile/app/(app)/(tabs)/hod-workers.jsx`
-- `mobile/app/(app)/more/hod-resolved.jsx`
-- `mobile/app/(app)/more/worker-completed.jsx`
-
-These screens still carry some mix of:
-
-- raw `apiCall(...)` usage
-- screen-local pagination/refresh logic
-- screen-owned filter serialization
-- heavier-than-ideal data orchestration
-
-### 13.3 Remaining Backend Duplication Hotspots
-
-The backend is significantly cleaner than earlier revisions, but duplication still exists around:
-
-- analytics filter normalization across analytics, heatmap, and report paths
-- report filter/schedule validation rules
-- response envelopes where legacy aliases still coexist with standardized shapes
-- notification typing and route contract ownership
-
-### 13.4 Remaining Frontend Duplication Hotspots
-
-The highest-signal remaining frontend duplication still lives in:
-
-- complaint feed and HOD complaint feed screens
-- heatmap screen orchestration
-- resolved/completed list screens
-- auth screens and auth boot utilities
-- some admin screens that still mix fetch, mutation, and rendering concerns
-
-## 14. Feature Coverage Matrix
-
-### 14.1 Citizen
-
-- registration, login, password reset, email verification: complete
-- complaint creation with text, media, and coordinates: complete
-- complaint tracking, history, and detail: complete
-- complaint chat: complete
-- feedback and satisfaction: complete
-- nearby complaint voting: complete
-- push and in-app notifications: complete
-- voice complaint drafting: backend-only
-
-### 14.2 Worker
-
-- invitation acceptance: complete
-- dashboard summary and active preview: complete
-- assigned and completed complaint flows: complete
-- worker status updates and completion proof upload: complete
-- worker analytics and leaderboard: complete
-- worker feedback and rating history: complete
-- complaint chat and notifications: complete
-
-### 14.3 HOD
-
-- dashboard summary: complete
-- department complaint queues and resolved queues: complete
-- worker assignment and task editing: complete
-- AI review queue: complete
-- worker invitation management: complete
-- report exports, email, schedules, schedule health, and run-now: complete
-- festival-event operations: backend-only
-
-### 14.4 Admin
-
-- user CRUD: backend-only
-- deleted complaint recycle bin: backend-only
-- festival event CRUD: backend-only
-- delivery-health operations UI: not yet exposed in mobile
-
-## 15. Suggested Next Features
-
-The current architecture is ready for higher-value product features without a full rewrite. Best fits are:
-
-- duplicate complaint detection with "join existing issue"
-- reopened complaint workflow with policy bounds and audit trail
-- event-aware staffing suggestions on HOD dashboards
-- admin operations console for push/email/realtime/cron health
-- microphone-assisted complaint drafting and assistant input
-- citizen transparency pages for SLA, escalation history, and department responsiveness
-- worker route grouping or route planning for multi-assignment days
-
-## 16. Contributor Guidance
-
-When extending the system:
-
-- prefer adding backend logic to services before growing controllers
-- keep complaint list/filter behavior aligned with `complaintQueryService.js`
-- keep notification payloads aligned with `notificationDomainService.js`
-- keep complaint transition logic aligned with `complaintWorkflowService.js`
-- favor React Query-based hooks over screen-local request state
-- keep mobile route deep links aligned with `notificationNavigation.js`
-
-## 17. Seed Data And Demo Coverage
-
-`backend/seedData.js` is intentionally broad because the product already spans authentication, workflow, analytics, notifications, reports, chat, and admin-only operations.
-
-The seeded environment now aims to cover:
-
-- all roles with realistic language, notification, token, and device-state variation
-- complaint lifecycle states from pending through resolved, cancelled, and needs-rework
-- leader-based multi-worker assignment data
-- AI analysis, upvotes, citizen feedback, satisfaction votes, SLA escalation, and completion photos
-- complaint chat history in `ComplaintMessage`
-- worker invitations in pending/accepted/expired/revoked states
-- report schedules with both successful and failing health metadata
-- persisted notifications for complaint, assignment, escalation, AI-review, and system scenarios
-- soft-deleted complaints so admin recycle-bin flows have realistic data
-
-When adding new backend capabilities, update the seeder whenever you introduce:
-
-- new workflow states
-- new admin-only collections
-- new notification types or route targets
-- new analytics-critical timestamps
-- new frontend flows that require realistic demo data to feel believable
-
-## 18. Documentation Scope
-
-This README is intentionally broad and deep, but it is still not a generated API spec. If the project grows further, the next documentation step should be:
-
-- generated endpoint reference
-- sequence diagrams for complaint workflow
-- role-by-role frontend/backend coverage matrix
-- deployment runbook
+
+Includes rate limiting on login/refresh/reset-related endpoints.
+
+### Complaints
+
+Mounted from [`backend/routes/complaintRoutes.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/complaintRoutes.js)
+
+- citizen complaint creation and self views
+- nearby complaints
+- complaint detail
+- upvotes
+- feedback
+- AI review endpoints for HOD/admin
+- worker completion photo upload
+- satisfaction votes
+- complaint message thread
+- admin special request review endpoints
+- admin delete / restore / purge / update routes
+
+### Worker
+
+Mounted from [`backend/routes/workerRoutes.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/workerRoutes.js)
+
+Includes assignment lists, status changes, worker analytics, and worker-facing operations.
+
+### HOD
+
+Mounted from [`backend/routes/hodRoutes.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/hodRoutes.js)
+
+Includes:
+
+- department queue views
+- worker assignment
+- workflow changes
+- analytics
+- invitation management
+
+### Notifications
+
+Mounted from [`backend/routes/notificationRoutes.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/notificationRoutes.js)
+
+- register Expo push token
+- notification history
+- mark read / mark all read
+- role-aware notification preferences
+- admin broadcast history
+- admin custom broadcast send
+
+### Reports
+
+Mounted from [`backend/routes/reportRoutes.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/reportRoutes.js)
+
+- Excel / PDF / CSV exports
+- dashboard stats
+- department breakdown
+- email report send
+- schedule create/list
+- schedule run-now
+- schedule cancel
+
+### Chat / Assistant
+
+Mounted from [`backend/routes/chatRoutes.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/chatRoutes.js)
+
+Supports:
+
+- assistant message handling
+- multilingual complaint registration assistance
+- speech transcription integration
+- complaint lookup and status flows
+
+### Other Route Groups
+
+- [`/api/analytics`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/analyticsRoutes.js)
+- [`/api/users`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/users.js)
+- [`/api/departments`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/departments.js)
+- [`/api/festival-events`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/routes/festivalEventRoutes.js)
+
+## Important Services
+
+### Complaint workflow and list/query services
+
+- [`complaintService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintService.js)
+- [`complaintWorkflowService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintWorkflowService.js)
+- [`complaintAssignmentService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintAssignmentService.js)
+- [`complaintQueryService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintQueryService.js)
+- [`complaintListService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintListService.js)
+- [`complaintLookupService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintLookupService.js)
+- [`complaintAnalyticsService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintAnalyticsService.js)
+- [`complaintAudienceService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintAudienceService.js)
+- [`complaintEventService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/complaintEventService.js)
+
+### Auth / access / provisioning
+
+- [`authService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/authService.js)
+- [`accessService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/accessService.js)
+- [`userProvisionService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/userProvisionService.js)
+
+### Media, reports, notifications, realtime
+
+- [`mediaUploadService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/mediaUploadService.js)
+- [`completionPhotoService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/completionPhotoService.js)
+- [`reportService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/reportService.js)
+- [`reportViewService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/reportViewService.js)
+- [`reportPolicyService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/reportPolicyService.js)
+- [`reportSchedulerService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/reportSchedulerService.js)
+- [`notificationDomainService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/notificationDomainService.js)
+- [`notificationDeliveryService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/notificationDeliveryService.js)
+- [`pushNotificationService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/pushNotificationService.js)
+- [`realtimeService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/realtimeService.js)
+
+### AI / assistant / analytics
+
+- [`geminiService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/geminiService.js)
+- [`chatAssistantService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/chatAssistantService.js)
+- [`analyticsMetricsService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/analyticsMetricsService.js)
+- [`workerMetricsService.js`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend/services/workerMetricsService.js)
+
+## Workflow Notes
+
+### Complaint statuses
+
+The backend recognizes these main complaint statuses:
+
+- `pending`
+- `assigned`
+- `in-progress`
+- `pending-approval`
+- `needs-rework`
+- `resolved`
+- `cancelled`
+
+### Soft delete behavior
+
+Admin deletes are soft deletes first. Soft-deleted complaints:
+
+- are excluded by default from normal complaint queries
+- can be restored by admin
+- can be permanently purged
+- can generate admin recycle-bin notifications
+
+### Special requests
+
+HOD users can raise special requests for admin review. These can ask to:
+
+- update department/priority routing
+- delete a complaint
+
+Admin review outcomes are tracked and seeded in the database.
+
+### AI review
+
+Complaints store AI analysis, including:
+
+- department suggestion
+- confidence
+- sentiment
+- urgency
+- keywords
+- suggested priority while pending
+
+There are dedicated HOD/admin review endpoints for AI-assisted routing correction.
+
+## Notifications
+
+The system supports:
+
+- in-app persisted notification history
+- realtime notification emission
+- Expo push delivery
+- role-scoped notification preferences
+- admin broadcast notifications
+
+Current preference model is role-aware:
+
+- citizens, workers, heads: complaint updates / assignments / escalations / system alerts
+- admins: special requests / deleted complaints
+
+## Reports
+
+Reports support:
+
+- PDF / Excel / CSV generation
+- dashboard stats
+- department breakdowns
+- direct email sending
+- recurring schedules with health data
+- rolling date-range presets such as past 24 hours / 7 days / 30 days
+
+## Assistant / Chat
+
+The assistant backend supports:
+
+- multilingual user messages
+- complaint registration guidance
+- complaint status lookup
+- complaint lookup by ticket ID
+- speech transcription metadata
+- in-progress complaint continuation through conversation history
+- enforcement of complaint registration requirements such as location and proof images
+
+## Background Jobs
+
+The backend starts these recurring/background behaviors:
+
+- SLA escalation job
+- event priority updater
+- report schedule initialization / execution
+- optional self-ping keepalive cron
+
+## Mobile Notes
+
+The mobile app is route-first and role-aware.
+
+Important mobile areas:
+
+- [`mobile/app/(app)/(tabs)`](/Users/bhavishyjain/Documents/GitHub/Sahayak/mobile/app/(app)/(tabs))
+- [`mobile/app/(app)/complaints`](/Users/bhavishyjain/Documents/GitHub/Sahayak/mobile/app/(app)/complaints)
+- [`mobile/app/(app)/more`](/Users/bhavishyjain/Documents/GitHub/Sahayak/mobile/app/(app)/more)
+- [`mobile/components`](/Users/bhavishyjain/Documents/GitHub/Sahayak/mobile/components)
+- [`mobile/utils`](/Users/bhavishyjain/Documents/GitHub/Sahayak/mobile/utils)
+
+The mobile app includes:
+
+- push token registration
+- notification preference settings
+- complaint feed and detail flows
+- assistant screen
+- worker, HOD, and admin dashboards
+- export/report flows
+- bilingual English/Hindi localization, with broader multilingual support in assistant/backend workflows
+
+## Suggested Dev Workflow
+
+For a fresh local setup:
+
+1. Start MongoDB.
+2. Configure backend `.env`.
+3. Run `npm install` in [`backend`](/Users/bhavishyjain/Documents/GitHub/Sahayak/backend).
+4. Run `npm run seed`.
+5. Run `npm run dev`.
+6. Start the Expo mobile app and log in with one of the seeded accounts.
+
+## Troubleshooting
+
+### Seed fails immediately
+
+Check:
+
+- `MONGO_URI` exists
+- MongoDB is running
+- the database user has write access
+
+### Push notifications do not arrive
+
+Check:
+
+- mobile Expo project ID is configured
+- the device granted notification permission
+- the backend received and stored push tokens
+- Expo/FCM credentials are set correctly for Android builds
+
+### Email features do not send
+
+Check:
+
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- optional `EMAIL_REPLY_TO`
+
+### Media uploads fail
+
+Check:
+
+- Cloudinary environment variables
+- network access from backend runtime
+- payload file count and multipart form shape
+
+## Current Documentation Boundaries
+
+This README focuses on the implemented backend and the key mobile integration points. It does not attempt to document every controller function line by line, but it should give you enough to:
+
+- boot the system
+- seed realistic data
+- understand the role model
+- navigate the backend structure
+- find the right file quickly when debugging or extending a feature

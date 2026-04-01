@@ -68,6 +68,8 @@ export const NOTIFICATION_MARK_READ_URL = (id) =>
   API_BASE + `/notifications/${id}/read`;
 export const NOTIFICATION_PREFERENCES_URL =
   API_BASE + "/notifications/preferences";
+export const ADMIN_NOTIFICATION_BROADCASTS_URL =
+  API_BASE + "/notifications/admin-broadcasts";
 
 // ============================================================================
 // CHAT URLs

@@ -96,7 +96,12 @@ function buildSchedulePolicy(req, filters = {}) {
     timezone,
     cronExpression,
     department,
-    filters,
+    filters: {
+      ...filters,
+      ...(normalizeString(input.rangePreset)
+        ? { rangePreset: normalizeString(input.rangePreset) }
+        : {}),
+    },
   };
 }
 

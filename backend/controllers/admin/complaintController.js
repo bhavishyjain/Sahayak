@@ -8,6 +8,14 @@ const {
   emitComplaintUpdated,
   emitRealtimeEvent,
 } = require("../../services/realtimeService");
+const {
+  deliverNotificationBatch,
+} = require("../../services/notificationDeliveryService");
+const {
+  buildNotificationRoute,
+  NOTIFICATION_ROUTE_SCREENS,
+} = require("../../services/notificationDomainService");
+const { NOTIFICATION_TYPES, ROLES } = require("../../domain/constants");
 
 async function emitAdminDashboardEvent(event, complaintId = null) {
   const admins = await User.find({ role: "admin", isActive: true }).select("_id");
@@ -19,6 +27,42 @@ async function emitAdminDashboardEvent(event, complaintId = null) {
       updatedAt: new Date().toISOString(),
     },
     { userIds: admins.map((admin) => admin._id) },
+  );
+}
+
+async function notifyOtherAdminsAboutRecycleBinAction({
+  actorId,
+  complaint,
+  action,
+  title,
+  body,
+}) {
+  const otherAdmins = await User.find({
+    role: ROLES.ADMIN,
+    isActive: true,
+    _id: { $ne: actorId },
+  }).select("_id");
+
+  const recipientIds = otherAdmins.map((admin) => admin._id);
+  if (recipientIds.length === 0 || !complaint?._id) return;
+
+  await deliverNotificationBatch(
+    recipientIds,
+    {
+      title,
+      body,
+      data: {
+        type: NOTIFICATION_TYPES.DELETED_COMPLAINT,
+        complaintId: String(complaint._id),
+        ticketId: complaint.ticketId,
+        action,
+        route: buildNotificationRoute(NOTIFICATION_ROUTE_SCREENS.RECYCLE_BIN, {
+          complaintId: String(complaint._id),
+          ticketId: complaint.ticketId,
+        }),
+      },
+    },
+    { saveHistory: true },
   );
 }
 
@@ -88,6 +132,13 @@ exports.softDeleteComplaint = asyncHandler(async (req, res) => {
     note: "Soft-deleted by admin",
   });
   await complaint.save();
+  await notifyOtherAdminsAboutRecycleBinAction({
+    actorId: req.user.userId,
+    complaint,
+    action: "soft-delete",
+    title: "Complaint Moved To Recycle Bin",
+    body: `Complaint #${complaint.ticketId} was soft-deleted and moved to the recycle bin.`,
+  });
   await emitAdminDashboardEvent("complaint-soft-deleted", complaint._id);
 
   sendSuccess(res, { message: "Complaint soft-deleted successfully" });
@@ -108,6 +159,13 @@ exports.restoreComplaint = asyncHandler(async (req, res) => {
     note: "Restored by admin",
   });
   await complaint.save();
+  await notifyOtherAdminsAboutRecycleBinAction({
+    actorId: req.user.userId,
+    complaint,
+    action: "restore",
+    title: "Complaint Restored",
+    body: `Complaint #${complaint.ticketId} was restored from the recycle bin.`,
+  });
   await emitAdminDashboardEvent("complaint-restored", complaint._id);
 
   sendSuccess(res, { message: "Complaint restored successfully" });
@@ -120,6 +178,14 @@ exports.hardDeleteComplaint = asyncHandler(async (req, res) => {
   if (!complaint.deleted) {
     throw new AppError("Complaint must be soft-deleted before permanent deletion", 409);
   }
+
+  await notifyOtherAdminsAboutRecycleBinAction({
+    actorId: req.user.userId,
+    complaint,
+    action: "purge",
+    title: "Complaint Permanently Deleted",
+    body: `Complaint #${complaint.ticketId} was permanently deleted from the recycle bin.`,
+  });
 
   await complaint.deleteOne();
   await emitAdminDashboardEvent("complaint-purged", complaintId);

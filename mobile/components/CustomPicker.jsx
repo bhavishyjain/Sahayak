@@ -1,14 +1,13 @@
 import { Check, ChevronDown } from "lucide-react-native";
 import {
   forwardRef,
-  useEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from "react";
 import { FlatList, Modal, Text, TouchableOpacity, View } from "react-native";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import { darkColors, lightColors } from "../colors";
+import AppTextInput from "./AppTextInput";
 import { useTheme } from "../utils/context/theme";
 
 const CustomPicker = forwardRef(
@@ -139,30 +138,18 @@ const CustomPicker = forwardRef(
               {/* Search */}
               {searchPlaceholder && (
                 <View className="m-3">
-                  <PaperTextInput
-                    mode="flat"
+                  <AppTextInput
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     placeholder={searchPlaceholder}
                     placeholderTextColor={colors.placeholder}
-                    className="h-[45px] text-sm"
-                    style={{
+                    inputContainerStyle={{
                       backgroundColor: colors.backgroundSecondary,
-                      borderRadius: 12,
+                      minHeight: 45,
                     }}
-                    underlineStyle={{ display: "none" }}
-                    contentStyle={{
-                      color: colors.textPrimary,
+                    inputStyle={{
+                      minHeight: 45,
                       fontSize: 14,
-                      paddingHorizontal: 0,
-                    }}
-                    theme={{
-                      colors: {
-                        primary: "transparent",
-                        text: colors.textPrimary,
-                        placeholder: colors.placeholder,
-                      },
-                      roundness: 12,
                     }}
                   />
                 </View>

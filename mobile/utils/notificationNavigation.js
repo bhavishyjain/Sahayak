@@ -5,6 +5,8 @@ const NOTIFICATION_ROUTE_SCREENS = Object.freeze({
   COMPLAINT_CHAT: "complaint-chat",
   AI_REVIEW: "ai-review",
   WORKER_ASSIGNMENT: "worker-assignment",
+  SPECIAL_REQUESTS: "special-requests",
+  RECYCLE_BIN: "recycle-bin",
 });
 
 function normalizeParams(params = {}) {
@@ -78,6 +80,16 @@ export function openNotificationRoute(data = {}, navigation = router) {
       navigation.push({
         pathname: "/hod/worker-assignment",
         params: { complaintId: route.params.complaintId },
+      });
+      return true;
+    case NOTIFICATION_ROUTE_SCREENS.SPECIAL_REQUESTS:
+      navigation.push({
+        pathname: "/(app)/more/special-requests",
+      });
+      return true;
+    case NOTIFICATION_ROUTE_SCREENS.RECYCLE_BIN:
+      navigation.push({
+        pathname: "/(app)/(tabs)/admin-recycle-bin",
       });
       return true;
     default:

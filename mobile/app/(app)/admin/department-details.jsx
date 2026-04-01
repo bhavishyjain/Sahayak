@@ -26,6 +26,7 @@ import {
   COMPLAINT_STATUS_META,
 } from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import {
   DEPARTMENT_INVITATIONS_URL,
   DEPARTMENT_INVITATION_DETAIL_URL,
@@ -62,6 +63,7 @@ function MetricCard({ label, value, colors, tone }) {
 }
 
 function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
+  const { t } = useTranslation();
   const active = member?.isActive !== false;
 
   return (
@@ -86,7 +88,8 @@ function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
             @{member?.username}
           </Text>
           <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-            {member?.email || "No email"} • {member?.phone || "No phone"}
+            {member?.email || t("adminScreens.departmentDetails.noEmail")} •{" "}
+            {member?.phone || t("adminScreens.departmentDetails.noPhone")}
           </Text>
         </View>
         <View
@@ -99,7 +102,9 @@ function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
             className="text-[11px] font-semibold"
             style={{ color: active ? colors.success : colors.danger }}
           >
-            {active ? "Active" : "Inactive"}
+            {active
+              ? t("adminScreens.departmentDetails.active")
+              : t("adminScreens.departmentDetails.inactive")}
           </Text>
         </View>
       </View>
@@ -115,7 +120,9 @@ function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
           className="text-sm font-semibold"
           style={{ color: active ? colors.danger : colors.success }}
         >
-          {active ? "Deactivate" : "Reactivate"}
+          {active
+            ? t("adminScreens.departmentDetails.deactivate")
+            : t("adminScreens.departmentDetails.reactivate")}
         </Text>
       </PressableBlock>
     </PressableBlock>
@@ -123,6 +130,7 @@ function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
 }
 
 function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
+  const { t } = useTranslation();
   return (
     <View
       className="rounded-xl p-4 mb-3"
@@ -138,10 +146,10 @@ function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
             {invitation?.email}
           </Text>
           <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-            Invited {roleLabel}
+            {t("adminScreens.departmentDetails.invitedRole", { role: roleLabel })}
           </Text>
           <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-            Pending invitation
+            {t("adminScreens.departmentDetails.pendingInvitation")}
           </Text>
         </View>
         <View
@@ -149,7 +157,7 @@ function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
           style={{ backgroundColor: colors.warning + "18" }}
         >
           <Text className="text-[11px] font-semibold" style={{ color: colors.warning }}>
-            Pending
+            {t("common.status.pending")}
           </Text>
         </View>
       </View>
@@ -162,7 +170,7 @@ function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
         <View className="flex-row items-center">
           <Trash2 size={15} color={colors.danger} />
           <Text className="text-sm font-semibold ml-2" style={{ color: colors.danger }}>
-            Revoke
+            {t("adminScreens.departmentDetails.revoke")}
           </Text>
         </View>
       </PressableBlock>
@@ -248,6 +256,7 @@ function DropdownSection({
 }
 
 export default function DepartmentDetailsScreen() {
+  const { t } = useTranslation();
   const { department } = useLocalSearchParams();
   const departmentName =
     typeof department === "string" && department.trim()
@@ -310,10 +319,12 @@ export default function DepartmentDetailsScreen() {
     if (!error) return;
     Toast.show({
       type: "error",
-      text1: "Could not load department",
-      text2: error?.response?.data?.message || "Please try again.",
+      text1: t("adminScreens.departmentDetails.toasts.loadFailedTitle"),
+      text2:
+        error?.response?.data?.message ||
+        t("adminScreens.departmentDetails.toasts.loadFailedMessage"),
     });
-  }, [error]);
+  }, [error, t]);
 
   const invalidateAdminQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-dashboard-home"] });
@@ -344,15 +355,17 @@ export default function DepartmentDetailsScreen() {
       setConfirmState(null);
       Toast.show({
         type: "success",
-        text1: "Member updated",
-        text2: "Department data has been refreshed.",
+        text1: t("adminScreens.departmentDetails.toasts.memberUpdatedTitle"),
+        text2: t("adminScreens.departmentDetails.toasts.memberUpdatedMessage"),
       });
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: "Could not update member",
-        text2: mutationError?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.departmentDetails.toasts.memberUpdateFailedTitle"),
+        text2:
+          mutationError?.response?.data?.message ||
+          t("adminScreens.departmentDetails.toasts.memberUpdateFailedMessage"),
       });
     },
   });
@@ -360,7 +373,7 @@ export default function DepartmentDetailsScreen() {
   const inviteDepartmentMemberMutation = useMutation({
     mutationFn: async ({ role, email }) => {
       if (!departmentRecord?.id) {
-        throw new Error("Department not found");
+        throw new Error(t("adminScreens.departmentDetails.departmentNotFound"));
       }
       return apiCall({
         method: "POST",
@@ -377,15 +390,29 @@ export default function DepartmentDetailsScreen() {
       setInviteEmail("");
       Toast.show({
         type: "success",
-        text1: `${variables.role === "head" ? "HOD" : "Worker"} invited`,
-        text2: `Invitation sent to ${variables.email.trim().toLowerCase()}.`,
+        text1: t("adminScreens.departmentDetails.toasts.invitedTitle", {
+          role:
+            variables.role === "head"
+              ? t("adminScreens.departmentDetails.hodShort")
+              : t("adminScreens.departmentDetails.worker"),
+        }),
+        text2: t("adminScreens.departmentDetails.toasts.invitedMessage", {
+          email: variables.email.trim().toLowerCase(),
+        }),
       });
     },
     onError: (mutationError, variables) => {
       Toast.show({
         type: "error",
-        text1: `Could not invite ${variables?.role === "head" ? "HOD" : "worker"}`,
-        text2: mutationError?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.departmentDetails.toasts.inviteFailedTitle", {
+          role:
+            variables?.role === "head"
+              ? t("adminScreens.departmentDetails.hodShort")
+              : t("adminScreens.departmentDetails.worker").toLowerCase(),
+        }),
+        text2:
+          mutationError?.response?.data?.message ||
+          t("adminScreens.departmentDetails.toasts.inviteFailedMessage"),
       });
     },
   });
@@ -393,7 +420,7 @@ export default function DepartmentDetailsScreen() {
   const revokeInvitationMutation = useMutation({
     mutationFn: async (invitation) => {
       if (!departmentRecord?.id) {
-        throw new Error("Department not found");
+        throw new Error(t("adminScreens.departmentDetails.departmentNotFound"));
       }
       return apiCall({
         method: "DELETE",
@@ -405,15 +432,17 @@ export default function DepartmentDetailsScreen() {
       setConfirmState(null);
       Toast.show({
         type: "success",
-        text1: "Invitation revoked",
-        text2: "The pending invite has been removed.",
+        text1: t("adminScreens.departmentDetails.toasts.revokedTitle"),
+        text2: t("adminScreens.departmentDetails.toasts.revokedMessage"),
       });
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: "Could not revoke invitation",
-        text2: mutationError?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.departmentDetails.toasts.revokeFailedTitle"),
+        text2:
+          mutationError?.response?.data?.message ||
+          t("adminScreens.departmentDetails.toasts.revokeFailedMessage"),
       });
     },
   });
@@ -421,7 +450,7 @@ export default function DepartmentDetailsScreen() {
   const deactivateDepartmentMutation = useMutation({
     mutationFn: async (nextActiveState) => {
       if (!departmentRecord?.id) {
-        throw new Error("Department not found");
+        throw new Error(t("adminScreens.departmentDetails.departmentNotFound"));
       }
       return apiCall({
         method: "POST",
@@ -436,18 +465,20 @@ export default function DepartmentDetailsScreen() {
       Toast.show({
         type: "success",
         text1: nextActiveState
-          ? "Department reactivated"
-          : "Department deactivated",
+          ? t("adminScreens.departmentDetails.toasts.departmentReactivatedTitle")
+          : t("adminScreens.departmentDetails.toasts.departmentDeactivatedTitle"),
         text2: nextActiveState
-          ? "HOD and workers in this department are now active again."
-          : "HOD and workers in this department are now inactive.",
+          ? t("adminScreens.departmentDetails.toasts.departmentReactivatedMessage")
+          : t("adminScreens.departmentDetails.toasts.departmentDeactivatedMessage"),
       });
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: "Could not update department status",
-        text2: mutationError?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.departmentDetails.toasts.departmentStatusFailedTitle"),
+        text2:
+          mutationError?.response?.data?.message ||
+          t("adminScreens.departmentDetails.toasts.departmentStatusFailedMessage"),
       });
     },
   });
@@ -455,7 +486,7 @@ export default function DepartmentDetailsScreen() {
   const renameDepartmentMutation = useMutation({
     mutationFn: async () => {
       if (!departmentRecord?.id) {
-        throw new Error("Department not found");
+        throw new Error(t("adminScreens.departmentDetails.departmentNotFound"));
       }
       return apiCall({
         method: "PUT",
@@ -471,8 +502,8 @@ export default function DepartmentDetailsScreen() {
       setRenameValue("");
       Toast.show({
         type: "success",
-        text1: "Department updated",
-        text2: "The department name has been changed.",
+        text1: t("adminScreens.departmentDetails.toasts.departmentUpdatedTitle"),
+        text2: t("adminScreens.departmentDetails.toasts.departmentUpdatedMessage"),
       });
       router.replace(
         `/(app)/admin/department-details?department=${encodeURIComponent(nextDepartmentName)}`,
@@ -481,8 +512,10 @@ export default function DepartmentDetailsScreen() {
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: "Could not update department",
-        text2: mutationError?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.departmentDetails.toasts.departmentUpdateFailedTitle"),
+        text2:
+          mutationError?.response?.data?.message ||
+          t("adminScreens.departmentDetails.toasts.departmentUpdateFailedMessage"),
       });
     },
   });
@@ -490,7 +523,7 @@ export default function DepartmentDetailsScreen() {
   const deleteDepartmentMutation = useMutation({
     mutationFn: async () => {
       if (!departmentRecord?.id) {
-        throw new Error("Department not found");
+        throw new Error(t("adminScreens.departmentDetails.departmentNotFound"));
       }
       return apiCall({
         method: "DELETE",
@@ -502,16 +535,18 @@ export default function DepartmentDetailsScreen() {
       setConfirmState(null);
       Toast.show({
         type: "success",
-        text1: "Department deleted",
-        text2: "Members and complaints were reassigned safely.",
+        text1: t("adminScreens.departmentDetails.toasts.departmentDeletedTitle"),
+        text2: t("adminScreens.departmentDetails.toasts.departmentDeletedMessage"),
       });
       router.replace("/(app)/(tabs)/admin-departments");
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: "Could not delete department",
-        text2: mutationError?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.departmentDetails.toasts.departmentDeleteFailedTitle"),
+        text2:
+          mutationError?.response?.data?.message ||
+          t("adminScreens.departmentDetails.toasts.departmentDeleteFailedMessage"),
       });
     },
   });
@@ -558,7 +593,7 @@ export default function DepartmentDetailsScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
       <BackButtonHeader
-        title={`${departmentName} Department`}
+        title={t("adminScreens.departmentDetails.title", { department: departmentName })}
         fallbackHref="/(app)/(tabs)/admin-departments"
       />
 
@@ -584,7 +619,7 @@ export default function DepartmentDetailsScreen() {
             style={{ backgroundColor: colors.primary }}
           >
             <Text className="text-sm font-semibold" style={{ color: colors.dark }}>
-              Edit Department Name
+              {t("adminScreens.departmentDetails.editDepartmentName")}
             </Text>
           </PressableBlock>
 
@@ -605,8 +640,8 @@ export default function DepartmentDetailsScreen() {
           >
             <Text className="text-sm font-semibold" style={{ color: colors.dark }}>
               {departmentRecord?.isActive === false
-                ? "Reactivate Department"
-                : "Deactivate Department"}
+                ? t("adminScreens.departmentDetails.reactivateDepartment")
+                : t("adminScreens.departmentDetails.deactivateDepartment")}
             </Text>
           </PressableBlock>
 
@@ -616,20 +651,20 @@ export default function DepartmentDetailsScreen() {
             style={{ backgroundColor: colors.danger }}
           >
             <Text className="text-sm font-semibold" style={{ color: colors.light }}>
-              Delete Department
+              {t("adminScreens.departmentDetails.deleteDepartment")}
             </Text>
           </PressableBlock>
         </View>
 
         <View className="flex-row mb-3" style={{ gap: 12 }}>
           <MetricCard
-            label="Total complaints"
+            label={t("adminScreens.departmentDetails.totalComplaints")}
             value={Number(analytics.total ?? 0)}
             tone={colors.textPrimary}
             colors={colors}
           />
           <MetricCard
-            label="Total members"
+            label={t("adminScreens.departmentDetails.totalMembers")}
             value={heads.length + workers.length}
             tone={colors.primary}
             colors={colors}
@@ -654,21 +689,21 @@ export default function DepartmentDetailsScreen() {
         </View>
 
         <DropdownSection
-          title="HODs"
+          title={t("adminScreens.departmentDetails.hods")}
           count={heads.length}
           pendingCount={headInvitations.length}
           icon={Shield}
           tone={colors.warning}
           open={hodOpen}
           onToggle={() => setHodOpen((value) => !value)}
-          actionLabel="Add HOD"
+          actionLabel={t("adminScreens.departmentDetails.addHod")}
           onAction={() => setConfirmState({ type: "invite", role: "head" })}
           colors={colors}
         >
           {heads.length === 0 ? (
             headInvitations.length === 0 ? (
               <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                No HOD found for this department.
+                {t("adminScreens.departmentDetails.noHod")}
               </Text>
             ) : null
           ) : (
@@ -676,7 +711,7 @@ export default function DepartmentDetailsScreen() {
               <MemberRow
                 key={head._id}
                 member={head}
-                roleLabel="Department head"
+                roleLabel={t("adminScreens.departmentDetails.departmentHead")}
                 colors={colors}
                 onToggle={() =>
                   setConfirmState({
@@ -692,7 +727,7 @@ export default function DepartmentDetailsScreen() {
             <InvitationRow
               key={invitation.id}
               invitation={invitation}
-              roleLabel="department head"
+              roleLabel={t("adminScreens.departmentDetails.departmentHeadLower")}
               colors={colors}
               onRevoke={() =>
                 setConfirmState({
@@ -705,21 +740,21 @@ export default function DepartmentDetailsScreen() {
         </DropdownSection>
 
         <DropdownSection
-          title="Workers"
+          title={t("adminScreens.departmentDetails.workers")}
           count={workers.length}
           pendingCount={workerInvitations.length}
           icon={Users}
           tone={colors.primary}
           open={workersOpen}
           onToggle={() => setWorkersOpen((value) => !value)}
-          actionLabel="Add worker"
+          actionLabel={t("adminScreens.departmentDetails.addWorker")}
           onAction={() => setConfirmState({ type: "invite", role: "worker" })}
           colors={colors}
         >
           {workers.length === 0 ? (
             workerInvitations.length === 0 ? (
               <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                No workers found for this department.
+                {t("adminScreens.departmentDetails.noWorkers")}
               </Text>
             ) : null
           ) : (
@@ -727,7 +762,7 @@ export default function DepartmentDetailsScreen() {
               <MemberRow
                 key={worker._id}
                 member={worker}
-                roleLabel="Worker"
+                roleLabel={t("adminScreens.departmentDetails.worker")}
                 colors={colors}
                 onPress={() =>
                   router.push({
@@ -749,7 +784,7 @@ export default function DepartmentDetailsScreen() {
             <InvitationRow
               key={invitation.id}
               invitation={invitation}
-              roleLabel="worker"
+              roleLabel={t("adminScreens.departmentDetails.workerLower")}
               colors={colors}
               onRevoke={() =>
                 setConfirmState({
@@ -767,43 +802,66 @@ export default function DepartmentDetailsScreen() {
         onClose={() => setConfirmState(null)}
         title={
           confirmState?.type === "rename"
-            ? "Edit department name"
+            ? t("adminScreens.departmentDetails.dialog.renameTitle")
             : confirmState?.type === "invite"
-              ? `Invite ${confirmState?.role === "head" ? "HOD" : "worker"}`
+              ? t("adminScreens.departmentDetails.dialog.inviteTitle", {
+                  role:
+                    confirmState?.role === "head"
+                      ? t("adminScreens.departmentDetails.hodShort")
+                      : t("adminScreens.departmentDetails.workerLower"),
+                })
             : confirmState?.type === "revoke-invite"
-              ? "Revoke invitation"
+              ? t("adminScreens.departmentDetails.dialog.revokeInviteTitle")
             : confirmState?.type === "delete"
-              ? "Delete department"
+              ? t("adminScreens.departmentDetails.dialog.deleteDepartmentTitle")
             : confirmState?.type === "department"
             ? confirmState?.isActive
-              ? "Reactivate department"
-              : "Deactivate department"
+              ? t("adminScreens.departmentDetails.dialog.reactivateDepartmentTitle")
+              : t("adminScreens.departmentDetails.dialog.deactivateDepartmentTitle")
             : confirmState?.isActive
-              ? "Reactivate member"
-              : "Deactivate member"
+              ? t("adminScreens.departmentDetails.dialog.reactivateMemberTitle")
+              : t("adminScreens.departmentDetails.dialog.deactivateMemberTitle")
         }
         message={
           confirmState?.type === "rename"
-            ? "Update the department name everywhere it is used."
+            ? t("adminScreens.departmentDetails.dialog.renameMessage")
             : confirmState?.type === "invite"
-              ? `Send an invitation email to join ${departmentName} Department as a ${confirmState?.role === "head" ? "department head" : "worker"}.`
+              ? t("adminScreens.departmentDetails.dialog.inviteMessage", {
+                  department: departmentName,
+                  role:
+                    confirmState?.role === "head"
+                      ? t("adminScreens.departmentDetails.departmentHeadLower")
+                      : t("adminScreens.departmentDetails.workerLower"),
+                })
             : confirmState?.type === "revoke-invite"
-              ? `Revoke the pending invitation for ${confirmState?.invitation?.email}?`
+              ? t("adminScreens.departmentDetails.dialog.revokeInviteMessage", {
+                  email: confirmState?.invitation?.email,
+                })
             : confirmState?.type === "delete"
-              ? "This will remove the department and move linked users, complaints, and invitations to Other. This is only allowed when every complaint in the department is resolved."
+              ? t("adminScreens.departmentDetails.dialog.deleteDepartmentMessage")
             : confirmState?.type === "department"
             ? confirmState?.isActive
-              ? "This will reactivate the HODs and workers in this department."
-              : "This will deactivate the HODs and all workers in this department. This is only allowed when every complaint in the department is resolved."
+              ? t("adminScreens.departmentDetails.dialog.reactivateDepartmentMessage")
+              : t("adminScreens.departmentDetails.dialog.deactivateDepartmentMessage")
             : confirmState?.isActive
-              ? `Reactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`
-              : `Deactivate ${confirmState?.member?.fullName || confirmState?.member?.username}?`
+              ? t("adminScreens.departmentDetails.dialog.reactivateMemberMessage", {
+                  name:
+                    confirmState?.member?.fullName ||
+                    confirmState?.member?.username,
+                })
+              : t("adminScreens.departmentDetails.dialog.deactivateMemberMessage", {
+                  name:
+                    confirmState?.member?.fullName ||
+                    confirmState?.member?.username,
+                })
         }
         showInput={
           confirmState?.type === "rename" || confirmState?.type === "invite"
         }
         inputPlaceholder={
-          confirmState?.type === "invite" ? "Email address" : "Department name"
+          confirmState?.type === "invite"
+            ? t("adminScreens.departmentDetails.dialog.emailPlaceholder")
+            : t("adminScreens.departmentDetails.dialog.departmentNamePlaceholder")
         }
         inputKeyboardType={
           confirmState?.type === "invite" ? "email-address" : "default"
@@ -814,28 +872,28 @@ export default function DepartmentDetailsScreen() {
         }
         confirmText={
           confirmState?.type === "rename"
-            ? "Save"
+            ? t("common.save")
             : confirmState?.type === "invite"
-              ? "Send invite"
+              ? t("adminScreens.departmentDetails.dialog.sendInvite")
             : confirmState?.type === "revoke-invite"
-              ? "Revoke"
+              ? t("adminScreens.departmentDetails.revoke")
             : confirmState?.type === "delete"
-              ? "Delete"
+              ? t("common.delete")
             : confirmState?.type === "department"
             ? confirmState?.isActive
-              ? "Reactivate"
-              : "Deactivate"
+              ? t("adminScreens.departmentDetails.reactivate")
+              : t("adminScreens.departmentDetails.deactivate")
             : confirmState?.isActive
-              ? "Reactivate"
-              : "Deactivate"
+              ? t("adminScreens.departmentDetails.reactivate")
+              : t("adminScreens.departmentDetails.deactivate")
         }
         onConfirm={() => {
           if (confirmState?.type === "rename") {
             if (!renameValue.trim()) {
               Toast.show({
                 type: "error",
-                text1: "Department name required",
-                text2: "Enter a valid department name.",
+                text1: t("adminScreens.departmentDetails.toasts.nameRequiredTitle"),
+                text2: t("adminScreens.departmentDetails.toasts.nameRequiredMessage"),
               });
               return;
             }
@@ -846,8 +904,8 @@ export default function DepartmentDetailsScreen() {
             if (!inviteEmail.trim()) {
               Toast.show({
                 type: "error",
-                text1: "Email required",
-                text2: "Enter an email before sending the invitation.",
+                text1: t("adminScreens.departmentDetails.toasts.emailRequiredTitle"),
+                text2: t("adminScreens.departmentDetails.toasts.emailRequiredMessage"),
               });
               return;
             }

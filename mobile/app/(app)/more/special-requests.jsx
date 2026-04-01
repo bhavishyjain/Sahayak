@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
@@ -18,7 +19,15 @@ import {
 } from "../../../url";
 import useRealtimeRefresh from "../../../utils/realtime/useRealtimeRefresh";
 
-function RequestCard({ item, colors, mode, onApprove, onReject, t }) {
+function RequestCard({
+  item,
+  colors,
+  mode,
+  onApprove,
+  onReject,
+  onOpen,
+  t,
+}) {
   const statusTone =
     item.status === "approved"
       ? colors.success
@@ -29,78 +38,90 @@ function RequestCard({ item, colors, mode, onApprove, onReject, t }) {
   return (
     <View
       className="rounded-xl p-4 mb-3"
-      style={{ backgroundColor: colors.backgroundSecondary }}
+      style={{
+        backgroundColor: colors.backgroundSecondary,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
     >
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-3">
-          <Text
-            className="text-sm font-semibold"
-            style={{ color: colors.textPrimary }}
+      <PressableBlock onPress={onOpen}>
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 pr-3">
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: colors.textPrimary }}
+            >
+              {item.ticketId}
+            </Text>
+            <Text
+              className="text-xs mt-1"
+              style={{ color: colors.textSecondary }}
+            >
+              {item.requestType === "delete"
+                ? t("more.specialRequestsScreen.card.deleteRequest")
+                : t("more.specialRequestsScreen.card.editRequest")}
+            </Text>
+            {item.requestType === "update" ? (
+              <Text
+                className="text-xs mt-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {[
+                  item.currentDepartment !== item.requestedDepartment
+                    ? t("more.specialRequestsScreen.card.departmentChange", {
+                        from: item.currentDepartment,
+                        to: item.requestedDepartment,
+                      })
+                    : null,
+                  item.currentPriority !== item.requestedPriority
+                    ? t("more.specialRequestsScreen.card.priorityChange", {
+                        from: item.currentPriority,
+                        to: item.requestedPriority,
+                      })
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(t("more.specialRequestsScreen.card.changeSeparator"))}
+              </Text>
+            ) : null}
+            {item.reason ? (
+              <Text
+                className="text-xs mt-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {item.reason}
+              </Text>
+            ) : null}
+            {item.requestedBy?.fullName || item.requestedBy?.username ? (
+              <Text
+                className="text-xs mt-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("more.specialRequestsScreen.card.requestedBy", {
+                  name: item.requestedBy.fullName || item.requestedBy.username,
+                })}
+              </Text>
+            ) : null}
+            <Text
+              className="text-xs mt-3 font-semibold"
+              style={{ color: colors.primary }}
+            >
+              {t("more.specialRequestsScreen.card.openComplaint")}
+            </Text>
+          </View>
+          <View
+            className="px-2.5 py-1 rounded-full"
+            style={{ backgroundColor: statusTone + "18" }}
           >
-            {item.ticketId}
-          </Text>
-          <Text
-            className="text-xs mt-1"
-            style={{ color: colors.textSecondary }}
-          >
-            {item.requestType === "delete"
-              ? t("more.specialRequestsScreen.card.deleteRequest")
-              : t("more.specialRequestsScreen.card.editRequest")}
-          </Text>
-          {item.requestType === "update" ? (
             <Text
-              className="text-xs mt-1"
-              style={{ color: colors.textSecondary }}
+              className="text-[11px] font-semibold"
+              style={{ color: statusTone }}
             >
-              {[
-                item.currentDepartment !== item.requestedDepartment
-                  ? t("more.specialRequestsScreen.card.departmentChange", {
-                      from: item.currentDepartment,
-                      to: item.requestedDepartment,
-                    })
-                  : null,
-                item.currentPriority !== item.requestedPriority
-                  ? t("more.specialRequestsScreen.card.priorityChange", {
-                      from: item.currentPriority,
-                      to: item.requestedPriority,
-                    })
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(t("more.specialRequestsScreen.card.changeSeparator"))}
+              {formatStatusLabel(t, item.status)}
             </Text>
-          ) : null}
-          {item.reason ? (
-            <Text
-              className="text-xs mt-1"
-              style={{ color: colors.textSecondary }}
-            >
-              {item.reason}
-            </Text>
-          ) : null}
-          {item.requestedBy?.fullName || item.requestedBy?.username ? (
-            <Text
-              className="text-xs mt-1"
-              style={{ color: colors.textSecondary }}
-            >
-              {t("more.specialRequestsScreen.card.requestedBy", {
-                name: item.requestedBy.fullName || item.requestedBy.username,
-              })}
-            </Text>
-          ) : null}
+          </View>
         </View>
-        <View
-          className="px-2.5 py-1 rounded-full"
-          style={{ backgroundColor: statusTone + "18" }}
-        >
-          <Text
-            className="text-[11px] font-semibold"
-            style={{ color: statusTone }}
-          >
-            {formatStatusLabel(t, item.status)}
-          </Text>
-        </View>
-      </View>
+      </PressableBlock>
 
       {mode === "admin" && item.status === "pending" ? (
         <View className="flex-row mt-4" style={{ gap: 10 }}>
@@ -310,6 +331,12 @@ export default function SpecialRequestsScreen() {
               }
               onReject={() =>
                 setReviewState({ request: item, decision: "reject" })
+              }
+              onOpen={() =>
+                router.push({
+                  pathname: "/(app)/complaints/complaint-details",
+                  params: { id: item.complaintId },
+                })
               }
             />
           ))

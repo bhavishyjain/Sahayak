@@ -1,15 +1,19 @@
 import {
   FileText,
+  FolderOpen,
+  Trash2,
   TriangleAlert,
   UserCheck,
   Wrench,
 } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  Pressable,
   RefreshControl,
   ScrollView,
-  Switch,
   Text,
   View,
 } from "react-native";
@@ -47,7 +51,69 @@ const PREF_ROWS = [
     subKey: "more.notificationsScreen.preferences.systemAlerts.sub",
     Icon: Wrench,
   },
+  {
+    key: "specialRequests",
+    labelKey: "more.notificationsScreen.preferences.specialRequests.label",
+    subKey: "more.notificationsScreen.preferences.specialRequests.sub",
+    Icon: FolderOpen,
+  },
+  {
+    key: "deletedComplaints",
+    labelKey: "more.notificationsScreen.preferences.deletedComplaints.label",
+    subKey: "more.notificationsScreen.preferences.deletedComplaints.sub",
+    Icon: Trash2,
+  },
 ];
+
+const TOGGLE_WIDTH = 52;
+const TOGGLE_HEIGHT = 30;
+const KNOB_SIZE = 24;
+const TOGGLE_PADDING = 3;
+const KNOB_TRAVEL = TOGGLE_WIDTH - KNOB_SIZE - TOGGLE_PADDING * 2;
+
+function PreferenceToggle({ checked, loading, onPress, toneColor, colors }) {
+  const translateX = useRef(new Animated.Value(checked ? KNOB_TRAVEL : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(translateX, {
+      toValue: checked ? KNOB_TRAVEL : 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [checked, translateX]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={loading}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: Boolean(checked), disabled: Boolean(loading) }}
+      className="rounded-full justify-center"
+      style={{
+        width: TOGGLE_WIDTH,
+        height: TOGGLE_HEIGHT,
+        paddingHorizontal: TOGGLE_PADDING,
+        backgroundColor: checked ? toneColor : colors.border,
+        opacity: loading ? 0.85 : 1,
+      }}
+    >
+      <Animated.View
+        className="rounded-full items-center justify-center"
+        style={{
+          width: KNOB_SIZE,
+          height: KNOB_SIZE,
+          backgroundColor: colors.light,
+          transform: [{ translateX }],
+        }}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={toneColor} />
+        ) : null}
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export default function NotificationsScreen() {
   const { colorScheme } = useTheme();
@@ -62,6 +128,8 @@ export default function NotificationsScreen() {
       if (key === "complaintsUpdates") return colors.info;
       if (key === "assignments") return colors.primary;
       if (key === "escalations") return colors.danger;
+      if (key === "specialRequests") return colors.warning;
+      if (key === "deletedComplaints") return colors.secondary;
       return colors.secondary;
     },
     [colors],
@@ -75,12 +143,18 @@ export default function NotificationsScreen() {
     refetch,
   } = useNotificationPreferences();
   const { updatePreferences } = useNotificationActions();
+  const allowedKeys = Array.isArray(preferenceData?.allowedKeys)
+    ? preferenceData.allowedKeys
+    : PREF_ROWS.map((item) => item.key);
+  const visibleRows = PREF_ROWS.filter((item) => allowedKeys.includes(item.key));
   const preferences = {
     complaintsUpdates: true,
     assignments: true,
     escalations: true,
     systemAlerts: true,
-    ...(preferenceData || {}),
+    specialRequests: true,
+    deletedComplaints: true,
+    ...((preferenceData && preferenceData.preferences) || {}),
   };
 
   const handleToggle = useCallback(
@@ -119,13 +193,6 @@ export default function NotificationsScreen() {
           }
           showsVerticalScrollIndicator={false}
         >
-          <Text
-            className="text-xs font-semibold uppercase mb-3"
-            style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
-          >
-            {t("more.notificationsScreen.preferences.title")}
-          </Text>
-
           <View
             className="rounded-2xl overflow-hidden"
             style={{
@@ -134,7 +201,7 @@ export default function NotificationsScreen() {
               borderColor: colors.border,
             }}
           >
-            {PREF_ROWS.map(({ key, labelKey, subKey, Icon }, idx) => {
+            {visibleRows.map(({ key, labelKey, subKey, Icon }, idx) => {
               const toneColor = getPreferenceColor(key);
 
               return (
@@ -160,18 +227,15 @@ export default function NotificationsScreen() {
                         {t(subKey)}
                       </Text>
                     </View>
-                    {savingPref === key ? (
-                      <ActivityIndicator size="small" color={toneColor} />
-                    ) : (
-                      <Switch
-                        value={preferences[key]}
-                        onValueChange={(val) => handleToggle(key, val)}
-                        trackColor={{ false: colors.border, true: toneColor }}
-                        thumbColor={colors.light}
-                      />
-                    )}
+                    <PreferenceToggle
+                      checked={Boolean(preferences[key])}
+                      loading={savingPref === key}
+                      toneColor={toneColor}
+                      colors={colors}
+                      onPress={() => handleToggle(key, !preferences[key])}
+                    />
                   </View>
-                  {idx < PREF_ROWS.length - 1 && (
+                  {idx < visibleRows.length - 1 && (
                     <View
                       className="h-[1px] ml-14"
                       style={{ backgroundColor: colors.border }}

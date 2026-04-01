@@ -21,9 +21,9 @@ import {
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import DialogBox from "../../../components/DialogBox";
@@ -284,47 +284,19 @@ export default function ManageInvitations() {
               {t("more.manageInvitations.form.description")}
             </Text>
 
-            <View
-              className="flex-row items-center px-3 rounded-xl mb-3"
-              style={{
-                backgroundColor: colors.backgroundSecondary,
-                borderWidth: 1,
-                borderColor: colors.border,
-                height: 48,
-              }}
-            >
-              <Mail size={16} color={colors.textSecondary} />
-              <PaperTextInput
-                mode="flat"
-                dense
-                style={{
-                  flex: 1,
-                  marginLeft: 8,
-                  backgroundColor: "transparent",
-                  color: colors.textPrimary,
-                }}
-                contentStyle={{
-                  color: colors.textPrimary,
-                  fontSize: 14,
-                  paddingHorizontal: 0,
-                  paddingVertical: 8,
-                }}
-                underlineStyle={{ display: "none" }}
-                theme={{
-                  colors: {
-                    text: colors.textPrimary,
-                    placeholder: colors.textSecondary,
-                  },
-                }}
-                placeholder={t("more.manageInvitations.form.emailPlaceholder")}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!sending}
-              />
-            </View>
+            <AppTextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder={t("more.manageInvitations.form.emailPlaceholder")}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!sending}
+              containerStyle={{ marginBottom: 12 }}
+              left={<Mail size={16} color={colors.textSecondary} />}
+              inputContainerStyle={{ minHeight: 48 }}
+              inputStyle={{ minHeight: 48 }}
+            />
 
             <TouchableOpacity
               onPress={handleSend}

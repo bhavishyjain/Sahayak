@@ -11,7 +11,11 @@ const WorkerInvitation = require("./models/WorkerInvitation");
 const Notification = require("./models/Notification");
 const ReportSchedule = require("./models/ReportSchedule");
 const FestivalEvent = require("./models/FestivalEvent");
+const AdminNotificationBroadcast = require("./models/AdminNotificationBroadcast");
 const generateTicketId = require("./utils/generateTicketId");
+const {
+  getAllowedNotificationPreferenceKeys,
+} = require("./services/notificationDomainService");
 
 const SEED_DEPARTMENTS = [
   { name: "Road", code: "road" },
@@ -115,7 +119,18 @@ function getDepartmentNames() {
 const LAST_60_DAYS = 60;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
-const TOTAL_COMPLAINTS = 2000;
+
+function readPositiveIntEnv(name, fallback) {
+  const parsed = Number.parseInt(process.env[name] || "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const SEED_CONFIG = Object.freeze({
+  adminCount: readPositiveIntEnv("SEED_ADMIN_COUNT", 2),
+  workersPerDepartment: readPositiveIntEnv("SEED_WORKERS_PER_DEPARTMENT", 6),
+  citizenCount: readPositiveIntEnv("SEED_CITIZEN_COUNT", 150),
+  totalComplaints: readPositiveIntEnv("SEED_TOTAL_COMPLAINTS", 2000),
+});
 
 const LANGUAGE_WEIGHTS = [
   { value: "en", weight: 0.56 },
@@ -145,11 +160,14 @@ function getRandomPreferredLanguage() {
 }
 
 function getRandomNotificationPreferences(role = "user") {
+  const allowedKeys = new Set(getAllowedNotificationPreferenceKeys(role));
   const base = {
-    complaintsUpdates: true,
-    assignments: role === "worker" || role === "head" || role === "admin",
-    escalations: role === "head" || role === "admin",
-    systemAlerts: true,
+    complaintsUpdates: allowedKeys.has("complaintsUpdates"),
+    assignments: allowedKeys.has("assignments"),
+    escalations: allowedKeys.has("escalations"),
+    systemAlerts: allowedKeys.has("systemAlerts"),
+    specialRequests: allowedKeys.has("specialRequests"),
+    deletedComplaints: allowedKeys.has("deletedComplaints"),
   };
 
   return {
@@ -158,6 +176,10 @@ function getRandomNotificationPreferences(role = "user") {
     assignments: Math.random() < 0.94 ? base.assignments : !base.assignments,
     escalations: Math.random() < 0.9 ? base.escalations : !base.escalations,
     systemAlerts: Math.random() < 0.96 ? base.systemAlerts : !base.systemAlerts,
+    specialRequests:
+      Math.random() < 0.94 ? base.specialRequests : !base.specialRequests,
+    deletedComplaints:
+      Math.random() < 0.94 ? base.deletedComplaints : !base.deletedComplaints,
   };
 }
 
@@ -275,6 +297,7 @@ async function clearSeedCollections() {
   await Notification.deleteMany({});
   await ReportSchedule.deleteMany({});
   await FestivalEvent.deleteMany({});
+  await AdminNotificationBroadcast.deleteMany({});
 }
 
 async function seedDepartments() {
@@ -319,6 +342,104 @@ function getComplaintCreatedAt(status, now = new Date()) {
     createdAt,
     daysAgo: Math.max(ageInDays, 0),
   };
+}
+
+function summarizeBy(items = [], keyGetter) {
+  return items.reduce((acc, item) => {
+    const key = keyGetter(item);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function logSummaryBlock(title, summary = {}) {
+  const entries = Object.entries(summary).sort(([leftKey], [rightKey]) =>
+    leftKey.localeCompare(rightKey),
+  );
+  console.log(`\n${title}`);
+  if (entries.length === 0) {
+    console.log("   - none");
+    return;
+  }
+  entries.forEach(([key, count]) => {
+    console.log(`   - ${key}: ${count}`);
+  });
+}
+
+function getRandomReportScopeFilters(department) {
+  const presetOptions = ["past24Hours", "past7Days", "past30Days", "custom"];
+  const rangePreset = pickRandom(presetOptions);
+  const statusPool = [
+    "pending",
+    "assigned",
+    "in-progress",
+    "pending-approval",
+    "needs-rework",
+    "resolved",
+    "cancelled",
+  ];
+  const selectedStatuses =
+    Math.random() < 0.35
+      ? ["all"]
+      : statusPool.filter(() => Math.random() < 0.45);
+  const now = new Date();
+  const customFrom = toDateOnly(getDateWithinLastDays(20, 45, now));
+  const customTo = toDateOnly(getDateWithinLastDays(0, 19, now));
+
+  return {
+    department,
+    rangePreset,
+    statuses: selectedStatuses.length > 0 ? selectedStatuses : ["all"],
+    fromDate: rangePreset === "custom" ? customFrom : null,
+    toDate: rangePreset === "custom" ? customTo : null,
+  };
+}
+
+function buildAdminBroadcastSeeds(admins = [], now = new Date()) {
+  if (admins.length === 0) return [];
+  const creator = admins[0];
+  const templates = [
+    {
+      title: "City ops briefing",
+      body: "Review pending escalations, unresolved backlog, and staffing gaps before today’s field coordination call.",
+      audienceLabel: "Department heads",
+      recipientRoles: ["head"],
+      recipientCount: 8,
+      deliveredCount: 8,
+      skippedCount: 0,
+      pushSentCount: 7,
+      status: "sent",
+    },
+    {
+      title: "Service advisory",
+      body: "Heavy weather is expected this evening. Keep location, proof image, and progress updates current on active complaints.",
+      audienceLabel: "Workers, Department heads",
+      recipientRoles: ["worker", "head"],
+      recipientCount: 38,
+      deliveredCount: 36,
+      skippedCount: 2,
+      pushSentCount: 28,
+      status: "partial",
+    },
+    {
+      title: "Citizen information notice",
+      body: "Scheduled maintenance may affect water and electricity complaint response times for a few hours in selected zones.",
+      audienceLabel: "All active users",
+      recipientRoles: [],
+      recipientCount: 190,
+      deliveredCount: 184,
+      skippedCount: 6,
+      pushSentCount: 111,
+      status: "partial",
+    },
+  ];
+
+  return templates.map((template, index) => ({
+    createdBy: creator._id,
+    ...template,
+    createdAt: getDateWithinLastDays(0, 14 + index * 3, now),
+    updatedAt: now,
+  }));
 }
 
 function createStageTimestamp(
@@ -1543,11 +1664,14 @@ async function seedDatabase() {
 
     // Create users
     console.log("\n👥 Creating users...");
+    console.log(
+      `   Seed config -> admins: ${SEED_CONFIG.adminCount}, workers/department: ${SEED_CONFIG.workersPerDepartment}, citizens: ${SEED_CONFIG.citizenCount}, complaints: ${SEED_CONFIG.totalComplaints}`,
+    );
     const hashedPassword = await bcrypt.hash("password123", 10);
     const users = [];
 
-    // Admin users (2)
-    for (let i = 1; i <= 2; i++) {
+    // Admin users
+    for (let i = 1; i <= SEED_CONFIG.adminCount; i++) {
       const username = `admin${i}`;
       users.push({
         username,
@@ -1612,9 +1736,9 @@ async function seedDatabase() {
       });
     });
 
-    // Worker users (30 - 6 per department for better load distribution)
+    // Worker users
     for (let dept of departments) {
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= SEED_CONFIG.workersPerDepartment; i++) {
         const location = getRandomLocation();
         const username = `worker_${dept.toLowerCase()}_${i}`;
         users.push({
@@ -1653,7 +1777,7 @@ async function seedDatabase() {
       }
     }
 
-    // Regular user accounts (150 citizens for realistic complaint spread)
+    // Regular user accounts
     const firstNames = [
       "Rahul",
       "Priya",
@@ -1745,7 +1869,7 @@ async function seedDatabase() {
       "Bhatia",
     ];
 
-    for (let i = 1; i <= 150; i++) {
+    for (let i = 1; i <= SEED_CONFIG.citizenCount; i++) {
       const firstName =
         firstNames[Math.floor(Math.random() * firstNames.length)];
       const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
@@ -1787,6 +1911,10 @@ async function seedDatabase() {
     console.log(
       `   - ${createdUsers.filter((u) => u.role === "user").length} Citizens`,
     );
+    logSummaryBlock(
+      "🌐 Preferred languages",
+      summarizeBy(createdUsers, (user) => user.preferredLanguage || "en"),
+    );
 
     // Create complaints
     console.log("\n📋 Creating complaints...");
@@ -1797,7 +1925,7 @@ async function seedDatabase() {
 
     // Generate complaints with realistic distribution
     let multiWorkerCount = 0;
-    for (let i = 1; i <= TOTAL_COMPLAINTS; i++) {
+    for (let i = 1; i <= SEED_CONFIG.totalComplaints; i++) {
       const randomUser =
         regularUsers[Math.floor(Math.random() * regularUsers.length)];
       const complaint = generateComplaint(randomUser._id, regularUsers);
@@ -2014,7 +2142,9 @@ async function seedDatabase() {
       complaints.push(complaint);
 
       if (i % 200 === 0) {
-        console.log(`   Generated ${i}/${TOTAL_COMPLAINTS} complaints...`);
+        console.log(
+          `   Generated ${i}/${SEED_CONFIG.totalComplaints} complaints...`,
+        );
       }
     }
 
@@ -2052,6 +2182,14 @@ async function seedDatabase() {
     );
     console.log(
       `   - ${createdComplaints.filter((c) => c.satisfactionVotes && ((c.satisfactionVotes.thumbsUp || []).length > 0 || (c.satisfactionVotes.thumbsDown || []).length > 0)).length} With satisfaction votes`,
+    );
+    logSummaryBlock(
+      "🏷️  Complaint status mix",
+      summarizeBy(createdComplaints, (complaint) => complaint.status),
+    );
+    logSummaryBlock(
+      "🏢 Complaint department mix",
+      summarizeBy(createdComplaints, (complaint) => complaint.department),
     );
 
     console.log("\n💬 Seeding complaint chat threads...");
@@ -2618,7 +2756,7 @@ async function seedDatabase() {
         format,
         cronExpression: getCronExpressionForFrequency(frequency, hour),
         department: hod.department,
-        filters: { department: hod.department },
+        filters: getRandomReportScopeFilters(hod.department),
         timezone: process.env.REPORT_SCHEDULE_TIMEZONE || "Asia/Kolkata",
         hour,
         isActive: Math.random() < 0.88,
@@ -2641,6 +2779,13 @@ async function seedDatabase() {
     }
     await ReportSchedule.insertMany(scheduleRows);
     console.log(`✅ Created ${scheduleRows.length} report schedules`);
+
+    console.log("\n📣 Seeding admin broadcast history...");
+    const adminBroadcastRows = buildAdminBroadcastSeeds(admins, now);
+    if (adminBroadcastRows.length > 0) {
+      await AdminNotificationBroadcast.insertMany(adminBroadcastRows);
+    }
+    console.log(`✅ Created ${adminBroadcastRows.length} admin broadcasts`);
 
     // ── Seed Notification History ──────────────────────────────────────
     console.log("\n🔔 Seeding notifications...");
@@ -2778,6 +2923,10 @@ async function seedDatabase() {
       await Notification.insertMany(notificationRows);
     }
     console.log(`✅ Created ${notificationRows.length} notifications`);
+    logSummaryBlock(
+      "🔔 Notification type mix",
+      summarizeBy(notificationRows, (notification) => notification.type),
+    );
 
     console.log("\n🎉 Database seeded successfully!");
     console.log("\n📝 Sample Login Credentials:");

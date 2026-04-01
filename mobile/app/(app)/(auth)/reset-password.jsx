@@ -2,9 +2,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import PressableBlock from "../../../components/PressableBlock";
 import {
   getPasswordStrengthMessage,
@@ -90,33 +90,19 @@ export default function ResetPassword() {
           {t("auth.resetPassword.subtitle")}
         </Text>
 
-        <View
-          className="flex-row items-center rounded-lg px-4 mb-4 h-[50px]"
-          style={{
-            backgroundColor: colors.backgroundSecondary,
-            borderWidth: 1,
-            borderColor: colors.muted,
-          }}
-        >
-          <PaperTextInput
-            mode="flat"
-            value={password}
-            onChangeText={setPassword}
-            placeholder={t("auth.resetPassword.newPasswordPlaceholder")}
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-            autoCapitalize="none"
-            style={{ flex: 1, backgroundColor: "transparent" }}
-            underlineStyle={{ display: "none" }}
-            contentStyle={{
-              color: colors.textPrimary,
-              fontSize: 16,
-              fontWeight: "600",
-              paddingHorizontal: 0,
-            }}
-            theme={{ colors: { text: colors.textPrimary } }}
-          />
-        </View>
+        <AppTextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder={t("auth.resetPassword.newPasswordPlaceholder")}
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry
+          autoCapitalize="none"
+          borderColor={colors.muted}
+          activeBorderColor={colors.primary}
+          containerStyle={{ marginBottom: 16 }}
+          inputContainerStyle={{ minHeight: 50 }}
+          inputStyle={{ fontSize: 16, fontWeight: "600", minHeight: 50 }}
+        />
 
         <Text
           className="text-xs mb-4 -mt-2"
@@ -125,33 +111,19 @@ export default function ResetPassword() {
           {getPasswordStrengthMessage(t)}
         </Text>
 
-        <View
-          className="flex-row items-center rounded-lg px-4 mb-5 h-[50px]"
-          style={{
-            backgroundColor: colors.backgroundSecondary,
-            borderWidth: 1,
-            borderColor: colors.muted,
-          }}
-        >
-          <PaperTextInput
-            mode="flat"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder={t("auth.resetPassword.confirmPasswordPlaceholder")}
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-            autoCapitalize="none"
-            style={{ flex: 1, backgroundColor: "transparent" }}
-            underlineStyle={{ display: "none" }}
-            contentStyle={{
-              color: colors.textPrimary,
-              fontSize: 16,
-              fontWeight: "600",
-              paddingHorizontal: 0,
-            }}
-            theme={{ colors: { text: colors.textPrimary } }}
-          />
-        </View>
+        <AppTextInput
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          placeholder={t("auth.resetPassword.confirmPasswordPlaceholder")}
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry
+          autoCapitalize="none"
+          borderColor={colors.muted}
+          activeBorderColor={colors.primary}
+          containerStyle={{ marginBottom: 20 }}
+          inputContainerStyle={{ minHeight: 50 }}
+          inputStyle={{ fontSize: 16, fontWeight: "600", minHeight: 50 }}
+        />
 
         <PressableBlock
           className="w-full py-4 rounded-lg items-center mb-4"

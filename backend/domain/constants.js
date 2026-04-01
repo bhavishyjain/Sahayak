@@ -31,6 +31,8 @@ const NOTIFICATION_TYPES = Object.freeze({
   ESCALATION: "escalation",
   COMPLAINT_ESCALATED: "complaint_escalated",
   SYSTEM: "system",
+  SPECIAL_REQUEST: "special-request",
+  DELETED_COMPLAINT: "deleted-complaint",
   CHAT_MESSAGE: "chat-message",
   TEST: "test",
   OTHER: "other",

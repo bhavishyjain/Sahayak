@@ -73,7 +73,7 @@ export function useNotificationPreferences() {
         method: "GET",
         url: NOTIFICATION_PREFERENCES_URL,
       });
-      return response?.data?.preferences ?? {};
+      return response?.data ?? {};
     },
   });
 }
@@ -202,7 +202,10 @@ export function useNotificationActions() {
     const previous = queryClient.getQueryData(queryKeys.notificationPreferences);
     queryClient.setQueryData(queryKeys.notificationPreferences, (current) => ({
       ...(current || {}),
-      ...(partialPreferences || {}),
+      preferences: {
+        ...((current && current.preferences) || {}),
+        ...(partialPreferences || {}),
+      },
     }));
 
     try {
@@ -211,7 +214,7 @@ export function useNotificationActions() {
         url: NOTIFICATION_PREFERENCES_URL,
         data: partialPreferences,
       });
-      const nextPreferences = response?.data?.preferences ?? {};
+      const nextPreferences = response?.data ?? {};
       queryClient.setQueryData(
         queryKeys.notificationPreferences,
         nextPreferences,

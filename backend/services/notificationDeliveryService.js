@@ -20,7 +20,7 @@ async function deliverNotificationToUser(userId, payload, options = {}) {
   } = options;
 
   const user = await User.findById(userId).select(
-    "pushTokens notificationPreferences",
+    "pushTokens notificationPreferences role",
   );
   if (!user) {
     return { delivered: false, reason: "user-not-found" };
@@ -28,9 +28,11 @@ async function deliverNotificationToUser(userId, payload, options = {}) {
 
   const normalizedPayload = buildNotificationPayload(payload);
   const type = normalizedPayload.data?.type;
-  if (
-    !shouldDeliverByPreference(user.notificationPreferences || {}, type)
-  ) {
+  if (!shouldDeliverByPreference(
+    user.notificationPreferences || {},
+    normalizedPayload,
+    user.role,
+  )) {
     return {
       delivered: false,
       reason: "preference-disabled",

@@ -1,15 +1,17 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { BellRing, Clock3, History, Send } from "lucide-react-native";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import PressableBlock from "../../../components/PressableBlock";
+import apiCall from "../../../utils/api";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import { queryKeys } from "../../../utils/queryKeys";
 import { useTheme } from "../../../utils/context/theme";
-
-const STORAGE_KEY = "admin_sent_notification_history_v1";
+import { ADMIN_NOTIFICATION_BROADCASTS_URL } from "../../../url";
 
 function formatTimestamp(value) {
   try {
@@ -27,34 +29,19 @@ function SimpleInput({
   multiline = false,
 }) {
   return (
-    <PaperTextInput
+    <AppTextInput
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      mode="flat"
       multiline={multiline}
-      underlineStyle={{ display: "none" }}
-      style={{
+      backgroundColor={colors.backgroundPrimary}
+      inputContainerStyle={{
         backgroundColor: colors.backgroundPrimary,
-        borderWidth: 1,
-        borderColor: colors.border,
-        color: colors.textPrimary,
         minHeight: multiline ? 120 : 48,
-        borderRadius: 12,
-        textAlignVertical: multiline ? "top" : "center",
       }}
-      contentStyle={{
-        color: colors.textPrimary,
+      inputStyle={{
         fontSize: 14,
-        paddingHorizontal: 16,
-        paddingVertical: multiline ? 12 : 10,
-      }}
-      theme={{
-        colors: {
-          text: colors.textPrimary,
-          placeholder: colors.textSecondary,
-        },
-        roundness: 12,
+        minHeight: multiline ? 120 : 48,
       }}
     />
   );
@@ -62,34 +49,70 @@ function SimpleInput({
 
 export default function AdminSendNotificationScreen() {
   const { colorScheme } = useTheme();
+  const { t } = useTranslation();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [audienceKey, setAudienceKey] = useState("all");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        const parsed = saved ? JSON.parse(saved) : [];
-        setHistory(Array.isArray(parsed) ? parsed : []);
-      } catch (_error) {
-        setHistory([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const audienceOptions = useMemo(
+    () => [
+      {
+        key: "all",
+        label: t("more.menu.adminSendNotification.form.audienceOptions.all"),
+        roles: [],
+      },
+      {
+        key: "user",
+        label: t("more.menu.adminSendNotification.form.audienceOptions.user"),
+        roles: ["user"],
+      },
+      {
+        key: "worker",
+        label: t("more.menu.adminSendNotification.form.audienceOptions.worker"),
+        roles: ["worker"],
+      },
+      {
+        key: "head",
+        label: t("more.menu.adminSendNotification.form.audienceOptions.head"),
+        roles: ["head"],
+      },
+      {
+        key: "admin",
+        label: t("more.menu.adminSendNotification.form.audienceOptions.admin"),
+        roles: ["admin"],
+      },
+    ],
+    [t],
+  );
+
+  const selectedAudience =
+    audienceOptions.find((option) => option.key === audienceKey) ||
+    audienceOptions[0];
+
+  const {
+    data: historyData,
+    isLoading: loading,
+  } = useQuery({
+    queryKey: [...queryKeys.notifications, "admin-broadcasts"],
+    queryFn: async () => {
+      const response = await apiCall({
+        method: "GET",
+        url: `${ADMIN_NOTIFICATION_BROADCASTS_URL}?limit=30`,
+      });
+      return response?.data ?? {};
+    },
+  });
 
   const sortedHistory = useMemo(
     () =>
-      [...history].sort(
+      [...(Array.isArray(historyData?.broadcasts) ? historyData.broadcasts : [])].sort(
         (left, right) =>
           new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
       ),
-    [history],
+    [historyData?.broadcasts],
   );
 
   const handleSend = async () => {
@@ -99,38 +122,42 @@ export default function AdminSendNotificationScreen() {
     if (!nextTitle || !nextBody) {
       Toast.show({
         type: "error",
-        text1: "Missing details",
-        text2: "Add both a notification title and body.",
+        text1: t("more.menu.adminSendNotification.toasts.missingDetailsTitle"),
+        text2: t("more.menu.adminSendNotification.toasts.missingDetailsMessage"),
       });
       return;
     }
 
-    const record = {
-      id: `${Date.now()}`,
-      title: nextTitle,
-      body: nextBody,
-      audience: "All users",
-      createdAt: new Date().toISOString(),
-      status: "Pending backend delivery",
-    };
-
     try {
       setSaving(true);
-      const nextHistory = [record, ...history].slice(0, 30);
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextHistory));
-      setHistory(nextHistory);
+      await apiCall({
+        method: "POST",
+        url: ADMIN_NOTIFICATION_BROADCASTS_URL,
+        data: {
+          title: nextTitle,
+          body: nextBody,
+          roles: selectedAudience.roles,
+        },
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [...queryKeys.notifications, "admin-broadcasts"],
+      });
       setTitle("");
       setBody("");
       Toast.show({
-        type: "info",
-        text1: "Saved to sent history",
-        text2: "Delivery still needs the backend admin-notification API.",
+        type: "success",
+        text1: t("more.menu.adminSendNotification.toasts.sentTitle"),
+        text2: t("more.menu.adminSendNotification.toasts.sentMessage", {
+          audience: selectedAudience.label,
+        }),
       });
-    } catch (_error) {
+    } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Could not save history",
-        text2: "Please try again.",
+        text1: t("more.menu.adminSendNotification.toasts.failedTitle"),
+        text2:
+          error?.response?.data?.message ||
+          t("more.menu.adminSendNotification.toasts.failedMessage"),
       });
     } finally {
       setSaving(false);
@@ -139,7 +166,7 @@ export default function AdminSendNotificationScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
-      <BackButtonHeader title="Send Notification" />
+      <BackButtonHeader title={t("more.menu.adminSendNotification.title")} />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
@@ -150,10 +177,10 @@ export default function AdminSendNotificationScreen() {
             className="text-base font-semibold"
             style={{ color: colors.textPrimary }}
           >
-            Create notification
+            {t("more.menu.adminSendNotification.form.title")}
           </Text>
           <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-            Draft a notification to save in admin send history.
+            {t("more.menu.adminSendNotification.form.subtitle")}
           </Text>
         </View>
 
@@ -169,12 +196,12 @@ export default function AdminSendNotificationScreen() {
             className="text-xs font-semibold mb-2"
             style={{ color: colors.textSecondary }}
           >
-            Title
+            {t("more.menu.adminSendNotification.form.fields.title")}
           </Text>
           <SimpleInput
             value={title}
             onChangeText={setTitle}
-            placeholder="Notification title"
+            placeholder={t("more.menu.adminSendNotification.form.placeholders.title")}
             colors={colors}
           />
 
@@ -182,18 +209,55 @@ export default function AdminSendNotificationScreen() {
             className="text-xs font-semibold mt-4 mb-2"
             style={{ color: colors.textSecondary }}
           >
-            Message
+            {t("more.menu.adminSendNotification.form.fields.message")}
           </Text>
           <SimpleInput
             value={body}
             onChangeText={setBody}
-            placeholder="Notification body"
+            placeholder={t("more.menu.adminSendNotification.form.placeholders.message")}
             colors={colors}
             multiline={true}
           />
 
+          <Text
+            className="text-xs font-semibold mt-4 mb-2"
+            style={{ color: colors.textSecondary }}
+          >
+            {t("more.menu.adminSendNotification.form.fields.audience")}
+          </Text>
+          <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+            {audienceOptions.map((option) => {
+              const active = option.key === audienceKey;
+              return (
+                <PressableBlock
+                  key={option.key}
+                  onPress={() => setAudienceKey(option.key)}
+                  className="px-3.5 py-2 rounded-full"
+                  style={{
+                    borderWidth: 1,
+                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active
+                      ? colors.primary + "18"
+                      : colors.backgroundPrimary,
+                  }}
+                >
+                  <Text
+                    className="text-xs font-semibold"
+                    style={{
+                      color: active ? colors.primary : colors.textPrimary,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </PressableBlock>
+              );
+            })}
+          </View>
+
           <Text className="text-xs mt-3" style={{ color: colors.textSecondary }}>
-            Saved locally until admin broadcast API is available.
+            {t("more.menu.adminSendNotification.form.helper", {
+              audience: selectedAudience.label,
+            })}
           </Text>
 
           <PressableBlock
@@ -208,7 +272,9 @@ export default function AdminSendNotificationScreen() {
             <View className="flex-row items-center">
               <Send size={16} color={colors.dark} />
               <Text className="text-sm font-semibold ml-2" style={{ color: colors.dark }}>
-                {saving ? "Saving..." : "Send Notification"}
+                {saving
+                  ? t("more.menu.adminSendNotification.form.sending")
+                  : t("more.menu.adminSendNotification.form.send")}
               </Text>
             </View>
           </PressableBlock>
@@ -218,7 +284,7 @@ export default function AdminSendNotificationScreen() {
           <View className="flex-row items-center justify-between mb-4">
             <View>
               <Text className="text-base font-semibold" style={{ color: colors.textPrimary }}>
-                Sent history
+                {t("more.menu.adminSendNotification.history.title")}
               </Text>
             </View>
             <History size={17} color={colors.textSecondary} />
@@ -226,7 +292,7 @@ export default function AdminSendNotificationScreen() {
 
           {loading ? (
             <Text className="text-sm" style={{ color: colors.textSecondary }}>
-              Loading history...
+              {t("more.menu.adminSendNotification.history.loading")}
             </Text>
           ) : sortedHistory.length === 0 ? (
             <View
@@ -238,13 +304,13 @@ export default function AdminSendNotificationScreen() {
               }}
             >
               <Text className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                No sent notifications yet.
+                {t("more.menu.adminSendNotification.history.empty")}
               </Text>
             </View>
           ) : (
             sortedHistory.map((item) => (
               <View
-                key={item.id}
+                key={String(item._id || item.id || item.createdAt)}
                 className="rounded-2xl p-4 mb-3"
                 style={{
                   backgroundColor: colors.backgroundSecondary,
@@ -289,7 +355,8 @@ export default function AdminSendNotificationScreen() {
                       className="text-xs ml-2"
                       style={{ color: colors.textSecondary }}
                     >
-                      {item.audience}
+                      {item.audienceLabel ||
+                        t("more.menu.adminSendNotification.form.audienceOptions.all")}
                     </Text>
                   </View>
                   <View className="flex-row items-center">
@@ -298,6 +365,24 @@ export default function AdminSendNotificationScreen() {
                       {formatTimestamp(item.createdAt)}
                     </Text>
                   </View>
+                </View>
+
+                <View className="flex-row mt-3" style={{ gap: 8 }}>
+                  <Text className="text-[11px]" style={{ color: colors.textSecondary }}>
+                    {t("more.menu.adminSendNotification.history.metrics.recipients", {
+                      count: Number(item.recipientCount ?? 0),
+                    })}
+                  </Text>
+                  <Text className="text-[11px]" style={{ color: colors.textSecondary }}>
+                    {t("more.menu.adminSendNotification.history.metrics.delivered", {
+                      count: Number(item.deliveredCount ?? 0),
+                    })}
+                  </Text>
+                  <Text className="text-[11px]" style={{ color: colors.textSecondary }}>
+                    {t("more.menu.adminSendNotification.history.metrics.pushSent", {
+                      count: Number(item.pushSentCount ?? 0),
+                    })}
+                  </Text>
                 </View>
               </View>
             ))

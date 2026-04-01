@@ -22,10 +22,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import DialogBox from "../../../components/DialogBox";
@@ -766,28 +766,24 @@ export default function WorkerAssignment() {
                                   </TouchableOpacity>
                                 ) : null}
 
-                                <PaperTextInput
-                                  mode="outlined"
-                                  dense
-                                  outlineColor={colors.border}
-                                  activeOutlineColor={colors.primary}
-                                  textColor={colors.textPrimary}
-                                  placeholderTextColor={colors.textSecondary}
-                                  style={{
-                                    backgroundColor: colors.backgroundSecondary,
-                                    height: 44,
-                                    fontSize: 14,
-                                  }}
-                                  contentStyle={{
-                                    fontSize: 14,
-                                    paddingVertical: 4,
-                                  }}
-                                  theme={{ roundness: 10 }}
+                                <AppTextInput
+                                  borderColor={colors.border}
+                                  activeBorderColor={colors.primary}
                                   placeholder={t(
                                     "hod.workerAssignment.taskDescriptionPlaceholder",
                                     { name: workerName },
                                   )}
                                   value={taskDescs[id] ?? ""}
+                                  inputContainerStyle={{
+                                    backgroundColor: colors.backgroundSecondary,
+                                    minHeight: 44,
+                                    borderRadius: 10,
+                                  }}
+                                  inputStyle={{
+                                    fontSize: 14,
+                                    minHeight: 44,
+                                    paddingVertical: 4,
+                                  }}
                                   onFocus={() => {
                                     setTimeout(() => {
                                       modalScrollRef.current?.scrollToEnd({

@@ -14,6 +14,14 @@ const {
   emitComplaintUpdated,
   emitRealtimeEvent,
 } = require("../../services/realtimeService");
+const {
+  deliverNotificationBatch,
+} = require("../../services/notificationDeliveryService");
+const {
+  buildNotificationRoute,
+  NOTIFICATION_ROUTE_SCREENS,
+} = require("../../services/notificationDomainService");
+const { NOTIFICATION_TYPES, ROLES } = require("../../domain/constants");
 
 function buildUpdateChangeNotes({
   currentDepartment,
@@ -167,6 +175,38 @@ exports.createSpecialRequest = asyncHandler(async (req, res) => {
   );
 
   const adminUsers = await User.find({ role: "admin", isActive: true }).select("_id");
+  const adminIds = adminUsers.map((user) => user._id);
+  await deliverNotificationBatch(
+    adminIds,
+    {
+      title:
+        normalizedType === "delete"
+          ? "Delete Request Needs Review"
+          : "Special Request Needs Review",
+      body:
+        normalizedType === "delete"
+          ? `Complaint #${complaint.ticketId} has a delete request waiting for admin review.`
+          : `Complaint #${complaint.ticketId} has an edit request waiting for admin review.`,
+      data: {
+        type: NOTIFICATION_TYPES.SPECIAL_REQUEST,
+        complaintId: String(complaint._id),
+        ticketId: complaint.ticketId,
+        requestId: String(savedRequest._id),
+        requestType: normalizedType,
+        queue: "special-requests",
+        route: buildNotificationRoute(
+          NOTIFICATION_ROUTE_SCREENS.SPECIAL_REQUESTS,
+          {
+            requestId: String(savedRequest._id),
+            complaintId: String(complaint._id),
+            ticketId: complaint.ticketId,
+          },
+        ),
+      },
+    },
+    { saveHistory: true },
+  );
+
   emitRealtimeEvent(
     "queue-updated",
     {
@@ -178,7 +218,7 @@ exports.createSpecialRequest = asyncHandler(async (req, res) => {
       status: savedRequest.status,
       updatedAt: new Date().toISOString(),
     },
-    { userIds: adminUsers.map((user) => user._id) },
+    { userIds: adminIds },
   );
 
   return sendSuccess(
@@ -321,6 +361,37 @@ exports.reviewSpecialRequest = asyncHandler(async (req, res) => {
   const savedRequest = await ComplaintSpecialRequest.findById(request._id)
     .populate("requestedBy", "fullName username email")
     .populate("reviewedBy", "fullName username email");
+
+  if (normalizedDecision === "approve" && request.requestType === "delete") {
+    const otherAdmins = await User.find({
+      role: ROLES.ADMIN,
+      isActive: true,
+      _id: { $ne: adminId },
+    }).select("_id");
+
+    await deliverNotificationBatch(
+      otherAdmins.map((admin) => admin._id),
+      {
+        title: "Complaint Moved To Recycle Bin",
+        body: `Complaint #${complaint.ticketId} was deleted after admin approval and is now in the recycle bin.`,
+        data: {
+          type: NOTIFICATION_TYPES.DELETED_COMPLAINT,
+          complaintId: String(complaint._id),
+          ticketId: complaint.ticketId,
+          action: "soft-delete",
+          source: "special-request-review",
+          route: buildNotificationRoute(
+            NOTIFICATION_ROUTE_SCREENS.RECYCLE_BIN,
+            {
+              complaintId: String(complaint._id),
+              ticketId: complaint.ticketId,
+            },
+          ),
+        },
+      },
+      { saveHistory: true },
+    );
+  }
 
   emitRealtimeEvent(
     "queue-updated",

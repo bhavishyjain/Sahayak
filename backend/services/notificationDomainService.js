@@ -1,8 +1,6 @@
 const Notification = require("../models/Notification");
 const { emitNotification } = require("./realtimeService");
-const {
-  NOTIFICATION_TYPES,
-} = require("../domain/constants");
+const { NOTIFICATION_TYPES, ROLES } = require("../domain/constants");
 
 const NOTIFICATION_CONTRACT_VERSION = 1;
 
@@ -11,6 +9,8 @@ const NOTIFICATION_ROUTE_SCREENS = Object.freeze({
   COMPLAINT_CHAT: "complaint-chat",
   AI_REVIEW: "ai-review",
   WORKER_ASSIGNMENT: "worker-assignment",
+  SPECIAL_REQUESTS: "special-requests",
+  RECYCLE_BIN: "recycle-bin",
 });
 
 const NOTIFICATION_PREFERENCE_BY_TYPE = Object.freeze({
@@ -19,25 +19,57 @@ const NOTIFICATION_PREFERENCE_BY_TYPE = Object.freeze({
   [NOTIFICATION_TYPES.ESCALATION]: "escalations",
   [NOTIFICATION_TYPES.COMPLAINT_ESCALATED]: "escalations",
   [NOTIFICATION_TYPES.SYSTEM]: "systemAlerts",
+  [NOTIFICATION_TYPES.SPECIAL_REQUEST]: "specialRequests",
+  [NOTIFICATION_TYPES.DELETED_COMPLAINT]: "deletedComplaints",
 });
+
+const NOTIFICATION_PREFERENCE_DEFINITIONS = Object.freeze([
+  {
+    key: "complaintsUpdates",
+    roles: [ROLES.USER, ROLES.WORKER, ROLES.HEAD],
+  },
+  {
+    key: "assignments",
+    roles: [ROLES.USER, ROLES.WORKER, ROLES.HEAD],
+  },
+  {
+    key: "escalations",
+    roles: [ROLES.USER, ROLES.WORKER, ROLES.HEAD],
+  },
+  {
+    key: "systemAlerts",
+    roles: [ROLES.USER, ROLES.WORKER, ROLES.HEAD],
+  },
+  {
+    key: "specialRequests",
+    roles: [ROLES.ADMIN],
+  },
+  {
+    key: "deletedComplaints",
+    roles: [ROLES.ADMIN],
+  },
+]);
 
 const NOTIFICATION_EVENT_CONTRACTS = Object.freeze({
   [NOTIFICATION_TYPES.COMPLAINT_UPDATE]: {
     type: NOTIFICATION_TYPES.COMPLAINT_UPDATE,
     defaultRouteScreen: NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
-    preferenceKey: NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.COMPLAINT_UPDATE],
+    preferenceKey:
+      NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.COMPLAINT_UPDATE],
     persistByDefault: true,
   },
   [NOTIFICATION_TYPES.ASSIGNMENT]: {
     type: NOTIFICATION_TYPES.ASSIGNMENT,
     defaultRouteScreen: NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
-    preferenceKey: NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.ASSIGNMENT],
+    preferenceKey:
+      NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.ASSIGNMENT],
     persistByDefault: true,
   },
   [NOTIFICATION_TYPES.ESCALATION]: {
     type: NOTIFICATION_TYPES.ESCALATION,
     defaultRouteScreen: NOTIFICATION_ROUTE_SCREENS.COMPLAINT_DETAIL,
-    preferenceKey: NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.ESCALATION],
+    preferenceKey:
+      NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.ESCALATION],
     persistByDefault: true,
   },
   [NOTIFICATION_TYPES.COMPLAINT_ESCALATED]: {
@@ -57,6 +89,20 @@ const NOTIFICATION_EVENT_CONTRACTS = Object.freeze({
     type: NOTIFICATION_TYPES.SYSTEM,
     defaultRouteScreen: null,
     preferenceKey: NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.SYSTEM],
+    persistByDefault: true,
+  },
+  [NOTIFICATION_TYPES.SPECIAL_REQUEST]: {
+    type: NOTIFICATION_TYPES.SPECIAL_REQUEST,
+    defaultRouteScreen: NOTIFICATION_ROUTE_SCREENS.SPECIAL_REQUESTS,
+    preferenceKey:
+      NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.SPECIAL_REQUEST],
+    persistByDefault: true,
+  },
+  [NOTIFICATION_TYPES.DELETED_COMPLAINT]: {
+    type: NOTIFICATION_TYPES.DELETED_COMPLAINT,
+    defaultRouteScreen: NOTIFICATION_ROUTE_SCREENS.RECYCLE_BIN,
+    preferenceKey:
+      NOTIFICATION_PREFERENCE_BY_TYPE[NOTIFICATION_TYPES.DELETED_COMPLAINT],
     persistByDefault: true,
   },
   [NOTIFICATION_TYPES.TEST]: {
@@ -89,9 +135,48 @@ function getNotificationEventContract(type) {
   );
 }
 
-function shouldDeliverByPreference(preferences = {}, type) {
-  const preferenceKey = NOTIFICATION_PREFERENCE_BY_TYPE[type];
+function getNotificationPreferenceDefinitionsForRole(role) {
+  const normalizedRole = String(role || "").trim();
+  return NOTIFICATION_PREFERENCE_DEFINITIONS.filter((item) =>
+    item.roles.includes(normalizedRole),
+  );
+}
+
+function getAllowedNotificationPreferenceKeys(role) {
+  return getNotificationPreferenceDefinitionsForRole(role).map(
+    (item) => item.key,
+  );
+}
+
+function buildRoleScopedNotificationPreferences(preferences = {}, role) {
+  return getAllowedNotificationPreferenceKeys(role).reduce((acc, key) => {
+    acc[key] = preferences[key] !== false;
+    return acc;
+  }, {});
+}
+
+function resolveNotificationPreferenceKey(input) {
+  if (typeof input === "string") {
+    return NOTIFICATION_PREFERENCE_BY_TYPE[input] || null;
+  }
+
+  if (input?.data?.preferenceKey) {
+    return String(input.data.preferenceKey).trim() || null;
+  }
+
+  const type = input?.data?.type || input?.type;
+  return NOTIFICATION_PREFERENCE_BY_TYPE[type] || null;
+}
+
+function shouldDeliverByPreference(preferences = {}, typeOrPayload, role) {
+  const preferenceKey = resolveNotificationPreferenceKey(typeOrPayload);
   if (!preferenceKey) return true;
+  if (
+    role &&
+    !getAllowedNotificationPreferenceKeys(role).includes(preferenceKey)
+  ) {
+    return true;
+  }
   return preferences[preferenceKey] !== false;
 }
 
@@ -102,11 +187,14 @@ function shouldPersistNotification({ saveHistory = true, type }) {
 
 function buildNotificationRoute(screen, params = {}) {
   if (!screen) return null;
-  const normalizedParams = Object.entries(params).reduce((acc, [key, value]) => {
-    if (value === undefined || value === null || value === "") return acc;
-    acc[key] = String(value);
-    return acc;
-  }, {});
+  const normalizedParams = Object.entries(params).reduce(
+    (acc, [key, value]) => {
+      if (value === undefined || value === null || value === "") return acc;
+      acc[key] = String(value);
+      return acc;
+    },
+    {},
+  );
 
   return {
     screen,
@@ -128,10 +216,10 @@ function inferNotificationRoute(data = {}) {
   const contract = getNotificationEventContract(type);
 
   if (contract.defaultRouteScreen) {
-    return buildNotificationRoute(
-      contract.defaultRouteScreen,
-      { complaintId, ticketId },
-    );
+    return buildNotificationRoute(contract.defaultRouteScreen, {
+      complaintId,
+      ticketId,
+    });
   }
 
   return null;
@@ -174,8 +262,13 @@ module.exports = {
   NOTIFICATION_CONTRACT_VERSION,
   NOTIFICATION_EVENT_CONTRACTS,
   NOTIFICATION_PREFERENCE_BY_TYPE,
+  NOTIFICATION_PREFERENCE_DEFINITIONS,
   normalizeNotificationType,
   getNotificationEventContract,
+  getNotificationPreferenceDefinitionsForRole,
+  getAllowedNotificationPreferenceKeys,
+  buildRoleScopedNotificationPreferences,
+  resolveNotificationPreferenceKey,
   shouldDeliverByPreference,
   shouldPersistNotification,
   buildNotificationPayload,

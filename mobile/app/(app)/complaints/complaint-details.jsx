@@ -41,13 +41,13 @@ import {
   ScrollView,
   Share,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { WebView } from "react-native-webview";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import ComplaintTimeline from "../../../components/ComplaintTimeline";
@@ -746,19 +746,6 @@ function ComplaintDetailsInner() {
             .join("")}</tbody></table>`
         : `<p class="muted">No timeline entries</p>`;
 
-      const escalationHtml = (complaint.sla?.escalationHistory || []).length
-        ? `<table><thead><tr><th>Level</th><th>Escalated At</th></tr></thead><tbody>${(
-            complaint.sla?.escalationHistory || []
-          )
-            .map(
-              (entry) => `<tr>
-                <td>L${escHtml(entry?.level)}</td>
-                <td>${escHtml(formatDateTime(entry?.escalatedAt))}</td>
-              </tr>`,
-            )
-            .join("")}</tbody></table>`
-        : `<p class="muted">No SLA escalations</p>`;
-
       const feedbackRating = complaint.feedback?.rating || null;
 
       const feedbackHtml = () => {
@@ -1284,12 +1271,12 @@ function ComplaintDetailsInner() {
               >
                 <View className="flex-row items-center justify-center">
                   <Trash2 size={18} color={colors.light} />
-                  <Text
-                    className="text-sm font-semibold ml-2"
-                    style={{ color: colors.light }}
-                  >
-                    Delete Complaint
-                  </Text>
+	                  <Text
+	                    className="text-sm font-semibold ml-2"
+	                    style={{ color: colors.light }}
+	                  >
+	                    {t("complaints.details.deleteComplaint")}
+	                  </Text>
                 </View>
               </Card>
             </PressableBlock>
@@ -3138,21 +3125,15 @@ function ComplaintDetailsInner() {
                 >
                   {t("complaints.details.additionalComments")}
                 </Text>
-                <TextInput
+                <AppTextInput
                   value={feedbackComment}
                   onChangeText={setFeedbackComment}
                   placeholder={t("complaints.details.shareYourExperience")}
-                  placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
-                  className="rounded-xl p-4 mb-6"
-                  style={{
-                    backgroundColor: colors.backgroundSecondary,
-                    color: colors.textPrimary,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    textAlignVertical: "top",
-                  }}
+                  containerStyle={{ marginBottom: 24 }}
+                  inputContainerStyle={{ minHeight: 120 }}
+                  inputStyle={{ minHeight: 120 }}
                 />
 
                 <View className="flex-row">
@@ -3518,23 +3499,19 @@ function ComplaintDetailsInner() {
                     className="text-sm mb-2"
                     style={{ color: colors.textSecondary }}
                   >
-                    Reason
+                    {t("complaints.details.specialRequestReasonLabel")}
                   </Text>
-                  <TextInput
+                  <AppTextInput
                     value={specialRequestReason}
                     onChangeText={setSpecialRequestReason}
-                    placeholder="Explain why this complaint needs to be updated"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholder={t(
+                      "complaints.details.specialRequestUpdatePlaceholder",
+                    )}
                     multiline
                     numberOfLines={4}
-                    className="rounded-xl p-4 mb-6"
-                    style={{
-                      backgroundColor: colors.backgroundSecondary,
-                      color: colors.textPrimary,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      textAlignVertical: "top",
-                    }}
+                    containerStyle={{ marginBottom: 24 }}
+                    inputContainerStyle={{ minHeight: 120 }}
+                    inputStyle={{ minHeight: 120 }}
                   />
 
                   <View className="flex-row" style={{ gap: 12 }}>
@@ -3547,7 +3524,7 @@ function ComplaintDetailsInner() {
                         className="text-base font-semibold"
                         style={{ color: colors.textPrimary }}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Text>
                     </Pressable>
 
@@ -3573,7 +3550,7 @@ function ComplaintDetailsInner() {
                           className="text-base font-semibold"
                           style={{ color: colors.light }}
                         >
-                          Send Request
+                          {t("complaints.details.sendRequest")}
                         </Text>
                       )}
                     </Pressable>
@@ -3591,16 +3568,18 @@ function ComplaintDetailsInner() {
           onClose={() => setDeleteRequestModalVisible(false)}
           onCancel={() => setDeleteRequestModalVisible(false)}
           onConfirm={() => submitSpecialRequest("delete")}
-          title="Delete Complaint"
+          title={t("complaints.details.deleteComplaint")}
           message={
-            "This sends a special request to admin to delete this complaint.\n\nReason"
+            `${t("complaints.details.deleteRequestDialogMessage")}\n\n${t("complaints.details.specialRequestReasonLabel")}`
           }
           showInput
-          inputPlaceholder="Explain why this complaint should be deleted"
+          inputPlaceholder={t(
+            "complaints.details.specialRequestDeletePlaceholder",
+          )}
           inputValue={deleteRequestReason}
           onInputChange={setDeleteRequestReason}
-          confirmText="Send Request"
-          cancelText="Cancel"
+          confirmText={t("complaints.details.sendRequest")}
+          cancelText={t("common.cancel")}
           loading={submittingSpecialRequest}
           titleAlign="center"
           messageAlign="left"
@@ -3648,21 +3627,15 @@ function ComplaintDetailsInner() {
                   >
                     {t("complaints.details.reworkReasonRequired")}
                   </Text>
-                  <TextInput
+                  <AppTextInput
                     value={reworkReason}
                     onChangeText={setReworkReason}
                     placeholder={t("complaints.details.explainWhatNeedsFixing")}
-                    placeholderTextColor={colors.textSecondary}
                     multiline
                     numberOfLines={4}
-                    className="rounded-xl p-4 mb-6"
-                    style={{
-                      backgroundColor: colors.backgroundSecondary,
-                      color: colors.textPrimary,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      textAlignVertical: "top",
-                    }}
+                    containerStyle={{ marginBottom: 24 }}
+                    inputContainerStyle={{ minHeight: 120 }}
+                    inputStyle={{ minHeight: 120 }}
                   />
 
                   <View className="flex-row">

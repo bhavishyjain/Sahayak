@@ -70,6 +70,8 @@ const userSchema = new mongoose.Schema({
     assignments: { type: Boolean, default: true },
     escalations: { type: Boolean, default: true },
     systemAlerts: { type: Boolean, default: true },
+    specialRequests: { type: Boolean, default: true },
+    deletedComplaints: { type: Boolean, default: true },
   },
   preferredLanguage: {
     type: String,

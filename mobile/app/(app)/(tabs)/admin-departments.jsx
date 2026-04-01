@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { useEffect, useState } from "react";
@@ -10,10 +10,12 @@ import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
+import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import useDepartments from "../../../utils/hooks/useDepartments";
-import { DEPARTMENTS_URL } from "../../../url";
+import { DEPARTMENTS_URL, REPORT_DEPARTMENT_BREAKDOWN_URL } from "../../../url";
 
 export default function AdminDepartmentsTab() {
+  const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
   const queryClient = useQueryClient();
@@ -26,6 +28,16 @@ export default function AdminDepartmentsTab() {
     refetch,
     error,
   } = useDepartments({ includeInactive: true });
+  const { data: breakdownData } = useQuery({
+    queryKey: ["admin-department-breakdown"],
+    queryFn: async () => {
+      const response = await apiCall({
+        method: "GET",
+        url: REPORT_DEPARTMENT_BREAKDOWN_URL,
+      });
+      return response?.data?.breakdown || response?.data?.summary || response?.data || {};
+    },
+  });
 
   const createDepartmentMutation = useMutation({
     mutationFn: async () =>
@@ -41,15 +53,17 @@ export default function AdminDepartmentsTab() {
       setNewDepartmentName("");
       Toast.show({
         type: "success",
-        text1: "Department added",
-        text2: "The department list has been updated.",
+        text1: t("adminScreens.departments.toasts.addedTitle"),
+        text2: t("adminScreens.departments.toasts.addedMessage"),
       });
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: "Could not add department",
-        text2: mutationError?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.departments.toasts.addFailedTitle"),
+        text2:
+          mutationError?.response?.data?.message ||
+          t("adminScreens.departments.toasts.addFailedMessage"),
       });
     },
   });
@@ -58,17 +72,19 @@ export default function AdminDepartmentsTab() {
     if (!error) return;
     Toast.show({
       type: "error",
-      text1: "Could not load departments",
-      text2: error?.response?.data?.message || "Please try again.",
+      text1: t("adminScreens.departments.toasts.loadFailedTitle"),
+      text2:
+        error?.response?.data?.message ||
+        t("adminScreens.departments.toasts.loadFailedMessage"),
     });
-  }, [error]);
+  }, [error, t]);
 
   const handleAddDepartment = () => {
     if (!newDepartmentName.trim()) {
       Toast.show({
         type: "error",
-        text1: "Department name required",
-        text2: "Enter a name before creating the department.",
+        text1: t("adminScreens.departments.toasts.nameRequiredTitle"),
+        text2: t("adminScreens.departments.toasts.nameRequiredMessage"),
       });
       return;
     }
@@ -77,7 +93,10 @@ export default function AdminDepartmentsTab() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
-      <BackButtonHeader title="Departments" hasBackButton={false} />
+      <BackButtonHeader
+        title={t("adminScreens.departments.title")}
+        hasBackButton={false}
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
@@ -106,7 +125,7 @@ export default function AdminDepartmentsTab() {
               className="text-sm font-semibold ml-2"
               style={{ color: colors.primary }}
             >
-              Add department
+              {t("adminScreens.departments.addButton")}
             </Text>
           </View>
         </PressableBlock>
@@ -132,12 +151,25 @@ export default function AdminDepartmentsTab() {
               }}
             >
               <View className="flex-row items-center justify-between">
-                <Text
-                  className="text-base font-semibold"
-                  style={{ color: colors.textPrimary }}
-                >
-                  {department.name}
-                </Text>
+                <View className="flex-1 pr-3">
+                  <Text
+                    className="text-base font-semibold"
+                    style={{ color: colors.textPrimary }}
+                  >
+                    {department.name}
+                  </Text>
+                  <Text
+                    className="text-xs mt-1"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {t("adminScreens.departments.rowSummary", {
+                      total: Number(breakdownData?.[department.name]?.total ?? 0),
+                      pending: Number(
+                        breakdownData?.[department.name]?.pending ?? 0,
+                      ),
+                    })}
+                  </Text>
+                </View>
                 <View className="flex-row items-center">
                   <View
                     className="w-2.5 h-2.5 rounded-full mr-2"
@@ -155,7 +187,9 @@ export default function AdminDepartmentsTab() {
                         : colors.danger,
                     }}
                   >
-                    {department.isActive ? "Active" : "Inactive"}
+                    {department.isActive
+                      ? t("adminScreens.departments.active")
+                      : t("adminScreens.departments.inactive")}
                   </Text>
                 </View>
               </View>
@@ -170,13 +204,13 @@ export default function AdminDepartmentsTab() {
           setShowAddDialog(false);
           setNewDepartmentName("");
         }}
-        title="Add department"
-        message="Create a new department for admin assignment and complaint routing."
+        title={t("adminScreens.departments.dialog.title")}
+        message={t("adminScreens.departments.dialog.message")}
         showInput={true}
-        inputPlaceholder="Department name"
+        inputPlaceholder={t("adminScreens.departments.dialog.placeholder")}
         inputValue={newDepartmentName}
         onInputChange={setNewDepartmentName}
-        confirmText="Add"
+        confirmText={t("adminScreens.departments.dialog.confirm")}
         onConfirm={handleAddDepartment}
         onCancel={() => {
           setShowAddDialog(false);

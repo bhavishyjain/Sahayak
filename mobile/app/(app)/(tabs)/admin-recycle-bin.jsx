@@ -73,24 +73,26 @@ export default function AdminRecycleBinScreen() {
         type: "success",
         text1:
           variables.type === "restore"
-            ? "Complaint restored"
-            : "Complaint purged",
+            ? t("adminScreens.recycleBin.toasts.restoredTitle")
+            : t("adminScreens.recycleBin.toasts.purgedTitle"),
         text2:
           variables.type === "restore"
-            ? "The complaint has been moved back to the active system."
-            : "The complaint has been permanently removed.",
+            ? t("adminScreens.recycleBin.toasts.restoredMessage")
+            : t("adminScreens.recycleBin.toasts.purgedMessage"),
       });
     },
     onError: (error) => {
       Toast.show({
         type: "error",
-        text1: "Recycle-bin action failed",
-        text2: error?.response?.data?.message || "Please try again.",
+        text1: t("adminScreens.recycleBin.toasts.failedTitle"),
+        text2:
+          error?.response?.data?.message ||
+          t("adminScreens.recycleBin.toasts.failedMessage"),
       });
     },
   });
 
-  const complaints = data?.complaints ?? [];
+  const complaints = useMemo(() => data?.complaints ?? [], [data?.complaints]);
 
   const departmentOptions = useMemo(() => {
     const values = Array.from(
@@ -116,10 +118,12 @@ export default function AdminRecycleBinScreen() {
   const filterSummary = useMemo(() => {
     const tokens = [];
     if (departmentFilter !== "all") tokens.push(departmentFilter);
-    if (startDate || endDate) tokens.push("date");
-    if (sortOrder === "old-to-new") tokens.push("oldest first");
+    if (startDate || endDate) tokens.push(t("adminScreens.recycleBin.filters.date"));
+    if (sortOrder === "old-to-new") {
+      tokens.push(t("adminScreens.recycleBin.filters.oldestFirst"));
+    }
     return tokens.join(" • ");
-  }, [departmentFilter, endDate, sortOrder, startDate]);
+  }, [departmentFilter, endDate, sortOrder, startDate, t]);
 
   const filteredComplaints = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -183,7 +187,10 @@ export default function AdminRecycleBinScreen() {
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
-      <BackButtonHeader title="Recycle Bin" hasBackButton={false} />
+      <BackButtonHeader
+        title={t("adminScreens.recycleBin.title")}
+        hasBackButton={false}
+      />
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         refreshControl={
@@ -199,7 +206,7 @@ export default function AdminRecycleBinScreen() {
           <SearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search deleted complaints"
+            placeholder={t("adminScreens.recycleBin.searchPlaceholder")}
             style={{ flex: 1 }}
           />
           <FilterPanel
@@ -246,14 +253,13 @@ export default function AdminRecycleBinScreen() {
               className="text-base font-semibold"
               style={{ color: colors.textPrimary }}
             >
-              Recycle bin is empty
+              {t("adminScreens.recycleBin.emptyTitle")}
             </Text>
             <Text
               className="text-sm mt-2"
               style={{ color: colors.textSecondary }}
             >
-              Soft-deleted complaints will appear here with restore and purge
-              actions.
+              {t("adminScreens.recycleBin.emptyMessage")}
             </Text>
           </View>
         ) : (
@@ -271,38 +277,41 @@ export default function AdminRecycleBinScreen() {
                 className="text-base font-bold"
                 style={{ color: colors.textPrimary }}
               >
-                #{complaint.ticketId || "NA"}
+                #{complaint.ticketId || t("adminScreens.recycleBin.notAvailable")}
               </Text>
               <Text
                 className="text-sm mt-2"
                 style={{ color: colors.textPrimary }}
               >
-                {complaint.rawText || "No complaint text available"}
+                {complaint.rawText || t("adminScreens.recycleBin.noComplaintText")}
               </Text>
               <Text
                 className="text-xs mt-2"
                 style={{ color: colors.textSecondary }}
               >
-                Department: {complaint.department || "Unknown"}
+                {t("adminScreens.recycleBin.labels.department")}:{" "}
+                {complaint.department || t("adminScreens.recycleBin.unknown")}
               </Text>
               <Text
                 className="text-xs mt-1"
                 style={{ color: colors.textSecondary }}
               >
-                Deleted at:{" "}
+                {t("adminScreens.recycleBin.labels.deletedAt")}:{" "}
                 {complaint.deletedAt
                   ? new Date(complaint.deletedAt).toLocaleString()
-                  : "Unknown"}
+                  : t("adminScreens.recycleBin.unknown")}
               </Text>
               <Text
                 className="text-xs mt-1"
                 style={{ color: colors.textSecondary }}
               >
-                Owner:{" "}
+                {t("adminScreens.recycleBin.labels.owner")}:{" "}
                 {complaint.owner?.fullName ||
                   complaint.owner?.username ||
-                  "Unavailable"}{" "}
-                • Reason: {complaint.deletedReason || "Soft-deleted by admin"}
+                  t("adminScreens.recycleBin.unavailable")}{" "}
+                • {t("adminScreens.recycleBin.labels.reason")}:{" "}
+                {complaint.deletedReason ||
+                  t("adminScreens.recycleBin.softDeletedByAdmin")}
               </Text>
 
               <View className="flex-row mt-4" style={{ gap: 12 }}>
@@ -317,7 +326,7 @@ export default function AdminRecycleBinScreen() {
                     className="text-sm font-semibold"
                     style={{ color: colors.success }}
                   >
-                    Restore
+                    {t("adminScreens.recycleBin.actions.restore")}
                   </Text>
                 </PressableBlock>
                 <PressableBlock
@@ -329,7 +338,7 @@ export default function AdminRecycleBinScreen() {
                     className="text-sm font-semibold"
                     style={{ color: colors.danger }}
                   >
-                    Purge
+                    {t("adminScreens.recycleBin.actions.purge")}
                   </Text>
                 </PressableBlock>
               </View>
@@ -343,15 +352,19 @@ export default function AdminRecycleBinScreen() {
         onClose={() => setActionDialog(null)}
         title={
           actionDialog?.type === "restore"
-            ? "Restore complaint"
-            : "Purge complaint"
+            ? t("adminScreens.recycleBin.dialog.restoreTitle")
+            : t("adminScreens.recycleBin.dialog.purgeTitle")
         }
         message={
           actionDialog?.type === "restore"
-            ? "This will move the complaint back into the normal complaint workflow."
-            : "This action is irreversible and permanently removes the complaint."
+            ? t("adminScreens.recycleBin.dialog.restoreMessage")
+            : t("adminScreens.recycleBin.dialog.purgeMessage")
         }
-        confirmText={actionDialog?.type === "restore" ? "Restore" : "Purge"}
+        confirmText={
+          actionDialog?.type === "restore"
+            ? t("adminScreens.recycleBin.actions.restore")
+            : t("adminScreens.recycleBin.actions.purge")
+        }
         onConfirm={() =>
           actionDialog &&
           mutation.mutate({

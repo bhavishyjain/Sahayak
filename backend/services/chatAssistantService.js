@@ -2,7 +2,23 @@ const { analyze, genAI, sanitizeInput } = require("./geminiService");
 
 const CHAT_MODELS = ["gemini-2.5-flash", "gemini-1.5-flash"];
 const HINDI_SCRIPT_REGEX = /[\u0900-\u097F]/;
-const LANGUAGE_HINTS = {
+const LANGUAGE_HINT_KEYS = [
+  "complaintAuth",
+  "complaintCreated",
+  "complaintNeedLocation",
+  "complaintNeedCoordinates",
+  "complaintNeedImages",
+  "complaintNeedLocationAndImages",
+  "complaintNeedDetails",
+  "statusAuth",
+  "noComplaints",
+  "notFound",
+  "forbidden",
+  "recentHeader",
+  "statusLine",
+  "generic",
+];
+const LANGUAGE_HINT_STRINGS = {
   en: {
     complaintAuth:
       "Please log in first so I can register the complaint in your account.",
@@ -21,11 +37,11 @@ const LANGUAGE_HINTS = {
     statusAuth:
       "Please log in first so I can check complaint status for you.",
     noComplaints: "I could not find any recent complaints for your account.",
-    notFound: (ticketId) => `I could not find complaint ${ticketId}.`,
+    notFound: "I could not find complaint %{ticketId}.",
     forbidden:
       "You do not have permission to view this complaint.",
     recentHeader: "Here are your recent complaints:",
-    statusLine: (ticketId, status) => `Complaint ${ticketId} is currently ${status}.`,
+    statusLine: "Complaint %{ticketId} is currently %{status}.",
     generic:
       "I can help you register a complaint, check the latest complaint status, or find a complaint by ID.",
   },
@@ -46,21 +62,148 @@ const LANGUAGE_HINTS = {
     statusAuth:
       "कृपया पहले लॉग इन करें, तभी मैं शिकायत की स्थिति बता पाऊंगा।",
     noComplaints: "आपके खाते में हाल की कोई शिकायत नहीं मिली।",
-    notFound: (ticketId) => `मुझे ${ticketId} शिकायत नहीं मिली।`,
+    notFound: "मुझे %{ticketId} शिकायत नहीं मिली।",
     forbidden: "आपको यह शिकायत देखने की अनुमति नहीं है।",
     recentHeader: "ये आपकी हाल की शिकायतें हैं:",
-    statusLine: (ticketId, status) => `${ticketId} शिकायत की स्थिति अभी ${status} है।`,
+    statusLine: "%{ticketId} शिकायत की स्थिति अभी %{status} है।",
     generic:
       "मैं शिकायत दर्ज करने, हाल की शिकायत की स्थिति दिखाने, या आईडी से शिकायत खोजने में मदद कर सकता हूं।",
   },
 };
+const localizedLanguagePackCache = new Map();
+
+const ROMANIZED_HINDI_HINTS = [
+  "mujhe",
+  "mujh",
+  "meri",
+  "mera",
+  "mere",
+  "shikayat",
+  "kripya",
+  "kripiya",
+  "nahi",
+  "hai",
+  "karni",
+  "karna",
+  "kar do",
+  "madad",
+  "mandir",
+  "paas",
+  "gadde",
+  "sadak",
+  "road pe",
+  "colony",
+  "gali",
+];
 
 function hasGeminiClient() {
   return Boolean(genAI);
 }
 
-function getLanguagePack(language = "en") {
-  return LANGUAGE_HINTS[language] || LANGUAGE_HINTS.en;
+function normalizeLanguageCode(language = "en") {
+  const value = String(language || "").trim().toLowerCase();
+  if (!value) return "en";
+
+  if (value === "english") return "en";
+  if (value === "hindi") return "hi";
+
+  return value.split(/[-_]/)[0] || "en";
+}
+
+function interpolateTemplate(template = "", values = {}) {
+  return String(template || "").replace(/%\{(\w+)\}/g, (_match, key) =>
+    values[key] === undefined || values[key] === null ? "" : String(values[key]),
+  );
+}
+
+function buildLanguagePack(strings = LANGUAGE_HINT_STRINGS.en) {
+  return {
+    ...strings,
+    notFound: (ticketId) =>
+      interpolateTemplate(strings.notFound, { ticketId }),
+    statusLine: (ticketId, status) =>
+      interpolateTemplate(strings.statusLine, { ticketId, status }),
+  };
+}
+
+async function getLanguagePack(language = "en") {
+  const normalized = normalizeLanguageCode(language);
+  if (normalized === "en" || !genAI) {
+    return buildLanguagePack(LANGUAGE_HINT_STRINGS.en);
+  }
+  if (normalized === "hi") {
+    return buildLanguagePack(LANGUAGE_HINT_STRINGS.hi);
+  }
+  if (localizedLanguagePackCache.has(normalized)) {
+    return localizedLanguagePackCache.get(normalized);
+  }
+
+  try {
+    const prompt = `
+Translate the following municipal-assistant response templates into the target language.
+
+Target language code: ${normalized}
+
+Rules:
+1. Return valid JSON only.
+2. Preserve keys exactly.
+3. Preserve placeholders exactly, including %{ticketId} and %{status}.
+4. Keep the meaning concise and natural for end users.
+
+Templates:
+${JSON.stringify(LANGUAGE_HINT_STRINGS.en, null, 2)}
+`;
+
+    const raw = await runGeminiWithFallback(prompt);
+    const jsonCandidate = extractJsonObject(raw);
+    if (jsonCandidate) {
+      const parsed = JSON.parse(jsonCandidate);
+      const translated = LANGUAGE_HINT_KEYS.reduce((acc, key) => {
+        acc[key] = String(parsed?.[key] || LANGUAGE_HINT_STRINGS.en[key]).trim();
+        return acc;
+      }, {});
+      const pack = buildLanguagePack(translated);
+      localizedLanguagePackCache.set(normalized, pack);
+      return pack;
+    }
+  } catch (error) {
+    console.error("Language pack localization failed:", error?.message || error);
+  }
+
+  return buildLanguagePack(LANGUAGE_HINT_STRINGS.en);
+}
+
+async function detectLanguageWithModel(message = "") {
+  const fallback = detectLanguage(message);
+  const value = String(message || "").trim();
+  if (!value || !genAI) return fallback;
+
+  try {
+    const prompt = `
+Detect the primary language of this text and return JSON only.
+
+Text:
+"""${sanitizeInput(value, 500)}"""
+
+Rules:
+1. Return a short ISO 639-1 code when possible, such as en, hi, mr, gu, ta, te, bn, pa, ur, ar, fr, es.
+2. If the text is romanized Hindi, return "hi".
+3. If unsure, return "en".
+
+Return exactly:
+{"language":"en"}
+`;
+    const raw = await runGeminiWithFallback(prompt);
+    const jsonCandidate = extractJsonObject(raw);
+    if (jsonCandidate) {
+      const parsed = JSON.parse(jsonCandidate);
+      return normalizeLanguageCode(parsed?.language || fallback);
+    }
+  } catch (error) {
+    console.error("Language detection failed:", error?.message || error);
+  }
+
+  return fallback;
 }
 
 function detectLanguage(message = "") {
@@ -69,13 +212,7 @@ function detectLanguage(message = "") {
   if (HINDI_SCRIPT_REGEX.test(value)) return "hi";
 
   const lower = value.toLowerCase();
-  if (
-    lower.includes("meri") ||
-    lower.includes("shikayat") ||
-    lower.includes("kripya") ||
-    lower.includes("nahi") ||
-    lower.includes("status bata")
-  ) {
+  if (ROMANIZED_HINDI_HINTS.some((hint) => lower.includes(hint))) {
     return "hi";
   }
 
@@ -247,7 +384,15 @@ async function analyzeAssistantRequest(
   conversationHistory = [],
   departmentNames = [],
 ) {
-  const detectedLanguage = detectLanguage(message);
+  const detectedLanguage = await detectLanguageWithModel(message);
+  const recentConversationLanguage = [...conversationHistory]
+    .reverse()
+    .map((item) =>
+      item?.assistant?.language || detectLanguage(String(item?.text || item?.content || "")),
+    )
+    .find(Boolean);
+  const preferredLanguage =
+    detectedLanguage !== "en" ? detectedLanguage : recentConversationLanguage || detectedLanguage;
 
   if (genAI) {
     try {
@@ -272,18 +417,19 @@ Supported intents:
 Available department names: ${departmentNames.join(", ")}
 
 Rules:
-1. Detect the user's primary language and return ISO-like code in "language". Use "hi" for Hindi and "en" for English when unsure.
-2. If the user wants to register a complaint and enough details are present, set "shouldCreateComplaint" to true.
-3. For complaint registration, extract:
+1. Detect the user's primary language and return a short language code in "language". Use codes like "en", "hi", "mr", "gu", "ta", "te", "bn", "pa", "ur", "ar", "fr", "es" when possible.
+2. If the text is romanized Hindi, return "hi".
+3. If the user wants to register a complaint and enough details are present, set "shouldCreateComplaint" to true.
+4. For complaint registration, extract:
    - title
    - description
    - department
    - priority ("Low" | "Medium" | "High")
    - locationName
-4. For status checks, extract "ticketId" if present. If the user asks for the latest/recent complaint, use intent "recent_complaints".
-5. If key registration details are missing, list them in "missingFields". Use only: "description", "locationName".
-6. Never invent a ticket ID.
-7. "generalResponse" should be a short helpful reply in the same language as the user.
+5. For status checks, extract "ticketId" if present. If the user asks for the latest/recent complaint, use intent "recent_complaints".
+6. If key registration details are missing, list them in "missingFields". Use only: "description", "locationName".
+7. Never invent a ticket ID.
+8. "generalResponse" should be a short helpful reply in the same language as the user.
 
 Conversation history:
 ${history || "none"}
@@ -314,7 +460,11 @@ Return exactly this shape:
       if (jsonCandidate) {
         const parsed = JSON.parse(jsonCandidate);
         return {
-          language: parsed.language || detectedLanguage,
+          language: normalizeLanguageCode(
+            preferredLanguage !== "en"
+              ? preferredLanguage
+              : parsed.language || preferredLanguage,
+          ),
           intent: parsed.intent || "general",
           ticketId: parsed.ticketId
             ? String(parsed.ticketId).trim().toUpperCase()
@@ -348,7 +498,7 @@ Return exactly this shape:
     }
   }
 
-  return inferIntentHeuristically(message, detectedLanguage);
+  return inferIntentHeuristically(message, preferredLanguage);
 }
 
 async function generateChatResponse(
@@ -357,7 +507,7 @@ async function generateChatResponse(
   language = detectLanguage(message),
 ) {
   const lowerMessage = String(message || "").toLowerCase();
-  const copy = getLanguagePack(language);
+  const copy = await getLanguagePack(language);
 
   if (
     lowerMessage.includes("complaint") ||
@@ -436,6 +586,7 @@ module.exports = {
   generateChatResponse,
   analyzeAssistantRequest,
   detectLanguage,
+  detectLanguageWithModel,
   getLanguagePack,
   buildComplaintTitle,
 };

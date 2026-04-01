@@ -7,9 +7,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
@@ -26,16 +26,6 @@ export default function UpdateProfile() {
   const colors = useMemo(
     () => (colorScheme === "dark" ? darkColors : lightColors),
     [colorScheme],
-  );
-  const inputTheme = useMemo(
-    () => ({
-      colors: {
-        text: colors.textPrimary,
-        placeholder: colors.placeholder,
-      },
-      roundness: 12,
-    }),
-    [colors],
   );
   // Form fields consolidated into single object
   const [formData, setFormData] = useState({
@@ -151,27 +141,11 @@ export default function UpdateProfile() {
           >
             {t("settings.profile.email")}
           </Text>
-          <PaperTextInput
-            mode="flat"
-            dense
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              color: colors.textSecondary,
-              fontSize: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-            }}
-            contentStyle={{
-              color: colors.textSecondary,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-            }}
-            underlineStyle={{ display: "none" }}
+          <AppTextInput
             value={formData.email}
             editable={false}
             placeholder={t("settings.profile.emailPlaceholder")}
-            theme={inputTheme}
+            inputStyle={{ fontSize: 16, minHeight: 48 }}
           />
         </View>
 
@@ -183,27 +157,11 @@ export default function UpdateProfile() {
           >
             {t("settings.profile.fullName")}
           </Text>
-          <PaperTextInput
-            mode="flat"
-            dense
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              color: colors.textPrimary,
-              fontSize: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-            }}
-            contentStyle={{
-              color: colors.textPrimary,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-            }}
-            underlineStyle={{ display: "none" }}
+          <AppTextInput
             value={formData.fullName}
             onChangeText={(text) => updateFormField("fullName", text)}
             placeholder={t("settings.profile.fullNamePlaceholder")}
-            theme={inputTheme}
+            inputStyle={{ fontSize: 16, minHeight: 48 }}
           />
         </View>
 
@@ -215,28 +173,12 @@ export default function UpdateProfile() {
           >
             {t("settings.profile.phone")}
           </Text>
-          <PaperTextInput
-            mode="flat"
-            dense
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              color: colors.textPrimary,
-              fontSize: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-            }}
-            contentStyle={{
-              color: colors.textPrimary,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-            }}
-            underlineStyle={{ display: "none" }}
+          <AppTextInput
             value={formData.phone}
             onChangeText={(text) => updateFormField("phone", text)}
             placeholder={t("settings.profile.phonePlaceholder")}
             keyboardType="phone-pad"
-            theme={inputTheme}
+            inputStyle={{ fontSize: 16, minHeight: 48 }}
           />
         </View>
 
@@ -248,42 +190,22 @@ export default function UpdateProfile() {
           >
             {t("settings.profile.newPassword")}
           </Text>
-          <View className="flex-row items-center">
-            <PaperTextInput
-              mode="flat"
-              dense
-              style={{
-                flex: 1,
-                backgroundColor: colors.backgroundSecondary,
-                color: colors.textPrimary,
-                fontSize: 16,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 12,
-              }}
-              contentStyle={{
-                color: colors.textPrimary,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-              }}
-              underlineStyle={{ display: "none" }}
-              value={formData.password}
-              onChangeText={(text) => updateFormField("password", text)}
-              placeholder={t("settings.profile.passwordPlaceholder")}
-              secureTextEntry={!uiState.showPassword}
-              theme={inputTheme}
-            />
-            <PressableBlock
-              className="absolute right-3"
-              onPress={togglePasswordVisibility}
-            >
-              {uiState.showPassword ? (
-                <Eye size={20} color={colors.textSecondary} />
-              ) : (
-                <EyeOff size={20} color={colors.textSecondary} />
-              )}
-            </PressableBlock>
-          </View>
+          <AppTextInput
+            value={formData.password}
+            onChangeText={(text) => updateFormField("password", text)}
+            placeholder={t("settings.profile.passwordPlaceholder")}
+            secureTextEntry={!uiState.showPassword}
+            inputStyle={{ fontSize: 16, minHeight: 48 }}
+            right={
+              <PressableBlock onPress={togglePasswordVisibility}>
+                {uiState.showPassword ? (
+                  <Eye size={20} color={colors.textSecondary} />
+                ) : (
+                  <EyeOff size={20} color={colors.textSecondary} />
+                )}
+              </PressableBlock>
+            }
+          />
         </View>
 
         {/* Update profile button */}

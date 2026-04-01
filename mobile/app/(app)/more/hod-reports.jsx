@@ -16,6 +16,8 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   View,
@@ -23,18 +25,21 @@ import {
   Modal,
   Pressable,
 } from "react-native";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
-import FilterPanel from "../../../components/FilterPanel";
+import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useDownloadReport } from "../../../utils/hooks/useReports";
 import { useReportSchedules } from "../../../utils/hooks/useReportSchedules";
 import { useHodReportsDashboard } from "../../../utils/hooks/useHodReportsDashboard";
-import { formatStatusLabel } from "../../../data/complaintStatus";
+import {
+  ALL_STATUS_OPTIONS,
+  formatStatusLabel,
+} from "../../../data/complaintStatus";
 import getUserAuth from "../../../utils/userAuth";
 import { REPORT_EMAIL_URL } from "../../../url";
 import apiCall from "../../../utils/api";
@@ -98,6 +103,19 @@ const FORMAT_LABEL_KEYS = {
   excel: "reports.formats.excel",
   csv: "reports.formats.csv",
 };
+const RANGE_OPTION_KEYS = {
+  "24h": "reports.scope.range24h",
+  "7d": "reports.scope.range7d",
+  "30d": "reports.scope.range30d",
+  custom: "reports.scope.rangeCustom",
+};
+const RANGE_DESCRIPTION_KEYS = {
+  "24h": "reports.scope.range24hDesc",
+  "7d": "reports.scope.range7dDesc",
+  "30d": "reports.scope.range30dDesc",
+  custom: "reports.scope.rangeCustomDesc",
+};
+const RANGE_OPTIONS = ["24h", "7d", "30d", "custom"];
 
 function getFrequencyLabel(t, frequency) {
   const key = FREQUENCY_LABEL_KEYS[frequency];
@@ -123,11 +141,254 @@ function formatScheduleDateTime(value) {
 }
 
 function getScheduleHealthTone(schedule, colors) {
-  const status = String(schedule?.health?.lastRunStatus || schedule?.lastRunStatus || "idle");
+  const status = String(
+    schedule?.health?.lastRunStatus || schedule?.lastRunStatus || "idle",
+  );
   if (status === "failed") return colors.danger;
   if (status === "success") return colors.success;
   if (status === "pending") return colors.warning;
   return colors.textSecondary;
+}
+
+function formatDateInput(value) {
+  return String(value || "").trim();
+}
+
+function isValidDateInput(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(formatDateInput(value));
+}
+
+function getDateRangeForPreset(range) {
+  const now = new Date();
+  const endDate = now.toISOString().slice(0, 10);
+  const start = new Date(now);
+
+  if (range === "24h") {
+    start.setDate(start.getDate() - 1);
+  } else if (range === "7d") {
+    start.setDate(start.getDate() - 7);
+  } else if (range === "30d") {
+    start.setDate(start.getDate() - 30);
+  } else {
+    return { startDate: "", endDate: "" };
+  }
+
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate,
+  };
+}
+
+function getReportFiltersFromScope({
+  department,
+  status,
+  range,
+  startDate,
+  endDate,
+}) {
+  const resolvedRange =
+    range === "custom"
+      ? {
+          startDate: formatDateInput(startDate),
+          endDate: formatDateInput(endDate),
+        }
+      : getDateRangeForPreset(range);
+
+  return {
+    department,
+    status: status === "all" ? "" : status,
+    startDate: resolvedRange.startDate,
+    endDate: resolvedRange.endDate,
+  };
+}
+
+function getRangeLabel(t, range) {
+  return t(RANGE_OPTION_KEYS[range] || RANGE_OPTION_KEYS["7d"]);
+}
+
+function inferRangeFromScheduleFilters(filters = {}) {
+  const preset = String(filters?.rangePreset || "").trim();
+  if (RANGE_OPTIONS.includes(preset)) return preset;
+  const startDate = formatDateInput(
+    filters?.createdAt?.$gte || filters?.startDate,
+  );
+  const endDate = formatDateInput(filters?.createdAt?.$lte || filters?.endDate);
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (endDate === today) {
+    const diffDays = Math.round(
+      (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+    if (diffDays === 1) return "24h";
+    if (diffDays === 7) return "7d";
+    if (diffDays === 30) return "30d";
+  }
+
+  return "custom";
+}
+
+function getScheduleRangeSummary(filters = {}, t) {
+  const range = inferRangeFromScheduleFilters(filters);
+  const resolved =
+    range === "custom"
+      ? {
+          startDate: formatDateInput(
+            filters?.createdAt?.$gte || filters?.startDate,
+          ),
+          endDate: formatDateInput(
+            filters?.createdAt?.$lte || filters?.endDate,
+          ),
+        }
+      : getDateRangeForPreset(range);
+  const startDate = resolved.startDate;
+  const endDate = resolved.endDate;
+
+  const parts = [getRangeLabel(t, range)];
+  if (startDate && endDate) {
+    parts.push(`${startDate} to ${endDate}`);
+  }
+
+  return (
+    parts.join(" (").replace(/\($/, "") + (startDate && endDate ? ")" : "")
+  );
+}
+
+function ScopeSelector({ scope, setScope, t, colors, summary }) {
+  const statusOptions = useMemo(() => ["all", ...ALL_STATUS_OPTIONS], []);
+
+  return (
+    <>
+      <Text className="text-xs mb-2" style={{ color: colors.textSecondary }}>
+        {t("reports.scope.dateRangeLabel")}
+      </Text>
+      <View className="flex-row flex-wrap mb-2">
+        {RANGE_OPTIONS.map((range) => {
+          const selected = scope.range === range;
+          return (
+            <TouchableOpacity
+              key={range}
+              onPress={() => setScope((prev) => ({ ...prev, range }))}
+              className="mr-2 mb-2 rounded-full px-3 py-2"
+              style={{
+                backgroundColor: selected
+                  ? `${colors.primary}18`
+                  : colors.backgroundSecondary,
+                borderWidth: 1,
+                borderColor: selected ? colors.primary : colors.border,
+              }}
+            >
+              <Text
+                className="text-xs font-semibold"
+                style={{
+                  color: selected ? colors.primary : colors.textPrimary,
+                }}
+              >
+                {getRangeLabel(t, range)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <Text
+        className="text-xs mb-3"
+        style={{ color: colors.textSecondary, lineHeight: 18 }}
+      >
+        {t(RANGE_DESCRIPTION_KEYS[scope.range])}
+      </Text>
+
+      {scope.range === "custom" ? (
+        <View className="flex-row mb-4" style={{ gap: 8 }}>
+          <View className="flex-1">
+            <DateTimePickerModal
+              mode="date"
+              value={scope.startDate}
+              onChange={(startDate) =>
+                setScope((prev) => ({ ...prev, startDate }))
+              }
+              icon={Calendar}
+              placeholder={t("reports.filterStartDate")}
+              maxDateToday={true}
+              containerStyle={{
+                backgroundColor: colors.backgroundSecondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginBottom: 0,
+              }}
+            />
+          </View>
+          <View className="flex-1">
+            <DateTimePickerModal
+              mode="date"
+              value={scope.endDate}
+              onChange={(endDate) => setScope((prev) => ({ ...prev, endDate }))}
+              icon={Calendar}
+              placeholder={t("reports.filterEndDate")}
+              maxDateToday={true}
+              containerStyle={{
+                backgroundColor: colors.backgroundSecondary,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginBottom: 0,
+              }}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      <Text className="text-xs mb-2" style={{ color: colors.textSecondary }}>
+        {t("reports.scope.statusLabel")}
+      </Text>
+      <View className="flex-row flex-wrap mb-4">
+        {statusOptions.map((status) => {
+          const selected = scope.status === status;
+          return (
+            <TouchableOpacity
+              key={status}
+              onPress={() => setScope((prev) => ({ ...prev, status }))}
+              className="mr-2 mb-2 rounded-full px-3 py-2"
+              style={{
+                backgroundColor: selected
+                  ? `${colors.primary}18`
+                  : colors.backgroundSecondary,
+                borderWidth: 1,
+                borderColor: selected ? colors.primary : colors.border,
+              }}
+            >
+              <Text
+                className="text-xs font-semibold"
+                style={{
+                  color: selected ? colors.primary : colors.textPrimary,
+                }}
+              >
+                {status === "all"
+                  ? t("reports.scope.allStatuses")
+                  : formatStatusLabel(t, status)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View
+        className="rounded-2xl px-3 py-3 mb-4"
+        style={{ backgroundColor: colors.backgroundSecondary }}
+      >
+        <Text
+          className="text-[11px] uppercase mb-1"
+          style={{ color: colors.textSecondary, letterSpacing: 0.8 }}
+        >
+          {t("reports.scope.includedLabel")}
+        </Text>
+        <Text
+          className="text-xs"
+          style={{ color: colors.textPrimary, lineHeight: 18 }}
+        >
+          {summary}
+        </Text>
+      </View>
+    </>
+  );
 }
 
 export default function HODReports() {
@@ -142,15 +403,18 @@ export default function HODReports() {
   useEffect(() => {
     getUserAuth().then((user) => {
       const dept = user?.department ?? "";
-      setAppliedFilters((prev) => ({ ...prev, department: dept }));
+      setReportScope((prev) => ({ ...prev, department: dept }));
     });
   }, []);
 
-  // Filter states
+  // Report scope states
   const [downloadingFormat, setDownloadingFormat] = useState(null);
-  const [appliedFilters, setAppliedFilters] = useState({
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [pendingDownloadFormat, setPendingDownloadFormat] = useState("pdf");
+  const [reportScope, setReportScope] = useState({
     department: "",
     status: "all",
+    range: "24h",
     startDate: "",
     endDate: "",
   });
@@ -160,50 +424,88 @@ export default function HODReports() {
   const [scheduleEmail, setScheduleEmail] = useState("");
   const [scheduleFrequency, setScheduleFrequency] = useState("weekly");
   const [scheduleFormat, setScheduleFormat] = useState("pdf");
+  const [scheduleScope, setScheduleScope] = useState({
+    status: "all",
+    range: "24h",
+    startDate: "",
+    endDate: "",
+  });
   // Email report states
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [emailFormat, setEmailFormat] = useState("pdf");
   const [sendingEmail, setSendingEmail] = useState(false);
+  const computedReportFilters = useMemo(
+    () => getReportFiltersFromScope(reportScope),
+    [reportScope],
+  );
 
   const { download } = useDownloadReport();
-  const { normalizedFilters, error: reportsError } =
-    useHodReportsDashboard(appliedFilters);
+  const { normalizedFilters, error: reportsError } = useHodReportsDashboard(
+    computedReportFilters,
+  );
   const {
     schedules: activeSchedules,
     isLoading: loadingSchedules,
     createSchedule,
     cancelSchedule,
-    runScheduleNow,
     scheduling,
     cancellingId,
-    runningNowId,
   } = useReportSchedules(t);
-  const hasActiveFilters = useMemo(() => {
-    const flags = [
-      appliedFilters.status !== "all",
-      appliedFilters.startDate !== "",
-      appliedFilters.endDate !== "",
-    ];
-    return flags.some(Boolean);
-  }, [appliedFilters]);
-
   const statusSummary =
-    appliedFilters.status !== "all"
+    reportScope.status !== "all"
       ? t("reports.filterSummary.status", {
-          value: formatStatusLabel(t, appliedFilters.status),
+          value: formatStatusLabel(t, reportScope.status),
         })
       : null;
+  const rangeSummary = t("reports.filterSummary.range", {
+    value: getRangeLabel(t, reportScope.range),
+  });
   const fromSummary =
-    appliedFilters.startDate !== ""
-      ? t("reports.filterSummary.from", { date: appliedFilters.startDate })
+    computedReportFilters.startDate !== ""
+      ? t("reports.filterSummary.from", {
+          date: computedReportFilters.startDate,
+        })
       : null;
   const toSummary =
-    appliedFilters.endDate !== ""
-      ? t("reports.filterSummary.to", { date: appliedFilters.endDate })
+    computedReportFilters.endDate !== ""
+      ? t("reports.filterSummary.to", { date: computedReportFilters.endDate })
       : null;
-  const filterSummary = [statusSummary, fromSummary, toSummary]
+  const filterSummary = [rangeSummary, statusSummary, fromSummary, toSummary]
     .filter((value) => value != null)
+    .join(", ");
+  const scheduleFiltersPreview = useMemo(
+    () =>
+      getReportFiltersFromScope({
+        department: reportScope.department,
+        status: scheduleScope.status,
+        range: scheduleScope.range,
+        startDate: scheduleScope.startDate,
+        endDate: scheduleScope.endDate,
+      }),
+    [reportScope.department, scheduleScope],
+  );
+  const scheduleSummary = [
+    t("reports.filterSummary.range", {
+      value: getRangeLabel(t, scheduleScope.range),
+    }),
+    scheduleScope.status !== "all"
+      ? t("reports.filterSummary.status", {
+          value: formatStatusLabel(t, scheduleScope.status),
+        })
+      : null,
+    scheduleFiltersPreview.startDate
+      ? t("reports.filterSummary.from", {
+          date: scheduleFiltersPreview.startDate,
+        })
+      : null,
+    scheduleFiltersPreview.endDate
+      ? t("reports.filterSummary.to", {
+          date: scheduleFiltersPreview.endDate,
+        })
+      : null,
+  ]
+    .filter(Boolean)
     .join(", ");
 
   useEffect(() => {
@@ -211,18 +513,47 @@ export default function HODReports() {
     Toast.show({
       type: "error",
       text1: t("toast.error.title"),
-      text2: reportsError?.response?.data?.message ?? t("reports.generateFailed"),
+      text2:
+        reportsError?.response?.data?.message ?? t("reports.generateFailed"),
     });
   }, [reportsError, t]);
 
   const scheduleEmailTrimmed = scheduleEmail.trim();
   const emailAddressTrimmed = emailAddress.trim();
-  const isScheduleEmailInvalid =
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(scheduleEmailTrimmed);
-  const isEmailAddressInvalid =
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddressTrimmed);
+  const isScheduleEmailInvalid = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    scheduleEmailTrimmed,
+  );
+  const isEmailAddressInvalid = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    emailAddressTrimmed,
+  );
+  const reportDateInvalid =
+    reportScope.range === "custom" &&
+    (!isValidDateInput(reportScope.startDate) ||
+      !isValidDateInput(reportScope.endDate));
+  const scheduleDateInvalid =
+    scheduleScope.range === "custom" &&
+    (!isValidDateInput(scheduleScope.startDate) ||
+      !isValidDateInput(scheduleScope.endDate));
+
+  function showDateRequiredError() {
+    Toast.show({
+      type: "error",
+      text1: t("toast.error.title"),
+      text2: t("reports.scope.customDateRequired"),
+    });
+  }
+
+  const openDownloadModal = (format) => {
+    setPendingDownloadFormat(format);
+    setShowDownloadModal(true);
+  };
 
   const downloadReport = async (format) => {
+    if (reportDateInvalid) {
+      showDateRequiredError();
+      return;
+    }
+
     try {
       setDownloadingFormat(format);
       const result = await download({ format, filters: normalizedFilters });
@@ -250,7 +581,26 @@ export default function HODReports() {
     }
   };
 
+  const handleConfirmDownload = async () => {
+    if (reportDateInvalid) {
+      showDateRequiredError();
+      return;
+    }
+
+    setShowDownloadModal(false);
+    await downloadReport(pendingDownloadFormat);
+  };
+
   const handleScheduleReport = async () => {
+    if (!scheduleEmailTrimmed) {
+      Toast.show({
+        type: "error",
+        text1: t("toast.error.title"),
+        text2: t("reports.emailRequired"),
+      });
+      return;
+    }
+
     if (isScheduleEmailInvalid) {
       Toast.show({
         type: "error",
@@ -260,14 +610,27 @@ export default function HODReports() {
       return;
     }
 
+    if (scheduleDateInvalid) {
+      showDateRequiredError();
+      return;
+    }
+
+    const scheduleFilters = getReportFiltersFromScope({
+      department: reportScope.department,
+      status: scheduleScope.status,
+      range: scheduleScope.range,
+      startDate: scheduleScope.startDate,
+      endDate: scheduleScope.endDate,
+    });
     const departmentValue =
-      appliedFilters.department !== "all" ? appliedFilters.department : undefined;
-    const statusValue =
-      appliedFilters.status !== "all" ? appliedFilters.status : undefined;
+      scheduleFilters.department !== "all"
+        ? scheduleFilters.department
+        : undefined;
+    const statusValue = scheduleFilters.status || undefined;
     const startDateValue =
-      appliedFilters.startDate !== "" ? appliedFilters.startDate : undefined;
+      scheduleFilters.startDate !== "" ? scheduleFilters.startDate : undefined;
     const endDateValue =
-      appliedFilters.endDate !== "" ? appliedFilters.endDate : undefined;
+      scheduleFilters.endDate !== "" ? scheduleFilters.endDate : undefined;
 
     try {
       const ok = await createSchedule(
@@ -279,6 +642,7 @@ export default function HODReports() {
           status: statusValue,
           startDate: startDateValue,
           endDate: endDateValue,
+          rangePreset: scheduleScope.range,
         },
         getFrequencyLabel(t, scheduleFrequency),
       );
@@ -287,6 +651,12 @@ export default function HODReports() {
         setScheduleEmail("");
         setScheduleFrequency("weekly");
         setScheduleFormat("pdf");
+        setScheduleScope({
+          status: "all",
+          range: "24h",
+          startDate: "",
+          endDate: "",
+        });
       }
     } finally {
     }
@@ -296,11 +666,16 @@ export default function HODReports() {
     await cancelSchedule(scheduleId);
   };
 
-  const handleRunScheduleNow = async (scheduleId) => {
-    await runScheduleNow(scheduleId);
-  };
-
   const handleSendEmail = async () => {
+    if (!emailAddressTrimmed) {
+      Toast.show({
+        type: "error",
+        text1: t("toast.error.title"),
+        text2: t("reports.emailRequired"),
+      });
+      return;
+    }
+
     if (isEmailAddressInvalid) {
       Toast.show({
         type: "error",
@@ -310,14 +685,24 @@ export default function HODReports() {
       return;
     }
 
+    if (reportDateInvalid) {
+      showDateRequiredError();
+      return;
+    }
+
     const departmentValue =
-      appliedFilters.department !== "all" ? appliedFilters.department : undefined;
-    const statusValue =
-      appliedFilters.status !== "all" ? appliedFilters.status : undefined;
+      computedReportFilters.department !== "all"
+        ? computedReportFilters.department
+        : undefined;
+    const statusValue = computedReportFilters.status || undefined;
     const startDateValue =
-      appliedFilters.startDate !== "" ? appliedFilters.startDate : undefined;
+      computedReportFilters.startDate !== ""
+        ? computedReportFilters.startDate
+        : undefined;
     const endDateValue =
-      appliedFilters.endDate !== "" ? appliedFilters.endDate : undefined;
+      computedReportFilters.endDate !== ""
+        ? computedReportFilters.endDate
+        : undefined;
 
     try {
       setSendingEmail(true);
@@ -367,27 +752,6 @@ export default function HODReports() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <View className="px-4 pt-4">
-          {/* Filter Panel */}
-          <FilterPanel
-            variant="bar"
-            statusFilter={appliedFilters.status}
-            setStatusFilter={(val) =>
-              setAppliedFilters((prev) => ({ ...prev, status: val }))
-            }
-            startDate={appliedFilters.startDate}
-            endDate={appliedFilters.endDate}
-            setStartDate={(val) =>
-              setAppliedFilters((prev) => ({ ...prev, startDate: val }))
-            }
-            setEndDate={(val) =>
-              setAppliedFilters((prev) => ({ ...prev, endDate: val }))
-            }
-            hasActiveFilters={hasActiveFilters}
-            summary={filterSummary}
-            t={t}
-            style={{ marginBottom: 16 }}
-          />
-
           {/* Tab Navigator */}
           <View
             className="flex-row rounded-2xl p-1 mb-4"
@@ -397,13 +761,17 @@ export default function HODReports() {
               onPress={() => setActiveTab("export")}
               className="flex-1 py-3 rounded-xl items-center"
               style={{
-                backgroundColor: activeTab === "export" ? colors.primary : undefined,
+                backgroundColor:
+                  activeTab === "export" ? colors.primary : undefined,
               }}
             >
               <Text
                 className="text-sm font-semibold"
                 style={{
-                  color: activeTab === "export" ? colors.light : colors.textSecondary,
+                  color:
+                    activeTab === "export"
+                      ? colors.light
+                      : colors.textSecondary,
                 }}
               >
                 {t("reports.tabs.export")}
@@ -422,7 +790,9 @@ export default function HODReports() {
                 className="text-sm font-semibold"
                 style={{
                   color:
-                    activeTab === "schedule" ? colors.light : colors.textSecondary,
+                    activeTab === "schedule"
+                      ? colors.light
+                      : colors.textSecondary,
                 }}
               >
                 {t("reports.tabs.schedule")}
@@ -450,53 +820,60 @@ export default function HODReports() {
                   }}
                 >
                   {DOWNLOAD_OPTIONS.map(
-                    ({ format, labelKey, descKey, icon: Icon, colorKey }, idx, arr) => {
+                    (
+                      { format, labelKey, descKey, icon: Icon, colorKey },
+                      idx,
+                      arr,
+                    ) => {
                       const color = colors[colorKey] ?? colors.primary;
                       return (
-                      <View key={format}>
-                        <TouchableOpacity
-                          onPress={() => downloadReport(format)}
-                          disabled={Boolean(downloadingFormat)}
-                          activeOpacity={0.6}
-                          className="flex-row items-center px-4 py-3.5"
-                        >
-                          <View
-                            className="w-8 h-8 rounded-lg items-center justify-center mr-3"
-                            style={{ backgroundColor: color + "20" }}
+                        <View key={format}>
+                          <TouchableOpacity
+                            onPress={() => openDownloadModal(format)}
+                            disabled={Boolean(downloadingFormat)}
+                            activeOpacity={0.6}
+                            className="flex-row items-center px-4 py-3.5"
                           >
-                            <Icon size={17} color={color} />
-                          </View>
-                          <View className="flex-1">
-                            <Text
-                              className="text-sm font-semibold"
-                              style={{ color: colors.textPrimary }}
+                            <View
+                              className="w-8 h-8 rounded-lg items-center justify-center mr-3"
+                              style={{ backgroundColor: color + "20" }}
                             >
-                              {t(labelKey)}
-                            </Text>
-                            <Text
-                              className="text-xs mt-0.5"
-                              style={{ color: colors.textSecondary }}
-                            >
-                              {t(descKey)}
-                            </Text>
-                          </View>
-                          {downloadingFormat === format ? (
-                            <ActivityIndicator
-                              size="small"
-                              color={colors.primary}
+                              <Icon size={17} color={color} />
+                            </View>
+                            <View className="flex-1">
+                              <Text
+                                className="text-sm font-semibold"
+                                style={{ color: colors.textPrimary }}
+                              >
+                                {t(labelKey)}
+                              </Text>
+                              <Text
+                                className="text-xs mt-0.5"
+                                style={{ color: colors.textSecondary }}
+                              >
+                                {t(descKey)}
+                              </Text>
+                            </View>
+                            {downloadingFormat === format ? (
+                              <ActivityIndicator
+                                size="small"
+                                color={colors.primary}
+                              />
+                            ) : (
+                              <Download
+                                size={17}
+                                color={colors.textSecondary}
+                              />
+                            )}
+                          </TouchableOpacity>
+                          {idx < arr.length - 1 && (
+                            <View
+                              className="h-[1px] ml-14"
+                              style={{ backgroundColor: colors.border }}
                             />
-                          ) : (
-                            <Download size={17} color={colors.textSecondary} />
                           )}
-                        </TouchableOpacity>
-                        {idx < arr.length - 1 && (
-                          <View
-                            className="h-[1px] ml-14"
-                            style={{ backgroundColor: colors.border }}
-                          />
-                        )}
-                      </View>
-                    );
+                        </View>
+                      );
                     },
                   )}
                 </View>
@@ -573,12 +950,19 @@ export default function HODReports() {
                   }}
                 >
                   {SCHEDULE_OPTIONS.map(
-                    ({ freq, labelKey, descKey, icon: Icon, colorKey }, idx, arr) => {
+                    (
+                      { freq, labelKey, descKey, icon: Icon, colorKey },
+                      idx,
+                      arr,
+                    ) => {
                       const color = colors[colorKey] ?? colors.primary;
                       const existing = activeSchedules.find(
                         (s) => s.frequency === freq && s.isActive,
                       );
-                      const healthColor = getScheduleHealthTone(existing, colors);
+                      const healthColor = getScheduleHealthTone(
+                        existing,
+                        colors,
+                      );
                       const nextRunAt = formatScheduleDateTime(
                         existing?.health?.nextRunAt || existing?.nextRunAt,
                       );
@@ -586,192 +970,218 @@ export default function HODReports() {
                         existing?.health?.lastSuccessAt || existing?.lastSentAt,
                       );
                       const lastFailureAt = formatScheduleDateTime(
-                        existing?.health?.lastFailureAt || existing?.lastFailureAt,
+                        existing?.health?.lastFailureAt ||
+                          existing?.lastFailureAt,
                       );
-                      const lastError = existing?.health?.lastError || existing?.lastError;
+                      const lastError =
+                        existing?.health?.lastError || existing?.lastError;
                       const lastErrorStage =
                         existing?.health?.lastErrorStage ||
                         existing?.lastErrorStage ||
                         null;
                       const healthStatusKey =
-                        existing?.health?.lastRunStatus || existing?.lastRunStatus || "idle";
+                        existing?.health?.lastRunStatus ||
+                        existing?.lastRunStatus ||
+                        "idle";
                       return (
                         <View key={freq}>
                           <View className="px-4 py-3.5">
-                            <View className="flex-row items-center">
-                            <View
-                              className="w-8 h-8 rounded-lg items-center justify-center mr-3"
-                              style={{
-                                backgroundColor: existing
-                                  ? color + "25"
-                                  : color + "18",
-                              }}
-                            >
-                              {existing ? (
-                                <CheckCircle size={17} color={color} />
-                              ) : (
-                                <Icon size={17} color={color} />
-                              )}
-                            </View>
-                            <View className="flex-1">
-                              <Text
-                                className="text-sm font-semibold"
+                            <View className="flex-row items-start">
+                              <View
+                                className="w-8 h-8 rounded-lg items-center justify-center mr-3"
                                 style={{
-                                  color: existing ? color : colors.textPrimary,
+                                  backgroundColor: existing
+                                    ? color + "25"
+                                    : color + "18",
                                 }}
-                                >
-                                  {t(labelKey)} {t("reports.schedule.reportsSuffix")}
-                                </Text>
-                              {existing ? (
-                                <>
+                              >
+                                {existing ? (
+                                  <CheckCircle size={17} color={color} />
+                                ) : (
+                                  <Icon size={17} color={color} />
+                                )}
+                              </View>
+                              <View className="flex-1">
+                                <View className="flex-row items-start justify-between">
                                   <Text
-                                    className="text-xs mt-0.5"
-                                    style={{ color: colors.textSecondary }}
+                                    className="text-sm font-semibold flex-1 pr-3"
+                                    style={{
+                                      color: existing
+                                        ? color
+                                        : colors.textPrimary,
+                                    }}
                                   >
-                                    {t("reports.schedule.activeMeta", {
-                                      email:
-                                        existing.email ?? t("reports.notAvailable"),
-                                      format:
-                                        existing.format != null
-                                          ? String(existing.format).toUpperCase()
-                                          : t("reports.notAvailable"),
-                                    })}
+                                    {t(labelKey)}{" "}
+                                    {t("reports.schedule.reportsSuffix")}
                                   </Text>
-                                  <View className="flex-row items-center mt-2">
+                                  {existing ? (
                                     <View
                                       className="px-2 py-1 rounded-full"
-                                      style={{ backgroundColor: `${healthColor}20` }}
+                                      style={{
+                                        backgroundColor: `${healthColor}20`,
+                                      }}
                                     >
                                       <Text
                                         className="text-[10px] font-semibold uppercase"
                                         style={{ color: healthColor }}
                                       >
-                                        {t(`reports.schedule.health.status.${healthStatusKey}`)}
+                                        {t(
+                                          `reports.schedule.health.status.${healthStatusKey}`,
+                                        )}
                                       </Text>
                                     </View>
-                                  </View>
-                                  <View className="mt-2">
+                                  ) : null}
+                                </View>
+                                {existing ? (
+                                  <>
                                     <Text
-                                      className="text-xs"
+                                      className="text-xs mt-0.5"
                                       style={{ color: colors.textSecondary }}
                                     >
-                                      {t("reports.schedule.health.nextRun", {
-                                        value:
-                                          nextRunAt ?? t("reports.notAvailable"),
-                                      })}
-                                    </Text>
-                                    <Text
-                                      className="text-xs mt-1"
-                                      style={{ color: colors.textSecondary }}
-                                    >
-                                      {t("reports.schedule.health.lastSuccess", {
-                                        value:
-                                          lastSuccessAt ?? t("reports.notAvailable"),
-                                      })}
-                                    </Text>
-                                    <Text
-                                      className="text-xs mt-1"
-                                      style={{
-                                        color: lastFailureAt
-                                          ? colors.danger
-                                          : colors.textSecondary,
-                                      }}
-                                    >
-                                      {t("reports.schedule.health.lastFailure", {
-                                        value:
-                                          lastFailureAt ?? t("reports.notAvailable"),
-                                      })}
-                                    </Text>
-                                    {lastError ? (
-                                      <Text
-                                        className="text-xs mt-1"
-                                        style={{ color: colors.danger }}
-                                      >
-                                        {t("reports.schedule.health.error", {
-                                          stage: lastErrorStage
-                                            ? t(
-                                                `reports.schedule.health.stages.${lastErrorStage}`,
-                                              )
+                                      {t("reports.schedule.activeMeta", {
+                                        email:
+                                          existing.email ??
+                                          t("reports.notAvailable"),
+                                        format:
+                                          existing.format != null
+                                            ? String(
+                                                existing.format,
+                                              ).toUpperCase()
                                             : t("reports.notAvailable"),
-                                          value: lastError,
+                                      })}
+                                    </Text>
+                                    <Text
+                                      className="text-xs mt-1"
+                                      style={{ color: colors.textSecondary }}
+                                    >
+                                      {[
+                                        t("reports.filterSummary.range", {
+                                          value: getScheduleRangeSummary(
+                                            existing.filters,
+                                            t,
+                                          ),
+                                        }),
+                                        existing?.filters?.status
+                                          ? t("reports.filterSummary.status", {
+                                              value: formatStatusLabel(
+                                                t,
+                                                existing.filters.status,
+                                              ),
+                                            })
+                                          : null,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(", ")}
+                                    </Text>
+                                    <View className="mt-2">
+                                      <Text
+                                        className="text-xs"
+                                        style={{ color: colors.textSecondary }}
+                                      >
+                                        {t("reports.schedule.health.nextRun", {
+                                          value:
+                                            nextRunAt ??
+                                            t("reports.notAvailable"),
                                         })}
                                       </Text>
-                                    ) : null}
-                                  </View>
-                                </>
+                                      <Text
+                                        className="text-xs mt-1"
+                                        style={{ color: colors.textSecondary }}
+                                      >
+                                        {t(
+                                          "reports.schedule.health.lastSuccess",
+                                          {
+                                            value:
+                                              lastSuccessAt ??
+                                              t("reports.notAvailable"),
+                                          },
+                                        )}
+                                      </Text>
+                                      <Text
+                                        className="text-xs mt-1"
+                                        style={{
+                                          color: lastFailureAt
+                                            ? colors.danger
+                                            : colors.textSecondary,
+                                        }}
+                                      >
+                                        {t(
+                                          "reports.schedule.health.lastFailure",
+                                          {
+                                            value:
+                                              lastFailureAt ??
+                                              t("reports.notAvailable"),
+                                          },
+                                        )}
+                                      </Text>
+                                      {lastError ? (
+                                        <Text
+                                          className="text-xs mt-1"
+                                          style={{ color: colors.danger }}
+                                        >
+                                          {t("reports.schedule.health.error", {
+                                            stage: lastErrorStage
+                                              ? t(
+                                                  `reports.schedule.health.stages.${lastErrorStage}`,
+                                                )
+                                              : t("reports.notAvailable"),
+                                            value: lastError,
+                                          })}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+                                  </>
+                                ) : (
+                                  <Text
+                                    className="text-xs mt-0.5"
+                                    style={{ color: colors.textSecondary }}
+                                  >
+                                    {t(descKey)}
+                                  </Text>
+                                )}
+                              </View>
+                              {existing ? (
+                                <View className="items-end ml-3">
+                                  <TouchableOpacity
+                                    onPress={() =>
+                                      handleCancelSchedule(existing._id)
+                                    }
+                                    disabled={cancellingId === existing._id}
+                                    hitSlop={{
+                                      top: 8,
+                                      bottom: 8,
+                                      left: 8,
+                                      right: 8,
+                                    }}
+                                  >
+                                    {cancellingId === existing._id ? (
+                                      <ActivityIndicator
+                                        size="small"
+                                        color={colors.danger}
+                                      />
+                                    ) : (
+                                      <Trash2 size={16} color={colors.danger} />
+                                    )}
+                                  </TouchableOpacity>
+                                </View>
                               ) : (
-                                <Text
-                                  className="text-xs mt-0.5"
-                                  style={{ color: colors.textSecondary }}
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setScheduleFrequency(freq);
+                                    setShowScheduleModal(true);
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg"
+                                  style={{ backgroundColor: color + "18" }}
                                 >
-                                  {t(descKey)}
-                                </Text>
+                                  <Text
+                                    className="text-xs font-semibold"
+                                    style={{ color }}
+                                  >
+                                    {t("reports.schedule.setUp")}
+                                  </Text>
+                                </TouchableOpacity>
                               )}
                             </View>
-                            {existing ? (
-                              <View className="items-end ml-3">
-                                <TouchableOpacity
-                                  onPress={() =>
-                                    handleRunScheduleNow(existing._id)
-                                  }
-                                  disabled={runningNowId === existing._id}
-                                  className="px-3 py-1.5 rounded-lg mb-2"
-                                  style={{ backgroundColor: colors.primary + "18" }}
-                                >
-                                  {runningNowId === existing._id ? (
-                                    <ActivityIndicator
-                                      size="small"
-                                      color={colors.primary}
-                                    />
-                                  ) : (
-                                    <Text
-                                      className="text-xs font-semibold"
-                                      style={{ color: colors.primary }}
-                                    >
-                                      {t("reports.schedule.runNow")}
-                                    </Text>
-                                  )}
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  onPress={() =>
-                                    handleCancelSchedule(existing._id)
-                                  }
-                                  disabled={cancellingId === existing._id}
-                                  hitSlop={{
-                                    top: 8,
-                                    bottom: 8,
-                                    left: 8,
-                                    right: 8,
-                                  }}
-                                >
-                                  {cancellingId === existing._id ? (
-                                    <ActivityIndicator
-                                      size="small"
-                                      color={colors.danger}
-                                    />
-                                  ) : (
-                                    <Trash2 size={16} color={colors.danger} />
-                                  )}
-                                </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <TouchableOpacity
-                                onPress={() => {
-                                  setScheduleFrequency(freq);
-                                  setShowScheduleModal(true);
-                                }}
-                                className="px-3 py-1.5 rounded-lg"
-                                style={{ backgroundColor: color + "18" }}
-                              >
-                                <Text
-                                  className="text-xs font-semibold"
-                                  style={{ color }}
-                                >
-                                  {t("reports.schedule.setUp")}
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
                           </View>
                           {idx < arr.length - 1 && (
                             <View
@@ -811,6 +1221,75 @@ export default function HODReports() {
         </View>
       </ScrollView>
 
+      <Modal
+        visible={showDownloadModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDownloadModal(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end"
+          style={{ backgroundColor: colors.dark + "80" }}
+          onPress={() => setShowDownloadModal(false)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
+            <Pressable
+              className="rounded-t-3xl px-6 pt-6"
+              style={{
+                backgroundColor: colors.backgroundPrimary,
+                paddingBottom: Math.max(insets.bottom + 16, 24),
+              }}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: colors.textPrimary }}
+                >
+                  {`${t("reports.sections.download")} ${getFormatLabel(
+                    t,
+                    pendingDownloadFormat,
+                  )}`}
+                </Text>
+                <TouchableOpacity onPress={() => setShowDownloadModal(false)}>
+                  <X size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScopeSelector
+                scope={reportScope}
+                setScope={setReportScope}
+                t={t}
+                colors={colors}
+                summary={filterSummary}
+              />
+
+              <TouchableOpacity
+                onPress={handleConfirmDownload}
+                disabled={Boolean(downloadingFormat)}
+                className="py-3.5 rounded-xl items-center"
+                style={{ backgroundColor: colors.primary }}
+              >
+                {downloadingFormat === pendingDownloadFormat ? (
+                  <ActivityIndicator size="small" color={colors.light} />
+                ) : (
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: colors.light }}
+                  >
+                    {t("reports.downloadCta", {
+                      format: getFormatLabel(t, pendingDownloadFormat),
+                    })}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
+
       {/* Schedule Modal */}
       <Modal
         visible={showScheduleModal}
@@ -823,114 +1302,113 @@ export default function HODReports() {
           style={{ backgroundColor: colors.dark + "80" }}
           onPress={() => setShowScheduleModal(false)}
         >
-          <Pressable
-            className="rounded-t-3xl px-6 pt-6"
-            style={{
-              backgroundColor: colors.backgroundPrimary,
-              paddingBottom: Math.max(insets.bottom + 16, 24),
-            }}
-            onPress={(e) => e.stopPropagation()}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text
-                className="text-lg font-bold"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("reports.schedule.modalTitle", {
-                  frequency: getFrequencyLabel(t, scheduleFrequency),
-                })}
-              </Text>
-              <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
-                <X size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text
-              className="text-xs mb-2"
-              style={{ color: colors.textSecondary }}
-            >
-              {t("reports.emailAddressLabel")}
-            </Text>
-            <PaperTextInput
-              mode="flat"
-              value={scheduleEmail}
-              onChangeText={setScheduleEmail}
-              placeholder={t("reports.emailPlaceholder")}
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="email-address"
-              autoCapitalize="none"
+            <Pressable
+              className="rounded-t-3xl px-6 pt-6"
               style={{
-                marginBottom: 16,
-                backgroundColor: colors.backgroundSecondary,
-                color: colors.textPrimary,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: colors.border,
+                backgroundColor: colors.backgroundPrimary,
+                paddingBottom: Math.max(insets.bottom + 16, 24),
               }}
-              contentStyle={{
-                color: colors.textPrimary,
-                fontSize: 14,
-                paddingHorizontal: 16,
-              }}
-              underlineStyle={{ display: "none" }}
-              theme={{ colors: { text: colors.textPrimary } }}
-            />
-
-            <Text
-              className="text-xs mb-2"
-              style={{ color: colors.textSecondary }}
+              onPress={(e) => e.stopPropagation()}
             >
-              {t("reports.formatLabel")}
-            </Text>
-            <View className="flex-row mb-5" style={{ gap: 8 }}>
-              {["pdf", "excel", "csv"].map((fmt) => (
-                <TouchableOpacity
-                  key={fmt}
-                  onPress={() => setScheduleFormat(fmt)}
-                  className="flex-1 py-2.5 rounded-xl items-center"
-                  style={{
-                    backgroundColor:
-                      scheduleFormat === fmt
-                        ? colors.primary + "20"
-                        : colors.backgroundSecondary,
-                    borderWidth: 1,
-                    borderColor:
-                      scheduleFormat === fmt ? colors.primary : colors.border,
-                  }}
+              <View className="flex-row items-center justify-between mb-4">
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: colors.textPrimary }}
                 >
-                  <Text
-                    className="text-xs font-semibold uppercase"
+                  {t("reports.schedule.modalTitle", {
+                    frequency: getFrequencyLabel(t, scheduleFrequency),
+                  })}
+                </Text>
+                <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
+                  <X size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text
+                className="text-xs mb-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("reports.emailAddressLabel")}
+              </Text>
+              <AppTextInput
+                value={scheduleEmail}
+                onChangeText={setScheduleEmail}
+                placeholder={t("reports.emailPlaceholder")}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                containerStyle={{
+                  marginBottom: 16,
+                }}
+                inputStyle={{ fontSize: 14 }}
+              />
+
+              <ScopeSelector
+                scope={scheduleScope}
+                setScope={setScheduleScope}
+                t={t}
+                colors={colors}
+                summary={scheduleSummary}
+              />
+
+              <Text
+                className="text-xs mb-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("reports.formatLabel")}
+              </Text>
+              <View className="flex-row mb-5" style={{ gap: 8 }}>
+                {["pdf", "excel", "csv"].map((fmt) => (
+                  <TouchableOpacity
+                    key={fmt}
+                    onPress={() => setScheduleFormat(fmt)}
+                    className="flex-1 py-2.5 rounded-xl items-center"
                     style={{
-                      color:
+                      backgroundColor:
                         scheduleFormat === fmt
-                          ? colors.primary
-                          : colors.textSecondary,
+                          ? colors.primary + "20"
+                          : colors.backgroundSecondary,
+                      borderWidth: 1,
+                      borderColor:
+                        scheduleFormat === fmt ? colors.primary : colors.border,
                     }}
                   >
-                    {getFormatLabel(t, fmt)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      className="text-xs font-semibold uppercase"
+                      style={{
+                        color:
+                          scheduleFormat === fmt
+                            ? colors.primary
+                            : colors.textSecondary,
+                      }}
+                    >
+                      {getFormatLabel(t, fmt)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <TouchableOpacity
-              onPress={handleScheduleReport}
-              disabled={scheduling}
-              className="py-3.5 rounded-xl items-center"
-              style={{ backgroundColor: colors.primary }}
-            >
-              {scheduling ? (
-                <ActivityIndicator size="small" color={colors.light} />
-              ) : (
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.light }}
-                >
-                  {t("reports.schedule.cta")}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </Pressable>
+              <TouchableOpacity
+                onPress={handleScheduleReport}
+                disabled={scheduling}
+                className="py-3.5 rounded-xl items-center"
+                style={{ backgroundColor: colors.primary }}
+              >
+                {scheduling ? (
+                  <ActivityIndicator size="small" color={colors.light} />
+                ) : (
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: colors.light }}
+                  >
+                    {t("reports.schedule.cta")}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </Pressable>
+          </KeyboardAvoidingView>
         </Pressable>
       </Modal>
 
@@ -946,112 +1424,111 @@ export default function HODReports() {
           style={{ backgroundColor: colors.dark + "80" }}
           onPress={() => setShowEmailModal(false)}
         >
-          <Pressable
-            className="rounded-t-3xl px-6 pt-6"
-            style={{
-              backgroundColor: colors.backgroundPrimary,
-              paddingBottom: Math.max(insets.bottom + 16, 24),
-            }}
-            onPress={(e) => e.stopPropagation()}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text
-                className="text-lg font-bold"
-                style={{ color: colors.textPrimary }}
-              >
-                {t("reports.email.modalTitle")}
-              </Text>
-              <TouchableOpacity onPress={() => setShowEmailModal(false)}>
-                <X size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text
-              className="text-xs mb-2"
-              style={{ color: colors.textSecondary }}
-            >
-              {t("reports.emailAddressLabel")}
-            </Text>
-            <PaperTextInput
-              mode="flat"
-              value={emailAddress}
-              onChangeText={setEmailAddress}
-              placeholder={t("reports.emailPlaceholder")}
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="email-address"
-              autoCapitalize="none"
+            <Pressable
+              className="rounded-t-3xl px-6 pt-6"
               style={{
-                marginBottom: 16,
-                backgroundColor: colors.backgroundSecondary,
-                color: colors.textPrimary,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: colors.border,
+                backgroundColor: colors.backgroundPrimary,
+                paddingBottom: Math.max(insets.bottom + 16, 24),
               }}
-              contentStyle={{
-                color: colors.textPrimary,
-                fontSize: 14,
-                paddingHorizontal: 16,
-              }}
-              underlineStyle={{ display: "none" }}
-              theme={{ colors: { text: colors.textPrimary } }}
-            />
-
-            <Text
-              className="text-xs mb-2"
-              style={{ color: colors.textSecondary }}
+              onPress={(e) => e.stopPropagation()}
             >
-              {t("reports.formatLabel")}
-            </Text>
-            <View className="flex-row mb-5" style={{ gap: 8 }}>
-              {["pdf", "excel", "csv"].map((fmt) => (
-                <TouchableOpacity
-                  key={fmt}
-                  onPress={() => setEmailFormat(fmt)}
-                  className="flex-1 py-2.5 rounded-xl items-center"
-                  style={{
-                    backgroundColor:
-                      emailFormat === fmt
-                        ? colors.primary + "20"
-                        : colors.backgroundSecondary,
-                    borderWidth: 1,
-                    borderColor:
-                      emailFormat === fmt ? colors.primary : colors.border,
-                  }}
+              <View className="flex-row items-center justify-between mb-4">
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: colors.textPrimary }}
                 >
-                  <Text
-                    className="text-xs font-semibold uppercase"
+                  {t("reports.email.modalTitle")}
+                </Text>
+                <TouchableOpacity onPress={() => setShowEmailModal(false)}>
+                  <X size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text
+                className="text-xs mb-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("reports.emailAddressLabel")}
+              </Text>
+              <AppTextInput
+                value={emailAddress}
+                onChangeText={setEmailAddress}
+                placeholder={t("reports.emailPlaceholder")}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                containerStyle={{
+                  marginBottom: 16,
+                }}
+                inputStyle={{ fontSize: 14 }}
+              />
+
+              <ScopeSelector
+                scope={reportScope}
+                setScope={setReportScope}
+                t={t}
+                colors={colors}
+                summary={filterSummary}
+              />
+
+              <Text
+                className="text-xs mb-2"
+                style={{ color: colors.textSecondary }}
+              >
+                {t("reports.formatLabel")}
+              </Text>
+              <View className="flex-row mb-5" style={{ gap: 8 }}>
+                {["pdf", "excel", "csv"].map((fmt) => (
+                  <TouchableOpacity
+                    key={fmt}
+                    onPress={() => setEmailFormat(fmt)}
+                    className="flex-1 py-2.5 rounded-xl items-center"
                     style={{
-                      color:
+                      backgroundColor:
                         emailFormat === fmt
-                          ? colors.primary
-                          : colors.textSecondary,
+                          ? colors.primary + "20"
+                          : colors.backgroundSecondary,
+                      borderWidth: 1,
+                      borderColor:
+                        emailFormat === fmt ? colors.primary : colors.border,
                     }}
                   >
-                    {getFormatLabel(t, fmt)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      className="text-xs font-semibold uppercase"
+                      style={{
+                        color:
+                          emailFormat === fmt
+                            ? colors.primary
+                            : colors.textSecondary,
+                      }}
+                    >
+                      {getFormatLabel(t, fmt)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <TouchableOpacity
-              onPress={handleSendEmail}
-              disabled={sendingEmail}
-              className="py-3.5 rounded-xl items-center"
-              style={{ backgroundColor: colors.info }}
-            >
-              {sendingEmail ? (
-                <ActivityIndicator size="small" color={colors.light} />
-              ) : (
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.light }}
-                >
-                  {t("reports.email.cta")}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </Pressable>
+              <TouchableOpacity
+                onPress={handleSendEmail}
+                disabled={sendingEmail}
+                className="py-3.5 rounded-xl items-center"
+                style={{ backgroundColor: colors.info }}
+              >
+                {sendingEmail ? (
+                  <ActivityIndicator size="small" color={colors.light} />
+                ) : (
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: colors.light }}
+                  >
+                    {t("reports.email.cta")}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </Pressable>
+          </KeyboardAvoidingView>
         </Pressable>
       </Modal>
     </View>

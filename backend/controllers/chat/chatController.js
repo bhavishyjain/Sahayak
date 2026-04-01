@@ -6,6 +6,7 @@ const {
   generateChatResponse,
   analyzeAssistantRequest,
   detectLanguage,
+  detectLanguageWithModel,
   getLanguagePack,
   buildComplaintTitle,
 } = require("../../services/chatAssistantService");
@@ -63,6 +64,29 @@ function getPendingRegistrationContext(conversationHistory = []) {
   }
 
   return null;
+}
+
+function looksLikeStandaloneLocationMessage(message = "") {
+  const value = String(message || "").trim();
+  if (!value) return false;
+
+  if (value.length > 140) return false;
+
+  const lower = value.toLowerCase();
+  if (
+    /\b(exponentpushtoken|rd\d+|cmp-[a-z0-9-]+)\b/i.test(value) ||
+    lower.includes("status") ||
+    lower.includes("complaint id")
+  ) {
+    return false;
+  }
+
+  return (
+    /[,/-]/.test(value) ||
+    /\b(colony|nagar|mandir|road|street|sector|block|area|gali|near|paas|ke paas|opposite|behind|beside)\b/i.test(
+      value,
+    )
+  );
 }
 
 function toComplaintCard(complaint) {
@@ -192,12 +216,15 @@ async function handleMessage(req, res) {
       conversationHistory,
       departmentNames,
     );
-    const language = analysis.language || detectLanguage(message);
-    const copy = getLanguagePack(language);
-    const fallbackTicketId = extractTicketId(message);
-    const effectiveTicketId = analysis.ticketId || fallbackTicketId;
     const pendingRegistrationContext =
       getPendingRegistrationContext(conversationHistory);
+    const language =
+      analysis.language ||
+      pendingRegistrationContext?.assistantMeta?.language ||
+      detectLanguage(message);
+    const copy = await getLanguagePack(language);
+    const fallbackTicketId = extractTicketId(message);
+    const effectiveTicketId = analysis.ticketId || fallbackTicketId;
 
     if (analysis.intent === "recent_complaints") {
       if (!req.user?._id) {
@@ -335,6 +362,17 @@ async function handleMessage(req, res) {
         if (!draft.locationName && forcedDraft.locationName) {
           draft.locationName = forcedDraft.locationName;
         }
+      }
+
+      if (
+        forcedDraft &&
+        !draft.locationName &&
+        missingFields.includes("locationName") &&
+        looksLikeStandaloneLocationMessage(message)
+      ) {
+        draft.locationName = String(message || "").trim();
+        const locationIndex = missingFields.indexOf("locationName");
+        if (locationIndex >= 0) missingFields.splice(locationIndex, 1);
       }
 
       if (!draft.description && !missingFields.includes("description")) {
@@ -516,10 +554,10 @@ async function handleSpeechToText(req, res) {
       return res.status(422).json({ error: "No speech detected" });
     }
 
-    return res.json({
-      text: transcription,
-      language: detectLanguage(transcription),
-    });
+      return res.json({
+        text: transcription,
+        language: await detectLanguageWithModel(transcription),
+      });
   } catch (error) {
     console.error("Speech-to-text error:", error);
     return res.status(500).json({

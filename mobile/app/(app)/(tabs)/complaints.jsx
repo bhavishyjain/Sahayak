@@ -8,11 +8,13 @@ import {
   View,
   ActivityIndicator,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import ComplaintCard from "../../../components/ComplaintCard";
+import { useTabBarHeight } from "../../../components/CurvedTabBar";
 import FilterPanel from "../../../components/FilterPanel";
 import SearchBar from "../../../components/SearchBar";
 import apiCall from "../../../utils/api";
@@ -33,6 +35,8 @@ export default function Complaints() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useTabBarHeight();
   const { isOnline } = useNetworkStatus();
 
   const [statusFilter, setStatusFilter] = useState("all");
@@ -82,6 +86,10 @@ export default function Complaints() {
     sortOrder !== "new-to-old" ||
     !!startDate ||
     !!endDate;
+  const listBottomPadding = Math.max(
+    140,
+    Math.max(insets.bottom, 8) + Math.max(tabBarHeight, 70) + 56,
+  );
 
   const clearFilters = () => {
     setStatusFilter("all");
@@ -158,7 +166,7 @@ export default function Complaints() {
           />
         )}
         ListHeaderComponent={
-          <View style={{ padding: 16, paddingBottom: 0 }}>
+          <View style={{ paddingTop: 16, paddingBottom: 0 }}>
             <PressableBlock
               onPress={() => router.push("/(app)/more/new-complaint")}
               className="rounded-xl items-center justify-center py-3.5 flex-row mb-3"
@@ -212,7 +220,7 @@ export default function Complaints() {
         }
         ListEmptyComponent={
           !loading ? (
-            <View style={{ paddingHorizontal: 16 }}>
+            <View>
               <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
                 <Text style={{ color: colors.textSecondary }}>
                   {t("complaints.noComplaints")}
@@ -223,14 +231,17 @@ export default function Complaints() {
         }
         ListFooterComponent={
           loadingMore ? (
-            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
+            <View style={{ paddingTop: 16, paddingBottom: 24 }}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : (
             <View style={{ height: 24 }} />
           )
         }
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: listBottomPadding,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

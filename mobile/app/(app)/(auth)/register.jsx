@@ -3,9 +3,10 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Keyboard, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { TextInput as PaperTextInput } from "react-native-paper";
+import { Eye, EyeOff } from "lucide-react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import LanguagePicker from "../../../components/LanguagePicker";
 import PressableBlock from "../../../components/PressableBlock";
 import {
@@ -147,70 +148,45 @@ export default function Register() {
             keyboardType: "phone-pad",
           },
         ].map((input, index) => (
-          <View
+          <AppTextInput
             key={index}
-            className="flex-row items-center w-full rounded-lg px-4 mb-4 h-[50px]"
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              borderWidth: 1,
-              borderColor: colors.muted,
-            }}
-          >
-            <PaperTextInput
-              mode="flat"
-              value={input.value}
-              onChangeText={input.onChangeText}
-              placeholder={input.placeholder}
-              placeholderTextColor={colors.placeholder}
-              keyboardType={input.keyboardType}
-              autoCapitalize={input.autoCapitalize || "sentences"}
-              autoCorrect={false}
-              style={{ flex: 1, backgroundColor: "transparent" }}
-              underlineStyle={{ display: "none" }}
-              contentStyle={{
-                color: colors.textPrimary,
-                fontSize: 16,
-                fontWeight: "600",
-                paddingHorizontal: 0,
-              }}
-              theme={{ colors: { text: colors.textPrimary } }}
-            />
-          </View>
+            value={input.value}
+            onChangeText={input.onChangeText}
+            placeholder={input.placeholder}
+            placeholderTextColor={colors.placeholder}
+            keyboardType={input.keyboardType}
+            autoCapitalize={input.autoCapitalize || "sentences"}
+            autoCorrect={false}
+            borderColor={colors.muted}
+            activeBorderColor={colors.primary}
+            containerStyle={{ width: "100%", marginBottom: 16 }}
+            inputContainerStyle={{ minHeight: 50 }}
+            inputStyle={{ fontSize: 16, fontWeight: "600", minHeight: 50 }}
+          />
         ))}
 
-        <View
-          className="flex-row items-center w-full rounded-lg px-4 mb-5 h-[50px]"
-          style={{
-            backgroundColor: colors.backgroundSecondary,
-            borderWidth: 1,
-            borderColor: colors.muted,
-          }}
-        >
-          <PaperTextInput
-            mode="flat"
-            value={password}
-            onChangeText={setPassword}
-            placeholder={t("auth.register.passwordPlaceholder")}
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry={secure}
-            autoCapitalize="none"
-            style={{ flex: 1, backgroundColor: "transparent" }}
-            underlineStyle={{ display: "none" }}
-            contentStyle={{
-              color: colors.textPrimary,
-              fontSize: 16,
-              fontWeight: "600",
-              paddingHorizontal: 0,
-            }}
-            theme={{ colors: { text: colors.textPrimary } }}
-            right={
-              <PaperTextInput.Icon
-                icon={secure ? "eye-off" : "eye"}
-                onPress={() => setSecure((v) => !v)}
-              />
-            }
-          />
-        </View>
+        <AppTextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder={t("auth.register.passwordPlaceholder")}
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry={secure}
+          autoCapitalize="none"
+          borderColor={colors.muted}
+          activeBorderColor={colors.primary}
+          containerStyle={{ width: "100%", marginBottom: 20 }}
+          inputContainerStyle={{ minHeight: 50 }}
+          inputStyle={{ fontSize: 16, fontWeight: "600", minHeight: 50 }}
+          right={
+            <PressableBlock onPress={() => setSecure((v) => !v)}>
+              {secure ? (
+                <EyeOff size={18} color={colors.textSecondary} />
+              ) : (
+                <Eye size={18} color={colors.textSecondary} />
+              )}
+            </PressableBlock>
+          }
+        />
 
         <Text
           className="w-full text-xs mb-5 -mt-2"

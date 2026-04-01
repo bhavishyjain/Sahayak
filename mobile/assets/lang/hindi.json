@@ -7,42 +7,20 @@
     "save": "सहेजें",
     "cancel": "रद्द करें",
     "delete": "हटाएं",
-    "edit": "संपादित करें",
-    "update": "अपडेट करें",
     "submit": "जमा करें",
     "confirm": "पुष्टि करें",
-    "close": "बंद करें",
-    "continue": "जारी रखें",
-    "back": "वापस",
-    "next": "आगे",
-    "done": "पूर्ण",
-    "ok": "ठीक है",
     "yes": "हाँ",
     "no": "नहीं",
     "allow": "अनुमति दें",
     "dontAllow": "अनुमति न दें",
-    "search": "खोजें",
-    "filter": "फ़िल्टर",
     "filters": "फ़िल्टर",
     "sort": "क्रमबद्ध करें",
-    "refresh": "रीफ्रेश करें",
+    "loadMore": "और लोड करें",
     "loading": "लोड हो रहा है...",
-    "noData": "कोई डेटा उपलब्ध नहीं",
-    "error": "त्रुटि",
-    "success": "सफलता",
     "failed": "विफल",
     "tryAgain": "पुनः प्रयास करें",
-    "viewDetails": "विवरण देखें",
-    "viewAll": "सभी देखें",
-    "showMore": "और दिखाएं",
-    "showLess": "कम दिखाएं",
-    "select": "चुनें",
-    "selected": "चयनित",
     "all": "सभी",
-    "none": "कोई नहीं",
     "you": "आप",
-    "optional": "वैकल्पिक",
-    "required": "आवश्यक",
     "clear": "साफ़ करें",
     "reset": "रीसेट",
     "apply": "लागू करें"
@@ -57,20 +35,21 @@
     "evening": "शुभ संध्या",
     "night": "शुभ रात्रि"
   },
+  "accountDeactivated": {
+    "title": "खाता निष्क्रिय कर दिया गया है",
+    "messagePrimary": "इस खाते को एक प्रशासक द्वारा निष्क्रिय कर दिया गया है। जब तक खाता फिर से सक्रिय नहीं किया जाता, आप ऐप का उपयोग नहीं कर सकते।",
+    "messageSecondary": "कृपया पहुंच के लिए अपने प्रशासक या विभाग प्रमुख से संपर्क करें।",
+    "logout": "लॉगआउट"
+  },
   "auth": {
     "login": {
       "title": "वापसी पर स्वागत है",
-      "subtitle": "जारी रखने के लिए साइन इन करें",
       "subtitleEmail": "लॉगिन करने के लिए अपना ईमेल और पासवर्ड दर्ज करें",
       "emailPlaceholder": "ईमेल पता",
       "passwordPlaceholder": "पासवर्ड",
       "forgotPassword": "पासवर्ड भूल गए?",
       "button": "लॉगिन करें",
-      "loginButton": "लॉगिन करें",
       "loading": "लॉगिन हो रहा है...",
-      "noAccount": "खाता नहीं है?",
-      "signUp": "साइन अप करें",
-      "rememberMe": "मुझे याद रखें",
       "changeLanguage": "भाषा बदलें"
     },
     "register": {
@@ -81,24 +60,13 @@
       "usernamePlaceholder": "उपयोगकर्ता नाम",
       "phonePlaceholder": "फ़ोन",
       "passwordPlaceholder": "पासवर्ड",
-      "confirmPasswordPlaceholder": "पासवर्ड की पुष्टि करें",
       "button": "पंजीकरण करें",
-      "registerButton": "पंजीकरण करें",
       "loading": "पंजीकरण हो रहा है...",
-      "backToLogin": "लॉगिन पर वापस जाएं",
-      "alreadyHaveAccount": "पहले से खाता है?",
-      "signIn": "साइन इन करें",
-      "termsText": "पंजीकरण करके, आप हमारी",
-      "termsLink": "नियम और शर्तें",
-      "and": "और",
-      "privacyLink": "गोपनीयता नीति"
+      "backToLogin": "लॉगिन पर वापस जाएं"
     },
     "logout": {
       "title": "आपको लॉगआउट किया जा रहा है...",
-      "subtitle": "जल्द मिलते हैं!",
-      "message": "क्या आप वाकई लॉगआउट करना चाहते हैं?",
-      "confirm": "लॉगआउट करें",
-      "cancel": "रद्द करें"
+      "subtitle": "जल्द मिलते हैं!"
     },
     "forgotPassword": {
       "title": "पासवर्ड भूल गए",
@@ -121,11 +89,8 @@
       "invalidLinkTitle": "अमान्य लिंक",
       "invalidLinkMessage": "पासवर्ड रीसेट टोकन उपलब्ध नहीं है।",
       "weakPasswordTitle": "कमज़ोर पासवर्ड",
-      "weakPasswordMessage": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए।",
       "passwordMismatchTitle": "पासवर्ड मेल नहीं खाते",
       "passwordMismatchMessage": "दोनों पासवर्ड समान नहीं हैं।",
-      "updatedTitle": "पासवर्ड अपडेट हुआ",
-      "updatedMessage": "कृपया नए पासवर्ड से लॉग इन करें।",
       "failedTitle": "रीसेट विफल",
       "failedMessage": "रीसेट लिंक अमान्य है या समाप्त हो चुका है।"
     },
@@ -143,8 +108,6 @@
       "invalidMessage": "सत्यापन लिंक अमान्य है या समाप्त हो चुका है।",
       "sentTo": "सत्यापन ईमेल भेजा गया",
       "resendButton": "सत्यापन ईमेल फिर भेजें",
-      "resendSentTitle": "सत्यापन भेजा गया",
-      "resendSentMessage": "कृपया अपना इनबॉक्स देखें।",
       "resendFailedTitle": "फिर से भेजा नहीं जा सका",
       "resendFailedMessage": "कृपया लॉग इन करके कुछ देर बाद फिर प्रयास करें।",
       "continueToLogin": "लॉग इन जारी रखें",
@@ -153,17 +116,25 @@
     "acceptInvite": {
       "workerRegistrationTitle": "कर्मी पंजीकरण",
       "workerInvitationTitle": "कर्मी आमंत्रण",
+      "hodRegistrationTitle": "विभाग प्रमुख पंजीकरण",
+      "hodInvitationTitle": "विभाग प्रमुख आमंत्रण",
       "joinAsWorker": "कर्मी के रूप में जुड़ें",
+      "joinAsHead": "विभाग प्रमुख के रूप में जुड़ें",
       "youreInvited": "आपको आमंत्रित किया गया है!",
       "departmentLabel": "विभाग",
       "createAccountTo": "खाता बनाएं और जुड़ें",
       "asAWorker": "एक कर्मी के रूप में।",
+      "asHead": "एक विभाग प्रमुख के रूप में।",
+      "workerInviteMessage": "आपके विभाग प्रमुख ने आपको सहायक प्रणाली में एक कर्मी के रूप में जुड़ने के लिए आमंत्रित किया है।",
       "hodInviteMessage": "आपके विभागाध्यक्ष ने आपको सहायक प्रणाली में कर्मी के रूप में शामिल होने के लिए आमंत्रित किया है।",
       "benefitsTitle": "एक कर्मी के रूप में, आप कर सकते हैं:",
+      "benefitsWorkerTitle": "एक कर्मी के रूप में, आप कर सकते हैं:",
+      "benefitsHeadTitle": "एक विभाग प्रमुख के रूप में, आप कर सकते हैं:",
       "expiryWarning": "यह आमंत्रण 7 दिनों में समाप्त हो जाएगा। तब तक स्वीकार करें।",
       "acceptButton": "आमंत्रण स्वीकार करें",
       "decline": "अस्वीकार करें",
       "registerButton": "कर्मी के रूप में पंजीकरण करें",
+      "registerHeadButton": "विभाग प्रमुख के रूप में पंजीकरण करें",
       "alreadyHaveAccount": "पहले से खाता है? लॉग इन करें",
       "invalidTitle": "अमान्य आमंत्रण",
       "invalidMessage": "इस आमंत्रण लिंक में आवश्यक जानकारी नहीं है। कृपया अपने विभागाध्यक्ष से पुनः आमंत्रण भेजने को कहें।",
@@ -182,18 +153,13 @@
         "password": "पासवर्ड"
       },
       "toast": {
-        "welcomeTitle": "टीम में आपका स्वागत है!",
-        "welcomeMessage": "अब आप कर्मी हैं",
         "acceptFailedTitle": "आमंत्रण स्वीकार नहीं हुआ",
         "acceptFailed": "आमंत्रण स्वीकार करने में विफल",
-        "accountCreatedTitle": "खाता बन गया!",
-        "accountCreatedMessage": "स्वागत है",
         "registerFailedTitle": "पंजीकरण नहीं हुआ",
         "registerFailed": "पंजीकरण विफल",
         "fullNameRequired": "पूरा नाम आवश्यक है",
         "usernameRequired": "उपयोगकर्ता नाम आवश्यक है",
-        "phoneRequired": "फोन नंबर आवश्यक है",
-        "passwordTooShort": "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए"
+        "phoneRequired": "फोन नंबर आवश्यक है"
       }
     }
   },
@@ -243,6 +209,7 @@
       "title": "आस-पास के खुले मुद्दे",
       "reload": "रीलोड",
       "distanceAway": "%{distance} किमी दूर",
+      "distanceUnit": "km",
       "complaintFallback": "शिकायत",
       "departmentFallback": "अज्ञात विभाग",
       "locationFallback": "आस-पास",
@@ -386,6 +353,11 @@
       "shareHeader": "शिकायत #%{ticketId} — %{department}",
       "shareStatusLine": "स्थिति: %{status} | प्राथमिकता: %{priority}",
       "shareOpenInApp": "सहायक में खोलें: %{link}",
+      "shareFailed": "साझा करना विफल रहा",
+      "pdfDownloaded": "PDF डाउनलोड हो गई",
+      "pdfSavedAs": "complaint_%{ticketId}.pdf के रूप में सहेजी गई",
+      "exportFailed": "एक्सपोर्ट विफल रहा",
+      "couldNotGeneratePdf": "PDF जनरेट नहीं हो सकी",
       "currentlyAssigned": "वर्तमान में सौंपा गया",
       "assignedWorkersTitle": "सौंपे गए कर्मी (%{count})",
       "assignedWorkersCount": "सौंपे गए कर्मी (%{count})",
@@ -446,6 +418,15 @@
       "sentForRework": "पुनः कार्य के लिए भेजा गया",
       "requestFailed": "अनुरोध विफल",
       "couldNotSendRework": "पुनः कार्य के लिए नहीं भेजा जा सका",
+      "deleteRequestSent": "हटाने का अनुरोध भेज दिया गया",
+      "editRequestSent": "संपादन अनुरोध भेज दिया गया",
+      "specialRequestFailed": "विशेष अनुरोध नहीं भेजा जा सका",
+      "specialRequestSent": "आपका विशेष अनुरोध एडमिन को भेज दिया गया है।",
+      "specialRequestReasonLabel": "कारण",
+      "specialRequestUpdatePlaceholder": "बताएं कि इस शिकायत को अपडेट करने की आवश्यकता क्यों है",
+      "specialRequestDeletePlaceholder": "बताएं कि इस शिकायत को क्यों हटाया जाना चाहिए",
+      "deleteRequestDialogMessage": "यह शिकायत हटाने के लिए एडमिन को विशेष अनुरोध भेजता है।",
+      "sendRequest": "अनुरोध भेजें",
       "cancelled": "रद्द",
       "complaintCancelled": "शिकायत रद्द कर दी गई है",
       "cancelFailed": "रद्द करना विफल",
@@ -614,24 +595,13 @@
   "assistant": {
     "title": "सहायक",
     "inputPlaceholder": "अपना संदेश टाइप करें...",
-    "send": "भेजें",
     "openSettings": "सेटिंग्स खोलें",
     "welcomeShort": "नमस्ते, मैं सहायक हूं। आप आवाज या टेक्स्ट से शिकायत दर्ज कर सकते हैं, हाल की शिकायत देख सकते हैं, या शिकायत आईडी भेज सकते हैं।",
-    "clearChat": "चैट साफ़ करें",
-    "clear": "साफ़ करें",
-    "clearChatConfirm": "क्या आप वाकई सभी सहायक संदेशों को साफ़ करना चाहते हैं?",
-    "welcomeMessage": "नमस्ते, मैं सहायक हूं। अपनी शिकायतों के बारे में मुझसे पूछें।",
     "thinking": "सोच रहा हूं...",
-    "error": "क्षमा करें, मैं उस अनुरोध को संसाधित नहीं कर सका।",
-    "noMessages": "अभी तक कोई संदेश नहीं। बातचीत शुरू करें!",
     "noResponse": "कोई प्रतिक्रिया नहीं",
-    "loginRequired": "टिकट स्थिति जांचने के लिए कृपया लॉगिन करें। मैं अभी भी सामान्य प्रश्नों में मदद कर सकता हूं।",
     "assistantFailed": "सहायक विफल रहा",
     "errorResponse": "प्रतिक्रिया नहीं मिल सकी।",
     "detailsHint": "सुझाव: बेहतर सहायता के लिए समस्या, स्थान, विभाग, तात्कालिकता और टिकट आईडी लिखें।",
-    "micStart": "बोलने के लिए माइक्रोफोन दबाएं",
-    "listening": "सुन रहा हूं... ट्रांसक्राइब करने के लिए रोकें दबाएं",
-    "transcribing": "आवाज को टेक्स्ट में बदल रहा हूं...",
     "transcriptReady": "आवाज समझ ली गई है",
     "transcriptLabel": "पहचानी गई भाषा",
     "recentSection": "हाल की शिकायतें",
@@ -656,8 +626,8 @@
     "needImagesOnly": "कम से कम एक प्रूफ इमेज जोड़नी है।",
     "captureLocationAction": "लोकेशन कैप्चर करें",
     "photosCount": "फोटो %{count}/5",
-    "continueWithCoordinatesAndImages": "मेरी शिकायत दर्ज करने के लिए ये लोकेशन coordinates और प्रूफ इमेज हैं।",
-    "continueWithCoordinates": "मेरी शिकायत दर्ज करने के लिए ये लोकेशन coordinates हैं।",
+    "continueWithCoordinatesAndImages": "मेरी शिकायत दर्ज करने के लिए ये लोकेशन निर्देशांक और प्रूफ इमेज हैं।",
+    "continueWithCoordinates": "मेरी शिकायत दर्ज करने के लिए ये लोकेशन निर्देशांक हैं।",
     "continueWithImages": "मेरी शिकायत दर्ज करने के लिए ये प्रूफ इमेज हैं।",
     "attachedProofImages": "%{count} प्रूफ इमेज जोड़ी गई",
     "voiceFailed": "वॉइस इनपुट विफल रहा",
@@ -730,6 +700,9 @@
       "recentActivity": "हाल की गतिविधि",
       "trends": "रुझान",
       "activeWorkRate": "सक्रिय कार्य दर",
+      "snapshotTitle": "स्नैपशॉट",
+      "workloadFlow": "कार्यभार प्रवाह",
+      "signalsTitle": "संकेत",
       "priorityDistribution": "प्राथमिकता वितरण",
       "noAnalyticsData": "कोई एनालिटिक्स डेटा उपलब्ध नहीं",
       "awaitingApproval": "अनुमोदन की प्रतीक्षा में",
@@ -738,6 +711,23 @@
       "hoursToAssign": "सौंपने में घंटे",
       "noData": "कोई डेटा नहीं",
       "publicEngagement": "जन सहभागिता",
+      "cards": {
+        "activeComplaints": "सक्रिय शिकायतें",
+        "totalCases": "%{count} कुल मामले",
+        "communitySupport": "सामुदायिक समर्थन",
+        "totalComplaintUpvotes": "कुल शिकायत अपवोट",
+        "citizenFeedback": "नागरिक प्रतिक्रिया"
+      },
+      "priorityHints": {
+        "urgentCases": "अत्यावश्यक मामले",
+        "standardQueue": "सामान्य कतार",
+        "lowerUrgency": "कम तात्कालिकता"
+      },
+      "metrics": {
+        "pendingComplaints": "लंबित शिकायतें",
+        "assignedInProgress": "आवंटित और प्रगति में",
+        "resolvedComplaints": "समाधान की गई शिकायतें"
+      },
       "engagement": {
         "totalUpvotes": "कुल अपवोट",
         "avgPerComplaint": "प्रति शिकायत औसत",
@@ -753,16 +743,16 @@
       "assign": "आवंटित करें",
       "bulkAssign": "थोक आवंटन",
       "bulkSelect": "थोक चयन",
-      "approve": "स्वीकृत करें",
-      "reject": "अस्वीकार करें",
-      "cancel": "रद्द करें",
+      "loadingComplaints": "शिकायतें लोड हो रही हैं...",
       "selectWorker": "कृपया एक कर्मचारी चुनें",
       "assignedSuccessfully": "%{count} शिकायतें सफलतापूर्वक आवंटित की गईं",
       "couldNotAssign": "शिकायतें आवंटित नहीं की जा सकीं",
       "couldNotLoadWorkers": "कर्मचारी लोड नहीं किए जा सके",
-      "loadingComplaints": "शिकायतें लोड हो रही हैं...",
       "overdue": "समय सीमा समाप्त",
       "clearAll": "सभी साफ करें",
+      "approve": "स्वीकृत करें",
+      "reject": "अस्वीकार करें",
+      "cancel": "रद्द करें",
       "bulkAssignTitle": "थोक आवंटन",
       "bulkAssigning": "आवंटित कर रहे हैं...",
       "bulkSelectedCount": "%{count} शिकायतें चुनी गईं",
@@ -797,6 +787,7 @@
       "noWorkers": "कोई कर्मचारी नहीं मिला",
       "loadingWorkers": "कार्यकर्ता लोड हो रहे हैं...",
       "active": "सक्रिय",
+      "inactive": "निष्क्रिय",
       "completed": "पूर्ण",
       "rating": "रेटिंग",
       "notAvailable": "उपलब्ध नहीं",
@@ -944,6 +935,26 @@
       "affected": "%{count} प्रभावित",
       "suggestionsTitle": "एआई सुझाव",
       "priorityOnly": "केवल प्राथमिकता सुझाव",
+      "queueLabel": "एआई समीक्षा कतार",
+      "reviewQueueTitle": "समीक्षा कतार",
+      "itemsWaiting": "%{count} आइटम प्रतीक्षा में",
+      "loadingMore": "और लोड हो रहा है...",
+      "departmentShiftsLabel": "विभाग परिवर्तन",
+      "routingChangesHint": "रूटिंग बदलाव",
+      "priorityShiftsLabel": "प्राथमिकता परिवर्तन",
+      "urgencyChangesHint": "तात्कालिकता बदलाव",
+      "reviewTypes": {
+        "all": "सभी",
+        "department": "विभाग",
+        "priority": "प्राथमिकता",
+        "both": "दोनों"
+      },
+      "queueSubtitles": {
+        "all": "सभी एआई-सुझाए गए बदलाव",
+        "department": "केवल विभाग बदलाव",
+        "priority": "केवल प्राथमिकता बदलाव",
+        "both": "विभाग और प्राथमिकता दोनों बदलाव"
+      },
       "labels": {
         "department": "विभाग",
         "priority": "प्राथमिकता"
@@ -1057,6 +1068,7 @@
       "loading": "आवंटित शिकायतें लोड हो रही हैं...",
       "searchPlaceholder": "ID, शीर्षक, स्थान से खोजें...",
       "noComplaints": "कोई आवंटित शिकायत नहीं",
+      "allCaughtUp": "आप पूरी तरह अपडेट हैं! नए असाइनमेंट यहां दिखाई देंगे।",
       "noResults": "कोई शिकायत नहीं मिली",
       "tryAdjusting": "अपने फ़िल्टर को समायोजित करने का प्रयास करें",
       "showingResults": "%{count} में से %{total} शिकायतें दिखाई जा रही हैं",
@@ -1189,11 +1201,11 @@
       "rating": "रेटिंग",
       "score": "स्कोर",
       "you": "आप",
-      "avgTime": "औसत समय",
-      "streak": "लकीर",
       "top10": "शीर्ष 10 कर्मचारी",
       "thisMonth": "इस महीने",
       "allTime": "सभी समय",
+      "avgTime": "औसत समय",
+      "streak": "लकीर",
       "failed": "विफल",
       "loadingError": "लीडरबोर्ड लोड नहीं हो सका"
     },
@@ -1236,7 +1248,6 @@
       "description": "चर्चा शुरू करें। नागरिक, कर्मी और विभाग प्रमुख सभी यहाँ जवाब दे सकते हैं।"
     },
     "toasts": {
-      "loadFailedTitle": "संदेश लोड नहीं हो सके",
       "sendFailedTitle": "संदेश भेजा नहीं जा सका",
       "tryAgain": "कृपया फिर से प्रयास करें"
     }
@@ -1438,6 +1449,233 @@
     "head": "विभाग प्रमुख",
     "admin": "व्यवस्थापक"
   },
+  "adminScreens": {
+    "home": {
+      "defaultTitle": "एडमिन डैशबोर्ड",
+      "subtitle": "एक ही जगह से शिकायत प्रवाह, विभागीय लोड और टीम की स्थिति देखें।",
+      "greeting": {
+        "morning": "सुप्रभात",
+        "afternoon": "नमस्कार",
+        "evening": "शुभ संध्या",
+        "night": "शुभ रात्रि"
+      },
+      "systemOverview": "सिस्टम अवलोकन",
+      "totalComplaintsHelper": "%{count} विभागों में ट्रैक की गई कुल शिकायतें",
+      "resolutionRate": "समाधान दर",
+      "avgResolution": "औसत समाधान",
+      "activeTeam": "सक्रिय टीम",
+      "inactiveMembers": "%{count} निष्क्रिय सदस्य",
+      "deletedComplaints": "हटाई गई शिकायतें",
+      "deletedComplaintsHelper": "रिसायकल बिन में प्रतीक्षित आइटम",
+      "complaintStatus": "शिकायत स्थिति",
+      "workers": "कर्मी",
+      "departmentHeads": "विभाग प्रमुख",
+      "inactiveShort": "%{count} निष्क्रिय",
+      "departments": "विभाग",
+      "operationalInsight": "ऑपरेशनल इनसाइट",
+      "busiestDepartment": "सबसे व्यस्त विभाग",
+      "noDepartmentData": "कोई विभागीय डेटा नहीं",
+      "noDepartmentDataHelper": "जब विभागीय विश्लेषण उपलब्ध हो तो रिफ्रेश करें।",
+      "busiestSummary": "%{total} कुल शिकायतें • %{pending} लंबित • %{inProgress} प्रगति में",
+      "toasts": {
+        "loadFailedTitle": "एडमिन डैशबोर्ड लोड नहीं हो सका",
+        "loadFailedMessage": "कृपया फिर से प्रयास करें।"
+      }
+    },
+    "departments": {
+      "title": "विभाग",
+      "addButton": "विभाग जोड़ें",
+      "rowSummary": "%{total} शिकायतें • %{pending} लंबित",
+      "active": "सक्रिय",
+      "inactive": "निष्क्रिय",
+      "dialog": {
+        "title": "विभाग जोड़ें",
+        "message": "एडमिन असाइनमेंट और शिकायत रूटिंग के लिए नया विभाग बनाएं।",
+        "placeholder": "विभाग का नाम",
+        "confirm": "जोड़ें"
+      },
+      "toasts": {
+        "addedTitle": "विभाग जोड़ दिया गया",
+        "addedMessage": "विभाग सूची अपडेट कर दी गई है।",
+        "addFailedTitle": "विभाग नहीं जोड़ सके",
+        "addFailedMessage": "कृपया फिर से प्रयास करें।",
+        "loadFailedTitle": "विभाग लोड नहीं हो सके",
+        "loadFailedMessage": "कृपया फिर से प्रयास करें।",
+        "nameRequiredTitle": "विभाग का नाम आवश्यक है",
+        "nameRequiredMessage": "विभाग बनाने से पहले नाम दर्ज करें।"
+      }
+    },
+    "recycleBin": {
+      "title": "रिसायकल बिन",
+      "searchPlaceholder": "हटाई गई शिकायतें खोजें",
+      "emptyTitle": "रिसायकल बिन खाली है",
+      "emptyMessage": "सॉफ्ट-डिलीट की गई शिकायतें यहां restore और purge क्रियाओं के साथ दिखाई देंगी।",
+      "notAvailable": "उपलब्ध नहीं",
+      "unknown": "अज्ञात",
+      "unavailable": "उपलब्ध नहीं",
+      "noComplaintText": "कोई शिकायत विवरण उपलब्ध नहीं",
+      "softDeletedByAdmin": "एडमिन द्वारा सॉफ्ट-डिलीट",
+      "labels": {
+        "department": "विभाग",
+        "deletedAt": "हटाने का समय",
+        "owner": "मालिक",
+        "reason": "कारण"
+      },
+      "filters": {
+        "date": "तारीख",
+        "oldestFirst": "सबसे पुराना पहले"
+      },
+      "actions": {
+        "restore": "पुनर्स्थापित करें",
+        "purge": "स्थायी हटाएं"
+      },
+      "dialog": {
+        "restoreTitle": "शिकायत पुनर्स्थापित करें",
+        "purgeTitle": "शिकायत स्थायी हटाएं",
+        "restoreMessage": "यह शिकायत को सामान्य शिकायत वर्कफ़्लो में वापस ले जाएगा।",
+        "purgeMessage": "यह क्रिया अपरिवर्तनीय है और शिकायत को स्थायी रूप से हटा देगी।"
+      },
+      "toasts": {
+        "restoredTitle": "शिकायत पुनर्स्थापित हुई",
+        "restoredMessage": "शिकायत को सक्रिय सिस्टम में वापस ले जाया गया है।",
+        "purgedTitle": "शिकायत स्थायी हटाई गई",
+        "purgedMessage": "शिकायत को स्थायी रूप से हटा दिया गया है।",
+        "failedTitle": "रिसायकल-बिन क्रिया विफल हुई",
+        "failedMessage": "कृपया फिर से प्रयास करें।"
+      }
+    },
+    "editComplaint": {
+      "title": "शिकायत संपादित करें",
+      "searchTitle": "शिकायत खोजें",
+      "searchSubtitle": "शिकायत आईडी से खोजें।",
+      "searchPlaceholder": "शिकायत आईडी",
+      "searching": "खोजा जा रहा है...",
+      "searchButton": "शिकायत खोजें",
+      "reviewTitle": "शिकायत समीक्षा",
+      "reviewSubtitle": "शिकायत की समीक्षा करें और केवल आवश्यकता होने पर रूटिंग अपडेट करें।",
+      "untitled": "बिना शीर्षक की शिकायत",
+      "noDescription": "कोई विवरण उपलब्ध नहीं।",
+      "departmentSection": "विभाग",
+      "prioritySection": "प्राथमिकता",
+      "saveChanges": "परिवर्तन सहेजें",
+      "saving": "सहेजा जा रहा है...",
+      "deleteComplaint": "शिकायत हटाएं",
+      "deleting": "हटाया जा रहा है...",
+      "labels": {
+        "location": "स्थान",
+        "status": "स्थिति",
+        "priority": "प्राथमिकता",
+        "created": "बनाया गया",
+        "upvotes": "अपवोट्स",
+        "currentRouting": "वर्तमान रूटिंग",
+        "department": "विभाग",
+        "lastUpdated": "अंतिम अपडेट"
+      },
+      "toasts": {
+        "complaintIdRequiredTitle": "शिकायत आईडी आवश्यक है",
+        "complaintIdRequiredMessage": "खोज से पहले शिकायत आईडी दर्ज करें।",
+        "notFoundTitle": "शिकायत नहीं मिली",
+        "notFoundMessage": "उस शिकायत आईडी के लिए कोई शिकायत नहीं मिली।",
+        "searchFailedTitle": "खोज विफल हुई",
+        "searchFailedMessage": "कृपया फिर से प्रयास करें।",
+        "missingDetailsTitle": "जानकारी अधूरी है",
+        "missingDetailsMessage": "विभाग और प्राथमिकता दोनों चुनें।",
+        "updatedTitle": "शिकायत अपडेट हुई",
+        "updatedMessage": "प्राथमिकता और विभाग सहेज दिए गए।",
+        "updateFailedTitle": "शिकायत अपडेट नहीं कर सके",
+        "updateFailedMessage": "कृपया फिर से प्रयास करें।",
+        "deletedTitle": "शिकायत हटाई गई",
+        "deletedMessage": "शिकायत सफलतापूर्वक सॉफ्ट-डिलीट हुई।",
+        "deleteFailedTitle": "शिकायत हटाई नहीं जा सकी",
+        "deleteFailedMessage": "कृपया फिर से प्रयास करें।"
+      }
+    },
+    "departmentDetails": {
+      "title": "%{department} विभाग",
+      "departmentNotFound": "विभाग नहीं मिला",
+      "editDepartmentName": "विभाग का नाम संपादित करें",
+      "reactivateDepartment": "विभाग पुनः सक्रिय करें",
+      "deactivateDepartment": "विभाग निष्क्रिय करें",
+      "deleteDepartment": "विभाग हटाएं",
+      "totalComplaints": "कुल शिकायतें",
+      "totalMembers": "कुल सदस्य",
+      "hods": "HODs",
+      "workers": "कर्मी",
+      "addHod": "HOD जोड़ें",
+      "addWorker": "कर्मी जोड़ें",
+      "departmentHead": "विभाग प्रमुख",
+      "departmentHeadLower": "विभाग प्रमुख",
+      "hodShort": "HOD",
+      "worker": "कर्मी",
+      "workerLower": "कर्मी",
+      "noHod": "इस विभाग के लिए कोई HOD नहीं मिला।",
+      "noWorkers": "इस विभाग के लिए कोई कर्मी नहीं मिला।",
+      "pendingInvitation": "लंबित आमंत्रण",
+      "invitedRole": "%{role} के रूप में आमंत्रित",
+      "noEmail": "कोई ईमेल नहीं",
+      "noPhone": "कोई फ़ोन नहीं",
+      "active": "सक्रिय",
+      "inactive": "निष्क्रिय",
+      "deactivate": "निष्क्रिय करें",
+      "reactivate": "पुनः सक्रिय करें",
+      "revoke": "रद्द करें",
+      "dialog": {
+        "renameTitle": "विभाग का नाम संपादित करें",
+        "inviteTitle": "%{role} आमंत्रित करें",
+        "revokeInviteTitle": "आमंत्रण रद्द करें",
+        "deleteDepartmentTitle": "विभाग हटाएं",
+        "reactivateDepartmentTitle": "विभाग पुनः सक्रिय करें",
+        "deactivateDepartmentTitle": "विभाग निष्क्रिय करें",
+        "reactivateMemberTitle": "सदस्य पुनः सक्रिय करें",
+        "deactivateMemberTitle": "सदस्य निष्क्रिय करें",
+        "renameMessage": "जहां-जहां विभाग का नाम उपयोग हुआ है, वहां इसे अपडेट करें।",
+        "inviteMessage": "%{department} विभाग में %{role} के रूप में जुड़ने के लिए ईमेल आमंत्रण भेजें।",
+        "revokeInviteMessage": "%{email} के लिए लंबित आमंत्रण रद्द करें?",
+        "deleteDepartmentMessage": "यह विभाग को हटाकर जुड़े उपयोगकर्ता, शिकायतें और आमंत्रण Other में भेज देगा। यह तभी संभव है जब विभाग की सभी शिकायतें resolved हों।",
+        "reactivateDepartmentMessage": "यह इस विभाग के HOD और कर्मियों को फिर से सक्रिय करेगा।",
+        "deactivateDepartmentMessage": "यह इस विभाग के HOD और सभी कर्मियों को निष्क्रिय करेगा। यह तभी संभव है जब विभाग की सभी शिकायतें resolved हों।",
+        "reactivateMemberMessage": "%{name} को पुनः सक्रिय करें?",
+        "deactivateMemberMessage": "%{name} को निष्क्रिय करें?",
+        "emailPlaceholder": "ईमेल पता",
+        "departmentNamePlaceholder": "विभाग का नाम",
+        "sendInvite": "आमंत्रण भेजें"
+      },
+      "toasts": {
+        "loadFailedTitle": "विभाग लोड नहीं हो सका",
+        "loadFailedMessage": "कृपया फिर से प्रयास करें।",
+        "memberUpdatedTitle": "सदस्य अपडेट हुआ",
+        "memberUpdatedMessage": "विभाग का डेटा रिफ्रेश कर दिया गया है।",
+        "memberUpdateFailedTitle": "सदस्य अपडेट नहीं कर सके",
+        "memberUpdateFailedMessage": "कृपया फिर से प्रयास करें।",
+        "invitedTitle": "%{role} आमंत्रित किया गया",
+        "invitedMessage": "%{email} पर आमंत्रण भेजा गया।",
+        "inviteFailedTitle": "%{role} को आमंत्रित नहीं कर सके",
+        "inviteFailedMessage": "कृपया फिर से प्रयास करें।",
+        "revokedTitle": "आमंत्रण रद्द किया गया",
+        "revokedMessage": "लंबित आमंत्रण हटा दिया गया है।",
+        "revokeFailedTitle": "आमंत्रण रद्द नहीं कर सके",
+        "revokeFailedMessage": "कृपया फिर से प्रयास करें।",
+        "departmentReactivatedTitle": "विभाग पुनः सक्रिय हुआ",
+        "departmentReactivatedMessage": "इस विभाग के HOD और कर्मी फिर से सक्रिय हैं।",
+        "departmentDeactivatedTitle": "विभाग निष्क्रिय हुआ",
+        "departmentDeactivatedMessage": "इस विभाग के HOD और कर्मी अब निष्क्रिय हैं।",
+        "departmentStatusFailedTitle": "विभाग की स्थिति अपडेट नहीं कर सके",
+        "departmentStatusFailedMessage": "कृपया फिर से प्रयास करें।",
+        "departmentUpdatedTitle": "विभाग अपडेट हुआ",
+        "departmentUpdatedMessage": "विभाग का नाम बदल दिया गया है।",
+        "departmentUpdateFailedTitle": "विभाग अपडेट नहीं कर सके",
+        "departmentUpdateFailedMessage": "कृपया फिर से प्रयास करें।",
+        "departmentDeletedTitle": "विभाग हटाया गया",
+        "departmentDeletedMessage": "सदस्यों और शिकायतों को सुरक्षित रूप से पुनः असाइन किया गया।",
+        "departmentDeleteFailedTitle": "विभाग हटाया नहीं जा सका",
+        "departmentDeleteFailedMessage": "कृपया फिर से प्रयास करें।",
+        "nameRequiredTitle": "विभाग का नाम आवश्यक है",
+        "nameRequiredMessage": "मान्य विभाग नाम दर्ज करें।",
+        "emailRequiredTitle": "ईमेल आवश्यक है",
+        "emailRequiredMessage": "आमंत्रण भेजने से पहले ईमेल दर्ज करें।"
+      }
+    }
+  },
   "reports": {
     "title": "रिपोर्ट और विश्लेषण",
     "statistics": "सांख्यिकी",
@@ -1462,6 +1700,7 @@
       "highPriorityLabel": "%{count} उच्च प्राथमिकता"
     },
     "filterSummary": {
+      "range": "रेंज: %{value}",
       "status": "स्थिति: %{value}",
       "from": "से: %{date}",
       "to": "तक: %{date}"
@@ -1490,13 +1729,37 @@
     "filterOptionsSoon": "फ़िल्टर विकल्प जल्द आ रहे हैं...",
     "reportGenerated": "रिपोर्ट तैयार",
     "reportReady": "%{format} रिपोर्ट डाउनलोड के लिए तैयार है",
+    "downloadCta": "%{format} डाउनलोड करें",
     "generateFailed": "रिपोर्ट बनाने में विफल",
     "loadStatsFailed": "सांख्यिकी लोड करने में विफल",
+    "emailRequired": "कृपया ईमेल पता दर्ज करें",
     "invalidEmail": "कृपया मान्य ईमेल पता दर्ज करें",
     "notAvailable": "उपलब्ध नहीं",
     "emailAddressLabel": "ईमेल पता",
     "emailPlaceholder": "ईमेल पता दर्ज करें",
     "formatLabel": "फॉर्मेट",
+    "scope": {
+      "title": "शामिल शिकायतें",
+      "description": "यहीं चुनें कि कौन सी शिकायतें डाउनलोड या ईमेल में शामिल होंगी। केवल यही दिखाई गई सीमा उपयोग होगी।",
+      "dateRangeLabel": "तिथि सीमा",
+      "statusLabel": "शिकायत की स्थिति",
+      "includedLabel": "इस रिपोर्ट में शामिल है",
+      "allStatuses": "सभी स्थितियां",
+      "range24h": "पिछले 24 घंटे",
+      "range24hDesc": "पिछले 24 घंटों में बनी शिकायतें शामिल होंगी।",
+      "range7d": "पिछले 7 दिन",
+      "range7dDesc": "पिछले 7 दिनों में बनी शिकायतें शामिल होंगी।",
+      "range30d": "पिछले 30 दिन",
+      "range30dDesc": "पिछले 30 दिनों में बनी शिकायतें शामिल होंगी।",
+      "rangeCustom": "कस्टम रेंज",
+      "rangeCustomDesc": "आरंभ और समाप्ति तिथि दोनों YYYY-MM-DD प्रारूप में दर्ज करें।",
+      "customDateRequired": "आरंभ और समाप्ति तिथि दोनों YYYY-MM-DD प्रारूप में आवश्यक हैं।"
+    },
+    "formats": {
+      "pdf": "PDF",
+      "excel": "Excel",
+      "csv": "CSV"
+    },
     "schedule": {
       "dailyLabel": "दैनिक",
       "dailyDesc": "हर दिन सुबह 9:00 बजे",
@@ -1678,7 +1941,48 @@
       },
       "adminSendNotification": {
         "title": "सूचना भेजें",
-        "subtitle": "एडमिन सूचनाएं तैयार करें और एक ही जगह सूचना इतिहास देखें"
+        "subtitle": "एडमिन सूचनाएं तैयार करें और एक ही जगह सूचना इतिहास देखें",
+        "form": {
+          "title": "सूचना बनाएं",
+          "subtitle": "चुने हुए समूह को सूचना भेजें और हाल की भेजी गई सूचनाएं देखें।",
+          "fields": {
+            "title": "शीर्षक",
+            "message": "संदेश",
+            "audience": "प्राप्तकर्ता समूह"
+          },
+          "placeholders": {
+            "title": "सूचना शीर्षक",
+            "message": "सूचना संदेश"
+          },
+          "audienceOptions": {
+            "all": "सभी सक्रिय उपयोगकर्ता",
+            "user": "नागरिक",
+            "worker": "कर्मी",
+            "head": "विभाग प्रमुख",
+            "admin": "एडमिन"
+          },
+          "helper": "यह %{audience} को इन-ऐप सूचना और जहां उपलब्ध हो वहां पुश सूचना भेजता है।",
+          "send": "सूचना भेजें",
+          "sending": "भेजा जा रहा है..."
+        },
+        "history": {
+          "title": "भेजी गई सूचना इतिहास",
+          "loading": "इतिहास लोड हो रहा है...",
+          "empty": "अभी तक कोई सूचना नहीं भेजी गई है।",
+          "metrics": {
+            "recipients": "प्राप्तकर्ता: %{count}",
+            "delivered": "डिलीवर: %{count}",
+            "pushSent": "पुश भेजे गए: %{count}"
+          }
+        },
+        "toasts": {
+          "missingDetailsTitle": "विवरण अधूरा है",
+          "missingDetailsMessage": "सूचना का शीर्षक और संदेश दोनों जोड़ें।",
+          "sentTitle": "सूचना भेजी गई",
+          "sentMessage": "प्रसारण %{audience} को भेज दिया गया है।",
+          "failedTitle": "सूचना नहीं भेज सके",
+          "failedMessage": "कृपया फिर से प्रयास करें।"
+        }
       },
       "deleteAccount": {
         "title": "खाता हटाएं",
@@ -1762,9 +2066,9 @@
       "darkDesc": "रात के समय के लिए डार्क थीम"
     },
     "notificationsScreen": {
+      "title": "सूचनाएं",
       "empty": "अभी तक कोई सूचना नहीं",
       "preferences": {
-        "title": "प्राथमिकताएँ",
         "complaintsUpdates": {
           "label": "शिकायत अपडेट",
           "sub": "आपकी शिकायतों की स्थिति बदलने पर"
@@ -1780,18 +2084,63 @@
         "systemAlerts": {
           "label": "सिस्टम अलर्ट",
           "sub": "ऐप घोषणाएँ और अपडेट"
+        },
+        "specialRequests": {
+          "label": "विशेष अनुरोध",
+          "sub": "एडमिन समीक्षा के लिए शिकायत संपादन और हटाने के अनुरोध"
+        },
+        "deletedComplaints": {
+          "label": "हटाई गई शिकायतें",
+          "sub": "रिसायकल बिन में restore और purge गतिविधि"
         }
       },
       "history": {
         "title": "इतिहास",
         "unread": "%{count} अपठित",
-        "markAllRead": "सभी पढ़े हुए चिह्नित करें"
+        "markAllRead": "सभी पढ़े हुए चिह्नित करें",
+        "noBody": "कोई विवरण उपलब्ध नहीं"
       },
       "toasts": {
         "markReadFailed": "पढ़ा हुआ चिह्नित नहीं कर सके",
         "markAllReadSuccess": "सभी पढ़े हुए चिह्नित किए गए",
         "markAllReadFailed": "सभी को पढ़ा हुआ चिह्नित नहीं कर सके",
         "savePreferenceFailed": "प्राथमिकता सहेजने में विफल"
+      }
+    },
+    "specialRequestsScreen": {
+      "title": "विशेष अनुरोध",
+      "loading": "अनुरोध लोड हो रहे हैं...",
+      "emptyAll": "कोई अनुरोध नहीं है।",
+      "emptyForStatus": "%{status} के लिए कोई अनुरोध नहीं है।",
+      "actions": {
+        "approve": "स्वीकृत करें",
+        "reject": "अस्वीकार करें"
+      },
+      "filters": {
+        "fromDate": "%{date} से",
+        "toDate": "%{date} तक"
+      },
+      "card": {
+        "deleteRequest": "शिकायत हटाने का अनुरोध",
+        "editRequest": "शिकायत संपादन अनुरोध",
+        "departmentChange": "विभाग: %{from} -> %{to}",
+        "priorityChange": "प्राथमिकता: %{from} -> %{to}",
+        "changeSeparator": " | ",
+        "requestedBy": "%{name} द्वारा",
+        "openComplaint": "शिकायत खोलें"
+      },
+      "toasts": {
+        "requestApproved": "अनुरोध स्वीकृत हुआ",
+        "requestRejected": "अनुरोध अस्वीकृत हुआ",
+        "reviewFailedTitle": "अनुरोध की समीक्षा नहीं हो सकी",
+        "reviewFailedMessage": "कृपया फिर से प्रयास करें।"
+      },
+      "dialog": {
+        "approveTitle": "अनुरोध स्वीकृत करें",
+        "rejectTitle": "अनुरोध अस्वीकार करें",
+        "approveMessage": "क्या इस विशेष अनुरोध को स्वीकृत करके शिकायत पर लागू करें?",
+        "rejectMessage": "क्या इस विशेष अनुरोध को अस्वीकार करें?",
+        "optionalNote": "वैकल्पिक नोट"
       }
     },
     "workerAnalyticsScreen": {
@@ -1803,11 +2152,18 @@
       "noValue": "उपलब्ध नहीं",
       "percentValue": "%{value}%",
       "hoursValue": "%{value}घं",
+      "summary": {
+        "workerRatingLabel": "कर्मी रेटिंग",
+        "workerRatingHint": "वर्तमान सेवा रेटिंग",
+        "activeAssignedLabel": "सक्रिय आवंटित",
+        "activeAssignedHint": "वर्तमान आवंटित शिकायतें"
+      },
       "metrics": {
         "totalAssigned": "कुल असाइन",
         "completed": "पूर्ण",
         "completionRate": "पूर्णता दर",
-        "avgCompletion": "औसत पूर्णता"
+        "avgCompletion": "औसत पूर्णता",
+        "avgCompletionHint": "आवंटन के बाद कार्य बंद करने में लगा औसत समय।"
       },
       "weeklyTrend": {
         "title": "साप्ताहिक पूर्णता रुझान",

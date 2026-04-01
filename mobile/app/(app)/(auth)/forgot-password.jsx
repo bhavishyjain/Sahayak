@@ -2,9 +2,9 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Keyboard, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
@@ -66,34 +66,20 @@ export default function ForgotPassword() {
           {t("auth.forgotPassword.subtitle")}
         </Text>
 
-        <View
-          className="flex-row items-center rounded-lg px-4 mb-5 h-[50px]"
-          style={{
-            backgroundColor: colors.backgroundSecondary,
-            borderWidth: 1,
-            borderColor: colors.muted,
-          }}
-        >
-          <PaperTextInput
-            mode="flat"
-            value={email}
-            onChangeText={setEmail}
-            placeholder={t("auth.login.emailPlaceholder")}
-            placeholderTextColor={colors.placeholder}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={{ flex: 1, backgroundColor: "transparent" }}
-            underlineStyle={{ display: "none" }}
-            contentStyle={{
-              color: colors.textPrimary,
-              fontSize: 16,
-              fontWeight: "600",
-              paddingHorizontal: 0,
-            }}
-            theme={{ colors: { text: colors.textPrimary } }}
-          />
-        </View>
+        <AppTextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder={t("auth.login.emailPlaceholder")}
+          placeholderTextColor={colors.placeholder}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          borderColor={colors.muted}
+          activeBorderColor={colors.primary}
+          containerStyle={{ marginBottom: 20 }}
+          inputContainerStyle={{ minHeight: 50 }}
+          inputStyle={{ fontSize: 16, fontWeight: "600", minHeight: 50 }}
+        />
 
         <PressableBlock
           className="w-full py-4 rounded-lg items-center mb-4"

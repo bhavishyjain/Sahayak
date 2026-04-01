@@ -1,8 +1,8 @@
 import { useRef } from "react";
 import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import { darkColors, lightColors } from "../colors";
 import { useTheme } from "../utils/context/theme";
+import AppTextInput from "./AppTextInput";
 import PressableBlock from "./PressableBlock";
 
 export default function DialogBox({
@@ -177,8 +177,7 @@ export default function DialogBox({
                       borderRadius: 8,
                     }}
                   >
-                    <PaperTextInput
-                      mode="flat"
+                    <AppTextInput
                       ref={(ref) => (inputRefs.current[i] = ref)}
                       value={digit}
                       onChangeText={(value) => handleOtpChange(value, i)}
@@ -186,29 +185,23 @@ export default function DialogBox({
                       keyboardType="number-pad"
                       maxLength={1}
                       selectTextOnFocus
-                      style={{
+                      inputContainerStyle={{
                         width: 50,
                         height: 50,
                         backgroundColor: "transparent",
-                        textAlign: "center",
+                        minHeight: 50,
+                        borderWidth: 0,
                       }}
-                      underlineStyle={{ display: "none" }}
-                      contentStyle={{
+                      inputStyle={{
+                        width: 50,
+                        minHeight: 50,
                         textAlign: "center",
                         color: colors.textPrimary,
                         fontSize: 24,
                         fontWeight: "bold",
-                        paddingLeft: 0,
-                        paddingRight: 0,
-                        paddingTop: 0,
-                        paddingBottom: 0,
-                        marginLeft: -8,
-                      }}
-                      theme={{
-                        colors: {
-                          primary: "transparent",
-                          text: colors.textPrimary,
-                        },
+                        paddingHorizontal: 0,
+                        paddingVertical: 0,
+                        marginLeft: -1,
                       }}
                     />
                   </View>
@@ -242,21 +235,18 @@ export default function DialogBox({
 
             {/* Input Field */}
             {showInput && (
-              <PaperTextInput
+              <AppTextInput
                 value={inputValue}
                 onChangeText={onInputChange}
                 placeholder={inputPlaceholder}
                 keyboardType={inputKeyboardType}
-                mode="outlined"
-                outlineColor={colors.muted}
-                activeOutlineColor={colors.primary}
-                textColor={colors.textPrimary}
+                borderColor={colors.muted}
+                activeBorderColor={colors.primary}
                 placeholderTextColor={colors.textSecondary}
-                style={{
+                inputContainerStyle={{
                   backgroundColor: colors.backgroundPrimary,
                   marginBottom: 24,
                 }}
-                theme={{ roundness: 12 }}
               />
             )}
 

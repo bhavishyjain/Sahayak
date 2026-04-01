@@ -11,11 +11,11 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { TextInput as PaperTextInput } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import CustomPicker from "../../../components/CustomPicker";
 import PressableBlock from "../../../components/PressableBlock";
@@ -36,34 +36,17 @@ function ComplaintInput({
   colors,
 }) {
   return (
-    <PaperTextInput
-      mode="flat"
-      dense
+    <AppTextInput
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
       multiline={multiline}
-      underlineStyle={{ display: "none" }}
-      style={{
-        backgroundColor: colors.backgroundSecondary,
+      inputContainerStyle={{
         minHeight: multiline ? 110 : 48,
-        borderWidth: 1,
-        borderColor: colors.border,
-        color: colors.textPrimary,
-        borderRadius: 12,
-        textAlignVertical: multiline ? "top" : "center",
       }}
-      contentStyle={{
-        color: colors.textPrimary,
+      inputStyle={{
         fontSize: 14,
-        paddingHorizontal: 12,
-        paddingVertical: multiline ? 10 : 8,
-      }}
-      theme={{
-        colors: {
-          text: colors.textPrimary,
-          placeholder: colors.placeholder,
-        },
+        minHeight: multiline ? 110 : 48,
       }}
     />
   );

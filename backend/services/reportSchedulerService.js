@@ -10,6 +10,35 @@ const { emitRealtimeEvent } = require("./realtimeService");
 const activeJobs = new Map();
 const runningSchedules = new Set();
 
+function formatScheduleDate(value) {
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function resolveDynamicScheduleFilters(filters = {}) {
+  const rangePreset = String(filters?.rangePreset || "").trim();
+  if (!rangePreset || rangePreset === "custom") {
+    return { ...(filters || {}) };
+  }
+
+  const now = new Date();
+  const start = new Date(now);
+  if (rangePreset === "24h") {
+    start.setDate(start.getDate() - 1);
+  } else if (rangePreset === "7d") {
+    start.setDate(start.getDate() - 7);
+  } else if (rangePreset === "30d") {
+    start.setDate(start.getDate() - 30);
+  } else {
+    return { ...(filters || {}) };
+  }
+
+  return {
+    ...(filters || {}),
+    startDate: formatScheduleDate(start),
+    endDate: formatScheduleDate(now),
+  };
+}
+
 async function generateReportBuffer(format, filters, userId) {
   switch (format) {
     case "excel":
@@ -48,7 +77,7 @@ async function sendScheduledReport(schedule) {
   try {
     reportArtifact = await generateReportBuffer(
       schedule.format,
-      schedule.filters || {},
+      resolveDynamicScheduleFilters(schedule.filters || {}),
       schedule.userId,
     );
   } catch (error) {

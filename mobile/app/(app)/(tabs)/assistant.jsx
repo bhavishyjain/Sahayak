@@ -24,18 +24,19 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
+import AppTextInput from "../../../components/AppTextInput";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import { useTabBarHeight } from "../../../components/CurvedTabBar";
@@ -284,6 +285,8 @@ export default function Assistant() {
   const [messages, setMessages] = useState([]);
   const [historyHydrated, setHistoryHydrated] = useState(false);
   const [previewImageUri, setPreviewImageUri] = useState("");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [composerHeight, setComposerHeight] = useState(120);
 
   useEffect(() => {
     return () => {
@@ -357,9 +360,32 @@ export default function Assistant() {
     });
   }, [historyHydrated, locale, t]);
 
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(Math.max(0, event?.endCoordinates?.height || 0));
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   const busy = loading || voiceLoading;
   const hasPendingAttachment = Boolean(coordinates) || selectedImages.length > 0;
-  const composerBottomSpacing = Math.max(insets.bottom, 8) + Math.max(24, tabBarHeight - 28);
+  const tabBarSpacing =
+    Math.max(insets.bottom, 8) + Math.max(24, tabBarHeight - 28);
+  const activeComposerBottom = keyboardHeight
+    ? Math.max(12, keyboardHeight - insets.bottom)
+    : tabBarSpacing;
 
   const helperHint = useMemo(
     () => t("assistant.detailsHint"),
@@ -877,7 +903,7 @@ export default function Assistant() {
 
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {!historyHydrated ? null : (
         <View className="flex-1">
@@ -886,7 +912,7 @@ export default function Assistant() {
             className="flex-1"
             contentContainerStyle={{
               padding: 16,
-              paddingBottom: composerBottomSpacing + 180,
+              paddingBottom: activeComposerBottom + composerHeight + 48,
             }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -1006,8 +1032,11 @@ export default function Assistant() {
 
           <View
             className="absolute left-0 right-0 px-4 pt-2"
+            onLayout={(event) => {
+              setComposerHeight(event.nativeEvent.layout.height);
+            }}
             style={{
-              bottom: composerBottomSpacing,
+              bottom: activeComposerBottom,
               backgroundColor: colors.backgroundPrimary,
             }}
           >
@@ -1041,20 +1070,22 @@ export default function Assistant() {
                   <Camera size={20} color={colors.primary} />
                 </PressableBlock>
 
-                <TextInput
+                <AppTextInput
                   value={text}
                   onChangeText={setText}
-                  placeholder={t(
-                    "assistant.inputPlaceholder",
-                  )}
-                  placeholderTextColor={colors.placeholder}
+                  placeholder={t("assistant.inputPlaceholder")}
                   editable={!busy}
                   multiline
-                  style={{
-                    flex: 1,
+                  containerStyle={{ flex: 1 }}
+                  inputContainerStyle={{
                     minHeight: 44,
                     maxHeight: 120,
-                    color: colors.textPrimary,
+                    borderWidth: 0,
+                    backgroundColor: "transparent",
+                  }}
+                  inputStyle={{
+                    minHeight: 44,
+                    maxHeight: 120,
                     paddingTop: 8,
                   }}
                 />

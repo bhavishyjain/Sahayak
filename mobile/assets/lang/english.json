@@ -7,43 +7,20 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
-    "edit": "Edit",
-    "update": "Update",
     "submit": "Submit",
     "confirm": "Confirm",
-    "close": "Close",
-    "continue": "Continue",
-    "back": "Back",
-    "next": "Next",
-    "done": "Done",
-    "ok": "OK",
     "yes": "Yes",
     "no": "No",
     "allow": "Allow",
     "dontAllow": "Don't Allow",
-    "search": "Search",
-    "filter": "Filter",
     "filters": "Filters",
     "sort": "Sort",
-    "refresh": "Refresh",
     "loadMore": "Load more",
     "loading": "Loading...",
-    "noData": "No data available",
-    "error": "Error",
-    "success": "Success",
     "failed": "Failed",
     "tryAgain": "Try Again",
-    "viewDetails": "View Details",
-    "viewAll": "View All",
-    "showMore": "Show More",
-    "showLess": "Show Less",
-    "select": "Select",
-    "selected": "Selected",
     "all": "All",
-    "none": "None",
     "you": "You",
-    "optional": "Optional",
-    "required": "Required",
     "clear": "Clear",
     "reset": "Reset",
     "apply": "Apply"
@@ -67,17 +44,12 @@
   "auth": {
     "login": {
       "title": "Welcome Back",
-      "subtitle": "Sign in to continue",
       "subtitleEmail": "Use your email and password to login",
       "emailPlaceholder": "Email Address",
       "passwordPlaceholder": "Password",
       "forgotPassword": "Forgot Password?",
       "button": "Login",
-      "loginButton": "Login",
       "loading": "Logging in...",
-      "noAccount": "Don't have an account?",
-      "signUp": "Sign Up",
-      "rememberMe": "Remember me",
       "changeLanguage": "Change Language"
     },
     "register": {
@@ -88,23 +60,13 @@
       "usernamePlaceholder": "Username",
       "phonePlaceholder": "Phone",
       "passwordPlaceholder": "Password",
-      "confirmPasswordPlaceholder": "Confirm Password",
       "button": "Register",
       "loading": "Registering...",
-      "backToLogin": "Back to Login",
-      "alreadyHaveAccount": "Already have an account?",
-      "signIn": "Sign In",
-      "termsText": "By registering, you agree to our",
-      "termsLink": "Terms & Conditions",
-      "and": "and",
-      "privacyLink": "Privacy Policy"
+      "backToLogin": "Back to Login"
     },
     "logout": {
       "title": "Logging you out...",
-      "subtitle": "See you soon!",
-      "message": "Are you sure you want to logout?",
-      "confirm": "Logout",
-      "cancel": "Cancel"
+      "subtitle": "See you soon!"
     },
     "forgotPassword": {
       "title": "Forgot Password",
@@ -460,6 +422,11 @@
       "editRequestSent": "Edit request sent",
       "specialRequestFailed": "Could not send special request",
       "specialRequestSent": "Your special request was sent to admin.",
+      "specialRequestReasonLabel": "Reason",
+      "specialRequestUpdatePlaceholder": "Explain why this complaint needs to be updated",
+      "specialRequestDeletePlaceholder": "Explain why this complaint should be deleted",
+      "deleteRequestDialogMessage": "This sends a special request to admin to delete this complaint.",
+      "sendRequest": "Send Request",
       "cancelled": "Cancelled",
       "complaintCancelled": "Complaint has been cancelled",
       "cancelFailed": "Cancel Failed",
@@ -628,24 +595,13 @@
   "assistant": {
     "title": "Assistant",
     "inputPlaceholder": "Type your message...",
-    "send": "Send",
     "openSettings": "Open Settings",
     "welcomeShort": "Hi, I am Sahayak. You can use voice or text to register a complaint, check your latest complaint, or send a complaint ID.",
-    "clearChat": "Clear chat",
-    "clear": "Clear",
-    "clearChatConfirm": "Are you sure you want to clear all assistant messages?",
-    "welcomeMessage": "Hi, I am Sahayak. Ask me about your complaints.",
     "thinking": "Thinking...",
-    "error": "Sorry, I couldn't process that request.",
-    "noMessages": "No messages yet. Start a conversation!",
     "noResponse": "No response",
-    "loginRequired": "Please login to check ticket status. I can still help with general questions.",
     "assistantFailed": "Assistant failed",
     "errorResponse": "Could not get response.",
     "detailsHint": "Tip: Include issue, location, department, urgency, and any ticket ID for best help.",
-    "micStart": "Tap mic to speak",
-    "listening": "Listening... tap stop to transcribe",
-    "transcribing": "Transcribing voice...",
     "transcriptReady": "Voice transcript ready",
     "transcriptLabel": "Detected language",
     "recentSection": "Recent complaints",
@@ -1493,6 +1449,233 @@
     "head": "Department Head",
     "admin": "Admin"
   },
+  "adminScreens": {
+    "home": {
+      "defaultTitle": "Admin Dashboard",
+      "subtitle": "Monitor complaint flow, department load, and team health from one place.",
+      "greeting": {
+        "morning": "Good morning",
+        "afternoon": "Good afternoon",
+        "evening": "Good evening",
+        "night": "Good night"
+      },
+      "systemOverview": "System Overview",
+      "totalComplaintsHelper": "total complaints tracked across %{count} departments",
+      "resolutionRate": "Resolution rate",
+      "avgResolution": "Avg resolution",
+      "activeTeam": "Active team",
+      "inactiveMembers": "%{count} inactive members",
+      "deletedComplaints": "Deleted complaints",
+      "deletedComplaintsHelper": "Items waiting in recycle bin",
+      "complaintStatus": "Complaint Status",
+      "workers": "Workers",
+      "departmentHeads": "Department heads",
+      "inactiveShort": "%{count} inactive",
+      "departments": "Departments",
+      "operationalInsight": "Operational Insight",
+      "busiestDepartment": "Busiest department",
+      "noDepartmentData": "No department data",
+      "noDepartmentDataHelper": "Pull to refresh when department analytics are available.",
+      "busiestSummary": "%{total} total complaints • %{pending} pending • %{inProgress} in progress",
+      "toasts": {
+        "loadFailedTitle": "Could not load admin dashboard",
+        "loadFailedMessage": "Please try again."
+      }
+    },
+    "departments": {
+      "title": "Departments",
+      "addButton": "Add department",
+      "rowSummary": "%{total} complaints • %{pending} pending",
+      "active": "Active",
+      "inactive": "Inactive",
+      "dialog": {
+        "title": "Add department",
+        "message": "Create a new department for admin assignment and complaint routing.",
+        "placeholder": "Department name",
+        "confirm": "Add"
+      },
+      "toasts": {
+        "addedTitle": "Department added",
+        "addedMessage": "The department list has been updated.",
+        "addFailedTitle": "Could not add department",
+        "addFailedMessage": "Please try again.",
+        "loadFailedTitle": "Could not load departments",
+        "loadFailedMessage": "Please try again.",
+        "nameRequiredTitle": "Department name required",
+        "nameRequiredMessage": "Enter a name before creating the department."
+      }
+    },
+    "recycleBin": {
+      "title": "Recycle Bin",
+      "searchPlaceholder": "Search deleted complaints",
+      "emptyTitle": "Recycle bin is empty",
+      "emptyMessage": "Soft-deleted complaints will appear here with restore and purge actions.",
+      "notAvailable": "NA",
+      "unknown": "Unknown",
+      "unavailable": "Unavailable",
+      "noComplaintText": "No complaint text available",
+      "softDeletedByAdmin": "Soft-deleted by admin",
+      "labels": {
+        "department": "Department",
+        "deletedAt": "Deleted at",
+        "owner": "Owner",
+        "reason": "Reason"
+      },
+      "filters": {
+        "date": "date",
+        "oldestFirst": "oldest first"
+      },
+      "actions": {
+        "restore": "Restore",
+        "purge": "Purge"
+      },
+      "dialog": {
+        "restoreTitle": "Restore complaint",
+        "purgeTitle": "Purge complaint",
+        "restoreMessage": "This will move the complaint back into the normal complaint workflow.",
+        "purgeMessage": "This action is irreversible and permanently removes the complaint."
+      },
+      "toasts": {
+        "restoredTitle": "Complaint restored",
+        "restoredMessage": "The complaint has been moved back to the active system.",
+        "purgedTitle": "Complaint purged",
+        "purgedMessage": "The complaint has been permanently removed.",
+        "failedTitle": "Recycle-bin action failed",
+        "failedMessage": "Please try again."
+      }
+    },
+    "editComplaint": {
+      "title": "Edit Complaint",
+      "searchTitle": "Search complaint",
+      "searchSubtitle": "Search by complaint ID.",
+      "searchPlaceholder": "Complaint ID",
+      "searching": "Searching...",
+      "searchButton": "Search Complaint",
+      "reviewTitle": "Complaint Review",
+      "reviewSubtitle": "Review the complaint and update routing only if needed.",
+      "untitled": "Untitled complaint",
+      "noDescription": "No description provided.",
+      "departmentSection": "Department",
+      "prioritySection": "Priority",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "deleteComplaint": "Delete Complaint",
+      "deleting": "Deleting...",
+      "labels": {
+        "location": "Location",
+        "status": "Status",
+        "priority": "Priority",
+        "created": "Created",
+        "upvotes": "Upvotes",
+        "currentRouting": "Current Routing",
+        "department": "Department",
+        "lastUpdated": "Last Updated"
+      },
+      "toasts": {
+        "complaintIdRequiredTitle": "Complaint ID required",
+        "complaintIdRequiredMessage": "Enter a complaint ID before searching.",
+        "notFoundTitle": "Complaint not found",
+        "notFoundMessage": "No complaint was found for that complaint ID.",
+        "searchFailedTitle": "Search failed",
+        "searchFailedMessage": "Please try again.",
+        "missingDetailsTitle": "Missing details",
+        "missingDetailsMessage": "Choose both a department and priority.",
+        "updatedTitle": "Complaint updated",
+        "updatedMessage": "Priority and department were saved.",
+        "updateFailedTitle": "Could not update complaint",
+        "updateFailedMessage": "Please try again.",
+        "deletedTitle": "Complaint deleted",
+        "deletedMessage": "The complaint was soft-deleted successfully.",
+        "deleteFailedTitle": "Could not delete complaint",
+        "deleteFailedMessage": "Please try again."
+      }
+    },
+    "departmentDetails": {
+      "title": "%{department} Department",
+      "departmentNotFound": "Department not found",
+      "editDepartmentName": "Edit Department Name",
+      "reactivateDepartment": "Reactivate Department",
+      "deactivateDepartment": "Deactivate Department",
+      "deleteDepartment": "Delete Department",
+      "totalComplaints": "Total complaints",
+      "totalMembers": "Total members",
+      "hods": "HODs",
+      "workers": "Workers",
+      "addHod": "Add HOD",
+      "addWorker": "Add worker",
+      "departmentHead": "Department head",
+      "departmentHeadLower": "department head",
+      "hodShort": "HOD",
+      "worker": "Worker",
+      "workerLower": "worker",
+      "noHod": "No HOD found for this department.",
+      "noWorkers": "No workers found for this department.",
+      "pendingInvitation": "Pending invitation",
+      "invitedRole": "Invited %{role}",
+      "noEmail": "No email",
+      "noPhone": "No phone",
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "revoke": "Revoke",
+      "dialog": {
+        "renameTitle": "Edit department name",
+        "inviteTitle": "Invite %{role}",
+        "revokeInviteTitle": "Revoke invitation",
+        "deleteDepartmentTitle": "Delete department",
+        "reactivateDepartmentTitle": "Reactivate department",
+        "deactivateDepartmentTitle": "Deactivate department",
+        "reactivateMemberTitle": "Reactivate member",
+        "deactivateMemberTitle": "Deactivate member",
+        "renameMessage": "Update the department name everywhere it is used.",
+        "inviteMessage": "Send an invitation email to join %{department} Department as a %{role}.",
+        "revokeInviteMessage": "Revoke the pending invitation for %{email}?",
+        "deleteDepartmentMessage": "This will remove the department and move linked users, complaints, and invitations to Other. This is only allowed when every complaint in the department is resolved.",
+        "reactivateDepartmentMessage": "This will reactivate the HODs and workers in this department.",
+        "deactivateDepartmentMessage": "This will deactivate the HODs and all workers in this department. This is only allowed when every complaint in the department is resolved.",
+        "reactivateMemberMessage": "Reactivate %{name}?",
+        "deactivateMemberMessage": "Deactivate %{name}?",
+        "emailPlaceholder": "Email address",
+        "departmentNamePlaceholder": "Department name",
+        "sendInvite": "Send invite"
+      },
+      "toasts": {
+        "loadFailedTitle": "Could not load department",
+        "loadFailedMessage": "Please try again.",
+        "memberUpdatedTitle": "Member updated",
+        "memberUpdatedMessage": "Department data has been refreshed.",
+        "memberUpdateFailedTitle": "Could not update member",
+        "memberUpdateFailedMessage": "Please try again.",
+        "invitedTitle": "%{role} invited",
+        "invitedMessage": "Invitation sent to %{email}.",
+        "inviteFailedTitle": "Could not invite %{role}",
+        "inviteFailedMessage": "Please try again.",
+        "revokedTitle": "Invitation revoked",
+        "revokedMessage": "The pending invite has been removed.",
+        "revokeFailedTitle": "Could not revoke invitation",
+        "revokeFailedMessage": "Please try again.",
+        "departmentReactivatedTitle": "Department reactivated",
+        "departmentReactivatedMessage": "HOD and workers in this department are now active again.",
+        "departmentDeactivatedTitle": "Department deactivated",
+        "departmentDeactivatedMessage": "HOD and workers in this department are now inactive.",
+        "departmentStatusFailedTitle": "Could not update department status",
+        "departmentStatusFailedMessage": "Please try again.",
+        "departmentUpdatedTitle": "Department updated",
+        "departmentUpdatedMessage": "The department name has been changed.",
+        "departmentUpdateFailedTitle": "Could not update department",
+        "departmentUpdateFailedMessage": "Please try again.",
+        "departmentDeletedTitle": "Department deleted",
+        "departmentDeletedMessage": "Members and complaints were reassigned safely.",
+        "departmentDeleteFailedTitle": "Could not delete department",
+        "departmentDeleteFailedMessage": "Please try again.",
+        "nameRequiredTitle": "Department name required",
+        "nameRequiredMessage": "Enter a valid department name.",
+        "emailRequiredTitle": "Email required",
+        "emailRequiredMessage": "Enter an email before sending the invitation."
+      }
+    }
+  },
   "reports": {
     "title": "Reports & Analytics",
     "statistics": "Statistics",
@@ -1517,6 +1700,7 @@
       "highPriorityLabel": "%{count} high priority"
     },
     "filterSummary": {
+      "range": "Range: %{value}",
       "status": "Status: %{value}",
       "from": "From: %{date}",
       "to": "To: %{date}"
@@ -1545,13 +1729,32 @@
     "filterOptionsSoon": "Filter options coming soon...",
     "reportGenerated": "Report Generated",
     "reportReady": "%{format} report is ready for download",
+    "downloadCta": "Download %{format}",
     "generateFailed": "Failed to generate report",
     "loadStatsFailed": "Failed to load statistics",
+    "emailRequired": "Please enter an email address",
     "invalidEmail": "Please enter a valid email address",
     "notAvailable": "N/A",
     "emailAddressLabel": "Email Address",
     "emailPlaceholder": "Enter email address",
     "formatLabel": "Format",
+    "scope": {
+      "title": "Included complaints",
+      "description": "Choose exactly which complaints should be downloaded or emailed. Only this visible scope will be used.",
+      "dateRangeLabel": "Date range",
+      "statusLabel": "Complaint status",
+      "includedLabel": "This export includes",
+      "allStatuses": "All statuses",
+      "range24h": "Past 24 hours",
+      "range24hDesc": "Includes complaints created in the last 24 hours.",
+      "range7d": "Past 7 days",
+      "range7dDesc": "Includes complaints created in the last 7 days.",
+      "range30d": "Past 30 days",
+      "range30dDesc": "Includes complaints created in the last 30 days.",
+      "rangeCustom": "Custom range",
+      "rangeCustomDesc": "Enter both a start date and an end date in YYYY-MM-DD format.",
+      "customDateRequired": "Start date and end date are required in YYYY-MM-DD format."
+    },
     "formats": {
       "pdf": "PDF",
       "excel": "Excel",
@@ -1738,7 +1941,48 @@
       },
       "adminSendNotification": {
         "title": "Send Notification",
-        "subtitle": "Draft admin notifications and review notification history in one place"
+        "subtitle": "Draft admin notifications and review notification history in one place",
+        "form": {
+          "title": "Create notification",
+          "subtitle": "Broadcast a notification to a selected audience and review recent sends.",
+          "fields": {
+            "title": "Title",
+            "message": "Message",
+            "audience": "Audience"
+          },
+          "placeholders": {
+            "title": "Notification title",
+            "message": "Notification body"
+          },
+          "audienceOptions": {
+            "all": "All active users",
+            "user": "Citizens",
+            "worker": "Workers",
+            "head": "Department heads",
+            "admin": "Admins"
+          },
+          "helper": "This sends a real in-app notification and push notification where available to %{audience}.",
+          "send": "Send Notification",
+          "sending": "Sending..."
+        },
+        "history": {
+          "title": "Sent history",
+          "loading": "Loading history...",
+          "empty": "No sent notifications yet.",
+          "metrics": {
+            "recipients": "Recipients: %{count}",
+            "delivered": "Delivered: %{count}",
+            "pushSent": "Push sent: %{count}"
+          }
+        },
+        "toasts": {
+          "missingDetailsTitle": "Missing details",
+          "missingDetailsMessage": "Add both a notification title and body.",
+          "sentTitle": "Notification sent",
+          "sentMessage": "The broadcast has been delivered to %{audience}.",
+          "failedTitle": "Could not send notification",
+          "failedMessage": "Please try again."
+        }
       },
       "deleteAccount": {
         "title": "Delete Account",
@@ -1825,7 +2069,6 @@
       "title": "Notifications",
       "empty": "No notifications yet",
       "preferences": {
-        "title": "Preferences",
         "complaintsUpdates": {
           "label": "Complaint updates",
           "sub": "Status changes on your complaints"
@@ -1841,6 +2084,14 @@
         "systemAlerts": {
           "label": "System alerts",
           "sub": "App announcements and updates"
+        },
+        "specialRequests": {
+          "label": "Special requests",
+          "sub": "Edit and delete requests that need admin review"
+        },
+        "deletedComplaints": {
+          "label": "Deleted complaints",
+          "sub": "Restore and purge activity in the recycle bin"
         }
       },
       "history": {
@@ -1875,7 +2126,8 @@
         "departmentChange": "Department: %{from} -> %{to}",
         "priorityChange": "Priority: %{from} -> %{to}",
         "changeSeparator": " | ",
-        "requestedBy": "By %{name}"
+        "requestedBy": "By %{name}",
+        "openComplaint": "Open complaint"
       },
       "toasts": {
         "requestApproved": "Request approved",

@@ -1,9 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { AppState } from "react-native";
+import { markAccountDeactivated } from "../utils/accountStatus";
 import { invalidateComplaintQueries } from "../utils/invalidateComplaintQueries";
 import { prependRealtimeNotification } from "../utils/notificationsCache";
 import { queryKeys } from "../utils/queryKeys";
+import getUserAuth from "../utils/userAuth";
 import {
   addRealtimeListener,
   ensureRealtimeConnection,
@@ -46,9 +48,22 @@ export default function RealtimeBridge() {
     );
     const unsubscribeAdminUpdated = addRealtimeListener(
       "admin-updated",
-      () => {
+      async (payload) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.adminRecycleBin });
         queryClient.invalidateQueries({ queryKey: queryKeys.adminDashboardHome });
+
+        if (payload?.event !== "user-deactivated" || !payload?.userId) {
+          return;
+        }
+
+        const currentUser = await getUserAuth();
+        const currentUserId = String(
+          currentUser?._id || currentUser?.id || currentUser?.userId || "",
+        );
+
+        if (currentUserId && currentUserId === String(payload.userId)) {
+          await markAccountDeactivated();
+        }
       },
     );
 

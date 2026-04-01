@@ -8,11 +8,13 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import ComplaintCard from "../../../components/ComplaintCard";
+import { useTabBarHeight } from "../../../components/CurvedTabBar";
 import FilterPanel from "../../../components/FilterPanel";
 import SearchBar from "../../../components/SearchBar";
 import { formatPriorityLabel } from "../../../data/complaintStatus";
@@ -26,6 +28,8 @@ export default function MyComplaints() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useTabBarHeight();
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -74,6 +78,10 @@ export default function MyComplaints() {
     sortOrder !== "new-to-old" ||
     !!startDate ||
     !!endDate;
+  const listBottomPadding = Math.max(
+    140,
+    Math.max(insets.bottom, 8) + Math.max(tabBarHeight, 70) + 56,
+  );
 
   const clearFilters = () => {
     setStatusFilter("all");
@@ -108,7 +116,7 @@ export default function MyComplaints() {
           />
         )}
         ListHeaderComponent={
-          <View style={{ padding: 16, paddingBottom: 0 }}>
+          <View style={{ paddingTop: 16, paddingBottom: 0 }}>
             <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
               <View className="flex-1">
                 <SearchBar
@@ -147,7 +155,7 @@ export default function MyComplaints() {
         }
         ListEmptyComponent={
           !loading ? (
-            <View style={{ paddingHorizontal: 16 }}>
+            <View>
               <Card style={{ margin: 0, marginTop: 10, flex: 0 }}>
                 <View className="items-center py-1">
                   <Inbox size={18} color={colors.textSecondary} />
@@ -164,14 +172,17 @@ export default function MyComplaints() {
         }
         ListFooterComponent={
           loadingMore ? (
-            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
+            <View style={{ paddingTop: 16, paddingBottom: 24 }}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : (
             <View style={{ height: 24 }} />
           )
         }
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: listBottomPadding,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
