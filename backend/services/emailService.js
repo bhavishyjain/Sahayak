@@ -39,6 +39,88 @@ function getEmailFrom() {
   return String(process.env.EMAIL_FROM || "").trim();
 }
 
+function getEmailReplyTo() {
+  return String(process.env.EMAIL_REPLY_TO || "").trim();
+}
+
+function normalizeEmail(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isValidEmail(value) {
+  // Pragmatic email format guard to avoid provider-side hard bounces for obvious invalid input.
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function normalizeRecipients(to) {
+  const list = Array.isArray(to) ? to : [to];
+  const normalized = Array.from(
+    new Set(list.map(normalizeEmail).filter((email) => isValidEmail(email))),
+  );
+  return normalized;
+}
+
+function htmlToText(html = "") {
+  return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function sendTransactionalEmail({
+  to,
+  subject,
+  html,
+  text,
+  attachments,
+}) {
+  assertEmailConfigured();
+  const recipients = normalizeRecipients(to);
+
+  if (recipients.length === 0) {
+    throw new Error("No valid recipient email addresses were provided");
+  }
+
+  if (!subject) {
+    throw new Error("Email subject is required");
+  }
+
+  const payload = {
+    from: getEmailFrom(),
+    to: recipients,
+    subject,
+    html: html || undefined,
+    text: text || (html ? htmlToText(html) : undefined),
+    attachments: attachments?.length ? attachments : undefined,
+  };
+
+  const replyTo = getEmailReplyTo();
+  if (replyTo && isValidEmail(replyTo)) {
+    payload.replyTo = replyTo;
+  }
+
+  const { data, error } = await resend.emails.send(payload);
+  if (error) {
+    const detail = [error.message, error.name, error.statusCode]
+      .filter(Boolean)
+      .join(" | ");
+    throw new Error(
+      `Resend send failed: ${detail || "Unknown provider error"}`,
+    );
+  }
+
+  return {
+    success: true,
+    messageId: data?.id,
+  };
+}
+
 /**
  * Builds the shared HTML email shell.
  * @param {string} headerHtml    - HTML content inside the header div
@@ -115,16 +197,20 @@ const sendWorkerInvitation = async (
   invitedRole = "worker",
 ) => {
   try {
-    assertEmailConfigured();
+    const recipient = normalizeEmail(email);
+    if (!isValidEmail(recipient)) {
+      throw new Error("Invalid recipient email address");
+    }
+
     const inviteLink = buildAppUrl("/accept-invite", {
       token: inviteToken,
-      email,
+      email: recipient,
       department,
       role: invitedRole,
     });
     const inviteDeepLink = buildDeepLink("accept-invite", {
       token: inviteToken,
-      email,
+      email: recipient,
       department,
       role: invitedRole,
     });
@@ -181,25 +267,16 @@ const sendWorkerInvitation = async (
       }
     `;
 
-    const html = buildEmailBase(
-      headerHtml,
-      bodyHtml,
-      extraCss,
-    );
+    const html = buildEmailBase(headerHtml, bodyHtml, extraCss);
 
-    const { data, error } = await resend.emails.send({
-      from: getEmailFrom(),
-      to: [email],
+    const result = await sendTransactionalEmail({
+      to: [recipient],
       subject: `Invitation to Join ${department} Department as ${invitedRole === "head" ? "Department Head" : "Worker"}`,
       html,
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    console.log("✅ Invitation email sent:", data.id);
-    return { success: true, messageId: data.id };
+    console.log("✅ Invitation email sent:", result.messageId);
+    return result;
   } catch (error) {
     console.error("❌ Email sending failed:", error);
     throw new Error(`Failed to send invitation email: ${error.message}`);
@@ -211,7 +288,6 @@ const sendWorkerInvitation = async (
  */
 const sendComplaintRegistered = async (userEmail, userName, complaintData) => {
   try {
-    assertEmailConfigured();
     const { ticketId, title, department, priority, locationName } =
       complaintData;
     const viewLink = buildAppUrl("/complaints/complaint-details", {
@@ -302,25 +378,16 @@ const sendComplaintRegistered = async (userEmail, userName, complaintData) => {
       }
     `;
 
-    const html = buildEmailBase(
-      headerHtml,
-      bodyHtml,
-      extraCss,
-    );
+    const html = buildEmailBase(headerHtml, bodyHtml, extraCss);
 
-    const { data, error } = await resend.emails.send({
-      from: getEmailFrom(),
+    const result = await sendTransactionalEmail({
       to: [userEmail],
       subject: `Complaint Registered - Ticket #${ticketId}`,
       html,
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    console.log("✅ Complaint registration email sent:", data.id);
-    return { success: true, messageId: data.id };
+    console.log("✅ Complaint registration email sent:", result.messageId);
+    return result;
   } catch (error) {
     console.error("❌ Email sending failed:", error);
     // Don't throw - we don't want to block complaint creation if email fails
@@ -338,7 +405,6 @@ const sendComplaintCompleted = async (
   feedbackLink,
 ) => {
   try {
-    assertEmailConfigured();
     const { ticketId, title, department, completedAt } = complaintData;
     const viewLink = buildAppUrl("/complaints/complaint-details", {
       id: complaintData._id,
@@ -419,25 +485,16 @@ const sendComplaintCompleted = async (
       .feedback-box h3 { margin-top: 0; color: #92400e; }
     `;
 
-    const html = buildEmailBase(
-      headerHtml,
-      bodyHtml,
-      extraCss,
-    );
+    const html = buildEmailBase(headerHtml, bodyHtml, extraCss);
 
-    const { data, error } = await resend.emails.send({
-      from: getEmailFrom(),
+    const result = await sendTransactionalEmail({
       to: [userEmail],
       subject: `Complaint Resolved - Ticket #${ticketId}`,
       html,
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    console.log("✅ Complaint completion email sent:", data.id);
-    return { success: true, messageId: data.id };
+    console.log("✅ Complaint completion email sent:", result.messageId);
+    return result;
   } catch (error) {
     console.error("❌ Email sending failed:", error);
     // Don't throw - we don't want to block complaint completion if email fails
@@ -465,7 +522,6 @@ const sendEmailWithAttachment = async ({
   html,
   attachments = [],
 }) => {
-  assertEmailConfigured();
   if (!to) {
     throw new Error("Recipient email is required");
   }
@@ -487,31 +543,21 @@ const sendEmailWithAttachment = async ({
     })
     .filter(Boolean);
 
-  const { data, error } = await resend.emails.send({
-    from: getEmailFrom(),
-    to: Array.isArray(to) ? to : [to],
+  const result = await sendTransactionalEmail({
+    to,
     subject,
-    text: text || undefined,
-    html: html || undefined,
-    attachments:
-      normalizedAttachments.length > 0 ? normalizedAttachments : undefined,
+    text,
+    html,
+    attachments: normalizedAttachments,
   });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return {
-    success: true,
-    messageId: data?.id,
-  };
+  return result;
 };
 
 /**
  * Send email verification link
  */
 const sendEmailVerification = async (email, fullName, token) => {
-  assertEmailConfigured();
   const verifyLink = buildAppUrl("/verify-email", { token });
   const verifyDeepLink = buildDeepLink("verify-email", { token });
 
@@ -565,28 +611,20 @@ const sendEmailVerification = async (email, fullName, token) => {
     .link-box a { color: #10b981; font-size: 13px; }
   `;
 
-  const html = buildEmailBase(
-    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-    headerHtml,
-    bodyHtml,
-    extraCss,
-  );
+  const html = buildEmailBase(headerHtml, bodyHtml, extraCss);
 
-  const { data, error } = await resend.emails.send({
-    from: getEmailFrom(),
+  const result = await sendTransactionalEmail({
     to: [email],
     subject: "Verify your Sahayak email address",
     html,
   });
-  if (error) throw new Error(error.message);
-  return { success: true, messageId: data.id };
+  return result;
 };
 
 /**
  * Send password reset link
  */
 const sendPasswordResetEmail = async (email, fullName, token) => {
-  assertEmailConfigured();
   const resetLink = buildAppUrl("/reset-password", { token });
   const resetDeepLink = buildDeepLink("reset-password", { token });
 
@@ -640,21 +678,14 @@ const sendPasswordResetEmail = async (email, fullName, token) => {
     .link-box a { color: #d97706; font-size: 13px; }
   `;
 
-  const html = buildEmailBase(
-    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-    headerHtml,
-    bodyHtml,
-    extraCss,
-  );
+  const html = buildEmailBase(headerHtml, bodyHtml, extraCss);
 
-  const { data, error } = await resend.emails.send({
-    from: getEmailFrom(),
+  const result = await sendTransactionalEmail({
     to: [email],
     subject: "Reset your Sahayak password",
     html,
   });
-  if (error) throw new Error(error.message);
-  return { success: true, messageId: data.id };
+  return result;
 };
 
 module.exports = {

@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import apiCall from "./api";
@@ -10,6 +11,26 @@ const ANDROID_DEFAULT_CHANNEL_ID = "default";
 let hasLoggedPushSetupWarning = false;
 let skipPushRegistrationForSession = false;
 let pushNotificationsInitialized = false;
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || "").trim(),
+  );
+}
+
+function getExpoProjectId() {
+  const projectId =
+    (
+    Constants?.expoConfig?.extra?.eas?.projectId ||
+    Constants?.easConfig?.projectId ||
+    Constants?.expoConfig?.projectId ||
+    process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
+    ""
+    )
+      .trim();
+
+  return isUuid(projectId) ? projectId : "";
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -79,7 +100,14 @@ export async function registerPushToken() {
 
     if (finalStatus !== "granted") return;
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const projectId = getExpoProjectId();
+    if (!projectId) {
+      skipPushRegistrationForSession = true;
+      hasLoggedPushSetupWarning = true;
+      return;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     const pushToken = tokenData?.data;
     if (!pushToken) return;
 
@@ -104,10 +132,19 @@ export async function registerPushToken() {
     }
   } catch (error) {
     const message = error?.message || "";
+    const invalidProjectId =
+      message.includes("projectId") &&
+      (message.includes("Invalid uuid") || message.includes("VALIDATION_ERROR"));
     const missingAndroidFcmSetup =
       Platform.OS === "android" &&
       (message.includes("Default FirebaseApp is not initialized") ||
         message.includes("fcm-credentials"));
+
+    if (invalidProjectId) {
+      skipPushRegistrationForSession = true;
+      hasLoggedPushSetupWarning = true;
+      return;
+    }
 
     if (missingAndroidFcmSetup) {
       skipPushRegistrationForSession = true;

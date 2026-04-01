@@ -43,7 +43,7 @@ export default function ThemeSettings() {
     <View style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
       <BackButtonHeader title={t("more.theme.title")} />
 
-      <View style={{ padding: 16 }}>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
         {/* CURRENT THEME CARD */}
         <View
           style={{

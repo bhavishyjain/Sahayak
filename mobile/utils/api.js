@@ -160,6 +160,7 @@ const apiCall = async ({
   headers = {},
   auth = null,
   responseType = undefined,
+  suppressErrorLog = false,
 }) => {
   // Silently abort in-flight calls fired after intentional logout
   if (isLoggingOut) {
@@ -314,8 +315,10 @@ const apiCall = async ({
           : undefined,
     };
   } catch (error) {
-    console.error("API Call Error:", error.message);
-    console.error(error);
+    if (!suppressErrorLog) {
+      console.error("API Call Error:", error.message);
+      console.error(error);
+    }
     throw error;
   }
 };

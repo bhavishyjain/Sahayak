@@ -173,7 +173,7 @@ export default function AcceptInvite() {
           )}
           fallbackHref="/(app)/(tabs)/home"
         />
-        <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
           <View className="w-full items-start mb-4">
             <Image
               source={require("../../../assets/images/mono-logo.png")}
@@ -323,7 +323,7 @@ export default function AcceptInvite() {
       />
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         enableOnAndroid

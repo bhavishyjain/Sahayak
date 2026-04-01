@@ -74,7 +74,7 @@ export default function Login() {
     <KeyboardAwareScrollView
       style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}
       contentContainerStyle={{
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         paddingVertical: 20,
         flexGrow: 1,
       }}
