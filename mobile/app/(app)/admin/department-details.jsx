@@ -22,9 +22,7 @@ import DialogBox from "../../../components/DialogBox";
 import PressableBlock from "../../../components/PressableBlock";
 import { darkColors, lightColors } from "../../../colors";
 import apiCall from "../../../utils/api";
-import {
-  COMPLAINT_STATUS_META,
-} from "../../../data/complaintStatus";
+import { COMPLAINT_STATUS_META } from "../../../data/complaintStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import {
@@ -78,16 +76,28 @@ function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
     >
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-3">
-          <Text className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: colors.textPrimary }}
+          >
             {member?.fullName || member?.username}
           </Text>
-          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mt-1"
+            style={{ color: colors.textSecondary }}
+          >
             {roleLabel}
           </Text>
-          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mt-1"
+            style={{ color: colors.textSecondary }}
+          >
             @{member?.username}
           </Text>
-          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mt-1"
+            style={{ color: colors.textSecondary }}
+          >
             {member?.email || t("adminScreens.departmentDetails.noEmail")} •{" "}
             {member?.phone || t("adminScreens.departmentDetails.noPhone")}
           </Text>
@@ -113,7 +123,9 @@ function MemberRow({ member, roleLabel, colors, onToggle, onPress }) {
         onPress={onToggle}
         className="rounded-xl py-3 items-center mt-4"
         style={{
-          backgroundColor: active ? colors.danger + "18" : colors.success + "18",
+          backgroundColor: active
+            ? colors.danger + "18"
+            : colors.success + "18",
         }}
       >
         <Text
@@ -142,13 +154,24 @@ function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
     >
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-3">
-          <Text className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: colors.textPrimary }}
+          >
             {invitation?.email}
           </Text>
-          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-            {t("adminScreens.departmentDetails.invitedRole", { role: roleLabel })}
+          <Text
+            className="text-xs mt-1"
+            style={{ color: colors.textSecondary }}
+          >
+            {t("adminScreens.departmentDetails.invitedRole", {
+              role: roleLabel,
+            })}
           </Text>
-          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mt-1"
+            style={{ color: colors.textSecondary }}
+          >
             {t("adminScreens.departmentDetails.pendingInvitation")}
           </Text>
         </View>
@@ -156,8 +179,11 @@ function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
           className="px-2.5 py-1 rounded-full"
           style={{ backgroundColor: colors.warning + "18" }}
         >
-          <Text className="text-[11px] font-semibold" style={{ color: colors.warning }}>
-            {t("common.status.pending")}
+          <Text
+            className="text-[11px] font-semibold"
+            style={{ color: colors.warning }}
+          >
+            {t("status.pending")}
           </Text>
         </View>
       </View>
@@ -169,7 +195,10 @@ function InvitationRow({ invitation, roleLabel, colors, onRevoke }) {
       >
         <View className="flex-row items-center">
           <Trash2 size={15} color={colors.danger} />
-          <Text className="text-sm font-semibold ml-2" style={{ color: colors.danger }}>
+          <Text
+            className="text-sm font-semibold ml-2"
+            style={{ color: colors.danger }}
+          >
             {t("adminScreens.departmentDetails.revoke")}
           </Text>
         </View>
@@ -210,14 +239,18 @@ function DropdownSection({
               <Icon size={18} color={tone} />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-semibold" style={{ color: colors.textPrimary }}>
+              <Text
+                className="text-base font-semibold"
+                style={{ color: colors.textPrimary }}
+              >
                 {title}
               </Text>
-              <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+              <Text
+                className="text-xs mt-1"
+                style={{ color: colors.textSecondary }}
+              >
                 {count} {count === 1 ? "member" : "members"}
-                {pendingCount > 0
-                  ? ` • ${pendingCount} pending`
-                  : ""}
+                {pendingCount > 0 ? ` • ${pendingCount} pending` : ""}
               </Text>
             </View>
           </View>
@@ -362,7 +395,9 @@ export default function DepartmentDetailsScreen() {
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: t("adminScreens.departmentDetails.toasts.memberUpdateFailedTitle"),
+        text1: t(
+          "adminScreens.departmentDetails.toasts.memberUpdateFailedTitle",
+        ),
         text2:
           mutationError?.response?.data?.message ||
           t("adminScreens.departmentDetails.toasts.memberUpdateFailedMessage"),
@@ -424,7 +459,10 @@ export default function DepartmentDetailsScreen() {
       }
       return apiCall({
         method: "DELETE",
-        url: DEPARTMENT_INVITATION_DETAIL_URL(departmentRecord.id, invitation.id),
+        url: DEPARTMENT_INVITATION_DETAIL_URL(
+          departmentRecord.id,
+          invitation.id,
+        ),
       });
     },
     onSuccess: () => {
@@ -465,20 +503,32 @@ export default function DepartmentDetailsScreen() {
       Toast.show({
         type: "success",
         text1: nextActiveState
-          ? t("adminScreens.departmentDetails.toasts.departmentReactivatedTitle")
-          : t("adminScreens.departmentDetails.toasts.departmentDeactivatedTitle"),
+          ? t(
+              "adminScreens.departmentDetails.toasts.departmentReactivatedTitle",
+            )
+          : t(
+              "adminScreens.departmentDetails.toasts.departmentDeactivatedTitle",
+            ),
         text2: nextActiveState
-          ? t("adminScreens.departmentDetails.toasts.departmentReactivatedMessage")
-          : t("adminScreens.departmentDetails.toasts.departmentDeactivatedMessage"),
+          ? t(
+              "adminScreens.departmentDetails.toasts.departmentReactivatedMessage",
+            )
+          : t(
+              "adminScreens.departmentDetails.toasts.departmentDeactivatedMessage",
+            ),
       });
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: t("adminScreens.departmentDetails.toasts.departmentStatusFailedTitle"),
+        text1: t(
+          "adminScreens.departmentDetails.toasts.departmentStatusFailedTitle",
+        ),
         text2:
           mutationError?.response?.data?.message ||
-          t("adminScreens.departmentDetails.toasts.departmentStatusFailedMessage"),
+          t(
+            "adminScreens.departmentDetails.toasts.departmentStatusFailedMessage",
+          ),
       });
     },
   });
@@ -496,14 +546,20 @@ export default function DepartmentDetailsScreen() {
     },
     onSuccess: (response) => {
       const nextDepartmentName =
-        response?.data?.name || response?.rawData?.department?.name || renameValue.trim();
+        response?.data?.name ||
+        response?.rawData?.department?.name ||
+        renameValue.trim();
       invalidateAdminQueries();
       setConfirmState(null);
       setRenameValue("");
       Toast.show({
         type: "success",
-        text1: t("adminScreens.departmentDetails.toasts.departmentUpdatedTitle"),
-        text2: t("adminScreens.departmentDetails.toasts.departmentUpdatedMessage"),
+        text1: t(
+          "adminScreens.departmentDetails.toasts.departmentUpdatedTitle",
+        ),
+        text2: t(
+          "adminScreens.departmentDetails.toasts.departmentUpdatedMessage",
+        ),
       });
       router.replace(
         `/(app)/admin/department-details?department=${encodeURIComponent(nextDepartmentName)}`,
@@ -512,10 +568,14 @@ export default function DepartmentDetailsScreen() {
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: t("adminScreens.departmentDetails.toasts.departmentUpdateFailedTitle"),
+        text1: t(
+          "adminScreens.departmentDetails.toasts.departmentUpdateFailedTitle",
+        ),
         text2:
           mutationError?.response?.data?.message ||
-          t("adminScreens.departmentDetails.toasts.departmentUpdateFailedMessage"),
+          t(
+            "adminScreens.departmentDetails.toasts.departmentUpdateFailedMessage",
+          ),
       });
     },
   });
@@ -535,25 +595,36 @@ export default function DepartmentDetailsScreen() {
       setConfirmState(null);
       Toast.show({
         type: "success",
-        text1: t("adminScreens.departmentDetails.toasts.departmentDeletedTitle"),
-        text2: t("adminScreens.departmentDetails.toasts.departmentDeletedMessage"),
+        text1: t(
+          "adminScreens.departmentDetails.toasts.departmentDeletedTitle",
+        ),
+        text2: t(
+          "adminScreens.departmentDetails.toasts.departmentDeletedMessage",
+        ),
       });
       router.replace("/(app)/(tabs)/admin-departments");
     },
     onError: (mutationError) => {
       Toast.show({
         type: "error",
-        text1: t("adminScreens.departmentDetails.toasts.departmentDeleteFailedTitle"),
+        text1: t(
+          "adminScreens.departmentDetails.toasts.departmentDeleteFailedTitle",
+        ),
         text2:
           mutationError?.response?.data?.message ||
-          t("adminScreens.departmentDetails.toasts.departmentDeleteFailedMessage"),
+          t(
+            "adminScreens.departmentDetails.toasts.departmentDeleteFailedMessage",
+          ),
       });
     },
   });
 
   const heads = useMemo(() => data?.heads ?? [], [data?.heads]);
   const workers = useMemo(() => data?.workers ?? [], [data?.workers]);
-  const invitations = useMemo(() => data?.invitations ?? [], [data?.invitations]);
+  const invitations = useMemo(
+    () => data?.invitations ?? [],
+    [data?.invitations],
+  );
   const analytics = useMemo(() => data?.analytics ?? {}, [data?.analytics]);
   const headInvitations = useMemo(
     () => invitations.filter((item) => item.role === "head"),
@@ -591,9 +662,14 @@ export default function DepartmentDetailsScreen() {
   }
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.backgroundPrimary }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.backgroundPrimary }}
+    >
       <BackButtonHeader
-        title={t("adminScreens.departmentDetails.title", { department: departmentName })}
+        title={t("adminScreens.departmentDetails.title", {
+          department: departmentName,
+        })}
         fallbackHref="/(app)/(tabs)/admin-departments"
       />
 
@@ -618,7 +694,10 @@ export default function DepartmentDetailsScreen() {
             className="rounded-2xl py-4 items-center"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-sm font-semibold" style={{ color: colors.dark }}>
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: colors.dark }}
+            >
               {t("adminScreens.departmentDetails.editDepartmentName")}
             </Text>
           </PressableBlock>
@@ -638,7 +717,10 @@ export default function DepartmentDetailsScreen() {
                   : colors.warning,
             }}
           >
-            <Text className="text-sm font-semibold" style={{ color: colors.dark }}>
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: colors.dark }}
+            >
               {departmentRecord?.isActive === false
                 ? t("adminScreens.departmentDetails.reactivateDepartment")
                 : t("adminScreens.departmentDetails.deactivateDepartment")}
@@ -650,7 +732,10 @@ export default function DepartmentDetailsScreen() {
             className="rounded-2xl py-4 items-center"
             style={{ backgroundColor: colors.danger }}
           >
-            <Text className="text-sm font-semibold" style={{ color: colors.light }}>
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: colors.light }}
+            >
               {t("adminScreens.departmentDetails.deleteDepartment")}
             </Text>
           </PressableBlock>
@@ -727,7 +812,9 @@ export default function DepartmentDetailsScreen() {
             <InvitationRow
               key={invitation.id}
               invitation={invitation}
-              roleLabel={t("adminScreens.departmentDetails.departmentHeadLower")}
+              roleLabel={t(
+                "adminScreens.departmentDetails.departmentHeadLower",
+              )}
               colors={colors}
               onRevoke={() =>
                 setConfirmState({
@@ -810,17 +897,27 @@ export default function DepartmentDetailsScreen() {
                       ? t("adminScreens.departmentDetails.hodShort")
                       : t("adminScreens.departmentDetails.workerLower"),
                 })
-            : confirmState?.type === "revoke-invite"
-              ? t("adminScreens.departmentDetails.dialog.revokeInviteTitle")
-            : confirmState?.type === "delete"
-              ? t("adminScreens.departmentDetails.dialog.deleteDepartmentTitle")
-            : confirmState?.type === "department"
-            ? confirmState?.isActive
-              ? t("adminScreens.departmentDetails.dialog.reactivateDepartmentTitle")
-              : t("adminScreens.departmentDetails.dialog.deactivateDepartmentTitle")
-            : confirmState?.isActive
-              ? t("adminScreens.departmentDetails.dialog.reactivateMemberTitle")
-              : t("adminScreens.departmentDetails.dialog.deactivateMemberTitle")
+              : confirmState?.type === "revoke-invite"
+                ? t("adminScreens.departmentDetails.dialog.revokeInviteTitle")
+                : confirmState?.type === "delete"
+                  ? t(
+                      "adminScreens.departmentDetails.dialog.deleteDepartmentTitle",
+                    )
+                  : confirmState?.type === "department"
+                    ? confirmState?.isActive
+                      ? t(
+                          "adminScreens.departmentDetails.dialog.reactivateDepartmentTitle",
+                        )
+                      : t(
+                          "adminScreens.departmentDetails.dialog.deactivateDepartmentTitle",
+                        )
+                    : confirmState?.isActive
+                      ? t(
+                          "adminScreens.departmentDetails.dialog.reactivateMemberTitle",
+                        )
+                      : t(
+                          "adminScreens.departmentDetails.dialog.deactivateMemberTitle",
+                        )
         }
         message={
           confirmState?.type === "rename"
@@ -833,27 +930,42 @@ export default function DepartmentDetailsScreen() {
                       ? t("adminScreens.departmentDetails.departmentHeadLower")
                       : t("adminScreens.departmentDetails.workerLower"),
                 })
-            : confirmState?.type === "revoke-invite"
-              ? t("adminScreens.departmentDetails.dialog.revokeInviteMessage", {
-                  email: confirmState?.invitation?.email,
-                })
-            : confirmState?.type === "delete"
-              ? t("adminScreens.departmentDetails.dialog.deleteDepartmentMessage")
-            : confirmState?.type === "department"
-            ? confirmState?.isActive
-              ? t("adminScreens.departmentDetails.dialog.reactivateDepartmentMessage")
-              : t("adminScreens.departmentDetails.dialog.deactivateDepartmentMessage")
-            : confirmState?.isActive
-              ? t("adminScreens.departmentDetails.dialog.reactivateMemberMessage", {
-                  name:
-                    confirmState?.member?.fullName ||
-                    confirmState?.member?.username,
-                })
-              : t("adminScreens.departmentDetails.dialog.deactivateMemberMessage", {
-                  name:
-                    confirmState?.member?.fullName ||
-                    confirmState?.member?.username,
-                })
+              : confirmState?.type === "revoke-invite"
+                ? t(
+                    "adminScreens.departmentDetails.dialog.revokeInviteMessage",
+                    {
+                      email: confirmState?.invitation?.email,
+                    },
+                  )
+                : confirmState?.type === "delete"
+                  ? t(
+                      "adminScreens.departmentDetails.dialog.deleteDepartmentMessage",
+                    )
+                  : confirmState?.type === "department"
+                    ? confirmState?.isActive
+                      ? t(
+                          "adminScreens.departmentDetails.dialog.reactivateDepartmentMessage",
+                        )
+                      : t(
+                          "adminScreens.departmentDetails.dialog.deactivateDepartmentMessage",
+                        )
+                    : confirmState?.isActive
+                      ? t(
+                          "adminScreens.departmentDetails.dialog.reactivateMemberMessage",
+                          {
+                            name:
+                              confirmState?.member?.fullName ||
+                              confirmState?.member?.username,
+                          },
+                        )
+                      : t(
+                          "adminScreens.departmentDetails.dialog.deactivateMemberMessage",
+                          {
+                            name:
+                              confirmState?.member?.fullName ||
+                              confirmState?.member?.username,
+                          },
+                        )
         }
         showInput={
           confirmState?.type === "rename" || confirmState?.type === "invite"
@@ -861,7 +973,9 @@ export default function DepartmentDetailsScreen() {
         inputPlaceholder={
           confirmState?.type === "invite"
             ? t("adminScreens.departmentDetails.dialog.emailPlaceholder")
-            : t("adminScreens.departmentDetails.dialog.departmentNamePlaceholder")
+            : t(
+                "adminScreens.departmentDetails.dialog.departmentNamePlaceholder",
+              )
         }
         inputKeyboardType={
           confirmState?.type === "invite" ? "email-address" : "default"
@@ -875,25 +989,29 @@ export default function DepartmentDetailsScreen() {
             ? t("common.save")
             : confirmState?.type === "invite"
               ? t("adminScreens.departmentDetails.dialog.sendInvite")
-            : confirmState?.type === "revoke-invite"
-              ? t("adminScreens.departmentDetails.revoke")
-            : confirmState?.type === "delete"
-              ? t("common.delete")
-            : confirmState?.type === "department"
-            ? confirmState?.isActive
-              ? t("adminScreens.departmentDetails.reactivate")
-              : t("adminScreens.departmentDetails.deactivate")
-            : confirmState?.isActive
-              ? t("adminScreens.departmentDetails.reactivate")
-              : t("adminScreens.departmentDetails.deactivate")
+              : confirmState?.type === "revoke-invite"
+                ? t("adminScreens.departmentDetails.revoke")
+                : confirmState?.type === "delete"
+                  ? t("common.delete")
+                  : confirmState?.type === "department"
+                    ? confirmState?.isActive
+                      ? t("adminScreens.departmentDetails.reactivate")
+                      : t("adminScreens.departmentDetails.deactivate")
+                    : confirmState?.isActive
+                      ? t("adminScreens.departmentDetails.reactivate")
+                      : t("adminScreens.departmentDetails.deactivate")
         }
         onConfirm={() => {
           if (confirmState?.type === "rename") {
             if (!renameValue.trim()) {
               Toast.show({
                 type: "error",
-                text1: t("adminScreens.departmentDetails.toasts.nameRequiredTitle"),
-                text2: t("adminScreens.departmentDetails.toasts.nameRequiredMessage"),
+                text1: t(
+                  "adminScreens.departmentDetails.toasts.nameRequiredTitle",
+                ),
+                text2: t(
+                  "adminScreens.departmentDetails.toasts.nameRequiredMessage",
+                ),
               });
               return;
             }
@@ -904,8 +1022,12 @@ export default function DepartmentDetailsScreen() {
             if (!inviteEmail.trim()) {
               Toast.show({
                 type: "error",
-                text1: t("adminScreens.departmentDetails.toasts.emailRequiredTitle"),
-                text2: t("adminScreens.departmentDetails.toasts.emailRequiredMessage"),
+                text1: t(
+                  "adminScreens.departmentDetails.toasts.emailRequiredTitle",
+                ),
+                text2: t(
+                  "adminScreens.departmentDetails.toasts.emailRequiredMessage",
+                ),
               });
               return;
             }

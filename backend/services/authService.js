@@ -104,12 +104,6 @@ function buildUserPayload(user) {
 
   if (user.role === "worker") {
     payload.rating = Number.isFinite(user.rating) ? user.rating : null;
-    payload.performanceMetrics = user.performanceMetrics || {
-      totalCompleted: 0,
-      averageCompletionTime: 0,
-      currentWeekCompleted: 0,
-      customerRating: null,
-    };
   }
 
   return payload;

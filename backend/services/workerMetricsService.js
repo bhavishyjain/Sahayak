@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const Complaint = require("../models/Complaint");
+const User = require("../models/User");
 const { atStartOfToday, atStartOfWeek } = require("../utils/normalize");
 
 function buildMetricsGroupFields(todayStart, weekStart) {
@@ -123,8 +125,234 @@ function calculateWorkerPerformanceScore(metrics) {
   return Math.min(Math.round((completedCount / totalAssigned) * 100), 100);
 }
 
+async function syncWorkerRatings(workerIds = []) {
+  const normalizedIds = [...new Set(
+    workerIds
+      .map((workerId) => String(workerId || "").trim())
+      .filter(Boolean),
+  )];
+
+  if (normalizedIds.length === 0) {
+    return {};
+  }
+
+  const rows = await Complaint.aggregate([
+    { $unwind: "$assignedWorkers" },
+    {
+      $match: {
+        "assignedWorkers.workerId": {
+          $in: normalizedIds.map(
+            (workerId) => new mongoose.Types.ObjectId(workerId),
+          ),
+        },
+        status: "resolved",
+        "feedback.rating": { $gte: 1 },
+      },
+    },
+    {
+      $group: {
+        _id: "$assignedWorkers.workerId",
+        averageRating: { $avg: "$feedback.rating" },
+        totalFeedback: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const summaryByWorkerId = rows.reduce((acc, row) => {
+    const roundedAverage =
+      Math.round((Number(row.averageRating || 0) || 0) * 10) / 10;
+    acc[String(row._id)] = {
+      averageRating: roundedAverage,
+      totalFeedback: Number(row.totalFeedback || 0),
+    };
+    return acc;
+  }, {});
+
+  const bulkOps = normalizedIds.map((workerId) => {
+    const summary = summaryByWorkerId[workerId] || {
+      averageRating: null,
+      totalFeedback: 0,
+    };
+
+    return {
+      updateOne: {
+        filter: { _id: workerId, role: "worker" },
+        update: {
+          $set: {
+            rating: summary.averageRating,
+            "performanceMetrics.customerRating": summary.averageRating,
+          },
+        },
+      },
+    };
+  });
+
+  if (bulkOps.length > 0) {
+    await User.bulkWrite(bulkOps);
+  }
+
+  return summaryByWorkerId;
+}
+
+async function getWorkerRatingsBulk(workerIds = []) {
+  const normalizedIds = [...new Set(
+    workerIds
+      .map((workerId) => String(workerId || "").trim())
+      .filter(Boolean),
+  )];
+
+  if (normalizedIds.length === 0) {
+    return {};
+  }
+
+  const rows = await Complaint.aggregate([
+    { $unwind: "$assignedWorkers" },
+    {
+      $match: {
+        "assignedWorkers.workerId": {
+          $in: normalizedIds.map(
+            (workerId) => new mongoose.Types.ObjectId(workerId),
+          ),
+        },
+        status: "resolved",
+        "feedback.rating": { $gte: 1 },
+      },
+    },
+    {
+      $group: {
+        _id: "$assignedWorkers.workerId",
+        averageRating: { $avg: "$feedback.rating" },
+        totalFeedback: { $sum: 1 },
+      },
+    },
+  ]);
+
+  return rows.reduce((acc, row) => {
+    acc[String(row._id)] = {
+      averageRating:
+        Math.round((Number(row.averageRating || 0) || 0) * 10) / 10,
+      totalFeedback: Number(row.totalFeedback || 0),
+    };
+    return acc;
+  }, {});
+}
+
+async function syncWorkerPerformanceMetrics(workerIds = [], now = new Date()) {
+  const normalizedIds = [...new Set(
+    workerIds
+      .map((workerId) => String(workerId || "").trim())
+      .filter(Boolean),
+  )];
+
+  if (normalizedIds.length === 0) {
+    return {};
+  }
+
+  const objectIds = normalizedIds.map(
+    (workerId) => new mongoose.Types.ObjectId(workerId),
+  );
+  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const rows = await Complaint.aggregate([
+    { $unwind: "$assignedWorkers" },
+    {
+      $match: {
+        "assignedWorkers.workerId": { $in: objectIds },
+        status: "resolved",
+      },
+    },
+    {
+      $project: {
+        workerId: "$assignedWorkers.workerId",
+        actualCompletionTime: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        resolvedAt: 1,
+      },
+    },
+    {
+      $addFields: {
+        effectiveResolvedAt: {
+          $ifNull: ["$resolvedAt", { $ifNull: ["$updatedAt", "$createdAt"] }],
+        },
+        computedCompletionHours: {
+          $cond: [
+            { $gt: ["$actualCompletionTime", 0] },
+            "$actualCompletionTime",
+            {
+              $divide: [
+                {
+                  $subtract: [
+                    { $ifNull: ["$resolvedAt", { $ifNull: ["$updatedAt", "$createdAt"] }] },
+                    "$createdAt",
+                  ],
+                },
+                1000 * 60 * 60,
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: "$workerId",
+        totalCompleted: { $sum: 1 },
+        currentWeekCompleted: {
+          $sum: {
+            $cond: [{ $gte: ["$effectiveResolvedAt", weekStart] }, 1, 0],
+          },
+        },
+        averageCompletionTime: { $avg: "$computedCompletionHours" },
+      },
+    },
+  ]);
+
+  const summaryByWorkerId = rows.reduce((acc, row) => {
+    acc[String(row._id)] = {
+      totalCompleted: Number(row.totalCompleted || 0),
+      currentWeekCompleted: Number(row.currentWeekCompleted || 0),
+      averageCompletionTime:
+        Math.round((Number(row.averageCompletionTime || 0) || 0) * 10) / 10,
+    };
+    return acc;
+  }, {});
+
+  const bulkOps = normalizedIds.map((workerId) => {
+    const summary = summaryByWorkerId[workerId] || {
+      totalCompleted: 0,
+      currentWeekCompleted: 0,
+      averageCompletionTime: 0,
+    };
+
+    return {
+      updateOne: {
+        filter: { _id: workerId, role: "worker" },
+        update: {
+          $set: {
+            "performanceMetrics.totalCompleted": summary.totalCompleted,
+            "performanceMetrics.currentWeekCompleted":
+              summary.currentWeekCompleted,
+            "performanceMetrics.averageCompletionTime":
+              summary.averageCompletionTime,
+          },
+        },
+      },
+    };
+  });
+
+  if (bulkOps.length > 0) {
+    await User.bulkWrite(bulkOps);
+  }
+
+  return summaryByWorkerId;
+}
+
 module.exports = {
   getWorkerMetrics,
   getWorkerMetricsBulk,
+  getWorkerRatingsBulk,
+  syncWorkerPerformanceMetrics,
   calculateWorkerPerformanceScore,
+  syncWorkerRatings,
 };

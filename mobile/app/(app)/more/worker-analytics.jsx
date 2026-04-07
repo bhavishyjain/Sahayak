@@ -1,11 +1,13 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivitySquare,
   BarChart2,
+  ChevronRight,
   CheckCircle,
   Clock3,
   Star,
   Target,
+  Trophy,
 } from "lucide-react-native";
 import { useEffect, useMemo } from "react";
 import {
@@ -14,6 +16,7 @@ import {
   RefreshControl,
   ScrollView,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import Svg, { G, Line, Rect, Text as SvgText } from "react-native-svg";
@@ -290,6 +293,7 @@ function StatusMeter({ label, count, total, tone, colors }) {
 
 export default function WorkerAnalytics() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { colorScheme } = useTheme();
   const { workerId } = useLocalSearchParams();
   const colors = useMemo(
@@ -365,6 +369,8 @@ export default function WorkerAnalytics() {
   const workerRating = Number.isFinite(data?.worker?.rating)
     ? data.worker.rating.toFixed(1)
     : t("more.workerAnalyticsScreen.noValue");
+  const trophyHistory = data?.achievements?.trophyHistory ?? [];
+  const trophyCount = Number(data?.achievements?.trophyCount ?? trophyHistory.length);
 
   if (loading) {
     return (
@@ -399,6 +405,67 @@ export default function WorkerAnalytics() {
           />
         }
       >
+        <View
+          className="rounded-2xl p-5 mb-5"
+          style={{
+            backgroundColor: colors.backgroundSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <Trophy
+                size={18}
+                color={colors.warning}
+                style={{ marginRight: 8 }}
+              />
+              <Text
+                className="text-base font-bold"
+                style={{ color: colors.textPrimary }}
+              >
+                {t("more.workerAnalyticsScreen.trophies.title")}
+              </Text>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/more/worker-trophies",
+                  params: workerId ? { workerId } : {},
+                })
+              }
+              className="flex-row items-center"
+            >
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: colors.primary }}
+              >
+                {t("more.workerAnalyticsScreen.trophies.viewAll")}
+              </Text>
+              <ChevronRight
+                size={16}
+                color={colors.primary}
+                style={{ marginLeft: 4 }}
+              />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-row items-end justify-between mt-5">
+            <Text
+              className="text-4xl font-bold"
+              style={{ color: colors.textPrimary }}
+            >
+              {trophyCount}
+            </Text>
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: colors.textSecondary }}
+            >
+              {t("more.workerAnalyticsScreen.trophies.countLabel")}
+            </Text>
+          </View>
+        </View>
+
         <View className="mb-5" style={{ gap: 12 }}>
           <View className="flex-row" style={{ gap: 12 }}>
             <SummaryTile

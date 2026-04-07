@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { Star, MessageSquareText } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -49,6 +50,7 @@ function Stars({ value, colors }) {
 }
 
 export default function WorkerFeedback() {
+  const { workerId } = useLocalSearchParams();
   const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
@@ -70,6 +72,7 @@ export default function WorkerFeedback() {
         const response = await apiCall({
           method: "GET",
           url: WORKER_FEEDBACK_URL,
+          params: workerId ? { workerId } : undefined,
         });
         setSummary(
           response?.data?.summary ?? { averageRating: 0, totalFeedback: 0 },
@@ -88,7 +91,7 @@ export default function WorkerFeedback() {
         setRefreshing(false);
       }
     },
-    [t],
+    [t, workerId],
   );
 
   useEffect(() => {

@@ -1,12 +1,11 @@
 import { useRouter } from "expo-router";
-import { AlertCircle, Calendar, ChevronDown } from "lucide-react-native";
+import { AlertCircle, Calendar } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
@@ -164,34 +163,18 @@ export default function HodResolvedComplaints() {
               </View>
             }
             ListFooterComponent={
-              hasMore ? (
-                <TouchableOpacity
-                  onPress={() => loadMore()}
-                  disabled={loadingMore}
-                  className="mt-2 rounded-xl items-center justify-center py-3"
-                  style={{
-                    backgroundColor: colors.backgroundSecondary,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    opacity: loadingMore ? 0.6 : 1,
-                  }}
-                >
-                  {loadingMore ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <View className="flex-row items-center" style={{ gap: 6 }}>
-                      <ChevronDown size={14} color={colors.textSecondary} />
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {t("common.loadMore")}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+              loadingMore ? (
+                <View className="items-center py-4">
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
               ) : null
             }
+            onEndReached={() => {
+              if (hasMore && !loadingMore && !loading && !refreshing) {
+                loadMore();
+              }
+            }}
+            onEndReachedThreshold={0.35}
           />
         </>
       )}

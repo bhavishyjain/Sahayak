@@ -9,11 +9,6 @@ async function calculateETA(complaint, worker) {
     const baseHours = { High: 48, Medium: 144, Low: 336 };
     let estimatedHours = baseHours[complaint.priority] || 144;
 
-    const workerAvg = worker.performanceMetrics?.averageCompletionTime;
-    if (workerAvg) {
-      estimatedHours = (estimatedHours + workerAvg) / 2;
-    }
-
     const similarComplaints = await Complaint.find({
       department: complaint.department,
       priority: complaint.priority,
@@ -28,6 +23,24 @@ async function calculateETA(complaint, worker) {
         similarComplaints.reduce((sum, c) => sum + c.actualCompletionTime, 0) /
         similarComplaints.length;
       estimatedHours = (estimatedHours + avgSimilar) / 2;
+    }
+
+    const workerResolved = await Complaint.find({
+      "assignedWorkers.workerId": worker._id,
+      status: "resolved",
+      actualCompletionTime: { $exists: true, $gt: 0 },
+    })
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .select("actualCompletionTime");
+
+    if (workerResolved.length > 0) {
+      const workerAvg =
+        workerResolved.reduce(
+          (sum, item) => sum + Number(item.actualCompletionTime || 0),
+          0,
+        ) / workerResolved.length;
+      estimatedHours = (estimatedHours + workerAvg) / 2;
     }
 
     const activeWorkload = await Complaint.countDocuments({

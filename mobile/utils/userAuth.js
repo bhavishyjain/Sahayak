@@ -4,6 +4,12 @@ import { Platform } from "react-native";
 import { initAuthToken } from "./cache/auth";
 
 let ongoingGetUser = null;
+const ASSISTANT_HISTORY_KEY = "@sahayak_assistant_history_v1";
+
+function getAssistantHistoryKey(user) {
+  const userId = user?._id || user?.id || user?.username || "guest";
+  return `${ASSISTANT_HISTORY_KEY}:${userId}`;
+}
 
 export default async function getUserAuth() {
   if (ongoingGetUser) {
@@ -48,15 +54,22 @@ export async function setUserAuth(user) {
 }
 
 export async function clearUserAuth() {
+  const currentUser = await getUserAuth();
+  const scopedAssistantHistoryKey = getAssistantHistoryKey(currentUser);
+
   // Clear AsyncStorage/localStorage
   if (Platform.OS === "web") {
     localStorage.removeItem("user");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("background_user_id");
+    localStorage.removeItem(scopedAssistantHistoryKey);
+    localStorage.removeItem(ASSISTANT_HISTORY_KEY);
   } else {
     await AsyncStorage.removeItem("user");
     await AsyncStorage.removeItem("auth_token");
     await AsyncStorage.removeItem("background_user_id");
+    await AsyncStorage.removeItem(scopedAssistantHistoryKey);
+    await AsyncStorage.removeItem(ASSISTANT_HISTORY_KEY);
   }
 
   // Note: QueryClient cache clearing is handled in logout.jsx

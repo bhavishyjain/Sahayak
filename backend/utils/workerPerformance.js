@@ -1,4 +1,4 @@
-const User = require("../models/User");
+const { syncWorkerPerformanceMetrics } = require("../services/workerMetricsService");
 
 function calculateCompletionHours(complaint) {
   const now = Date.now();
@@ -27,31 +27,7 @@ async function updateWorkerCompletionStats(
   complaintId,
   completionHours,
 ) {
-  await User.findByIdAndUpdate(workerId, {
-    $inc: {
-      "performanceMetrics.totalCompleted": 1,
-      "performanceMetrics.currentWeekCompleted": 1,
-    },
-  });
-
-  const worker = await User.findById(workerId).select("performanceMetrics");
-  if (!worker) return;
-
-  const totalCompleted = worker.performanceMetrics?.totalCompleted || 0;
-  const currentAvg = worker.performanceMetrics?.averageCompletionTime || 0;
-
-  let newAvg =
-    totalCompleted <= 1
-      ? completionHours
-      : (currentAvg * (totalCompleted - 1) + completionHours) / totalCompleted;
-
-  if (!Number.isFinite(newAvg)) {
-    newAvg = completionHours;
-  }
-
-  await User.findByIdAndUpdate(workerId, {
-    "performanceMetrics.averageCompletionTime": newAvg,
-  });
+  await syncWorkerPerformanceMetrics([workerId]);
 }
 
 module.exports = {

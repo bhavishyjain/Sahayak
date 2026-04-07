@@ -16,6 +16,13 @@ const generateTicketId = require("./utils/generateTicketId");
 const {
   getAllowedNotificationPreferenceKeys,
 } = require("./services/notificationDomainService");
+const {
+  syncWorkerRatings,
+  syncWorkerPerformanceMetrics,
+} = require("./services/workerMetricsService");
+const {
+  summarizeWorkerTrophies,
+} = require("./services/complaintAnalyticsService");
 
 const SEED_DEPARTMENTS = [
   { name: "Road", code: "road" },
@@ -119,6 +126,7 @@ function getDepartmentNames() {
 const LAST_60_DAYS = 60;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+const DEFAULT_SEED_TOTAL_COMPLAINTS = 2000;
 
 function readPositiveIntEnv(name, fallback) {
   const parsed = Number.parseInt(process.env[name] || "", 10);
@@ -129,7 +137,10 @@ const SEED_CONFIG = Object.freeze({
   adminCount: readPositiveIntEnv("SEED_ADMIN_COUNT", 2),
   workersPerDepartment: readPositiveIntEnv("SEED_WORKERS_PER_DEPARTMENT", 6),
   citizenCount: readPositiveIntEnv("SEED_CITIZEN_COUNT", 150),
-  totalComplaints: readPositiveIntEnv("SEED_TOTAL_COMPLAINTS", 2000),
+  totalComplaints: Math.max(
+    DEFAULT_SEED_TOTAL_COMPLAINTS,
+    readPositiveIntEnv("SEED_TOTAL_COMPLAINTS", DEFAULT_SEED_TOTAL_COMPLAINTS),
+  ),
 });
 
 const LANGUAGE_WEIGHTS = [
@@ -277,6 +288,38 @@ function getDateWithinLastDays(minDaysAgo, maxDaysAgo, now = new Date()) {
   return getRandomDateBetween(oldest, newest);
 }
 
+function getDateWithinSpecificDayAgo(daysAgo, now = new Date()) {
+  const safeDaysAgo = Math.max(
+    0,
+    Math.min(LAST_60_DAYS - 1, Math.floor(Number(daysAgo) || 0)),
+  );
+  const dayStart = new Date(now.getTime() - (safeDaysAgo + 1) * ONE_DAY_MS);
+  const dayEnd = new Date(now.getTime() - safeDaysAgo * ONE_DAY_MS);
+  return getRandomDateBetween(dayStart, dayEnd);
+}
+
+function buildEvenDayOffsets(totalCount, dayWindow = LAST_60_DAYS) {
+  const safeTotal = Math.max(0, Math.floor(Number(totalCount) || 0));
+  const safeWindow = Math.max(1, Math.floor(Number(dayWindow) || 1));
+  const basePerDay = Math.floor(safeTotal / safeWindow);
+  const remainder = safeTotal % safeWindow;
+
+  const offsets = [];
+  for (let day = 0; day < safeWindow; day++) {
+    const count = basePerDay + (day < remainder ? 1 : 0);
+    for (let i = 0; i < count; i++) {
+      offsets.push(day);
+    }
+  }
+
+  for (let i = offsets.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
+  }
+
+  return offsets;
+}
+
 function getRequiredAgeHoursByStatus(status) {
   if (status === "resolved") return 120;
   if (status === "pending-approval") return 72;
@@ -309,31 +352,23 @@ async function seedDepartments() {
   );
 }
 
-function getComplaintCreatedAt(status, now = new Date()) {
-  const bucket = Math.random();
-  let minDaysAgo = 0;
-  let maxDaysAgo = LAST_60_DAYS - 1;
-
-  if (bucket < 0.45) {
-    minDaysAgo = 0;
-    maxDaysAgo = 7;
-  } else if (bucket < 0.8) {
-    minDaysAgo = 8;
-    maxDaysAgo = 30;
-  } else {
-    minDaysAgo = 31;
-    maxDaysAgo = LAST_60_DAYS - 1;
-  }
-
+function getComplaintCreatedAt(
+  status,
+  now = new Date(),
+  preferredDaysAgo = null,
+) {
+  const maxDaysAgo = LAST_60_DAYS - 1;
   const requiredMinDaysAgo = getRequiredAgeHoursByStatus(status) / 24;
-  if (minDaysAgo < requiredMinDaysAgo) {
-    minDaysAgo = requiredMinDaysAgo;
-    if (maxDaysAgo < minDaysAgo) {
-      maxDaysAgo = minDaysAgo;
-    }
-  }
+  const minDaysAgo = Math.min(Math.max(requiredMinDaysAgo, 0), maxDaysAgo);
+  const hasPreferredDaysAgo = Number.isFinite(preferredDaysAgo);
+  const clampedPreferredDaysAgo = Math.min(
+    maxDaysAgo,
+    Math.max(minDaysAgo, Math.floor(preferredDaysAgo)),
+  );
 
-  const createdAt = getDateWithinLastDays(minDaysAgo, maxDaysAgo, now);
+  const createdAt = hasPreferredDaysAgo
+    ? getDateWithinSpecificDayAgo(clampedPreferredDaysAgo, now)
+    : getDateWithinLastDays(minDaysAgo, maxDaysAgo, now);
   const ageInDays = Math.floor(
     (now.getTime() - createdAt.getTime()) / ONE_DAY_MS,
   );
@@ -637,6 +672,167 @@ function pickRandom(arr) {
 function getTaskDescription(dept) {
   const arr = taskDescriptionsByDept[dept] || taskDescriptionsByDept.Other;
   return pickRandom(arr);
+}
+
+function buildGuaranteedMonthlyTrophyComplaints({
+  leadWorkers = [],
+  regularUsers = [],
+  hods = [],
+  now = new Date(),
+  nextTicketId,
+}) {
+  if (!leadWorkers.length || !regularUsers.length) return [];
+
+  const previousMonthStart = new Date(
+    now.getFullYear(),
+    now.getMonth() - 1,
+    1,
+    9,
+    0,
+    0,
+    0,
+  );
+  const previousMonthEnd = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    0,
+    18,
+    0,
+    0,
+    0,
+  );
+
+  const generated = [];
+
+  leadWorkers.forEach((worker, workerIndex) => {
+    const department = worker.department;
+    const deptTemplates = complaintTemplates[department] || complaintTemplates.Other;
+    const hod = hods.find((item) => item.department === department) || null;
+
+    for (let i = 0; i < 12; i++) {
+      const template = deptTemplates[i % deptTemplates.length];
+      const description =
+        template.descriptions[i % template.descriptions.length];
+      const owner = regularUsers[(workerIndex * 17 + i) % regularUsers.length];
+      const locationData = getRandomLocation();
+
+      const createdAt = new Date(previousMonthStart);
+      createdAt.setDate(Math.min(24, 2 + i * 2));
+      createdAt.setHours(8 + (i % 3), (i * 7) % 60, 0, 0);
+
+      if (createdAt > previousMonthEnd) {
+        createdAt.setTime(previousMonthEnd.getTime() - (11 - i) * ONE_DAY_MS);
+      }
+
+      const assignedAt = new Date(createdAt.getTime() + 2 * ONE_HOUR_MS);
+      const inProgressAt = new Date(createdAt.getTime() + 6 * ONE_HOUR_MS);
+      const pendingApprovalAt = new Date(createdAt.getTime() + 16 * ONE_HOUR_MS);
+      const resolvedAt = new Date(createdAt.getTime() + 20 * ONE_HOUR_MS);
+      const ratedAt = new Date(createdAt.getTime() + 23 * ONE_HOUR_MS);
+
+      const complaint = {
+        ticketId: nextTicketId(),
+        userId: owner._id,
+        rawText: `${template.title}: ${description}`,
+        refinedText: description,
+        department,
+        coordinates: { lat: locationData.lat, lng: locationData.lng },
+        locationName: `${locationData.name}, Indore`,
+        priority: i < 4 ? "High" : "Medium",
+        status: "resolved",
+        upvotes: [],
+        upvoteCount: 0,
+        createdAt,
+        updatedAt: ratedAt,
+        assignedAt,
+        assignedBy: hod?._id || null,
+        estimatedCompletionTime: 20,
+        actualCompletionTime: 20,
+        proofImage: [],
+        completionPhotos: [
+          "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=800",
+        ],
+        feedback: {
+          rating: i < 9 ? 5 : 4,
+          comment:
+            i < 9
+              ? feedbackComments[5][i % feedbackComments[5].length]
+              : feedbackComments[4][i % feedbackComments[4].length],
+          ratedBy: owner._id,
+          ratedAt,
+        },
+        history: [
+          {
+            status: "pending",
+            updatedBy: owner._id,
+            timestamp: createdAt,
+            note: "Complaint registered by citizen",
+          },
+          {
+            status: "assigned",
+            updatedBy: hod?._id || null,
+            timestamp: assignedAt,
+            note: "Assigned to worker by Head of Department",
+          },
+          {
+            status: "in-progress",
+            updatedBy: worker._id,
+            timestamp: inProgressAt,
+            note: "Worker started working on the issue",
+          },
+          {
+            status: "pending-approval",
+            updatedBy: worker._id,
+            timestamp: pendingApprovalAt,
+            note: "Worker submitted completion photos for HOD approval",
+          },
+          {
+            status: "resolved",
+            updatedBy: hod?._id || null,
+            timestamp: resolvedAt,
+            note: "HOD approved completion — issue resolved",
+          },
+        ],
+        assignedWorkers: [
+          {
+            workerId: worker._id,
+            assignedAt,
+            taskDescription: getTaskDescription(department),
+            status: "completed",
+            isLeader: true,
+            completedAt: pendingApprovalAt,
+          },
+        ],
+      };
+
+      complaint.aiAnalysis = buildAiAnalysisForComplaint({
+        title: template.title,
+        description,
+        department,
+        priority: complaint.priority,
+        status: complaint.status,
+      });
+
+      syncComplaintTimestamps(complaint, now);
+      generated.push(complaint);
+    }
+  });
+
+  return generated;
+}
+
+function getPreferredSeedWorker(deptWorkers = [], complaintStatus = "pending") {
+  if (!Array.isArray(deptWorkers) || deptWorkers.length === 0) return null;
+  const leadWorker = deptWorkers[0];
+  const isCompletedFlow = ["resolved", "pending-approval"].includes(
+    complaintStatus,
+  );
+
+  if (isCompletedFlow && leadWorker && Math.random() < 0.45) {
+    return leadWorker;
+  }
+
+  return deptWorkers[Math.floor(Math.random() * deptWorkers.length)];
 }
 
 // Sample complaint titles and descriptions by department
@@ -1057,6 +1253,267 @@ const complaintTemplates = {
   ],
 };
 
+const AI_DEPT_KEYWORDS = {
+  Road: [
+    "pothole",
+    "road damage",
+    "crack",
+    "tarring",
+    "speed breaker",
+    "divider",
+    "road shoulder",
+    "parking",
+    "road surface",
+  ],
+  Water: [
+    "water leakage",
+    "pipe burst",
+    "shortage",
+    "contaminated water",
+    "tanker",
+    "water pressure",
+    "borewell",
+    "water meter",
+    "water supply",
+  ],
+  Electricity: [
+    "power outage",
+    "street light",
+    "street lights",
+    "electric pole",
+    "transformer",
+    "voltage",
+    "wire",
+    "meter",
+    "electricity",
+    "signal",
+  ],
+  Waste: [
+    "garbage",
+    "overflowing bin",
+    "dustbin",
+    "waste collection",
+    "sanitation",
+    "dumping",
+    "trash",
+    "garbage truck",
+    "segregation",
+  ],
+  Drainage: [
+    "blocked drain",
+    "waterlogging",
+    "sewage overflow",
+    "manhole",
+    "flooding",
+    "drainage",
+    "septic tank",
+    "storm drain",
+    "sewage line",
+  ],
+  Other: [
+    "noise",
+    "encroachment",
+    "stray animals",
+    "tree",
+    "public toilet",
+    "park maintenance",
+    "illegal construction",
+    "cctv",
+    "bus stop",
+  ],
+};
+
+const AI_REASONING = {
+  Road:
+    "The complaint points to road-surface, divider, traffic calming, or carriageway damage that should be handled by the road department.",
+  Water:
+    "The complaint describes municipal water supply, leakage, pipeline, tanker, borewell, or pressure issues that belong to the water department.",
+  Electricity:
+    "The complaint mentions street lights, transformers, wires, power supply, voltage, or electrical infrastructure, so the electricity department is the right fit.",
+  Waste:
+    "The complaint is about garbage collection, dustbins, sanitation, dumping, or waste handling and should be routed to the waste department.",
+  Drainage:
+    "The complaint concerns drains, sewage, manholes, flooding, or waterlogging, which is most appropriate for the drainage department.",
+  Other:
+    "The complaint is civic in nature but does not clearly belong to the standard road, water, electricity, waste, or drainage queues.",
+};
+
+const AI_ROUTING_OVERRIDES = Object.freeze({
+  "Street lights not working": {
+    suggestedDepartment: "Electricity",
+    reasoning:
+      "The complaint is specifically about non-working street lights and dark stretches, so electricity is the more appropriate department than road.",
+    confidence: [0.88, 0.97],
+  },
+  "Traffic signal malfunction": {
+    suggestedDepartment: "Electricity",
+    reasoning:
+      "The issue concerns traffic signal power/electrical control hardware, which should be reviewed by the electricity department first.",
+    confidence: [0.82, 0.92],
+  },
+  "Park maintenance": {
+    suggestedDepartment: "Other",
+    reasoning:
+      "The complaint is about park facilities and upkeep rather than the standard utility departments, so it belongs in the general civic queue.",
+    confidence: [0.8, 0.9],
+  },
+  "Public toilet unavailable": {
+    suggestedDepartment: "Other",
+    reasoning:
+      "This is a civic amenity issue and fits the general civic operations queue better than utility-specific departments.",
+    confidence: [0.8, 0.9],
+  },
+  "Street animal issues": {
+    suggestedDepartment: "Other",
+    reasoning:
+      "The complaint is about stray animal control and civic response, which should be routed through the general operations queue.",
+    confidence: [0.82, 0.9],
+  },
+});
+
+function getRandomNumberInRange(min, max, decimals = 2) {
+  const value = min + Math.random() * (max - min);
+  return Number(value.toFixed(decimals));
+}
+
+function getSemanticDepartmentFromComplaint(title = "", description = "") {
+  const haystack = `${title} ${description}`.toLowerCase();
+  const override = AI_ROUTING_OVERRIDES[title];
+  if (override?.suggestedDepartment) {
+    return override.suggestedDepartment;
+  }
+
+  const scored = Object.entries(AI_DEPT_KEYWORDS)
+    .map(([department, keywords]) => ({
+      department,
+      score: keywords.reduce(
+        (sum, keyword) => sum + (haystack.includes(keyword.toLowerCase()) ? 1 : 0),
+        0,
+      ),
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  if (scored[0]?.score > 0) {
+    return scored[0].department;
+  }
+
+  return null;
+}
+
+function getAiPrioritySuggestion(title = "", description = "", priority = "Medium") {
+  const haystack = `${title} ${description}`.toLowerCase();
+  const highUrgencySignals = [
+    "accident",
+    "dangerous",
+    "urgent",
+    "shock",
+    "burst",
+    "hanging",
+    "school",
+    "child",
+    "fire",
+    "fall",
+    "health hazard",
+  ];
+  const mediumUrgencySignals = [
+    "dark",
+    "foul smell",
+    "traffic",
+    "water logging",
+    "flooding",
+    "multiple",
+    "frequent",
+    "overflow",
+  ];
+
+  if (highUrgencySignals.some((signal) => haystack.includes(signal))) {
+    return "High";
+  }
+
+  if (priority === "Low" && mediumUrgencySignals.some((signal) => haystack.includes(signal))) {
+    return "Medium";
+  }
+
+  return priority;
+}
+
+function buildAiAnalysisForComplaint({
+  title,
+  description,
+  department,
+  priority,
+  status,
+}) {
+  const semanticDepartment =
+    getSemanticDepartmentFromComplaint(title, description) || department;
+  const routingOverride = AI_ROUTING_OVERRIDES[title] || null;
+  const suggestedDepartment = semanticDepartment;
+  const allKw =
+    AI_DEPT_KEYWORDS[suggestedDepartment] || AI_DEPT_KEYWORDS.Other;
+  const shuffledKw = [...allKw].sort(() => Math.random() - 0.5);
+  const keywords = shuffledKw.slice(0, 2 + Math.floor(Math.random() * 2));
+  const suggestedPriority = getAiPrioritySuggestion(
+    title,
+    description,
+    priority,
+  );
+  const departmentDiffers = suggestedDepartment !== department;
+
+  let confidence;
+  if (routingOverride?.confidence?.length === 2) {
+    confidence = getRandomNumberInRange(
+      routingOverride.confidence[0],
+      routingOverride.confidence[1],
+      2,
+    );
+  } else if (departmentDiffers) {
+    confidence = getRandomNumberInRange(0.78, 0.9, 2);
+  } else {
+    confidence = getRandomNumberInRange(0.86, 0.98, 2);
+  }
+
+  const aiSentiment =
+    priority === "High"
+      ? Math.random() < 0.55
+        ? "angry"
+        : "frustrated"
+      : priority === "Medium"
+        ? Math.random() < 0.6
+          ? "frustrated"
+          : "calm"
+        : Math.random() < 0.7
+          ? "calm"
+          : "frustrated";
+
+  const aiUrgency =
+    suggestedPriority === "High"
+      ? 7 + Math.floor(Math.random() * 3)
+      : suggestedPriority === "Medium"
+        ? 4 + Math.floor(Math.random() * 3)
+        : 1 + Math.floor(Math.random() * 3);
+
+  const affectedCount =
+    suggestedPriority === "High"
+      ? 20 + Math.floor(Math.random() * 80)
+      : suggestedPriority === "Medium"
+        ? 5 + Math.floor(Math.random() * 20)
+        : 1 + Math.floor(Math.random() * 5);
+
+  return {
+    sentiment: aiSentiment,
+    urgency: aiUrgency,
+    keywords,
+    affectedCount,
+    suggestedPriority: status === "pending" ? suggestedPriority : null,
+    reasoning:
+      routingOverride?.reasoning ||
+      AI_REASONING[suggestedDepartment] ||
+      AI_REASONING.Other,
+    department: suggestedDepartment,
+    confidence,
+  };
+}
+
 // Feedback comments based on rating
 const feedbackComments = {
   5: [
@@ -1252,8 +1709,29 @@ function getAlternativePriority(currentPriority) {
   return pickRandom(candidates);
 }
 
+function createUniqueTicketIdFactory() {
+  const seenTicketIds = new Set();
+
+  return function nextTicketId() {
+    let ticketId = generateTicketId();
+    while (seenTicketIds.has(ticketId)) {
+      ticketId = generateTicketId();
+    }
+    seenTicketIds.add(ticketId);
+    return ticketId;
+  };
+}
+
 // Generate random complaint
-function generateComplaint(userId, allUsers) {
+function generateComplaint(userId, allUsers, options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const preferredDaysAgo = Number.isFinite(options.preferredDaysAgo)
+    ? options.preferredDaysAgo
+    : null;
+  const nextTicketId =
+    typeof options.nextTicketId === "function"
+      ? options.nextTicketId
+      : generateTicketId;
   const departments = getDepartmentNames();
   const department =
     departments[Math.floor(Math.random() * departments.length)];
@@ -1298,8 +1776,11 @@ function generateComplaint(userId, allUsers) {
     status = "cancelled";
   }
 
-  const now = new Date();
-  const { createdAt, daysAgo } = getComplaintCreatedAt(status, now);
+  const { createdAt, daysAgo } = getComplaintCreatedAt(
+    status,
+    now,
+    preferredDaysAgo,
+  );
 
   // More realistic upvote distribution
   // Recent and high priority complaints get more upvotes
@@ -1318,7 +1799,7 @@ function generateComplaint(userId, allUsers) {
   }
 
   const complaint = {
-    ticketId: generateTicketId(),
+    ticketId: nextTicketId(),
     userId: userId,
     rawText: `${template.title}: ${description}`,
     refinedText: description,
@@ -1334,119 +1815,13 @@ function generateComplaint(userId, allUsers) {
     proofImage: [], // Will be populated below
   };
 
-  // ── AI Analysis ──────────────────────────────────────────────────────
-  const AI_DEPT_KEYWORDS = {
-    Road: ["pothole", "road damage", "crack", "tarring", "speed bump"],
-    Water: [
-      "water leakage",
-      "pipe burst",
-      "shortage",
-      "contaminated water",
-      "tanker",
-    ],
-    Electricity: [
-      "power outage",
-      "streetlight",
-      "exposed wire",
-      "pole damage",
-      "transformer",
-    ],
-    Waste: [
-      "garbage",
-      "overflowing bin",
-      "littering",
-      "sanitation",
-      "waste collection",
-    ],
-    Drainage: [
-      "blocked drain",
-      "waterlogging",
-      "sewage overflow",
-      "manhole",
-      "flooding",
-    ],
-    Other: ["noise", "encroachment", "stray animals", "tree fall", "vandalism"],
-  };
-  const AI_REASONING = {
-    Road: "Road infrastructure complaint with clear indicators of physical damage needing civic attention.",
-    Water:
-      "Water supply issue identified from description keywords indicating supply chain or pipeline problem.",
-    Electricity:
-      "Electrical infrastructure concern requiring immediate assessment for safety.",
-    Waste:
-      "Waste management issue detected — affects public health and sanitation standards.",
-    Drainage:
-      "Drainage/sewage concern with potential flooding or public health risk.",
-    Other:
-      "General civic complaint routed to the appropriate municipal department.",
-  };
-
-  // Sentiment correlates with priority
-  const aiSentiment =
-    priority === "High"
-      ? Math.random() < 0.55
-        ? "angry"
-        : "frustrated"
-      : priority === "Medium"
-        ? Math.random() < 0.6
-          ? "frustrated"
-          : "calm"
-        : Math.random() < 0.7
-          ? "calm"
-          : "frustrated";
-
-  const aiUrgency =
-    priority === "High"
-      ? 7 + Math.floor(Math.random() * 3) // 7-9
-      : priority === "Medium"
-        ? 4 + Math.floor(Math.random() * 3) // 4-6
-        : 1 + Math.floor(Math.random() * 3); // 1-3
-
-  const allKw = AI_DEPT_KEYWORDS[department] || AI_DEPT_KEYWORDS.Other;
-  const shuffledKw = [...allKw].sort(() => Math.random() - 0.5);
-  const aiKeywords = shuffledKw.slice(0, 2 + Math.floor(Math.random() * 2));
-
-  const aiAffectedCount =
-    priority === "High"
-      ? 20 + Math.floor(Math.random() * 80)
-      : priority === "Medium"
-        ? 5 + Math.floor(Math.random() * 20)
-        : 1 + Math.floor(Math.random() * 5);
-
-  // AI priority suggestion is only stored while complaint is pending.
-  // ~30% chance AI disagrees on priority for pending complaints.
-  const priorityOptions = ["Low", "Medium", "High"];
-  const aiSuggestedPriority =
-    status === "pending"
-      ? Math.random() < 0.3
-        ? priorityOptions[
-            (priorityOptions.indexOf(priority) +
-              1 +
-              Math.floor(Math.random() * 2)) %
-              3
-          ]
-        : priority
-      : null;
-
-  complaint.aiAnalysis = {
-    sentiment: aiSentiment,
-    urgency: aiUrgency,
-    keywords: aiKeywords,
-    affectedCount: aiAffectedCount,
-    suggestedPriority: aiSuggestedPriority,
-    reasoning: AI_REASONING[department] || AI_REASONING.Other,
-    department: department,
-    confidence: 0.85 + Math.random() * 0.15,
-  };
-
-  // ~20% chance AI suggests a different department (creates review candidates)
-  if (Math.random() < 0.2) {
-    const altDepts = getDepartmentNames().filter((d) => d !== department);
-    complaint.aiAnalysis.department =
-      altDepts[Math.floor(Math.random() * altDepts.length)];
-    complaint.aiAnalysis.confidence = 0.7 + Math.random() * 0.2; // 70-90% when dept differs
-  }
-  // ─────────────────────────────────────────────────────────────────────
+  complaint.aiAnalysis = buildAiAnalysisForComplaint({
+    title: template.title,
+    description,
+    department,
+    priority,
+    status,
+  });
 
   // Add proof images (before photos) - 60% chance
   if (Math.random() < 0.6) {
@@ -1625,7 +2000,10 @@ function generateComplaint(userId, allUsers) {
   const slaDeadline = new Date(createdAt);
   slaDeadline.setHours(slaDeadline.getHours() + slaHours);
 
-  const isTerminal = status === "resolved" || status === "cancelled";
+  const isTerminal =
+    status === "resolved" ||
+    status === "cancelled" ||
+    status === "needs-rework";
   const isOverdue = !isTerminal && slaDeadline < now;
   // escalate overdue active complaints (not all at once — ~70% actually escalated)
   const shouldEscalate = isOverdue && Math.random() < 0.7;
@@ -1749,12 +2127,12 @@ async function seedDatabase() {
           email: `worker.${dept}.${i}@indore.gov.in`,
           phone: `91${9200000000 + users.length}`,
           fullName: `Worker ${dept.charAt(0).toUpperCase() + dept.slice(1)} ${i}`,
-          rating: 3.5 + Math.random() * 1.5,
+          rating: null,
           performanceMetrics: {
-            totalCompleted: Math.floor(Math.random() * 50),
-            averageCompletionTime: 12 + Math.random() * 24,
-            currentWeekCompleted: Math.floor(Math.random() * 10),
-            customerRating: 3.8 + Math.random() * 1.2,
+            totalCompleted: 0,
+            averageCompletionTime: 0,
+            currentWeekCompleted: 0,
+            customerRating: null,
           },
           workLocation: {
             lat: location.lat,
@@ -1911,10 +2289,6 @@ async function seedDatabase() {
     console.log(
       `   - ${createdUsers.filter((u) => u.role === "user").length} Citizens`,
     );
-    logSummaryBlock(
-      "🌐 Preferred languages",
-      summarizeBy(createdUsers, (user) => user.preferredLanguage || "en"),
-    );
 
     // Create complaints
     console.log("\n📋 Creating complaints...");
@@ -1925,10 +2299,20 @@ async function seedDatabase() {
 
     // Generate complaints with realistic distribution
     let multiWorkerCount = 0;
+    const complaintDayOffsets = buildEvenDayOffsets(
+      SEED_CONFIG.totalComplaints,
+      LAST_60_DAYS,
+    );
+    const complaintNow = new Date();
+    const nextTicketId = createUniqueTicketIdFactory();
     for (let i = 1; i <= SEED_CONFIG.totalComplaints; i++) {
       const randomUser =
         regularUsers[Math.floor(Math.random() * regularUsers.length)];
-      const complaint = generateComplaint(randomUser._id, regularUsers);
+      const complaint = generateComplaint(randomUser._id, regularUsers, {
+        now: complaintNow,
+        preferredDaysAgo: complaintDayOffsets[i - 1],
+        nextTicketId,
+      });
 
       // Assign worker if status is assigned or beyond
       if (
@@ -1944,8 +2328,10 @@ async function seedDatabase() {
           (w) => w.department === complaint.department,
         );
         if (deptWorkers.length > 0) {
-          const assignedWorker =
-            deptWorkers[Math.floor(Math.random() * deptWorkers.length)];
+          const assignedWorker = getPreferredSeedWorker(
+            deptWorkers,
+            complaint.status,
+          );
           complaint.assignedAt = complaint.history.find(
             (h) => h.status === "assigned",
           )?.timestamp;
@@ -2148,6 +2534,23 @@ async function seedDatabase() {
       }
     }
 
+    const leadWorkersByDepartment = departments
+      .map((department) =>
+        workers.find((worker) => worker.department === department),
+      )
+      .filter(Boolean);
+    const guaranteedTrophyComplaints = buildGuaranteedMonthlyTrophyComplaints({
+      leadWorkers: leadWorkersByDepartment,
+      regularUsers,
+      hods,
+      now: complaintNow,
+      nextTicketId,
+    });
+    complaints.push(...guaranteedTrophyComplaints);
+    console.log(
+      `   Added ${guaranteedTrophyComplaints.length} guaranteed trophy-seed complaints from the previous month`,
+    );
+
     console.log(
       `   Created ${multiWorkerCount} multi-worker assignments in memory`,
     );
@@ -2191,6 +2594,14 @@ async function seedDatabase() {
       "🏢 Complaint department mix",
       summarizeBy(createdComplaints, (complaint) => complaint.department),
     );
+
+    await syncWorkerRatings(workers.map((worker) => worker._id));
+    await syncWorkerPerformanceMetrics(
+      workers.map((worker) => worker._id),
+      complaintNow,
+    );
+    console.log("✅ Synced worker ratings from seeded complaint feedback");
+    console.log("✅ Synced worker performance metrics from seeded complaints");
 
     console.log("\n💬 Seeding complaint chat threads...");
     const workersById = new Map(
@@ -2797,6 +3208,10 @@ async function seedDatabase() {
       );
 
       if (owner && Math.random() < 0.8) {
+        const createdAt = getRandomDateBetween(
+          new Date(complaint.createdAt),
+          now,
+        );
         notificationRows.push({
           userId: owner._id,
           title: `Update on ${complaint.ticketId}`,
@@ -2816,14 +3231,22 @@ async function seedDatabase() {
             }),
           },
           readAt:
-            Math.random() < 0.55 ? getDateWithinLastDays(0, 14, now) : null,
-          createdAt: getDateWithinLastDays(0, 20, now),
+            Math.random() < 0.55 ? getRandomDateBetween(createdAt, now) : null,
+          createdAt,
           updatedAt: now,
         });
       }
 
       (complaint.assignedWorkers || []).forEach((assignment) => {
         if (Math.random() < 0.75) {
+          const createdAt = getRandomDateBetween(
+            new Date(
+              assignment.assignedAt ||
+                complaint.assignedAt ||
+                complaint.createdAt,
+            ),
+            now,
+          );
           notificationRows.push({
             userId: assignment.workerId,
             title: `Assignment: ${complaint.ticketId}`,
@@ -2840,8 +3263,8 @@ async function seedDatabase() {
               }),
             },
             readAt:
-              Math.random() < 0.7 ? getDateWithinLastDays(0, 10, now) : null,
-            createdAt: getDateWithinLastDays(0, 25, now),
+              Math.random() < 0.7 ? getRandomDateBetween(createdAt, now) : null,
+            createdAt,
             updatedAt: now,
           });
         }
@@ -2850,6 +3273,14 @@ async function seedDatabase() {
       if (complaint.sla?.escalated) {
         const deptHod = hods.find((h) => h.department === complaint.department);
         if (deptHod && Math.random() < 0.9) {
+          const createdAt = getRandomDateBetween(
+            new Date(
+              complaint.sla.lastEscalatedAt ||
+                complaint.sla.dueDate ||
+                complaint.createdAt,
+            ),
+            now,
+          );
           notificationRows.push({
             userId: deptHod._id,
             title: `SLA escalation: ${complaint.ticketId}`,
@@ -2866,8 +3297,10 @@ async function seedDatabase() {
               }),
             },
             readAt:
-              Math.random() < 0.45 ? getDateWithinLastDays(0, 10, now) : null,
-            createdAt: getDateWithinLastDays(0, 15, now),
+              Math.random() < 0.45
+                ? getRandomDateBetween(createdAt, now)
+                : null,
+            createdAt,
             updatedAt: now,
           });
         }
@@ -2876,6 +3309,10 @@ async function seedDatabase() {
       if (Math.random() < 0.15) {
         const deptHod = hods.find((h) => h.department === complaint.department);
         if (deptHod) {
+          const createdAt = getRandomDateBetween(
+            new Date(complaint.updatedAt || complaint.createdAt),
+            now,
+          );
           notificationRows.push({
             userId: deptHod._id,
             title: `AI review suggestion for ${complaint.ticketId}`,
@@ -2891,8 +3328,8 @@ async function seedDatabase() {
               }),
             },
             readAt:
-              Math.random() < 0.4 ? getDateWithinLastDays(0, 10, now) : null,
-            createdAt: getDateWithinLastDays(0, 12, now),
+              Math.random() < 0.4 ? getRandomDateBetween(createdAt, now) : null,
+            createdAt,
             updatedAt: now,
           });
         }
@@ -2922,11 +3359,6 @@ async function seedDatabase() {
     if (notificationRows.length > 0) {
       await Notification.insertMany(notificationRows);
     }
-    console.log(`✅ Created ${notificationRows.length} notifications`);
-    logSummaryBlock(
-      "🔔 Notification type mix",
-      summarizeBy(notificationRows, (notification) => notification.type),
-    );
 
     console.log("\n🎉 Database seeded successfully!");
     console.log("\n📝 Sample Login Credentials:");
@@ -2937,7 +3369,8 @@ async function seedDatabase() {
     console.log("Citizen:  username: user1          password: password123");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   } catch (error) {
-    console.error("❌ Error seeding database:", error);
+    const message = error?.message || String(error);
+    console.error("❌ Error seeding database:", message);
   } finally {
     await mongoose.connection.close();
     console.log("\n👋 Database disconnected");

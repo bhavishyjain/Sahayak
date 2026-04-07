@@ -32,7 +32,7 @@ export default function HeatMap() {
   const [filters, setFilters] = useState({
     department: "all",
     priority: "all",
-    timeframe: "30days",
+    timeframe: "7days",
   });
 
   const {
@@ -63,33 +63,42 @@ export default function HeatMap() {
   }, []);
 
   // Filter options
-  const departments = useMemo(() => [
-    { label: t("heatmap.allDepartments"), value: "all" },
-    ...departmentOptions,
-  ], [departmentOptions, t]);
+  const departments = useMemo(
+    () => [
+      { label: t("heatmap.allDepartments"), value: "all" },
+      ...departmentOptions,
+    ],
+    [departmentOptions, t],
+  );
 
-  const priorities = useMemo(() => [
-    { label: t("heatmap.allPriorities"), value: "all" },
-    { label: t("complaints.priority.high"), value: "High" },
-    { label: t("complaints.priority.medium"), value: "Medium" },
-    { label: t("complaints.priority.low"), value: "Low" },
-  ], [t]);
+  const priorities = useMemo(
+    () => [
+      { label: t("heatmap.allPriorities"), value: "all" },
+      { label: t("complaints.priority.high"), value: "High" },
+      { label: t("complaints.priority.medium"), value: "Medium" },
+      { label: t("complaints.priority.low"), value: "Low" },
+    ],
+    [t],
+  );
 
-  const timeframes = useMemo(() => [
-    { label: t("heatmap.timePeriods.7days"), value: "7days" },
-    {
-      label: t("heatmap.timePeriods.30days"),
-      value: "30days",
-    },
-    {
-      label: t("heatmap.timePeriods.3months"),
-      value: "3months",
-    },
-    {
-      label: t("heatmap.timePeriods.6months"),
-      value: "6months",
-    },
-  ], [t]);
+  const timeframes = useMemo(
+    () => [
+      { label: t("heatmap.timePeriods.7days"), value: "7days" },
+      {
+        label: t("heatmap.timePeriods.30days"),
+        value: "30days",
+      },
+      {
+        label: t("heatmap.timePeriods.3months"),
+        value: "3months",
+      },
+      {
+        label: t("heatmap.timePeriods.6months"),
+        value: "6months",
+      },
+    ],
+    [t],
+  );
 
   // Generate Leaflet map HTML
   const generateMapHTML = () => {

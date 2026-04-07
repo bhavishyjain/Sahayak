@@ -52,7 +52,10 @@ function StatTile({ label, value, subtitle, tone, colors }) {
         {value}
       </Text>
       {subtitle ? (
-        <Text className="text-xs mt-1.5" style={{ color: colors.textSecondary }}>
+        <Text
+          className="text-xs mt-1.5"
+          style={{ color: colors.textSecondary }}
+        >
           {subtitle}
         </Text>
       ) : null}
@@ -89,7 +92,9 @@ function SummaryRow({ icon: Icon, label, value, tone, onPress, colors }) {
           <Text className="text-xl font-bold mr-2" style={{ color: tone }}>
             {value}
           </Text>
-          {onPress ? <ChevronRight size={18} color={colors.textSecondary} /> : null}
+          {onPress ? (
+            <ChevronRight size={18} color={colors.textSecondary} />
+          ) : null}
         </View>
       </View>
     </View>
@@ -161,7 +166,9 @@ export default function AdminHomeTab() {
   const { departments } = useDepartments({ includeInactive: true });
 
   useEffect(() => {
-    getUserAuth().then(setUser).catch(() => {});
+    getUserAuth()
+      .then(setUser)
+      .catch(() => {});
   }, []);
 
   const getGreeting = () => {
@@ -175,12 +182,16 @@ export default function AdminHomeTab() {
   const { data, isLoading, isRefetching, refetch, error } = useQuery({
     queryKey: ["admin-dashboard-home"],
     queryFn: async () => {
-      const [statsRes, departmentsRes, usersRes, deletedRes] = await Promise.all([
-        apiCall({ method: "GET", url: REPORT_STATS_URL }),
-        apiCall({ method: "GET", url: REPORT_DEPARTMENT_BREAKDOWN_URL }),
-        apiCall({ method: "GET", url: `${USERS_URL}?includeStats=true` }),
-        apiCall({ method: "GET", url: `${DELETED_COMPLAINTS_URL}?page=1&limit=1` }),
-      ]);
+      const [statsRes, departmentsRes, usersRes, deletedRes] =
+        await Promise.all([
+          apiCall({ method: "GET", url: REPORT_STATS_URL }),
+          apiCall({ method: "GET", url: REPORT_DEPARTMENT_BREAKDOWN_URL }),
+          apiCall({ method: "GET", url: `${USERS_URL}?includeStats=true` }),
+          apiCall({
+            method: "GET",
+            url: `${DELETED_COMPLAINTS_URL}?page=1&limit=1`,
+          }),
+        ]);
 
       const users = usersRes?.data ?? [];
       const workers = users.filter((item) => item.role === "worker");
@@ -209,7 +220,8 @@ export default function AdminHomeTab() {
         counts: {
           workers: workers.length,
           heads: heads.length,
-          inactiveWorkers: workers.filter((item) => item.isActive === false).length,
+          inactiveWorkers: workers.filter((item) => item.isActive === false)
+            .length,
           inactiveHeads: heads.filter((item) => item.isActive === false).length,
           deletedComplaints: Number(deletedRes?.data?.total ?? 0),
         },
@@ -249,8 +261,7 @@ export default function AdminHomeTab() {
     Number(data?.counts?.workers ?? 0) -
     Number(data?.counts?.inactiveWorkers ?? 0);
   const activeHeads =
-    Number(data?.counts?.heads ?? 0) -
-    Number(data?.counts?.inactiveHeads ?? 0);
+    Number(data?.counts?.heads ?? 0) - Number(data?.counts?.inactiveHeads ?? 0);
   const activeTeam = activeWorkers + activeHeads;
   const inactiveTeam =
     Number(data?.counts?.inactiveWorkers ?? 0) +
@@ -316,7 +327,10 @@ export default function AdminHomeTab() {
           borderColor: colors.border,
         }}
       >
-        <Text className="text-xs uppercase" style={{ color: colors.textSecondary }}>
+        <Text
+          className="text-xs uppercase"
+          style={{ color: colors.textSecondary }}
+        >
           {t("adminScreens.home.systemOverview")}
         </Text>
         <Text
@@ -336,10 +350,16 @@ export default function AdminHomeTab() {
             className="flex-1 rounded-2xl p-3"
             style={{ backgroundColor: colors.backgroundPrimary }}
           >
-            <Text className="text-[11px]" style={{ color: colors.textSecondary }}>
+            <Text
+              className="text-[11px]"
+              style={{ color: colors.textSecondary }}
+            >
               {t("adminScreens.home.resolutionRate")}
             </Text>
-            <Text className="text-lg font-bold mt-1" style={{ color: colors.success }}>
+            <Text
+              className="text-lg font-bold mt-1"
+              style={{ color: colors.success }}
+            >
               {resolutionRate}
             </Text>
           </View>
@@ -347,10 +367,16 @@ export default function AdminHomeTab() {
             className="flex-1 rounded-2xl p-3"
             style={{ backgroundColor: colors.backgroundPrimary }}
           >
-            <Text className="text-[11px]" style={{ color: colors.textSecondary }}>
+            <Text
+              className="text-[11px]"
+              style={{ color: colors.textSecondary }}
+            >
               {t("adminScreens.home.avgResolution")}
             </Text>
-            <Text className="text-lg font-bold mt-1" style={{ color: colors.primary }}>
+            <Text
+              className="text-lg font-bold mt-1"
+              style={{ color: colors.primary }}
+            >
               {avgResolutionTime ? `${avgResolutionTime}h` : "-"}
             </Text>
           </View>
@@ -387,7 +413,10 @@ export default function AdminHomeTab() {
         }}
       >
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: colors.textPrimary }}
+          >
             {t("adminScreens.home.complaintStatus")}
           </Text>
           <Activity size={16} color={colors.textSecondary} />
@@ -396,7 +425,7 @@ export default function AdminHomeTab() {
         <View className="flex-row mb-3" style={{ gap: 10 }}>
           <View className="flex-1">
             <StatusPill
-              label={t("common.status.pending")}
+              label={t("status.pending")}
               value={pendingCount}
               tone={colors.warning}
               colors={colors}
@@ -404,7 +433,7 @@ export default function AdminHomeTab() {
           </View>
           <View className="flex-1">
             <StatusPill
-              label={t("common.status.assigned")}
+              label={t("status.assigned")}
               value={assignedCount}
               tone={colors.primary}
               colors={colors}
@@ -415,7 +444,7 @@ export default function AdminHomeTab() {
         <View className="flex-row" style={{ gap: 10 }}>
           <View className="flex-1">
             <StatusPill
-              label={t("common.status.inProgress")}
+              label={t("status.inProgress")}
               value={inProgressCount}
               tone={colors.info}
               colors={colors}
@@ -423,7 +452,7 @@ export default function AdminHomeTab() {
           </View>
           <View className="flex-1">
             <StatusPill
-              label={t("common.status.pendingApproval")}
+              label={t("complaints.status.pendingApproval")}
               value={pendingApprovalCount}
               tone={colors.warning}
               colors={colors}
@@ -471,7 +500,10 @@ export default function AdminHomeTab() {
         }}
       >
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: colors.textPrimary }}
+          >
             {t("adminScreens.home.operationalInsight")}
           </Text>
           <TrendingUp size={16} color={colors.textSecondary} />
@@ -487,10 +519,17 @@ export default function AdminHomeTab() {
             </Text>
             <Clock3 size={15} color={colors.textSecondary} />
           </View>
-          <Text className="text-lg font-semibold mt-2" style={{ color: colors.textPrimary }}>
-            {busiestDepartment?.department || t("adminScreens.home.noDepartmentData")}
+          <Text
+            className="text-lg font-semibold mt-2"
+            style={{ color: colors.textPrimary }}
+          >
+            {busiestDepartment?.department ||
+              t("adminScreens.home.noDepartmentData")}
           </Text>
-          <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+          <Text
+            className="text-xs mt-1"
+            style={{ color: colors.textSecondary }}
+          >
             {busiestDepartment
               ? t("adminScreens.home.busiestSummary", {
                   total: busiestDepartment.total,
@@ -500,7 +539,6 @@ export default function AdminHomeTab() {
               : t("adminScreens.home.noDepartmentDataHelper")}
           </Text>
         </View>
-
       </View>
     </ScrollView>
   );

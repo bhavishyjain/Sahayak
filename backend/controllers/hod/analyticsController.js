@@ -2,7 +2,10 @@ const User = require("../../models/User");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
 const { getHodOrThrow } = require("../../services/accessService");
-const { getWorkerMetricsBulk } = require("../../services/workerMetricsService");
+const {
+  getWorkerMetricsBulk,
+  getWorkerRatingsBulk,
+} = require("../../services/workerMetricsService");
 const { escapeRegex } = require("./helpers");
 const {
   ANALYTICS_STATUS_BUCKETS,
@@ -127,12 +130,16 @@ exports.getHodWorkers = asyncHandler(async (req, res) => {
   ]);
 
   const workerIds = workers.map((worker) => worker._id);
-  const metricsByWorkerId = await getWorkerMetricsBulk(workerIds);
+  const [metricsByWorkerId, ratingsByWorkerId] = await Promise.all([
+    getWorkerMetricsBulk(workerIds),
+    getWorkerRatingsBulk(workerIds),
+  ]);
   const workersWithMetrics = workers.map((worker) => {
     const metrics = metricsByWorkerId[String(worker._id)] || {
       activeComplaints: 0,
       completedCount: 0,
     };
+    const ratingSummary = ratingsByWorkerId[String(worker._id)] || null;
     return {
       id: worker._id,
       username: worker.username,
@@ -140,7 +147,11 @@ exports.getHodWorkers = asyncHandler(async (req, res) => {
       email: worker.email,
       phone: worker.phone,
       department: worker.department,
-      rating: worker.rating,
+      rating:
+        ratingSummary?.averageRating ??
+        worker.rating ??
+        worker.performanceMetrics?.customerRating ??
+        null,
       activeComplaints: metrics.activeComplaints,
       completedCount: metrics.completedCount,
     };
@@ -181,11 +192,15 @@ exports.getHodWorkerById = asyncHandler(async (req, res) => {
     throw new (require("../../core/AppError"))("Worker not found", 404);
   }
 
-  const metricsByWorkerId = await getWorkerMetricsBulk([worker._id]);
+  const [metricsByWorkerId, ratingsByWorkerId] = await Promise.all([
+    getWorkerMetricsBulk([worker._id]),
+    getWorkerRatingsBulk([worker._id]),
+  ]);
   const metrics = metricsByWorkerId[String(worker._id)] || {
     activeComplaints: 0,
     completedCount: 0,
   };
+  const ratingSummary = ratingsByWorkerId[String(worker._id)] || null;
 
   const workerView = {
     id: worker._id,
@@ -194,7 +209,11 @@ exports.getHodWorkerById = asyncHandler(async (req, res) => {
     email: worker.email,
     phone: worker.phone,
     department: worker.department,
-    rating: worker.rating,
+    rating:
+      ratingSummary?.averageRating ??
+      worker.rating ??
+      worker.performanceMetrics?.customerRating ??
+      null,
     activeComplaints: metrics.activeComplaints,
     completedCount: metrics.completedCount,
   };

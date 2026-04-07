@@ -367,6 +367,7 @@
       "assignToWorker": "Assign to Worker",
       "manageWorkers": "Manage Workers",
       "reassignWorker": "Reassign Worker",
+      "deleteComplaint": "Delete Complaint",
       "cancelComplaint": "Cancel Complaint",
       "approveCompletion": "Approve Completion",
       "requestRework": "Request Rework",
@@ -2158,6 +2159,13 @@
         "activeAssignedLabel": "Active Assigned",
         "activeAssignedHint": "Current assigned complaints"
       },
+      "trophies": {
+        "title": "Past Trophies",
+        "subtitle": "Milestones and achievement badges earned over time.",
+        "countLabel": "earned",
+        "viewAll": "View all",
+        "empty": "No trophies earned yet."
+      },
       "metrics": {
         "totalAssigned": "Total Assigned",
         "completed": "Completed",
@@ -2178,6 +2186,11 @@
         "subtitle": "Distribution across all %{count} tasks"
       },
       "noData": "No data available"
+    },
+    "workerTrophiesScreen": {
+      "title": "Past Trophies",
+      "subtitle": "All earned achievement badges with their earned dates.",
+      "empty": "No trophies earned yet."
     },
     "workerFeedbackScreen": {
       "title": "Rating & Feedback",

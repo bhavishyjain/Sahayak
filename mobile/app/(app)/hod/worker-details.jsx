@@ -184,7 +184,10 @@ export default function WorkerDetails() {
   const ratingValue =
     typeof worker.rating === "number"
       ? worker.rating.toFixed(1)
-      : t("hod.workers.details.notAvailable");
+      : Number.isFinite(data?.feedbackSummary?.averageRating) &&
+          Number(data?.feedbackSummary?.averageRating) > 0
+        ? Number(data.feedbackSummary.averageRating).toFixed(1)
+        : t("hod.workers.details.notAvailable");
 
   return (
     <View
@@ -309,6 +312,11 @@ export default function WorkerDetails() {
           </Card>
 
           <Card style={{ margin: 0, marginLeft: 6, flex: 1 }}>
+            <PressableBlock
+              onPress={() =>
+                router.push(`/(app)/more/worker-feedback?workerId=${id}`)
+              }
+            >
             <View className="items-center">
               <View className="flex-row items-center mb-1">
                 <Star size={16} color={colors.primary} />
@@ -323,6 +331,7 @@ export default function WorkerDetails() {
                 {t("hod.workers.details.stats.rating")}
               </Text>
             </View>
+            </PressableBlock>
           </Card>
         </View>
 

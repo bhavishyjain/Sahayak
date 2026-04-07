@@ -116,6 +116,7 @@ export default function ComplaintChat() {
 
   const [text, setText] = useState("");
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [composerInputHeight, setComposerInputHeight] = useState(48);
 
   const flatListRef = useRef(null);
   const {
@@ -206,8 +207,8 @@ export default function ComplaintChat() {
     <KeyboardAvoidingView
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 12 : 84}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 12 : 0}
     >
       <BackButtonHeader
         title={t("complaintChat.threadTitle", { title: discussionTitle })}
@@ -301,14 +302,31 @@ export default function ComplaintChat() {
               placeholder={t("complaintChat.inputPlaceholder")}
               multiline
               maxLength={2000}
+              onContentSizeChange={(event) => {
+                const nextHeight = Math.min(
+                  120,
+                  Math.max(48, event?.nativeEvent?.contentSize?.height || 48),
+                );
+                setComposerInputHeight(nextHeight);
+              }}
               containerStyle={{ flex: 1 }}
               inputContainerStyle={{
+                minHeight: 48,
+                height: composerInputHeight,
                 maxHeight: 120,
                 borderRadius: 16,
               }}
               inputStyle={{
                 fontSize: 14,
+                minHeight: 48,
+                height: composerInputHeight,
                 maxHeight: 120,
+                paddingVertical: 12,
+              }}
+              onBlur={() => {
+                if (!text.trim()) {
+                  setComposerInputHeight(48);
+                }
               }}
               onSubmitEditing={handleSend}
               blurOnSubmit={false}

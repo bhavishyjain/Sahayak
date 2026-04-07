@@ -20,11 +20,33 @@ const { listComplaints } = require("../../services/complaintListService");
 const {
   getWorkerDashboardSummary,
   getWorkerAnalyticsSummary,
+  summarizeWorkerTrophies,
 } = require("../../services/complaintAnalyticsService");
+const { getWorkerRatingsBulk } = require("../../services/workerMetricsService");
 const {
   buildListPayload,
   buildSummaryPayload,
 } = require("../../services/responseViewService");
+
+function getResolvedDate(complaint) {
+  return complaint?.resolvedAt || complaint?.updatedAt || complaint?.createdAt;
+}
+
+function getResolvedComplaintDurationHours(complaint) {
+  const start = complaint?.createdAt ? new Date(complaint.createdAt) : null;
+  const end = complaint?.actualCompletionTime
+    ? null
+    : getResolvedDate(complaint);
+
+  if (Number.isFinite(complaint?.actualCompletionTime)) {
+    return Number(complaint.actualCompletionTime);
+  }
+
+  if (!start || !end) return null;
+  const durationMs = new Date(end).getTime() - start.getTime();
+  if (!Number.isFinite(durationMs) || durationMs < 0) return null;
+  return durationMs / (1000 * 60 * 60);
+}
 
 exports.getWorkerOverview = asyncHandler(async (req, res) => {
   const workerId = getRequestUserId(req);
@@ -144,7 +166,23 @@ exports.getCompletedComplaints = asyncHandler(async (req, res) => {
 });
 
 exports.getWorkerFeedback = asyncHandler(async (req, res) => {
-  const workerId = getRequestUserId(req);
+  let workerId = getRequestUserId(req);
+
+  if (req.user?.role === "head" && req.query.workerId) {
+    const hod = await getHodOrThrow(req);
+    const worker = await User.findOne({
+      _id: req.query.workerId,
+      role: "worker",
+      department: hod.department,
+    }).select("_id");
+
+    if (!worker) {
+      throw new AppError("Worker not found in your department", 404);
+    }
+
+    workerId = worker._id;
+  }
+
   const complaints = await Complaint.find({
     "assignedWorkers.workerId": workerId,
     status: "resolved",
@@ -228,6 +266,7 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
   const workerIds = workers.map((w) => w._id);
   const last30Days = new Date();
   last30Days.setDate(last30Days.getDate() - 30);
+  const ratingsByWorkerId = await getWorkerRatingsBulk(workerIds);
 
   // Single aggregation replaces N×2 countDocuments+find calls
   const aggResults = await Complaint.aggregate([
@@ -254,6 +293,33 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
       },
     },
   ]);
+
+  const resolvedComplaints = await Complaint.find(
+    {
+      status: "resolved",
+      "assignedWorkers.workerId": { $in: workerIds },
+    },
+    {
+      assignedWorkers: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      resolvedAt: 1,
+      actualCompletionTime: 1,
+      feedback: 1,
+    },
+  ).lean();
+
+  const resolvedComplaintsByWorkerId = {};
+  resolvedComplaints.forEach((complaint) => {
+    (complaint.assignedWorkers || []).forEach((assignment) => {
+      const workerId = String(assignment?.workerId || "");
+      if (!workerId) return;
+      if (!resolvedComplaintsByWorkerId[workerId]) {
+        resolvedComplaintsByWorkerId[workerId] = [];
+      }
+      resolvedComplaintsByWorkerId[workerId].push(complaint);
+    });
+  });
 
   // Index by workerId string for O(1) lookup
   const aggMap = new Map(aggResults.map((r) => [String(r._id), r]));
@@ -288,60 +354,24 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
       }
     }
 
-    const metrics = worker.performanceMetrics || {};
-    const totalCompleted = metrics.totalCompleted || 0;
-    const avgTime = metrics.averageCompletionTime || 0;
-    const rating = worker.rating || 0;
-    const badges = [];
-
-    if (totalCompleted >= 10 && avgTime > 0 && avgTime <= 24)
-      badges.push({
-        id: "speed-demon",
-        name: "Speed Demon",
-        description: "Completes tasks in under 24 hours on average",
-        icon: "⚡",
-        color: "#F59E0B",
-      });
-    if (totalCompleted >= 10 && rating >= 4.5)
-      badges.push({
-        id: "quality-master",
-        name: "Quality Master",
-        description: "Maintains 4.5+ star rating",
-        icon: "⭐",
-        color: "#EAB308",
-      });
-    if (totalCompleted >= 50)
-      badges.push({
-        id: "community-hero",
-        name: "Community Hero",
-        description: "Resolved 50+ complaints",
-        icon: "🏆",
-        color: "#10B981",
-      });
-    if (totalCompleted >= 100)
-      badges.push({
-        id: "century-club",
-        name: "Century Club",
-        description: "Resolved 100+ complaints",
-        icon: "💯",
-        color: "#8B5CF6",
-      });
-    if (currentStreak >= 7)
-      badges.push({
-        id: "consistent-performer",
-        name: "Consistent Performer",
-        description: "7+ day streak",
-        icon: "🔥",
-        color: "#EF4444",
-      });
-    if (agg.periodCompleted >= 20 && period === "monthly")
-      badges.push({
-        id: "rising-star",
-        name: "Rising Star",
-        description: "20+ completions this month",
-        icon: "🌟",
-        color: "#06B6D4",
-      });
+    const workerResolvedComplaints =
+      resolvedComplaintsByWorkerId[String(worker._id)] || [];
+    const totalCompleted = workerResolvedComplaints.length;
+    const durations = workerResolvedComplaints
+      .map(getResolvedComplaintDurationHours)
+      .filter((value) => Number.isFinite(value) && value >= 0);
+    const avgTime =
+      durations.length > 0
+        ? durations.reduce((sum, value) => sum + value, 0) / durations.length
+        : 0;
+    const rating =
+      ratingsByWorkerId[String(worker._id)]?.averageRating ??
+      worker.rating ??
+      0;
+    const trophySummary = summarizeWorkerTrophies(
+      workerResolvedComplaints,
+    );
+    const badges = trophySummary.currentBadges;
 
     return {
       id: worker._id,
@@ -354,6 +384,7 @@ exports.getLeaderboard = asyncHandler(async (req, res) => {
       rating,
       currentStreak,
       badges,
+      trophyCount: trophySummary.trophyCount,
       isCurrentUser: String(worker._id) === String(currentWorkerId),
     };
   });

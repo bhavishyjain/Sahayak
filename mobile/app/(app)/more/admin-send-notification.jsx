@@ -21,6 +21,16 @@ function formatTimestamp(value) {
   }
 }
 
+function formatBroadcastStatus(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function SimpleInput({
   value,
   onChangeText,
@@ -333,7 +343,7 @@ export default function AdminSendNotificationScreen() {
                       className="text-[11px] font-semibold"
                       style={{ color: colors.primary }}
                     >
-                      {item.status}
+                      {formatBroadcastStatus(item.status)}
                     </Text>
                   </View>
                 </View>

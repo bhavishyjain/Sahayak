@@ -300,7 +300,7 @@ export default function WorkerLeaderboard() {
               className="text-sm ml-1"
               style={{ color: colors.textSecondary }}
             >
-              {worker.totalCompleted}
+              {Number(worker.trophyCount ?? 0)}
             </Text>
           </View>
         </View>

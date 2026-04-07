@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import { ChevronDown } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,7 +14,6 @@ import Card from "../../../components/Card";
 import ComplaintCard from "../../../components/ComplaintCard";
 import SearchBar from "../../../components/SearchBar";
 import FilterPanel from "../../../components/FilterPanel";
-import PressableBlock from "../../../components/PressableBlock";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import useDebouncedValue from "../../../utils/hooks/useDebouncedValue";
@@ -88,6 +86,27 @@ export default function WorkerAssigned() {
     Boolean(searchQuery.trim()),
   ].some(Boolean);
 
+  const handleScroll = (event) => {
+    if (!hasMore || loadingMore || loading || refreshing) return;
+
+    const {
+      layoutMeasurement,
+      contentOffset,
+      contentSize,
+    } = event.nativeEvent || {};
+
+    const visibleHeight = Number(layoutMeasurement?.height || 0);
+    const y = Number(contentOffset?.y || 0);
+    const totalHeight = Number(contentSize?.height || 0);
+
+    if (visibleHeight <= 0 || totalHeight <= 0) return;
+
+    const distanceFromBottom = totalHeight - (visibleHeight + y);
+    if (distanceFromBottom < 180) {
+      loadMore();
+    }
+  };
+
   if (loading) {
     return (
       <View
@@ -120,6 +139,8 @@ export default function WorkerAssigned() {
       <ScrollView
         className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -187,33 +208,11 @@ export default function WorkerAssigned() {
             />
           ))
         )}
-        {hasMore && (
-          <PressableBlock
-            onPress={() => loadMore()}
-            disabled={loadingMore}
-            className="mt-2 mb-4 rounded-xl items-center justify-center py-3"
-            style={{
-              backgroundColor: colors.backgroundSecondary,
-              borderWidth: 1,
-              borderColor: colors.border,
-              opacity: loadingMore ? 0.6 : 1,
-            }}
-          >
-            {loadingMore ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <View className="flex-row items-center" style={{ gap: 6 }}>
-                <ChevronDown size={14} color={colors.textSecondary} />
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {t("common.loadMore")}
-                </Text>
-              </View>
-            )}
-          </PressableBlock>
-        )}
+        {loadingMore ? (
+          <View className="items-center py-4">
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

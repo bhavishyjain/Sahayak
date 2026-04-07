@@ -14,7 +14,7 @@ export function useCitizenComplaintFeed(filters = {}) {
   } = filters;
 
   return useComplaintList({
-    scope: "mine",
+    scope: "public",
     status,
     excludeStatus: "resolved",
     department,

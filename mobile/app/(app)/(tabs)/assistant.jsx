@@ -45,6 +45,7 @@ import { CHAT_SPEECH_TO_TEXT_URL, CHAT_URL } from "../../../url";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
+import getUserAuth from "../../../utils/userAuth";
 
 function createAudioFormData(uri) {
   const formData = new FormData();
@@ -61,6 +62,11 @@ function createId(prefix = "msg") {
 }
 
 const ASSISTANT_HISTORY_KEY = "@sahayak_assistant_history_v1";
+
+function getAssistantHistoryKey(user) {
+  const userId = user?._id || user?.id || user?.username || "guest";
+  return `${ASSISTANT_HISTORY_KEY}:${userId}`;
+}
 
 function createWelcomeMessage(t) {
   return {
@@ -284,6 +290,7 @@ export default function Assistant() {
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const [messages, setMessages] = useState([]);
   const [historyHydrated, setHistoryHydrated] = useState(false);
+  const [historyStorageKey, setHistoryStorageKey] = useState("");
   const [previewImageUri, setPreviewImageUri] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [composerHeight, setComposerHeight] = useState(120);
@@ -299,10 +306,16 @@ export default function Assistant() {
 
     async function loadHistory() {
       try {
+        const currentUser = await getUserAuth();
+        if (cancelled) return;
+
+        const scopedKey = getAssistantHistoryKey(currentUser);
+        setHistoryStorageKey(scopedKey);
+
         const raw =
           Platform.OS === "web"
-            ? localStorage.getItem(ASSISTANT_HISTORY_KEY)
-            : await AsyncStorage.getItem(ASSISTANT_HISTORY_KEY);
+            ? localStorage.getItem(scopedKey)
+            : await AsyncStorage.getItem(scopedKey);
         if (cancelled) return;
 
         if (raw) {
@@ -310,6 +323,29 @@ export default function Assistant() {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setMessages(parsed);
             setHistoryHydrated(true);
+            return;
+          }
+        }
+
+        const legacyRaw =
+          Platform.OS === "web"
+            ? localStorage.getItem(ASSISTANT_HISTORY_KEY)
+            : await AsyncStorage.getItem(ASSISTANT_HISTORY_KEY);
+        if (cancelled) return;
+
+        if (legacyRaw) {
+          const parsedLegacy = JSON.parse(legacyRaw);
+          if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+            setMessages(parsedLegacy);
+            setHistoryHydrated(true);
+
+            if (Platform.OS === "web") {
+              localStorage.setItem(scopedKey, legacyRaw);
+              localStorage.removeItem(ASSISTANT_HISTORY_KEY);
+            } else {
+              await AsyncStorage.setItem(scopedKey, legacyRaw);
+              await AsyncStorage.removeItem(ASSISTANT_HISTORY_KEY);
+            }
             return;
           }
         }
@@ -330,16 +366,16 @@ export default function Assistant() {
   }, [locale, t]);
 
   useEffect(() => {
-    if (!historyHydrated || messages.length === 0) return;
+    if (!historyHydrated || messages.length === 0 || !historyStorageKey) return;
 
     const serialized = JSON.stringify(messages);
     if (Platform.OS === "web") {
-      localStorage.setItem(ASSISTANT_HISTORY_KEY, serialized);
+      localStorage.setItem(historyStorageKey, serialized);
       return;
     }
 
-    AsyncStorage.setItem(ASSISTANT_HISTORY_KEY, serialized).catch(() => {});
-  }, [historyHydrated, messages]);
+    AsyncStorage.setItem(historyStorageKey, serialized).catch(() => {});
+  }, [historyHydrated, historyStorageKey, messages]);
 
   useEffect(() => {
     if (!historyHydrated) return;
@@ -381,8 +417,7 @@ export default function Assistant() {
 
   const busy = loading || voiceLoading;
   const hasPendingAttachment = Boolean(coordinates) || selectedImages.length > 0;
-  const tabBarSpacing =
-    Math.max(insets.bottom, 8) + Math.max(24, tabBarHeight - 28);
+  const tabBarSpacing = tabBarHeight + 8;
   const activeComposerBottom = keyboardHeight
     ? Math.max(12, keyboardHeight - insets.bottom)
     : tabBarSpacing;
@@ -1029,6 +1064,16 @@ export default function Assistant() {
               ) : null}
             </View>
           </ScrollView>
+
+          <View
+            pointerEvents="none"
+            className="absolute left-0 right-0"
+            style={{
+              bottom: 0,
+              height: activeComposerBottom + composerHeight + 8,
+              backgroundColor: colors.backgroundPrimary,
+            }}
+          />
 
           <View
             className="absolute left-0 right-0 px-4 pt-2"

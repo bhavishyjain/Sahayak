@@ -444,10 +444,15 @@ export default function WorkerHome() {
 
                 return (
                   <PressableBlock
-                    key={complaint.id}
+                    key={String(
+                      complaint.id ??
+                        complaint._id ??
+                        complaint.ticketId ??
+                        complaint.createdAt,
+                    )}
                     onPress={() =>
                       router.push(
-                        `/complaints/complaint-details?id=${complaint.id}`,
+                        `/complaints/complaint-details?id=${complaint.id ?? complaint._id}`,
                       )
                     }
                   >

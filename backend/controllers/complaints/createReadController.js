@@ -13,6 +13,7 @@ const {
   uploadComplaintImages,
   applyUpvotePolicy,
 } = require("../../services/complaintService");
+const { syncWorkerRatings } = require("../../services/workerMetricsService");
 const { sendComplaintRegistered } = require("../../services/emailService");
 const {
   NOTIFICATION_ROUTE_SCREENS,
@@ -343,6 +344,10 @@ exports.submitFeedback = asyncHandler(async (req, res) => {
   };
 
   await complaint.save();
+
+  await syncWorkerRatings(
+    (complaint.assignedWorkers || []).map((assignment) => assignment.workerId),
+  );
 
   return sendSuccess(
     res,

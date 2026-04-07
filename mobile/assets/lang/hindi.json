@@ -367,6 +367,7 @@
       "assignToWorker": "कार्यकर्ता को सौंपें",
       "manageWorkers": "कर्मी प्रबंधित करें",
       "reassignWorker": "कार्यकर्ता पुनः सौंपें",
+      "deleteComplaint": "शिकायत हटाएं",
       "cancelComplaint": "शिकायत रद्द करें",
       "approveCompletion": "पूर्णता स्वीकृत करें",
       "requestRework": "पुनः कार्य का अनुरोध करें",
@@ -2158,6 +2159,13 @@
         "activeAssignedLabel": "सक्रिय आवंटित",
         "activeAssignedHint": "वर्तमान आवंटित शिकायतें"
       },
+      "trophies": {
+        "title": "पुरानी ट्रॉफियां",
+        "subtitle": "समय के साथ अर्जित उपलब्धियां और बैज।",
+        "countLabel": "अर्जित",
+        "viewAll": "सभी देखें",
+        "empty": "अभी तक कोई ट्रॉफी अर्जित नहीं हुई।"
+      },
       "metrics": {
         "totalAssigned": "कुल असाइन",
         "completed": "पूर्ण",
@@ -2178,6 +2186,11 @@
         "subtitle": "कुल %{count} कार्यों में वितरण"
       },
       "noData": "डेटा उपलब्ध नहीं है"
+    },
+    "workerTrophiesScreen": {
+      "title": "पुरानी ट्रॉफियां",
+      "subtitle": "सभी अर्जित उपलब्धि बैज उनकी तारीख के साथ।",
+      "empty": "अभी तक कोई ट्रॉफी अर्जित नहीं हुई।"
     },
     "workerFeedbackScreen": {
       "title": "रेटिंग और प्रतिक्रिया",

@@ -97,8 +97,8 @@ export default function Login() {
           />
         </View>
         <Image
-          source={require("../../../assets/images/login-image-hero.webp")}
-          style={{ width: 250, height: 250, marginBottom: 24 }}
+          source={require("../../../assets/images/login-image-hero.png")}
+          style={{ width: 350, height: 350, marginBottom: 24 }}
           resizeMode="contain"
         />
         <Text
