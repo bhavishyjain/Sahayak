@@ -450,11 +450,14 @@ export default function WorkerHome() {
                         complaint.ticketId ??
                         complaint.createdAt,
                     )}
-                    onPress={() =>
-                      router.push(
-                        `/complaints/complaint-details?id=${complaint.id ?? complaint._id}`,
-                      )
-                    }
+                    onPress={() => {
+                      const complaintId = complaint.id ?? complaint._id;
+                      if (!complaintId) return;
+                      router.push({
+                        pathname: "/(app)/complaints/complaint-details",
+                        params: { id: complaintId },
+                      });
+                    }}
                   >
                     <Card style={{ margin: 0, marginBottom: 12, flex: 0 }}>
                       <View className="flex-row items-start justify-between mb-2">

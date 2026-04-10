@@ -341,7 +341,7 @@ export default function AdminEditComplaintScreen() {
               <InlineMeta
                 icon={Search}
                 label={t("adminScreens.editComplaint.labels.status")}
-                value={formatStatusLabel(undefined, complaint.status)}
+                value={formatStatusLabel(t, complaint.status)}
                 colors={{
                   ...colors,
                   textPrimary: statusColor,

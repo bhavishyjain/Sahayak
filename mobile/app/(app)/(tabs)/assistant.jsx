@@ -41,6 +41,7 @@ import BackButtonHeader from "../../../components/BackButtonHeader";
 import Card from "../../../components/Card";
 import { useTabBarHeight } from "../../../components/CurvedTabBar";
 import PressableBlock from "../../../components/PressableBlock";
+import { formatStatusLabel } from "../../../data/complaintStatus";
 import { CHAT_SPEECH_TO_TEXT_URL, CHAT_URL } from "../../../url";
 import apiCall from "../../../utils/api";
 import { useTheme } from "../../../utils/context/theme";
@@ -85,33 +86,6 @@ function createAttachmentMessage({
   messages = [],
 }) {
   const trimmed = String(rawMessage || "").trim();
-  if (trimmed) return trimmed;
-
-  const pendingRegisterAssistant = [...messages]
-    .reverse()
-    .find(
-      (entry) =>
-        entry.role === "assistant" &&
-        entry.assistant?.intent === "register_complaint" &&
-        Array.isArray(entry.assistant?.missingFields) &&
-        entry.assistant.missingFields.length > 0,
-    );
-
-  if (pendingRegisterAssistant) {
-    const hasCoordinates = Boolean(coordinates);
-    const hasImages = selectedImages.length > 0;
-
-    if (hasCoordinates && hasImages) {
-      return t("assistant.continueWithCoordinatesAndImages");
-    }
-    if (hasCoordinates) {
-      return t("assistant.continueWithCoordinates");
-    }
-    if (hasImages) {
-      return t("assistant.continueWithImages");
-    }
-  }
-
   const parts = [];
   if (coordinates) {
     parts.push(`${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`);
@@ -124,10 +98,39 @@ function createAttachmentMessage({
   }
 
   if (parts.length > 0) {
+    if (trimmed) {
+      return `${trimmed}\n\n${parts.join(" • ")}`;
+    }
+
+    const pendingRegisterAssistant = [...messages]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.role === "assistant" &&
+          entry.assistant?.intent === "register_complaint" &&
+          Array.isArray(entry.assistant?.missingFields) &&
+          entry.assistant.missingFields.length > 0,
+      );
+
+    if (pendingRegisterAssistant) {
+      const hasCoordinates = Boolean(coordinates);
+      const hasImages = selectedImages.length > 0;
+
+      if (hasCoordinates && hasImages) {
+        return `${t("assistant.continueWithCoordinatesAndImages")}\n\n${parts.join(" • ")}`;
+      }
+      if (hasCoordinates) {
+        return `${t("assistant.continueWithCoordinates")}\n\n${parts.join(" • ")}`;
+      }
+      if (hasImages) {
+        return `${t("assistant.continueWithImages")}\n\n${parts.join(" • ")}`;
+      }
+    }
+
     return parts.join(" • ");
   }
 
-  return "";
+  return trimmed;
 }
 
 function getUiCopy(t) {
@@ -154,7 +157,9 @@ function getStatusTone(status, colors) {
 }
 
 function ComplaintCardMessage({ complaint, colors, label, onOpen }) {
+  const { t } = useTranslation();
   if (!complaint) return null;
+  const statusLabel = formatStatusLabel(t, complaint.status);
 
   return (
     <Card
@@ -194,8 +199,11 @@ function ComplaintCardMessage({ complaint, colors, label, onOpen }) {
           className="rounded-full px-3 py-1"
           style={{ backgroundColor: `${getStatusTone(complaint.status, colors)}22` }}
         >
-          <Text style={{ color: getStatusTone(complaint.status, colors) }}>
-            {complaint.status}
+          <Text
+            numberOfLines={1}
+            style={{ color: getStatusTone(complaint.status, colors) }}
+          >
+            {statusLabel}
           </Text>
         </View>
       </View>
@@ -418,9 +426,12 @@ export default function Assistant() {
   const busy = loading || voiceLoading;
   const hasPendingAttachment = Boolean(coordinates) || selectedImages.length > 0;
   const tabBarSpacing = tabBarHeight + 8;
-  const activeComposerBottom = keyboardHeight
-    ? Math.max(12, keyboardHeight - insets.bottom)
-    : tabBarSpacing;
+  const activeComposerBottom =
+    keyboardHeight > 0
+      ? Platform.OS === "android"
+        ? keyboardHeight + 8
+        : Math.max(12, keyboardHeight - insets.bottom)
+      : tabBarSpacing;
 
   const helperHint = useMemo(
     () => t("assistant.detailsHint"),
@@ -462,6 +473,7 @@ export default function Assistant() {
         role: item.role,
         text: item.text,
         assistant: item.assistant,
+        attachments: item.attachments,
       }));
 
       const hasAttachments =
@@ -938,7 +950,8 @@ export default function Assistant() {
 
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
       >
         {!historyHydrated ? null : (
         <View className="flex-1">

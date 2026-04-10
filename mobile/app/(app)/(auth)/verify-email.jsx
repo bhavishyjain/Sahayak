@@ -1,12 +1,14 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../../../colors";
 import PressableBlock from "../../../components/PressableBlock";
+import { getPostLoginRoute } from "../../../utils/accountStatus";
 import { useTheme } from "../../../utils/context/theme";
 import { useTranslation } from "../../../utils/i18n/LanguageProvider";
 import { useVerifyEmailActions } from "../../../utils/hooks/useAuthActions";
+import getUserAuth, { updateUserInfo } from "../../../utils/userAuth";
 
 export default function VerifyEmail() {
   const { colorScheme } = useTheme();
@@ -21,6 +23,7 @@ export default function VerifyEmail() {
 
   const [verifying, setVerifying] = useState(!!verifyToken);
   const [verified, setVerified] = useState(false);
+  const hasStartedVerification = useRef(false);
   const [message, setMessage] = useState(
     verifyToken
       ? t("auth.verifyEmail.verifying")
@@ -28,13 +31,28 @@ export default function VerifyEmail() {
   );
 
   useEffect(() => {
-    if (!verifyToken) return;
+    if (!verifyToken || hasStartedVerification.current) return;
+    hasStartedVerification.current = true;
 
     (async () => {
       try {
         const response = await verifyEmail(verifyToken);
         setVerified(true);
         setMessage(response?.message || t("auth.verifyEmail.verifiedMessage"));
+
+        try {
+          const currentUser = await getUserAuth();
+          if (currentUser?.auth_token) {
+            const refreshed = await updateUserInfo();
+            const updatedUser = refreshed?.data?.user;
+            if (updatedUser) {
+              router.replace(getPostLoginRoute(updatedUser));
+              return;
+            }
+          }
+        } catch (_refreshError) {
+        }
+
         Toast.show({
           type: "success",
           text1: t("auth.verifyEmail.verifiedTitle"),
@@ -50,7 +68,7 @@ export default function VerifyEmail() {
         setVerifying(false);
       }
     })();
-  }, [t, verifyEmail, verifyToken]);
+  }, [router, t, verifyEmail, verifyToken]);
 
   const handleResend = async () => {
     try {
@@ -130,7 +148,11 @@ export default function VerifyEmail() {
       )}
 
       <PressableBlock
-        onPress={() => router.replace("/(app)/(auth)/login")}
+        onPress={() =>
+          router.replace(
+            verified ? "/(app)/(tabs)/home" : "/(app)/(auth)/login",
+          )
+        }
         className="w-full py-4 rounded-lg items-center active:opacity-80"
         style={{
           backgroundColor: colors.backgroundSecondary,

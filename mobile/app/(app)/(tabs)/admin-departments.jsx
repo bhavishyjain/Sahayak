@@ -211,6 +211,7 @@ export default function AdminDepartmentsTab() {
         inputValue={newDepartmentName}
         onInputChange={setNewDepartmentName}
         confirmText={t("adminScreens.departments.dialog.confirm")}
+        cancelText={t("common.cancel")}
         onConfirm={handleAddDepartment}
         onCancel={() => {
           setShowAddDialog(false);

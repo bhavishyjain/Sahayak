@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Text,
   TouchableOpacity,
@@ -117,6 +117,8 @@ export default function ComplaintChat() {
   const [text, setText] = useState("");
   const [currentUserId, setCurrentUserId] = useState(null);
   const [composerInputHeight, setComposerInputHeight] = useState(48);
+  const [composerHeight, setComposerHeight] = useState(84);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const flatListRef = useRef(null);
   const {
@@ -141,6 +143,25 @@ export default function ComplaintChat() {
     };
     if (id) init();
   }, [id]);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(Math.max(0, event?.endCoordinates?.height || 0));
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!id) return undefined;
@@ -202,13 +223,17 @@ export default function ComplaintChat() {
   const discussionTitle = ticketId
     ? t("complaintChat.ticketTitle", { ticketId: String(ticketId) })
     : t("complaintChat.discussionTitle");
+  const composerBottomOffset =
+    keyboardHeight > 0
+      ? Platform.OS === "android"
+        ? keyboardHeight + 8
+        : Math.max(12, keyboardHeight - insets.bottom)
+      : Math.max(insets.bottom, 16);
 
   return (
-    <KeyboardAvoidingView
+    <View
       className="flex-1"
       style={{ backgroundColor: colors.backgroundPrimary }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 12 : 0}
     >
       <BackButtonHeader
         title={t("complaintChat.threadTitle", { title: discussionTitle })}
@@ -255,7 +280,7 @@ export default function ComplaintChat() {
               )}
               contentContainerStyle={{
                 padding: 16,
-                paddingBottom: 20,
+                paddingBottom: composerBottomOffset + composerHeight + 12,
                 flexGrow: 1,
                 justifyContent: "flex-end",
               }}
@@ -286,69 +311,91 @@ export default function ComplaintChat() {
             />
           )}
 
-          {/* Input bar */}
           <View
-            className="flex-row items-end px-4 py-3 gap-3"
             style={{
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: composerBottomOffset + composerHeight + 8,
               backgroundColor: colors.backgroundPrimary,
-              paddingBottom: Math.max(insets.bottom, 16),
+            }}
+          />
+
+          <View
+            className="absolute left-0 right-0 px-4 pt-2"
+            onLayout={(event) => {
+              setComposerHeight(event.nativeEvent.layout.height);
+            }}
+            style={{
+              bottom: composerBottomOffset,
+              backgroundColor: colors.backgroundPrimary,
             }}
           >
-            <AppTextInput
-              value={text}
-              onChangeText={setText}
-              placeholder={t("complaintChat.inputPlaceholder")}
-              multiline
-              maxLength={2000}
-              onContentSizeChange={(event) => {
-                const nextHeight = Math.min(
-                  120,
-                  Math.max(48, event?.nativeEvent?.contentSize?.height || 48),
-                );
-                setComposerInputHeight(nextHeight);
-              }}
-              containerStyle={{ flex: 1 }}
-              inputContainerStyle={{
-                minHeight: 48,
-                height: composerInputHeight,
-                maxHeight: 120,
-                borderRadius: 16,
-              }}
-              inputStyle={{
-                fontSize: 14,
-                minHeight: 48,
-                height: composerInputHeight,
-                maxHeight: 120,
-                paddingVertical: 12,
-              }}
-              onBlur={() => {
-                if (!text.trim()) {
-                  setComposerInputHeight(48);
-                }
-              }}
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
-            />
-            <TouchableOpacity
-              onPress={handleSend}
-              disabled={[!text.trim(), sending].some(Boolean)}
-              className="w-11 h-11 rounded-full items-center justify-center"
+            <View
+              className="flex-row items-end px-4 py-3 gap-3 rounded-2xl"
               style={{
-                backgroundColor:
-                  text.trim() && !sending ? colors.primary : colors.border,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.backgroundPrimary,
               }}
             >
-              {sending ? (
-                <ActivityIndicator size="small" color={colors.light} />
-              ) : (
-                <Send size={18} color={colors.light} />
-              )}
-            </TouchableOpacity>
+              <AppTextInput
+                value={text}
+                onChangeText={setText}
+                placeholder={t("complaintChat.inputPlaceholder")}
+                multiline
+                maxLength={2000}
+                onContentSizeChange={(event) => {
+                  const nextHeight = Math.min(
+                    120,
+                    Math.max(48, event?.nativeEvent?.contentSize?.height || 48),
+                  );
+                  setComposerInputHeight(nextHeight);
+                }}
+                containerStyle={{ flex: 1 }}
+                inputContainerStyle={{
+                  minHeight: 48,
+                  height: composerInputHeight,
+                  maxHeight: 120,
+                  borderWidth: 0,
+                  borderRadius: 16,
+                  backgroundColor: "transparent",
+                }}
+                inputStyle={{
+                  fontSize: 14,
+                  minHeight: 48,
+                  height: composerInputHeight,
+                  maxHeight: 120,
+                  paddingVertical: 12,
+                }}
+                onBlur={() => {
+                  if (!text.trim()) {
+                    setComposerInputHeight(48);
+                  }
+                }}
+                onSubmitEditing={handleSend}
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity
+                onPress={handleSend}
+                disabled={[!text.trim(), sending].some(Boolean)}
+                className="w-11 h-11 rounded-full items-center justify-center"
+                style={{
+                  backgroundColor:
+                    text.trim() && !sending ? colors.primary : colors.border,
+                }}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color={colors.light} />
+                ) : (
+                  <Send size={18} color={colors.light} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </>
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }

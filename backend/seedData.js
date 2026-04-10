@@ -7,7 +7,7 @@ const Complaint = require("./models/Complaint");
 const ComplaintMessage = require("./models/ComplaintMessage");
 const ComplaintSpecialRequest = require("./models/ComplaintSpecialRequest");
 const Department = require("./models/Department");
-const WorkerInvitation = require("./models/WorkerInvitation");
+const Invitation = require("./models/Invitation");
 const Notification = require("./models/Notification");
 const ReportSchedule = require("./models/ReportSchedule");
 const FestivalEvent = require("./models/FestivalEvent");
@@ -298,6 +298,37 @@ function getDateWithinSpecificDayAgo(daysAgo, now = new Date()) {
   return getRandomDateBetween(dayStart, dayEnd);
 }
 
+function remapPreferredDaysAgoForStatus(
+  preferredDaysAgo,
+  minDaysAgo,
+  maxDaysAgo = LAST_60_DAYS - 1,
+) {
+  if (!Number.isFinite(preferredDaysAgo)) return null;
+
+  const safeMax = Math.max(0, Math.floor(Number(maxDaysAgo) || 0));
+  const safeMin = Math.min(
+    safeMax,
+    Math.max(0, Math.floor(Number(minDaysAgo) || 0)),
+  );
+  const safePreferred = Math.min(
+    safeMax,
+    Math.max(0, Math.floor(Number(preferredDaysAgo) || 0)),
+  );
+
+  if (safeMin >= safeMax) {
+    return safeMax;
+  }
+
+  const ratio = safePreferred / safeMax;
+  return Math.min(
+    safeMax,
+    Math.max(
+      safeMin,
+      Math.round(safeMin + ratio * (safeMax - safeMin)),
+    ),
+  );
+}
+
 function buildEvenDayOffsets(totalCount, dayWindow = LAST_60_DAYS) {
   const safeTotal = Math.max(0, Math.floor(Number(totalCount) || 0));
   const safeWindow = Math.max(1, Math.floor(Number(dayWindow) || 1));
@@ -336,7 +367,7 @@ async function clearSeedCollections() {
   await ComplaintMessage.deleteMany({});
   await ComplaintSpecialRequest.deleteMany({});
   await Department.deleteMany({});
-  await WorkerInvitation.deleteMany({});
+  await Invitation.deleteMany({});
   await Notification.deleteMany({});
   await ReportSchedule.deleteMany({});
   await FestivalEvent.deleteMany({});
@@ -361,13 +392,14 @@ function getComplaintCreatedAt(
   const requiredMinDaysAgo = getRequiredAgeHoursByStatus(status) / 24;
   const minDaysAgo = Math.min(Math.max(requiredMinDaysAgo, 0), maxDaysAgo);
   const hasPreferredDaysAgo = Number.isFinite(preferredDaysAgo);
-  const clampedPreferredDaysAgo = Math.min(
+  const mappedPreferredDaysAgo = remapPreferredDaysAgoForStatus(
+    preferredDaysAgo,
+    minDaysAgo,
     maxDaysAgo,
-    Math.max(minDaysAgo, Math.floor(preferredDaysAgo)),
   );
 
   const createdAt = hasPreferredDaysAgo
-    ? getDateWithinSpecificDayAgo(clampedPreferredDaysAgo, now)
+    ? getDateWithinSpecificDayAgo(mappedPreferredDaysAgo, now)
     : getDateWithinLastDays(minDaysAgo, maxDaysAgo, now);
   const ageInDays = Math.floor(
     (now.getTime() - createdAt.getTime()) / ONE_DAY_MS,
@@ -716,8 +748,14 @@ function buildGuaranteedMonthlyTrophyComplaints({
       const owner = regularUsers[(workerIndex * 17 + i) % regularUsers.length];
       const locationData = getRandomLocation();
 
+      const monthlyDaySlots = [1, 3, 6, 8, 11, 13, 16, 18, 21, 24, 27, 30];
+      const maxDayInPreviousMonth = new Date(
+        previousMonthEnd.getFullYear(),
+        previousMonthEnd.getMonth() + 1,
+        0,
+      ).getDate();
       const createdAt = new Date(previousMonthStart);
-      createdAt.setDate(Math.min(24, 2 + i * 2));
+      createdAt.setDate(Math.min(maxDayInPreviousMonth, monthlyDaySlots[i]));
       createdAt.setHours(8 + (i % 3), (i * 7) % 60, 0, 0);
 
       if (createdAt > previousMonthEnd) {
@@ -3001,8 +3039,8 @@ async function seedDatabase() {
       `✅ Created ${specialRequestRows.length} special requests (${specialRequestRows.filter((item) => item.status === "pending").length} pending, ${specialRequestRows.filter((item) => item.status === "approved").length} approved, ${specialRequestRows.filter((item) => item.status === "rejected").length} rejected)`,
     );
 
-    // ── Seed Worker Invitations ────────────────────────────────────────
-    console.log("\n📧 Seeding worker invitations...");
+    // ── Seed Invitations ───────────────────────────────────────────────
+    console.log("\n📧 Seeding invitations...");
 
     const invitationTemplates = [
       // pending
@@ -3051,7 +3089,7 @@ async function seedDatabase() {
       }
     }
 
-    await WorkerInvitation.insertMany(invitations);
+    await Invitation.insertMany(invitations);
     const pendingCount = invitations.filter(
       (i) => !i.acceptedAt && !i.revokedAt && i.expiresAt > now,
     ).length;
@@ -3061,7 +3099,7 @@ async function seedDatabase() {
       (i) => !i.acceptedAt && !i.revokedAt && i.expiresAt <= now,
     ).length;
     console.log(
-      `✅ Created ${invitations.length} worker invitations (${pendingCount} pending, ${acceptedCount} accepted, ${revokedCount} revoked, ${expiredCount} expired)`,
+      `✅ Created ${invitations.length} invitations (${pendingCount} pending, ${acceptedCount} accepted, ${revokedCount} revoked, ${expiredCount} expired)`,
     );
 
     // ── Seed Festival Events ───────────────────────────────────────────

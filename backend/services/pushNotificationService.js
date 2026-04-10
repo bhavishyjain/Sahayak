@@ -16,6 +16,7 @@ async function sendExpoPushNotifications(tokens, payload) {
   const messages = validTokens.map((to) => ({
     to,
     sound: "default",
+    channelId: "default",
     title: payload.title,
     body: payload.body,
     data: payload.data || {},

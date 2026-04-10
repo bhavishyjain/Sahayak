@@ -50,10 +50,13 @@ export default function BackButtonHeader({
       )}
       <View className="flex-1 items-center justify-center px-2">
         <Text
-          className="text-lg font-fira-bold"
+          className="text-lg"
           numberOfLines={1}
           ellipsizeMode="tail"
-          style={{ color: colors.textPrimary }}
+          style={{
+            color: colors.textPrimary,
+            fontWeight: "700",
+          }}
         >
           {title}
         </Text>

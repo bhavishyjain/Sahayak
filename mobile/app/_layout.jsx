@@ -2,10 +2,10 @@ import { Stack, router } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, useTheme } from "@/utils/context/theme";
 import { LanguageProvider } from "@/utils/i18n/LanguageProvider";
-import { AppState, View } from "react-native";
+import { AppState, Keyboard, Platform, StyleSheet, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { darkColors, lightColors } from "../colors";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
 import * as SystemUI from "expo-system-ui";
 import {
@@ -15,6 +15,7 @@ import {
 import { openNotificationRoute } from "../utils/notificationNavigation";
 import { prepareReportsStorage } from "../utils/hooks/useReports";
 import RealtimeBridge from "../components/RealtimeBridge";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import "../global.css";
 import "../utils/i18n/config";
 
@@ -39,12 +40,31 @@ const queryClient = new QueryClient({
 function RootNavigator() {
   const { colorScheme } = useTheme();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
+  const insets = useSafeAreaInsets();
   const appState = useRef(AppState.currentState);
   const lastHandledNotificationId = useRef(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.backgroundPrimary).catch(() => {});
   }, [colors.backgroundPrimary]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(Math.max(0, event?.endCoordinates?.height || 0));
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     initializePushNotifications().catch(() => {});
@@ -62,12 +82,35 @@ function RootNavigator() {
     };
 
     const receivedSubscription = Notifications.addNotificationReceivedListener(
-      (notification) => {
+      async (notification) => {
         if (__DEV__) {
           console.log(
             "Push notification received:",
             notification?.request?.content,
           );
+        }
+
+        const isForeground = appState.current === "active";
+        const alreadyEchoed = Boolean(
+          notification?.request?.content?.data?.__foregroundEcho,
+        );
+
+        if (!isForeground || alreadyEchoed) return;
+
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: notification?.request?.content?.title,
+              body: notification?.request?.content?.body,
+              data: {
+                ...(notification?.request?.content?.data || {}),
+                __foregroundEcho: true,
+              },
+              sound: "default",
+            },
+            trigger: null,
+          });
+        } catch (_error) {
         }
       },
     );
@@ -118,7 +161,27 @@ function RootNavigator() {
       />
       <RealtimeBridge />
       <Stack screenOptions={{ headerShown: false }} />
-      <Toast position="bottom" />
+      <View
+        pointerEvents="box-none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            zIndex: 2147483647,
+            elevation: 2147483647,
+          },
+        ]}
+      >
+        <Toast
+          position="bottom"
+          bottomOffset={
+            keyboardHeight > 0
+              ? Math.max(32, keyboardHeight + 20)
+              : Platform.OS === "android"
+                ? Math.max(insets.bottom + 148, 148)
+                : Math.max(insets.bottom + 28, 40)
+          }
+        />
+      </View>
     </View>
   );
 }

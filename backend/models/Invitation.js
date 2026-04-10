@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const workerInvitationSchema = new mongoose.Schema(
+const invitationSchema = new mongoose.Schema(
   {
     email: {
       type: String,
@@ -44,12 +44,16 @@ const workerInvitationSchema = new mongoose.Schema(
     },
     revokedAt: { type: Date, default: null },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    // Keep existing collection so no data migration is required.
+    collection: "workerinvitations",
+  },
 );
 
-workerInvitationSchema.index(
+invitationSchema.index(
   { email: 1, department: 1, role: 1, expiresAt: 1 },
   { name: "worker_invitation_lookup" },
 );
 
-module.exports = mongoose.model("WorkerInvitation", workerInvitationSchema);
+module.exports = mongoose.model("Invitation", invitationSchema);

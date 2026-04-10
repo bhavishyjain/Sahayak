@@ -176,7 +176,12 @@ export default function Register() {
           activeBorderColor={colors.primary}
           containerStyle={{ width: "100%", marginBottom: 20 }}
           inputContainerStyle={{ minHeight: 50 }}
-          inputStyle={{ fontSize: 16, fontWeight: "600", minHeight: 50 }}
+          inputStyle={{
+            fontSize: 16,
+            fontWeight: "600",
+            minHeight: 50,
+            paddingLeft: 16,
+          }}
           right={
             <PressableBlock onPress={() => setSecure((v) => !v)}>
               {secure ? (

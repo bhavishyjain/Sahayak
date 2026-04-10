@@ -66,6 +66,48 @@ function getPendingRegistrationContext(conversationHistory = []) {
   return null;
 }
 
+function getLatestAttachmentState(conversationHistory = []) {
+  const history = Array.isArray(conversationHistory) ? conversationHistory : [];
+  let latestCoordinates = null;
+  let latestImages = [];
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const entry = history[index];
+    const attachments = entry?.attachments || {};
+
+    if (!latestCoordinates && attachments.coordinates) {
+      latestCoordinates = parseCoordinates(attachments.coordinates);
+    }
+
+    if (
+      latestImages.length === 0 &&
+      Array.isArray(attachments.images) &&
+      attachments.images.length > 0
+    ) {
+      latestImages = attachments.images
+        .map((image) => String(image || "").trim())
+        .filter(Boolean);
+    }
+
+    if (latestCoordinates && latestImages.length > 0) {
+      break;
+    }
+  }
+
+  return {
+    coordinates: latestCoordinates,
+    images: latestImages,
+  };
+}
+
+function uniqueImageUrls(images = []) {
+  return [...new Set(
+    (Array.isArray(images) ? images : [])
+      .map((image) => String(image || "").trim())
+      .filter(Boolean),
+  )];
+}
+
 function looksLikeStandaloneLocationMessage(message = "") {
   const value = String(message || "").trim();
   if (!value) return false;
@@ -328,12 +370,23 @@ async function handleMessage(req, res) {
 
       const forcedDraft =
         pendingRegistrationContext?.assistantMeta?.complaintDraft || null;
+      const latestAttachmentState = getLatestAttachmentState(conversationHistory);
       const draft = {
         ...(forcedDraft || {}),
         ...(analysis.complaintDraft || {}),
       };
-      const coordinates = parseCoordinates(req.body?.coordinates);
+      const persistedCoordinates =
+        parseCoordinates(
+          pendingRegistrationContext?.assistantMeta?.collectedCoordinates,
+        ) || latestAttachmentState.coordinates;
+      const coordinates =
+        parseCoordinates(req.body?.coordinates) || persistedCoordinates;
       const uploadedImages = await uploadComplaintImages(req.files || []);
+      const collectedImages = uniqueImageUrls([
+        ...(pendingRegistrationContext?.assistantMeta?.collectedImages || []),
+        ...latestAttachmentState.images,
+        ...uploadedImages,
+      ]);
       const missingFields = Array.isArray(
         pendingRegistrationContext?.assistantMeta?.missingFields,
       )
@@ -391,9 +444,9 @@ async function handleMessage(req, res) {
         if (index >= 0) missingFields.splice(index, 1);
       }
 
-      if (uploadedImages.length === 0 && !missingFields.includes("images")) {
+      if (collectedImages.length === 0 && !missingFields.includes("images")) {
         missingFields.push("images");
-      } else if (uploadedImages.length > 0) {
+      } else if (collectedImages.length > 0) {
         const index = missingFields.indexOf("images");
         if (index >= 0) missingFields.splice(index, 1);
       }
@@ -424,8 +477,10 @@ async function handleMessage(req, res) {
             created: false,
             missingFields,
             complaintDraft: draft,
+            collectedCoordinates: coordinates,
+            collectedImages,
             requiredLocationCapture: !coordinates,
-            requiredImages: uploadedImages.length === 0,
+            requiredImages: collectedImages.length === 0,
             language,
           }),
         );
@@ -442,7 +497,7 @@ async function handleMessage(req, res) {
         locationName: draft.locationName,
         coordinates,
         priority: draft.priority || "Medium",
-        proofImage: uploadedImages,
+        proofImage: collectedImages,
         status: "pending",
         history: [
           {

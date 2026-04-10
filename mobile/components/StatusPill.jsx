@@ -1,18 +1,18 @@
-import { Circle, Pause, Plane, Power } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { darkColors, lightColors } from "../colors";
 import {
-  getComplaintStatusMeta,
+  formatStatusLabel,
   getStatusColor,
 } from "../data/complaintStatus";
 import { useTheme } from "../utils/context/theme";
+import { useTranslation } from "../utils/i18n/LanguageProvider";
 
 export default function StatusPill({ user, status }) {
   const { colorScheme } = useTheme();
+  const { t } = useTranslation();
   const colors = colorScheme === "dark" ? darkColors : lightColors;
 
   let label = "Offline";
-  let Icon = Power;
   let dotColorHex = "#EF4444"; // red-500
   let pulse = false;
   let backgroundColor = colors.backgroundSecondary;
@@ -20,9 +20,8 @@ export default function StatusPill({ user, status }) {
   // If status prop is provided (for complaints), use complaint status logic
   if (status) {
     pulse = false; // No pulse animation for complaint statuses
-    const statusMeta = getComplaintStatusMeta(status);
     const statusColor = getStatusColor(status, colors) ?? colors.muted;
-    label = statusMeta?.fallbackLabel ?? String(status);
+    label = formatStatusLabel(t, status);
     dotColorHex = statusColor;
     backgroundColor = `${statusColor}22`;
   } else if (user) {
@@ -31,24 +30,20 @@ export default function StatusPill({ user, status }) {
 
     if (schedule?.on_vacation) {
       label = "Vacation";
-      Icon = Plane;
       dotColorHex = "#FBBF24"; // yellow-400
       pulse = false;
     } else if (schedule?.is_schedulable) {
       if (schedule?.schedule_paused) {
         label = "Paused";
-        Icon = Pause;
         dotColorHex = "#FB923C"; // orange-400
         pulse = false;
       } else {
         if (user?.data?.status === 1) {
           label = "Online";
-          Icon = Circle;
           dotColorHex = "#22C55E"; // green-500
           pulse = true; // 🔥 animate only when online
         } else {
           label = "Offline";
-          Icon = Power;
           dotColorHex = "#EF4444"; // red-500
           pulse = false;
         }
@@ -56,12 +51,10 @@ export default function StatusPill({ user, status }) {
     } else {
       if (user?.data?.status === 1) {
         label = "Online";
-        Icon = Circle;
         dotColorHex = "#22C55E"; // green-500
         pulse = true;
       } else {
         label = "Offline";
-        Icon = Power;
         dotColorHex = "#EF4444"; // red-500
         pulse = false;
       }
@@ -71,7 +64,7 @@ export default function StatusPill({ user, status }) {
   return (
     <View
       className="px-4 py-2 rounded flex-row items-center gap-2"
-      style={{ backgroundColor }}
+      style={{ backgroundColor, alignSelf: "flex-start", maxWidth: "100%" }}
     >
       {/* 🔵 STATUS DOT */}
       <View className="relative">
@@ -90,6 +83,7 @@ export default function StatusPill({ user, status }) {
       {/* LABEL */}
       <Text
         className="text-xs font-semibold"
+        numberOfLines={1}
         style={{ color: colors.textPrimary }}
       >
         {label}

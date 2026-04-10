@@ -630,7 +630,7 @@ export default function DepartmentDetailsScreen() {
     () => invitations.filter((item) => item.role === "head"),
     [invitations],
   );
-  const workerInvitations = useMemo(
+  const memberInvitations = useMemo(
     () => invitations.filter((item) => item.role !== "head"),
     [invitations],
   );
@@ -829,7 +829,7 @@ export default function DepartmentDetailsScreen() {
         <DropdownSection
           title={t("adminScreens.departmentDetails.workers")}
           count={workers.length}
-          pendingCount={workerInvitations.length}
+          pendingCount={memberInvitations.length}
           icon={Users}
           tone={colors.primary}
           open={workersOpen}
@@ -839,7 +839,7 @@ export default function DepartmentDetailsScreen() {
           colors={colors}
         >
           {workers.length === 0 ? (
-            workerInvitations.length === 0 ? (
+            memberInvitations.length === 0 ? (
               <Text className="text-sm" style={{ color: colors.textSecondary }}>
                 {t("adminScreens.departmentDetails.noWorkers")}
               </Text>
@@ -867,7 +867,7 @@ export default function DepartmentDetailsScreen() {
               />
             ))
           )}
-          {workerInvitations.map((invitation) => (
+          {memberInvitations.map((invitation) => (
             <InvitationRow
               key={invitation.id}
               invitation={invitation}

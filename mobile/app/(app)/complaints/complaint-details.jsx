@@ -3072,6 +3072,7 @@ function ComplaintDetailsInner() {
         >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 12}
             className="flex-1 justify-end"
             style={{ backgroundColor: colors.dark + "80" }}
           >
@@ -3080,6 +3081,7 @@ function ComplaintDetailsInner() {
               contentContainerStyle={{
                 flexGrow: 1,
                 justifyContent: "flex-end",
+                paddingBottom: Math.max(insets.bottom, 16),
               }}
             >
               <View

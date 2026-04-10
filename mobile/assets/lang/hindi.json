@@ -86,6 +86,8 @@
       "confirmPasswordPlaceholder": "पासवर्ड की पुष्टि करें",
       "updateButton": "पासवर्ड अपडेट करें",
       "backToLogin": "लॉग इन पर वापस जाएँ",
+      "updatedTitle": "पासवर्ड अपडेट हो गया",
+      "updatedMessage": "पासवर्ड सफलतापूर्वक रीसेट हो गया। कृपया दोबारा लॉग इन करें।",
       "invalidLinkTitle": "अमान्य लिंक",
       "invalidLinkMessage": "पासवर्ड रीसेट टोकन उपलब्ध नहीं है।",
       "weakPasswordTitle": "कमज़ोर पासवर्ड",
@@ -1415,6 +1417,7 @@
     "pending": "लंबित",
     "assigned": "आवंटित",
     "inProgress": "प्रगति में",
+    "approved": "स्वीकृत",
     "completed": "पूर्ण",
     "resolved": "समाधान",
     "rejected": "अस्वीकृत",
@@ -2099,7 +2102,37 @@
         "title": "इतिहास",
         "unread": "%{count} अपठित",
         "markAllRead": "सभी पढ़े हुए चिह्नित करें",
-        "noBody": "कोई विवरण उपलब्ध नहीं"
+        "noBody": "कोई विवरण उपलब्ध नहीं",
+        "summaryTitle": "सूचना इनबॉक्स",
+        "summaryUnread": "%{count} अपठित सूचनाएं आपकी प्रतीक्षा कर रही हैं।",
+        "summaryAllCaughtUp": "फिलहाल आप पूरी तरह अपडेट हैं।",
+        "emptyTitle": "अभी तक कोई सूचना नहीं",
+        "emptyDescription": "अपडेट, असाइनमेंट, एस्केलेशन और अलर्ट यहां दिखाई देंगे।",
+        "unreadPill": "अपठित",
+        "readPill": "पढ़ी गई",
+        "open": "खोलें",
+        "stats": {
+          "unread": "अपठित",
+          "total": "लोड की गई"
+        },
+        "filters": {
+          "all": "सभी",
+          "unread": "अपठित"
+        },
+        "sections": {
+          "today": "आज",
+          "yesterday": "कल",
+          "thisWeek": "इस सप्ताह",
+          "older": "पुरानी"
+        },
+        "types": {
+          "complaintUpdate": "शिकायत अपडेट",
+          "assignment": "असाइनमेंट",
+          "escalation": "एस्केलेशन",
+          "system": "सिस्टम",
+          "test": "टेस्ट",
+          "other": "अपडेट"
+        }
       },
       "toasts": {
         "markReadFailed": "पढ़ा हुआ चिह्नित नहीं कर सके",

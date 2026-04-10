@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const User = require("../models/User");
-const WorkerInvitation = require("../models/WorkerInvitation");
+const Invitation = require("../models/Invitation");
 const AppError = require("../core/AppError");
 const asyncHandler = require("../core/asyncHandler");
 const { sendSuccess } = require("../core/response");
@@ -40,7 +40,7 @@ exports.register = asyncHandler(async (req, res) => {
       .createHash("sha256")
       .update(String(inviteToken))
       .digest("hex");
-    invitation = await WorkerInvitation.findOne({
+    invitation = await Invitation.findOne({
       tokenHash,
       acceptedAt: null,
       revokedAt: null,
@@ -244,7 +244,7 @@ exports.acceptInvite = asyncHandler(async (req, res) => {
     .update(String(inviteToken))
     .digest("hex");
 
-  const invitation = await WorkerInvitation.findOne({
+  const invitation = await Invitation.findOne({
     tokenHash,
     acceptedAt: null,
     revokedAt: null,

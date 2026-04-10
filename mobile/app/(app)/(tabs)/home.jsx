@@ -10,6 +10,7 @@ import {
   Building2,
   ThumbsUp,
   Star,
+  ChevronRight,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -394,16 +395,18 @@ export default function Home() {
                       </Text>
                     </View>
 
-                    <View
-                      className="rounded-xl px-3 py-2"
-                      style={{ backgroundColor: colors.primary }}
-                    >
+                    <View className="flex-row items-center">
                       <Text
                         className="text-xs font-bold"
-                        style={{ color: colors.dark }}
+                        style={{ color: colors.textPrimary }}
                       >
                         {t("home.feedback.action")}
                       </Text>
+                      <ChevronRight
+                        size={14}
+                        color={colors.textPrimary}
+                        style={{ marginLeft: 4 }}
+                      />
                     </View>
                   </View>
                 </Pressable>

@@ -86,6 +86,8 @@
       "confirmPasswordPlaceholder": "Confirm Password",
       "updateButton": "Update Password",
       "backToLogin": "Back to Login",
+      "updatedTitle": "Password updated",
+      "updatedMessage": "Password reset successful. Please log in again.",
       "invalidLinkTitle": "Invalid link",
       "invalidLinkMessage": "Password reset token is missing.",
       "weakPasswordTitle": "Weak password",
@@ -1415,6 +1417,7 @@
     "pending": "Pending",
     "assigned": "Assigned",
     "inProgress": "In Progress",
+    "approved": "Approved",
     "completed": "Completed",
     "resolved": "Resolved",
     "rejected": "Rejected",
@@ -2099,7 +2102,37 @@
         "title": "History",
         "unread": "%{count} unread",
         "markAllRead": "Mark all read",
-        "noBody": "No details available"
+        "noBody": "No details available",
+        "summaryTitle": "Notification inbox",
+        "summaryUnread": "%{count} unread notifications need your attention.",
+        "summaryAllCaughtUp": "You are all caught up for now.",
+        "emptyTitle": "No notifications yet",
+        "emptyDescription": "Updates, assignments, escalations, and alerts will appear here.",
+        "unreadPill": "Unread",
+        "readPill": "Read",
+        "open": "Open",
+        "stats": {
+          "unread": "Unread",
+          "total": "Loaded"
+        },
+        "filters": {
+          "all": "All",
+          "unread": "Unread"
+        },
+        "sections": {
+          "today": "Today",
+          "yesterday": "Yesterday",
+          "thisWeek": "This week",
+          "older": "Older"
+        },
+        "types": {
+          "complaintUpdate": "Complaint update",
+          "assignment": "Assignment",
+          "escalation": "Escalation",
+          "system": "System",
+          "test": "Test",
+          "other": "Update"
+        }
       },
       "toasts": {
         "markReadFailed": "Failed to mark as read",

@@ -2,11 +2,11 @@ const crypto = require("crypto");
 const Complaint = require("../../models/Complaint");
 const Department = require("../../models/Department");
 const User = require("../../models/User");
-const WorkerInvitation = require("../../models/WorkerInvitation");
+const Invitation = require("../../models/Invitation");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
-const { sendWorkerInvitation } = require("../../services/emailService");
+const { sendInvitation } = require("../../services/emailService");
 const {
   assertDepartmentExists,
   listDepartments,
@@ -134,7 +134,7 @@ exports.updateDepartment = asyncHandler(async (req, res) => {
       { department: departmentRegex },
       { $set: { department: name, "aiAnalysis.department": name } },
     ),
-    WorkerInvitation.updateMany(
+    Invitation.updateMany(
       { department: departmentRegex },
       { $set: { department: name } },
     ),
@@ -238,7 +238,7 @@ exports.deleteDepartment = asyncHandler(async (req, res) => {
         },
       },
     ),
-    WorkerInvitation.updateMany(
+    Invitation.updateMany(
       { department: department.name },
       { $set: { department: fallbackName } },
     ),
@@ -288,7 +288,7 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
     .digest("hex");
   const inviteExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  await WorkerInvitation.updateMany(
+  await Invitation.updateMany(
     {
       email,
       department: department.name,
@@ -300,7 +300,7 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
     { $set: { revokedAt: new Date() } },
   );
 
-  const invitation = await WorkerInvitation.create({
+  const invitation = await Invitation.create({
     email,
     department: department.name,
     role,
@@ -310,7 +310,7 @@ exports.inviteDepartmentMember = asyncHandler(async (req, res) => {
   });
 
   try {
-    await sendWorkerInvitation(
+    await sendInvitation(
       email,
       inviteToken,
       department.name,
@@ -365,7 +365,7 @@ exports.listDepartmentInvitations = asyncHandler(async (req, res) => {
   if (!department) throw new AppError("Department not found", 404);
 
   const now = new Date();
-  const invitations = await WorkerInvitation.find({
+  const invitations = await Invitation.find({
     department: department.name,
     acceptedAt: null,
     revokedAt: null,
@@ -391,7 +391,7 @@ exports.revokeDepartmentInvitation = asyncHandler(async (req, res) => {
   const department = await Department.findById(req.params.id);
   if (!department) throw new AppError("Department not found", 404);
 
-  const invitation = await WorkerInvitation.findOne({
+  const invitation = await Invitation.findOne({
     _id: req.params.invitationId,
     department: department.name,
     acceptedAt: null,

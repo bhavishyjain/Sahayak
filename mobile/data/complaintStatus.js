@@ -99,6 +99,17 @@ export const HEAD_MANAGE_BLOCKED_STATUSES = [
   "pending-approval",
 ];
 
+const GENERIC_STATUS_LABEL_META = {
+  approved: {
+    translationKey: "status.approved",
+    fallbackLabel: "Approved",
+  },
+  rejected: {
+    translationKey: "status.rejected",
+    fallbackLabel: "Rejected",
+  },
+};
+
 export function normalizeStatus(status) {
   return normalizeComplaintStatus(status);
 }
@@ -113,12 +124,20 @@ function formatFallbackStatusLabel(status) {
 
 export function formatStatusLabel(t, status) {
   const key = getComplaintStatusTranslationKey(status);
-  if (!key) return formatFallbackStatusLabel(status);
-  if (typeof t === "function") return t(key);
-  return (
-    getComplaintStatusMeta(status)?.fallbackLabel ??
-    formatFallbackStatusLabel(status)
-  );
+  if (key) {
+    if (typeof t === "function") return t(key);
+    return (
+      getComplaintStatusMeta(status)?.fallbackLabel ??
+      formatFallbackStatusLabel(status)
+    );
+  }
+
+  const genericMeta = GENERIC_STATUS_LABEL_META[normalizeComplaintStatus(status)];
+  if (genericMeta?.translationKey && typeof t === "function") {
+    return t(genericMeta.translationKey);
+  }
+
+  return genericMeta?.fallbackLabel ?? formatFallbackStatusLabel(status);
 }
 
 export const COMPLAINT_PRIORITY_META = {

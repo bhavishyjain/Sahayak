@@ -105,9 +105,13 @@ export default function DialogBox({
             {title !== null && title !== undefined ? (
               typeof title === "string" || typeof title === "number" ? (
                 <Text
-                  className="text-xl font-fira-bold mb-4"
+                  className="text-xl mb-4"
                   style={[
-                    { textAlign: titleAlign, color: colors.textPrimary },
+                    {
+                      textAlign: titleAlign,
+                      color: colors.textPrimary,
+                      fontWeight: "700",
+                    },
                     titleStyle,
                   ]}
                 >
@@ -272,6 +276,7 @@ export default function DialogBox({
                 >
                   <Text
                     className="text-center text-base font-bold"
+                    numberOfLines={1}
                     style={[
                       {
                         color:
@@ -303,6 +308,7 @@ export default function DialogBox({
                   ) : (
                     <Text
                       className="text-center text-base font-bold"
+                      numberOfLines={1}
                       style={[{ color: colors.dark }, confirmTextStyle]}
                     >
                       {confirmText}

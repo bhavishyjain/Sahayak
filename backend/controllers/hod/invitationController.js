@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const Complaint = require("../../models/Complaint");
 const User = require("../../models/User");
-const WorkerInvitation = require("../../models/WorkerInvitation");
+const Invitation = require("../../models/Invitation");
 const AppError = require("../../core/AppError");
 const asyncHandler = require("../../core/asyncHandler");
 const { sendSuccess } = require("../../core/response");
@@ -9,7 +9,7 @@ const {
   getHodOrThrow,
   getWorkerOrThrow,
 } = require("../../services/accessService");
-const { sendWorkerInvitation } = require("../../services/emailService");
+const { sendInvitation } = require("../../services/emailService");
 
 function buildManualInviteLinks(
   inviteToken,
@@ -77,7 +77,7 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
     .digest("hex");
   const inviteExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  await WorkerInvitation.updateMany(
+  await Invitation.updateMany(
     {
       email: normalizedEmail,
       acceptedAt: null,
@@ -87,7 +87,7 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
     { $set: { revokedAt: new Date() } },
   );
 
-  const invitation = await WorkerInvitation.create({
+  const invitation = await Invitation.create({
     email: normalizedEmail,
     department: hod.department,
     role: "worker",
@@ -97,7 +97,7 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
   });
 
   try {
-    await sendWorkerInvitation(
+    await sendInvitation(
       normalizedEmail,
       inviteToken,
       hod.department,
@@ -127,7 +127,7 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
         message:
           "Invitation created, but email could not be delivered automatically. Share the invite link manually.",
       },
-      "Worker invitation created (manual share required)",
+      "Invitation created (manual share required)",
     );
   }
 
@@ -143,7 +143,7 @@ exports.inviteWorker = asyncHandler(async (req, res) => {
       },
       message: `Invitation sent to ${email}`,
     },
-    "Worker invitation sent successfully",
+    "Invitation sent successfully",
   );
 });
 
@@ -182,7 +182,7 @@ exports.removeWorker = asyncHandler(async (req, res) => {
 exports.listInvitations = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
 
-  const invitations = await WorkerInvitation.find({
+  const invitations = await Invitation.find({
     department: hod.department,
   })
     .populate("invitedBy", "fullName username role")
@@ -229,7 +229,7 @@ exports.revokeInvitation = asyncHandler(async (req, res) => {
   const hod = await getHodOrThrow(req);
   const { invitationId } = req.params;
 
-  const invitation = await WorkerInvitation.findOne({
+  const invitation = await Invitation.findOne({
     _id: invitationId,
     department: hod.department,
     invitedBy: hod._id,

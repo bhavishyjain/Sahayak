@@ -11,6 +11,7 @@ const ANDROID_DEFAULT_CHANNEL_ID = "default";
 let hasLoggedPushSetupWarning = false;
 let skipPushRegistrationForSession = false;
 let pushNotificationsInitialized = false;
+let ongoingPushTokenRegistration = null;
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -30,6 +31,32 @@ function getExpoProjectId() {
       .trim();
 
   return isUuid(projectId) ? projectId : "";
+}
+
+function getCurrentUserId(user) {
+  return String(user?._id || user?.id || user?.username || "").trim();
+}
+
+async function getCachedPushRegistration() {
+  const raw = await AsyncStorage.getItem(PUSH_TOKEN_CACHE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed.token === "string"
+    ) {
+      return {
+        token: parsed.token,
+        userId: typeof parsed.userId === "string" ? parsed.userId : "",
+      };
+    }
+  } catch (_error) {
+  }
+
+  return { token: raw, userId: "" };
 }
 
 Notifications.setNotificationHandler({
@@ -78,6 +105,11 @@ export async function initializePushNotifications() {
  * Fails silently so it never blocks the login / foreground flow.
  */
 export async function registerPushToken() {
+  if (ongoingPushTokenRegistration) {
+    return ongoingPushTokenRegistration;
+  }
+
+  ongoingPushTokenRegistration = (async () => {
   try {
     if (Platform.OS === "web") return;
 
@@ -88,6 +120,7 @@ export async function registerPushToken() {
     // Ensure a logged-in user exists before hitting the authenticated endpoint
     const user = await getUserAuth();
     if (!user?.auth_token) return;
+    const currentUserId = getCurrentUserId(user);
 
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
@@ -115,9 +148,15 @@ export async function registerPushToken() {
       console.log("Expo push token acquired:", pushToken);
     }
 
-    // Skip registration if the token hasn't changed since last successful call
-    const cachedToken = await AsyncStorage.getItem(PUSH_TOKEN_CACHE_KEY);
-    if (cachedToken === pushToken) return;
+    // Skip registration only when the same token was already registered
+    // for the same logged-in user on this device.
+    const cachedRegistration = await getCachedPushRegistration();
+    if (
+      cachedRegistration?.token === pushToken &&
+      cachedRegistration?.userId === currentUserId
+    ) {
+      return;
+    }
 
     await apiCall({
       method: "POST",
@@ -125,7 +164,10 @@ export async function registerPushToken() {
       data: { pushToken },
     });
 
-    await AsyncStorage.setItem(PUSH_TOKEN_CACHE_KEY, pushToken);
+    await AsyncStorage.setItem(
+      PUSH_TOKEN_CACHE_KEY,
+      JSON.stringify({ token: pushToken, userId: currentUserId }),
+    );
 
     if (__DEV__) {
       console.log("Expo push token registered with backend");
@@ -159,5 +201,12 @@ export async function registerPushToken() {
 
     // Non-critical — log but don't surface to user
     console.warn("Push token registration failed:", message);
+  }
+  })();
+
+  try {
+    return await ongoingPushTokenRegistration;
+  } finally {
+    ongoingPushTokenRegistration = null;
   }
 }

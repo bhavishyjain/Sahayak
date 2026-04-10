@@ -5,6 +5,7 @@ import { initAuthToken } from "./cache/auth";
 
 let ongoingGetUser = null;
 const ASSISTANT_HISTORY_KEY = "@sahayak_assistant_history_v1";
+const PUSH_TOKEN_CACHE_KEY = "registered_push_token";
 
 function getAssistantHistoryKey(user) {
   const userId = user?._id || user?.id || user?.username || "guest";
@@ -64,12 +65,14 @@ export async function clearUserAuth() {
     localStorage.removeItem("background_user_id");
     localStorage.removeItem(scopedAssistantHistoryKey);
     localStorage.removeItem(ASSISTANT_HISTORY_KEY);
+    localStorage.removeItem(PUSH_TOKEN_CACHE_KEY);
   } else {
     await AsyncStorage.removeItem("user");
     await AsyncStorage.removeItem("auth_token");
     await AsyncStorage.removeItem("background_user_id");
     await AsyncStorage.removeItem(scopedAssistantHistoryKey);
     await AsyncStorage.removeItem(ASSISTANT_HISTORY_KEY);
+    await AsyncStorage.removeItem(PUSH_TOKEN_CACHE_KEY);
   }
 
   // Note: QueryClient cache clearing is handled in logout.jsx

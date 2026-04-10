@@ -187,9 +187,9 @@ function buildEmailBase(headerHtml, bodyHtml, extraCss = "") {
 }
 
 /**
- * Send worker invitation email
+ * Send invitation email
  */
-const sendWorkerInvitation = async (
+const sendInvitation = async (
   email,
   inviteToken,
   department,
@@ -689,7 +689,7 @@ const sendPasswordResetEmail = async (email, fullName, token) => {
 };
 
 module.exports = {
-  sendWorkerInvitation,
+  sendInvitation,
   sendComplaintRegistered,
   sendComplaintCompleted,
   sendEmailWithAttachment,
