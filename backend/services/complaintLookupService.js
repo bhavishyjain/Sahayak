@@ -31,7 +31,7 @@ async function findRecentComplaintsForUser(userId, limit = 5) {
   return Complaint.find({ userId })
     .sort({ createdAt: -1 })
     .limit(limit)
-    .select("ticketId status department priority createdAt");
+    .select("ticketId status department priority createdAt locationName rawText refinedText");
 }
 
 async function findComplaintByTicketId(ticketId) {
@@ -50,7 +50,7 @@ async function searchComplaintsForUser(userId, search, limit = 10) {
   return Complaint.find(query)
     .sort({ createdAt: -1 })
     .limit(limit)
-    .select("ticketId status department priority createdAt locationName");
+    .select("ticketId status department priority createdAt locationName rawText refinedText");
 }
 
 async function canUserAccessComplaint(user, complaint) {

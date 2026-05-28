@@ -394,10 +394,19 @@ function toComplaintCard(complaint) {
 }
 
 function formatComplaintList(complaints = []) {
+  const formatStatusLabel = (status = "") => {
+    const normalized = String(status || "").trim().toLowerCase();
+    if (!normalized) return "Pending";
+    return normalized
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  };
+
   return complaints
     .map(
       (complaint, index) =>
-        `${index + 1}. ${complaint.ticketId} - ${complaint.status} (${complaint.department}, ${complaint.priority})`,
+        `${index + 1}. ${complaint.ticketId} - ${formatStatusLabel(complaint.status)} (${complaint.department}, ${complaint.priority})`,
     )
     .join("\n");
 }
@@ -870,7 +879,10 @@ async function handleSpeechToText(req, res) {
       return res.status(400).json({ error: "No audio file provided" });
     }
 
-    const sttProvider = (process.env.STT_PROVIDER || "whisper").toLowerCase();
+    const sttProvider = (
+      process.env.STT_PROVIDER ||
+      (hasGeminiClient() ? "gemini" : "whisper")
+    ).toLowerCase();
     let transcription = "";
 
     if (sttProvider === "whisper") {
@@ -901,11 +913,11 @@ async function handleSpeechToText(req, res) {
             mimeType,
           });
         } catch (geminiError) {
-          if (!canUseWhisper) throw geminiError;
+          if (sttProvider !== "whisper" || !canUseWhisper) throw geminiError;
           transcription = await transcribeWithWhisper(req.file);
         }
 
-        if (!String(transcription || "").trim() && canUseWhisper) {
+        if (!String(transcription || "").trim() && sttProvider === "whisper" && canUseWhisper) {
           transcription = await transcribeWithWhisper(req.file);
         }
       }
