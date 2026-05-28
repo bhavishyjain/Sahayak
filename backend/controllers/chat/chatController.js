@@ -158,6 +158,21 @@ function uniqueMissingFields(fields = []) {
   return [...new Set((Array.isArray(fields) ? fields : []).filter(Boolean))];
 }
 
+function resolveKnownDepartmentName(departmentNames = [], candidate = "") {
+  const value = String(candidate || "").trim();
+  if (!value) return "Other";
+
+  const exactMatch = departmentNames.find((name) => String(name || "").trim() === value);
+  if (exactMatch) return exactMatch;
+
+  const caseInsensitiveMatch = departmentNames.find(
+    (name) => String(name || "").trim().toLowerCase() === value.toLowerCase(),
+  );
+  if (caseInsensitiveMatch) return caseInsensitiveMatch;
+
+  return "Other";
+}
+
 function computeRegistrationMissingFields({
   description,
   locationName,
@@ -637,9 +652,10 @@ async function handleMessage(req, res) {
         if (!draft.locationName && forcedDraft.locationName) {
           draft.locationName = forcedDraft.locationName;
         }
-        if (!draft.originalUserMessage && forcedDraft.originalUserMessage) {
-          draft.originalUserMessage = forcedDraft.originalUserMessage;
-        }
+      }
+
+      if (forcedDraft?.originalUserMessage) {
+        draft.originalUserMessage = forcedDraft.originalUserMessage;
       }
 
       if (
@@ -648,6 +664,10 @@ async function handleMessage(req, res) {
         !looksLikeStandaloneLocationMessage(message)
       ) {
         draft.originalUserMessage = String(message || "").trim();
+      }
+
+      if (!draft.title && draft.description) {
+        draft.title = buildComplaintTitle(draft.description, draft.department);
       }
 
       if (
@@ -731,9 +751,10 @@ async function handleMessage(req, res) {
         );
       }
 
-      const normalizedDepartment = departmentNames.includes(draft.department)
-        ? draft.department
-        : "Other";
+      const normalizedDepartment = resolveKnownDepartmentName(
+        departmentNames,
+        draft.department,
+      );
       const complaintTitle =
         draft.title || buildComplaintTitle(draft.description, normalizedDepartment);
       const complaintDescription =

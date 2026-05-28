@@ -125,6 +125,9 @@ const DEPARTMENT_KEYWORDS = [
       /\blight\s+tut/i,
       /\bbulb\b/i,
       /\bpole\b/i,
+      /\bkhamb[ae]\b/i,
+      /\bbijli\b/i,
+      /\bgir\s+g(?:ya|yi|ye)\b/i,
       /\bsparking\b/i,
       /\blight\b/i,
       /\belectric/i,
@@ -142,11 +145,15 @@ const DEPARTMENT_KEYWORDS = [
     department: "Water",
     patterns: [
       /\bwater\b/i,
+      /\bpaani\b/i,
+      /\bpani\b/i,
       /\bpipe\b/i,
       /\bleak/i,
       /\bleakage\b/i,
       /\btap\b/i,
       /\bno\s+water\b/i,
+      /\bsamasya\b/i,
+      /\bsamsya\b/i,
       /\bsupply\b/i,
       /\bborewell\b/i,
       /\btanker\b/i,
@@ -167,6 +174,7 @@ const DEPARTMENT_KEYWORDS = [
       /\bblocked\s+drain\b/i,
       /\bmanhole\b/i,
       /\bnala\b/i,
+      /\bnali\b/i,
       /नाली/,
       /सीवर/,
       /ड्रेनेज/,
@@ -178,6 +186,7 @@ const DEPARTMENT_KEYWORDS = [
     patterns: [
       /\bgarbage\b/i,
       /\bwaste\b/i,
+      /\bkachr[ae]\b/i,
       /\bdustbin\b/i,
       /\btrash\b/i,
       /\blitter\b/i,
@@ -192,7 +201,7 @@ const DEPARTMENT_KEYWORDS = [
   {
     department: "Road",
     patterns: [
-      /\bpothole\b/i,
+      /\bpotholes?\b/i,
       /\broad\b/i,
       /\bstreet\b/i,
       /\bpavement\b/i,
@@ -202,6 +211,7 @@ const DEPARTMENT_KEYWORDS = [
       /\bgadd[ea]\b/i,
       /\bgadde\b/i,
       /\bkhadd[ea]\b/i,
+      /\bkhaddhe\b/i,
       /\bpit\b/i,
       /गड्ढ/,
       /सड़क/,
@@ -395,6 +405,24 @@ function normalizeComplaintTitleCandidate(title = "", description = "", departme
   return value;
 }
 
+function sanitizeComplaintDescriptionCandidate(description = "") {
+  return String(description || "")
+    .replace(ATTACHMENT_HELPER_PREFIX_REGEX, " ")
+    .replace(ATTACHMENT_TRAILER_REGEX, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyLocationOnlyMessage(message = "") {
+  const value = String(message || "").trim();
+  if (!value) return false;
+
+  const candidateLocation = sanitizeLocationNameCandidate(value);
+  const normalizedDescription = normalizeComplaintDescription(value);
+
+  return Boolean(candidateLocation) && !hasComplaintSignal(normalizedDescription);
+}
+
 function extractLocationFromText(message = "") {
   const value = String(message || "").trim();
   if (!value) return null;
@@ -466,6 +494,10 @@ function normalizeComplaintDescription(description = "") {
     .replace(/^(mere\s+house\s+ke\s+samne)\b/i, "in front of my house")
     .replace(/\b(tut\s+gayi|tut\s+gyi|tut\s+gai)\b/gi, "broken")
     .replace(/\blight\s+gay[ai]\b/gi, "light not working")
+    .replace(/\bpaani\b/gi, "water")
+    .replace(/\bpani\b/gi, "water")
+    .replace(/\bbijli\b/gi, "electricity")
+    .replace(/\bkhamb[ae]\b/gi, "pole")
     .replace(/\b(gadde|gadda|khadda|khadde)\b/gi, "potholes")
     .replace(/\s+/g, " ")
     .trim();
@@ -480,6 +512,20 @@ function inferDepartmentFromDescription(description = "") {
   );
 
   return matched?.department || "Other";
+}
+
+function chooseBestDepartment(...candidates) {
+  const normalized = candidates
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  for (const candidate of normalized) {
+    if (candidate && candidate !== "Other") {
+      return candidate;
+    }
+  }
+
+  return normalized[0] || "Other";
 }
 
 function hasComplaintSignal(message = "") {
@@ -511,6 +557,13 @@ function buildComplaintTitle(description = "", department = "") {
   const source = String(description || "").trim();
   if (!source) return `${department || "General"} complaint`;
 
+  if (/\b(pole|khamb[ae]|electricity)\b|बिजली/i.test(source)) {
+    if (/\b(fall|fell|fallen|gir|ghir|broken|damaged|collapsed)\b|गिर|टूटी|खराब/i.test(source)) {
+      return "Electric pole issue";
+    }
+    return "Electricity issue";
+  }
+
   if (/\bstreet\s*light\b|\bstreetlight\b|स्ट्रीट\s*लाइट/i.test(source)) {
     if (/\b(broken|not working|fused|damaged|dead|tut|gay[ai])\b|टूटी|खराब|बंद/i.test(source)) {
       return "Broken street light";
@@ -526,7 +579,7 @@ function buildComplaintTitle(description = "", department = "") {
     return "Garbage collection issue";
   }
 
-  if (/\bwater\b|\bleak\b|पानी|लीकेज/i.test(source)) {
+  if (/\bwater\b|\bpaani\b|\bpani\b|\bleak\b|पानी|लीकेज/i.test(source)) {
     return "Water supply issue";
   }
 
@@ -732,15 +785,24 @@ Rules:
 2. If the text is romanized Hindi, return "hi".
 3. If the user wants to register a complaint and enough details are present, set "shouldCreateComplaint" to true.
 4. For complaint registration, extract:
-   - title: a short, clear complaint heading of 3-8 words focused only on the civic issue. Do not copy the full user sentence. Do not include requests like "please register", and do not include vague personal references like "my house" unless that is the only context.
-   - description
-   - department
+   - title: a short, clear complaint heading of 2-6 words focused on the civic issue only.
+     It must not be a full sentence.
+     It must not include filler like "please", "register complaint", "help", "my house", "mere ghar", "kr do", "darj kr do".
+     Good examples: "Electric pole issue", "Water supply issue", "Road potholes", "Drain blockage".
+   - description: the exact original complaint text written by the user for the issue, preserving the user's wording and language as much as possible.
+     Do not summarize, shorten, clean up, or translate it.
+     Do not replace it with a location-only continuation message.
+   - department: must be exactly one value from the available department names list above.
+     Choose the closest matching department even if the user uses slang, romanized Hindi, Hindi, or mixed language.
+     Do not return "Other" unless the issue genuinely does not fit any listed department.
    - priority ("Low" | "Medium" | "High")
    - locationName: only if the user gave a real colony, area, locality, road name, or landmark. Return null for vague phrases like "my house", "in front of my home", or generic relative descriptions.
 5. For status checks, extract "ticketId" if present. If the user asks for the latest/recent complaint, use intent "recent_complaints".
 6. If key registration details are missing, list them in "missingFields". Use only: "description", "locationName".
 7. Never invent a ticket ID.
 8. "generalResponse" should be a short helpful reply in the same language as the user.
+9. If the current message is only a location reply or landmark reply for a pending complaint, do not overwrite the original complaint description with that location reply.
+10. If multiple issues are mentioned in one complaint, choose the primary civic issue for title and department, but keep the full original user complaint text in description.
 
 Conversation history:
 ${history || "none"}
@@ -783,9 +845,10 @@ Return exactly this shape:
         const rawMissingFields = Array.isArray(parsed.missingFields)
           ? parsed.missingFields.filter(Boolean)
           : [];
-        const mergedDescription = parsed?.complaintDraft?.description
-          ? normalizeComplaintDescription(parsed.complaintDraft.description)
-          : heuristicDescription || null;
+        const parsedDescription = sanitizeComplaintDescriptionCandidate(
+          parsed?.complaintDraft?.description,
+        );
+        const mergedDescription = parsedDescription || heuristicDescription || null;
         const mergedLocationName = parsed?.complaintDraft?.locationName
           ? sanitizeLocationNameCandidate(parsed.complaintDraft.locationName)
           : heuristicLocation || null;
@@ -795,10 +858,11 @@ Return exactly this shape:
         const parsedDepartment = parsedComplaintDraft.department
           ? String(parsedComplaintDraft.department).trim()
           : "";
-        const mergedDepartment =
-          parsedDepartment && parsedDepartment !== "Other"
-            ? parsedDepartment
-            : heuristicDepartment;
+        const mergedDepartment = chooseBestDepartment(
+          parsedDepartment,
+          heuristicDepartment,
+          inferDepartmentFromDescription(message),
+        );
         const mergedIntent =
           parsed.intent === "general" &&
           heuristicWantsRegister.intent === "register_complaint"
@@ -810,7 +874,11 @@ Return exactly this shape:
           return true;
         });
 
-        const originalUserMessage = String(message || "").trim() || null;
+        const originalUserMessage = parsedDescription
+          ? parsedDescription
+          : isLikelyLocationOnlyMessage(message)
+            ? null
+            : String(message || "").trim() || null;
 
         return {
           language: normalizeLanguageCode(
