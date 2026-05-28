@@ -115,6 +115,11 @@ const DEPARTMENT_KEYWORDS = [
     patterns: [
       /\bstreet\s*light\b/i,
       /\bstreetlight\b/i,
+      /\blight\s+gay[ai]\b/i,
+      /\blight\s+tut/i,
+      /\bbulb\b/i,
+      /\bpole\b/i,
+      /\bsparking\b/i,
       /\blight\b/i,
       /\belectric/i,
       /\btransformer\b/i,
@@ -133,10 +138,15 @@ const DEPARTMENT_KEYWORDS = [
       /\bwater\b/i,
       /\bpipe\b/i,
       /\bleak/i,
+      /\bleakage\b/i,
+      /\btap\b/i,
+      /\bno\s+water\b/i,
+      /\bsupply\b/i,
       /\bborewell\b/i,
       /\btanker\b/i,
       /पानी/,
       /लीकेज/,
+      /लीक/,
       /बोरवेल/,
       /टैंकर/,
     ],
@@ -147,6 +157,9 @@ const DEPARTMENT_KEYWORDS = [
       /\bdrain/i,
       /\bsewer/i,
       /\bsewage/i,
+      /\bdrainage\b/i,
+      /\bblocked\s+drain\b/i,
+      /\bmanhole\b/i,
       /\bnala\b/i,
       /नाली/,
       /सीवर/,
@@ -162,7 +175,10 @@ const DEPARTMENT_KEYWORDS = [
       /\bdustbin\b/i,
       /\btrash\b/i,
       /\blitter\b/i,
+      /\brubbish\b/i,
+      /\boverflowing\s+bin\b/i,
       /कचरा/,
+      /कूड़ा/,
       /डस्टबिन/,
       /वेस्ट/,
     ],
@@ -175,6 +191,12 @@ const DEPARTMENT_KEYWORDS = [
       /\bstreet\b/i,
       /\bpavement\b/i,
       /\bdivider\b/i,
+      /\bbroken\s+road\b/i,
+      /\broad\s+broken\b/i,
+      /\bgadd[ea]\b/i,
+      /\bgadde\b/i,
+      /\bkhadd[ea]\b/i,
+      /\bpit\b/i,
       /गड्ढ/,
       /सड़क/,
       /रोड/,
@@ -360,8 +382,30 @@ function extractComplaintDescription(message = "") {
       /(?:लोकेशन|स्थान|पता|location|address)\s*(?:is|h|hai|है|:)?\s*[^.!?\n]+/gi,
       " ",
     )
+    .replace(
+      /\b(mujhe|mujhko|meri|mere|mera|please|pls|plz|kripya|please\s+fix|fix\s+it|register|complaint|krni|karni|karna|krdo|kar do|jaldi se|issue hai|problem hai)\b/gi,
+      " ",
+    )
+    .replace(
+      /(मुझे|मेरी|मेरा|मेरे|कृपया|शिकायत|दर्ज|करनी|करना|कर दो|जल्दी|ठीक करें)/g,
+      " ",
+    )
     .replace(/\b(register|raise|file|lodge|check|show|track)\b/gi, "")
     .replace(/\b(complaint|issue|problem|status)\b/gi, "")
+    .replace(/\b(h|hai)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeComplaintDescription(description = "") {
+  return extractComplaintDescription(description)
+    .replace(/^(mere\s+ghr\s+ke\s+saamne)\b/i, "in front of my house")
+    .replace(/^(mere\s+ghar\s+ke\s+saamne)\b/i, "in front of my house")
+    .replace(/^(mere\s+ghr\s+samne)\b/i, "in front of my house")
+    .replace(/^(mere\s+house\s+ke\s+samne)\b/i, "in front of my house")
+    .replace(/\b(tut\s+gayi|tut\s+gyi|tut\s+gai)\b/gi, "broken")
+    .replace(/\blight\s+gay[ai]\b/gi, "light not working")
+    .replace(/\b(gadde|gadda|khadda|khadde)\b/gi, "potholes")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -375,6 +419,19 @@ function inferDepartmentFromDescription(description = "") {
   );
 
   return matched?.department || "Other";
+}
+
+function hasComplaintSignal(message = "") {
+  const lower = String(message || "").toLowerCase();
+  if (!lower) return false;
+
+  return (
+    inferDepartmentFromDescription(lower) !== "Other" ||
+    /\b(report|register|complaint|issue|problem|help|urgent|danger|broken|not working|leak|overflow|garbage|street light|pothole|road|water|drain|waste)\b/i.test(
+      lower,
+    ) ||
+    /(शिकायत|समस्या|मदद|खराब|टूटी|गड्ढ|कचरा|पानी|नाली|बिजली|रोड|सड़क)/.test(lower)
+  );
 }
 
 function normalizeAssistantHistoryText(message = "", generatedContinuation = false) {
@@ -394,13 +451,13 @@ function buildComplaintTitle(description = "", department = "") {
   if (!source) return `${department || "General"} complaint`;
 
   if (/\bstreet\s*light\b|\bstreetlight\b|स्ट्रीट\s*लाइट/i.test(source)) {
-    if (/\b(broken|not working|fused|damaged|dead)\b|टूटी|खराब|बंद/i.test(source)) {
+    if (/\b(broken|not working|fused|damaged|dead|tut|gay[ai])\b|टूटी|खराब|बंद/i.test(source)) {
       return "Broken street light";
     }
     return "Street light issue";
   }
 
-  if (/\bpothole\b|गड्ढ/i.test(source)) {
+  if (/\bpothole\b|\bgadd[ea]\b|\bgadde\b|\bkhadd[ea]\b|गड्ढ/i.test(source)) {
     return "Pothole on road";
   }
 
@@ -489,12 +546,14 @@ function inferIntentHeuristically(message = "", detectedLanguage = "en") {
     lower.includes("gadde") ||
     lower.includes("broken") ||
     lower.includes("toot") ||
-    lower.includes("kharab");
+    lower.includes("kharab") ||
+    hasComplaintSignal(message);
 
   const description = extractComplaintDescription(message);
+  const normalizedDescription = normalizeComplaintDescription(description);
   const locationName = extractLocationFromText(message);
   const missingFields = [];
-  if (wantsRegister && !description) missingFields.push("description");
+  if (wantsRegister && !normalizedDescription) missingFields.push("description");
   if (wantsRegister && !locationName) missingFields.push("locationName");
 
   if (ticketId) {
@@ -531,15 +590,15 @@ function inferIntentHeuristically(message = "", detectedLanguage = "en") {
   }
 
   if (wantsRegister) {
-    const inferredDepartment = inferDepartmentFromDescription(description);
+    const inferredDepartment = inferDepartmentFromDescription(normalizedDescription);
     return {
       language: detectedLanguage,
       intent: "register_complaint",
       ticketId: null,
-      complaintDraft: {
-        title: buildComplaintTitle(description),
-        description,
-        department: inferredDepartment,
+        complaintDraft: {
+        title: buildComplaintTitle(normalizedDescription),
+        description: normalizedDescription,
+        department: inferDepartmentFromDescription(normalizedDescription),
         priority: "Medium",
         locationName,
       },
@@ -649,7 +708,7 @@ Return exactly this shape:
           parsed?.complaintDraft && typeof parsed.complaintDraft === "object"
             ? parsed.complaintDraft
             : {};
-        const heuristicDescription = extractComplaintDescription(message);
+        const heuristicDescription = normalizeComplaintDescription(message);
         const heuristicLocation = extractLocationFromText(message);
         const heuristicWantsRegister = inferIntentHeuristically(
           message,
@@ -659,7 +718,7 @@ Return exactly this shape:
           ? parsed.missingFields.filter(Boolean)
           : [];
         const mergedDescription = parsed?.complaintDraft?.description
-          ? String(parsed.complaintDraft.description).trim()
+          ? normalizeComplaintDescription(parsed.complaintDraft.description)
           : heuristicDescription || null;
         const mergedLocationName = parsed?.complaintDraft?.locationName
           ? String(parsed.complaintDraft.locationName).trim()

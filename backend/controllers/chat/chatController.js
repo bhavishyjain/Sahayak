@@ -48,8 +48,25 @@ function createAssistantResponse(response, assistant = {}) {
   };
 }
 
-function getPendingRegistrationContext(conversationHistory = []) {
+function getActiveConversationWindow(conversationHistory = []) {
   const history = Array.isArray(conversationHistory) ? conversationHistory : [];
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const entry = history[index];
+    if (
+      entry?.role === "assistant" &&
+      entry?.assistant?.intent === "register_complaint" &&
+      entry?.assistant?.created === true
+    ) {
+      return history.slice(index + 1);
+    }
+  }
+
+  return history;
+}
+
+function getPendingRegistrationContext(conversationHistory = []) {
+  const history = getActiveConversationWindow(conversationHistory);
   for (let index = history.length - 1; index >= 0; index -= 1) {
     const entry = history[index];
     if (
@@ -67,7 +84,7 @@ function getPendingRegistrationContext(conversationHistory = []) {
 }
 
 function getLatestAttachmentState(conversationHistory = []) {
-  const history = Array.isArray(conversationHistory) ? conversationHistory : [];
+  const history = getActiveConversationWindow(conversationHistory);
   let latestCoordinates = null;
   let latestImages = [];
 
@@ -435,8 +452,11 @@ async function transcribeWithWhisper(reqFile) {
 async function handleMessage(req, res) {
   try {
     const message = String(req.body?.message || "").trim();
-    const conversationHistory = parseConversationHistory(
+    const fullConversationHistory = parseConversationHistory(
       req.body?.conversationHistory,
+    );
+    const conversationHistory = getActiveConversationWindow(
+      fullConversationHistory,
     );
     const hasUploadedImages = Array.isArray(req.files) && req.files.length > 0;
     const hasIncomingCoordinates = Boolean(parseCoordinates(req.body?.coordinates));
