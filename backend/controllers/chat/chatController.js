@@ -9,6 +9,7 @@ const {
   detectLanguageWithModel,
   getLanguagePack,
   buildComplaintTitle,
+  sanitizeLocationNameCandidate,
 } = require("../../services/chatAssistantService");
 const {
   extractTicketId,
@@ -293,7 +294,7 @@ function extractContinuationLocationName(message = "") {
   for (const pattern of explicitPatterns) {
     const match = value.match(pattern);
     if (match?.[1]) {
-      return match[1].trim();
+      return sanitizeLocationNameCandidate(match[1]);
     }
   }
 
@@ -306,7 +307,7 @@ function extractContinuationLocationName(message = "") {
       ) || /(कॉलोनी|नगर|रोड|सड़क|गली|चौराहा|मंदिर|पार्क|हॉस्पिटल|स्कूल)/.test(segment),
     );
 
-  return locationLikeSegment || null;
+  return sanitizeLocationNameCandidate(locationLikeSegment);
 }
 
 function extractContinuationDescription(message = "") {
@@ -636,6 +637,17 @@ async function handleMessage(req, res) {
         if (!draft.locationName && forcedDraft.locationName) {
           draft.locationName = forcedDraft.locationName;
         }
+        if (!draft.originalUserMessage && forcedDraft.originalUserMessage) {
+          draft.originalUserMessage = forcedDraft.originalUserMessage;
+        }
+      }
+
+      if (
+        !draft.originalUserMessage &&
+        String(message || "").trim() &&
+        !looksLikeStandaloneLocationMessage(message)
+      ) {
+        draft.originalUserMessage = String(message || "").trim();
       }
 
       if (
@@ -644,9 +656,11 @@ async function handleMessage(req, res) {
         missingFields.includes("locationName") &&
         looksLikeStandaloneLocationMessage(message)
       ) {
-        draft.locationName =
-          extractContinuationLocationName(message) || String(message || "").trim();
-        removeMissingField(missingFields, "locationName");
+        const continuedLocationName = extractContinuationLocationName(message);
+        if (continuedLocationName) {
+          draft.locationName = continuedLocationName;
+          removeMissingField(missingFields, "locationName");
+        }
       }
 
       if (forcedDraft) {
@@ -720,10 +734,14 @@ async function handleMessage(req, res) {
       const normalizedDepartment = departmentNames.includes(draft.department)
         ? draft.department
         : "Other";
+      const complaintTitle =
+        draft.title || buildComplaintTitle(draft.description, normalizedDepartment);
+      const complaintDescription =
+        String(draft.originalUserMessage || "").trim() || draft.description;
       const complaint = await Complaint.create({
         userId: req.user._id,
-        rawText: `${draft.title || buildComplaintTitle(draft.description, normalizedDepartment)}: ${draft.description}`,
-        refinedText: draft.description,
+        rawText: `${complaintTitle}: ${complaintDescription}`,
+        refinedText: complaintDescription,
         department: normalizedDepartment,
         locationName: draft.locationName,
         coordinates,
@@ -753,7 +771,7 @@ async function handleMessage(req, res) {
           {
             _id: complaint._id,
             ticketId: complaint.ticketId,
-            title: draft.title || buildComplaintTitle(draft.description, normalizedDepartment),
+            title: complaintTitle,
             department: normalizedDepartment,
             priority: complaint.priority,
             locationName: draft.locationName,

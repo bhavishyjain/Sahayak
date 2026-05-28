@@ -108,6 +108,12 @@ const ATTACHMENT_HELPER_PREFIX_REGEX =
   /^(use these location coordinates(?: and proof images)? to continue registering my complaint\.?|use these proof images to continue registering my complaint\.?|मेरी शिकायत दर्ज करने के लिए ये लोकेशन निर्देशांक(?: और प्रूफ इमेज)? हैं।?|मेरी शिकायत दर्ज करने के लिए ये प्रूफ इमेज हैं।?)/i;
 const ATTACHMENT_TRAILER_REGEX =
   /(\b\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\b|\b\d+\s+proof image(?:s)? attached\b|\b\d+\s+प्रूफ इमेज जोड़ी गई\b)/gi;
+const GENERIC_LOCATION_PHRASE_REGEX =
+  /\b(?:my house|my home|home|house|ghar|ghr|mere ghar|mere ghr|ghar ke saamne|ghr ke saamne|front of my house|in front of my house)\b/i;
+const LOCATION_ISSUE_WORD_REGEX =
+  /\b(?:complaint|register|issue|problem|fix|please|plz|pls|kr do|kar do|road pe|pothole|potholes|gadd[ea]|gadde|khadd[ea]|light|broken|leak|garbage|drain)\b/i;
+const TITLE_FILLER_REGEX =
+  /\b(?:please|plz|pls|complaint|register|kr do|kar do|issue|problem|help|urgent|mere|mera|meri|my|house|ghar|ghr)\b/i;
 
 const DEPARTMENT_KEYWORDS = [
   {
@@ -334,32 +340,87 @@ function normalizePriority(value = "") {
   return "Medium";
 }
 
+function sanitizeLocationNameCandidate(candidate = "") {
+  const value = String(candidate || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[,:-]+|[,:-]+$/g, "")
+    .trim();
+
+  if (!value) return null;
+  if (value.length < 3 || value.length > 120) return null;
+  if (/^\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?$/.test(value)) return null;
+
+  const lower = value.toLowerCase();
+  const hasLocationKeyword =
+    LOCATION_KEYWORD_REGEX.test(value) || HINDI_LOCATION_KEYWORD_REGEX.test(value);
+  const hasGenericOnly =
+    GENERIC_LOCATION_PHRASE_REGEX.test(value) && !hasLocationKeyword;
+  const hasGenericRelativePhrase = GENERIC_LOCATION_PHRASE_REGEX.test(value);
+  const looksLikeIssueSentence =
+    LOCATION_ISSUE_WORD_REGEX.test(lower) && /\s/.test(value) && !hasLocationKeyword;
+  const genericComplaintSentence =
+    hasGenericRelativePhrase && LOCATION_ISSUE_WORD_REGEX.test(lower);
+
+  if (hasGenericOnly || looksLikeIssueSentence || genericComplaintSentence) {
+    return null;
+  }
+
+  return value;
+}
+
+function normalizeComplaintTitleCandidate(title = "", description = "", department = "") {
+  const value = String(title || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[,:-]+|[,:-]+$/g, "")
+    .trim();
+
+  if (!value) {
+    return buildComplaintTitle(description, department);
+  }
+
+  const lower = value.toLowerCase();
+  const tooLong = value.length > 50 || value.split(/\s+/).length > 8;
+  const looksLikeUserSentence =
+    TITLE_FILLER_REGEX.test(lower) ||
+    /[.!?]/.test(value) ||
+    value.includes(":") ||
+    value === String(description || "").trim();
+
+  if (tooLong || looksLikeUserSentence) {
+    return buildComplaintTitle(description, department);
+  }
+
+  return value;
+}
+
 function extractLocationFromText(message = "") {
   const value = String(message || "").trim();
   if (!value) return null;
 
   const explicitEnglish = value.match(LOCATION_SEGMENT_REGEX);
   if (explicitEnglish?.[1]) {
-    return explicitEnglish[1].trim();
+    return sanitizeLocationNameCandidate(explicitEnglish[1]);
   }
 
   const explicitHindi = value.match(HINDI_LOCATION_SEGMENT_REGEX);
   if (explicitHindi?.[1]) {
-    return explicitHindi[1].trim();
+    return sanitizeLocationNameCandidate(explicitHindi[1]);
   }
 
   const englishMatch = value.match(
     /\b(?:at|near|in|behind|beside|opposite|around)\s+([a-z0-9 ,.'-]{3,100})/i,
   );
   if (englishMatch?.[1]) {
-    return englishMatch[1].trim();
+    return sanitizeLocationNameCandidate(englishMatch[1]);
   }
 
   const hindiMatch = value.match(
     /(?:के\s+पास|के\s+सामने|में|के\s+निकट)\s+([^.!?\n]{3,100})/i,
   );
   if (hindiMatch?.[1] && (LOCATION_KEYWORD_REGEX.test(hindiMatch[1]) || HINDI_LOCATION_KEYWORD_REGEX.test(hindiMatch[1]))) {
-    return hindiMatch[1].trim();
+    return sanitizeLocationNameCandidate(hindiMatch[1]);
   }
 
   const tailWithKeyword = value
@@ -371,7 +432,7 @@ function extractLocationFromText(message = "") {
         HINDI_LOCATION_KEYWORD_REGEX.test(segment),
     );
 
-  return tailWithKeyword || null;
+  return sanitizeLocationNameCandidate(tailWithKeyword);
 }
 
 function extractComplaintDescription(message = "") {
@@ -457,7 +518,7 @@ function buildComplaintTitle(description = "", department = "") {
     return "Street light issue";
   }
 
-  if (/\bpothole\b|\bgadd[ea]\b|\bgadde\b|\bkhadd[ea]\b|गड्ढ/i.test(source)) {
+  if (/\bpotholes?\b|\bgadd[ea]\b|\bgadde\b|\bkhadd[ea]\b|गड्ढ/i.test(source)) {
     return "Pothole on road";
   }
 
@@ -595,12 +656,17 @@ function inferIntentHeuristically(message = "", detectedLanguage = "en") {
       language: detectedLanguage,
       intent: "register_complaint",
       ticketId: null,
-        complaintDraft: {
-        title: buildComplaintTitle(normalizedDescription),
+      complaintDraft: {
+        title: normalizeComplaintTitleCandidate(
+          buildComplaintTitle(normalizedDescription),
+          normalizedDescription,
+          inferredDepartment,
+        ),
         description: normalizedDescription,
-        department: inferDepartmentFromDescription(normalizedDescription),
+        department: inferredDepartment,
         priority: "Medium",
         locationName,
+        originalUserMessage: String(message || "").trim() || null,
       },
       missingFields,
       shouldCreateComplaint: missingFields.length === 0,
@@ -666,11 +732,11 @@ Rules:
 2. If the text is romanized Hindi, return "hi".
 3. If the user wants to register a complaint and enough details are present, set "shouldCreateComplaint" to true.
 4. For complaint registration, extract:
-   - title
+   - title: a short, clear complaint heading of 3-8 words focused only on the civic issue. Do not copy the full user sentence. Do not include requests like "please register", and do not include vague personal references like "my house" unless that is the only context.
    - description
    - department
    - priority ("Low" | "Medium" | "High")
-   - locationName
+   - locationName: only if the user gave a real colony, area, locality, road name, or landmark. Return null for vague phrases like "my house", "in front of my home", or generic relative descriptions.
 5. For status checks, extract "ticketId" if present. If the user asks for the latest/recent complaint, use intent "recent_complaints".
 6. If key registration details are missing, list them in "missingFields". Use only: "description", "locationName".
 7. Never invent a ticket ID.
@@ -721,7 +787,7 @@ Return exactly this shape:
           ? normalizeComplaintDescription(parsed.complaintDraft.description)
           : heuristicDescription || null;
         const mergedLocationName = parsed?.complaintDraft?.locationName
-          ? String(parsed.complaintDraft.locationName).trim()
+          ? sanitizeLocationNameCandidate(parsed.complaintDraft.locationName)
           : heuristicLocation || null;
         const heuristicDepartment = inferDepartmentFromDescription(
           mergedDescription,
@@ -744,6 +810,8 @@ Return exactly this shape:
           return true;
         });
 
+        const originalUserMessage = String(message || "").trim() || null;
+
         return {
           language: normalizeLanguageCode(
             preferredLanguage !== "en"
@@ -763,7 +831,11 @@ Return exactly this shape:
           complaintDraft: parsed.complaintDraft || heuristicWantsRegister.complaintDraft
             ? {
                 title: parsedComplaintDraft.title
-                  ? String(parsedComplaintDraft.title).trim()
+                  ? normalizeComplaintTitleCandidate(
+                      parsedComplaintDraft.title,
+                      mergedDescription,
+                      mergedDepartment,
+                    )
                   : buildComplaintTitle(
                       mergedDescription,
                       mergedDepartment,
@@ -772,6 +844,7 @@ Return exactly this shape:
                 department: mergedDepartment,
                 priority: normalizePriority(parsedComplaintDraft.priority),
                 locationName: mergedLocationName,
+                originalUserMessage,
               }
             : null,
           generalResponse: String(parsed.generalResponse || "").trim(),
@@ -873,4 +946,5 @@ module.exports = {
   detectLanguageWithModel,
   getLanguagePack,
   buildComplaintTitle,
+  sanitizeLocationNameCandidate,
 };
