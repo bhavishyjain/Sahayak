@@ -439,6 +439,7 @@ export default function Assistant() {
   );
 
   async function submitMessage(rawMessage = text, options = {}) {
+    const trimmedRawMessage = String(rawMessage || "").trim();
     const pendingCoordinates = coordinates ? { ...coordinates } : null;
     const pendingImages = selectedImages.map((image) => ({ ...image }));
     const msg = createAttachmentMessage({
@@ -449,11 +450,16 @@ export default function Assistant() {
       messages,
     });
     if (!msg || busy) return;
+    const isAttachmentOnlyContinuation =
+      !trimmedRawMessage &&
+      (Boolean(pendingCoordinates) || pendingImages.length > 0);
 
     const userMessage = {
       id: createId("user"),
       role: "user",
       text: msg,
+      rawText: trimmedRawMessage,
+      generatedContinuation: isAttachmentOnlyContinuation,
       attachments: {
         coordinates: pendingCoordinates,
         images: pendingImages.map((image) => image.uri).filter(Boolean),
@@ -471,9 +477,13 @@ export default function Assistant() {
       setLoading(true);
       const conversationPayload = nextMessages.slice(-12).map((item) => ({
         role: item.role,
-        text: item.text,
+        text:
+          item.role === "user"
+            ? String(item.rawText ?? "").trim()
+            : item.text,
         assistant: item.assistant,
         attachments: item.attachments,
+        generatedContinuation: Boolean(item.generatedContinuation),
       }));
 
       const hasAttachments =
@@ -481,7 +491,7 @@ export default function Assistant() {
       const requestConfig = hasAttachments
         ? (() => {
             const formData = new FormData();
-            formData.append("message", msg);
+            formData.append("message", trimmedRawMessage);
             formData.append(
               "conversationHistory",
               JSON.stringify(conversationPayload),
@@ -513,7 +523,7 @@ export default function Assistant() {
             method: "POST",
             url: `${CHAT_URL}/message`,
             data: {
-              message: msg,
+              message: trimmedRawMessage,
               conversationHistory: conversationPayload,
             },
           };

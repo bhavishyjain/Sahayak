@@ -104,6 +104,83 @@ const LOCATION_KEYWORD_REGEX =
   /\b(colony|nagar|road|street|sector|block|area|gali|mandir|chowk|bridge|market|hospital|school|park)\b/i;
 const HINDI_LOCATION_KEYWORD_REGEX =
   /(कॉलोनी|नगर|रोड|सड़क|गली|चौराहा|मंदिर|पार्क|मार्केट|हॉस्पिटल|स्कूल)/;
+const ATTACHMENT_HELPER_PREFIX_REGEX =
+  /^(use these location coordinates(?: and proof images)? to continue registering my complaint\.?|use these proof images to continue registering my complaint\.?|मेरी शिकायत दर्ज करने के लिए ये लोकेशन निर्देशांक(?: और प्रूफ इमेज)? हैं।?|मेरी शिकायत दर्ज करने के लिए ये प्रूफ इमेज हैं।?)/i;
+const ATTACHMENT_TRAILER_REGEX =
+  /(\b\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\b|\b\d+\s+proof image(?:s)? attached\b|\b\d+\s+प्रूफ इमेज जोड़ी गई\b)/gi;
+
+const DEPARTMENT_KEYWORDS = [
+  {
+    department: "Electricity",
+    patterns: [
+      /\bstreet\s*light\b/i,
+      /\bstreetlight\b/i,
+      /\blight\b/i,
+      /\belectric/i,
+      /\btransformer\b/i,
+      /\bmeter\b/i,
+      /\bwire\b/i,
+      /\bpower\b/i,
+      /स्ट्रीट\s*लाइट/,
+      /बिजली/,
+      /मीटर/,
+      /ट्रांसफॉर्मर/,
+    ],
+  },
+  {
+    department: "Water",
+    patterns: [
+      /\bwater\b/i,
+      /\bpipe\b/i,
+      /\bleak/i,
+      /\bborewell\b/i,
+      /\btanker\b/i,
+      /पानी/,
+      /लीकेज/,
+      /बोरवेल/,
+      /टैंकर/,
+    ],
+  },
+  {
+    department: "Drainage",
+    patterns: [
+      /\bdrain/i,
+      /\bsewer/i,
+      /\bsewage/i,
+      /\bnala\b/i,
+      /नाली/,
+      /सीवर/,
+      /ड्रेनेज/,
+      /गटर/,
+    ],
+  },
+  {
+    department: "Waste",
+    patterns: [
+      /\bgarbage\b/i,
+      /\bwaste\b/i,
+      /\bdustbin\b/i,
+      /\btrash\b/i,
+      /\blitter\b/i,
+      /कचरा/,
+      /डस्टबिन/,
+      /वेस्ट/,
+    ],
+  },
+  {
+    department: "Road",
+    patterns: [
+      /\bpothole\b/i,
+      /\broad\b/i,
+      /\bstreet\b/i,
+      /\bpavement\b/i,
+      /\bdivider\b/i,
+      /गड्ढ/,
+      /सड़क/,
+      /रोड/,
+    ],
+  },
+];
 
 function hasGeminiClient() {
   return Boolean(genAI);
@@ -277,6 +354,8 @@ function extractLocationFromText(message = "") {
 
 function extractComplaintDescription(message = "") {
   return String(message || "")
+    .replace(ATTACHMENT_HELPER_PREFIX_REGEX, " ")
+    .replace(ATTACHMENT_TRAILER_REGEX, " ")
     .replace(
       /(?:लोकेशन|स्थान|पता|location|address)\s*(?:is|h|hai|है|:)?\s*[^.!?\n]+/gi,
       " ",
@@ -287,9 +366,56 @@ function extractComplaintDescription(message = "") {
     .trim();
 }
 
+function inferDepartmentFromDescription(description = "") {
+  const value = String(description || "").trim();
+  if (!value) return "Other";
+
+  const matched = DEPARTMENT_KEYWORDS.find(({ patterns }) =>
+    patterns.some((pattern) => pattern.test(value)),
+  );
+
+  return matched?.department || "Other";
+}
+
+function normalizeAssistantHistoryText(message = "", generatedContinuation = false) {
+  const value = String(message || "").trim();
+  if (!value) return "";
+  if (generatedContinuation) return "";
+
+  return value
+    .replace(ATTACHMENT_HELPER_PREFIX_REGEX, " ")
+    .replace(ATTACHMENT_TRAILER_REGEX, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function buildComplaintTitle(description = "", department = "") {
   const source = String(description || "").trim();
   if (!source) return `${department || "General"} complaint`;
+
+  if (/\bstreet\s*light\b|\bstreetlight\b|स्ट्रीट\s*लाइट/i.test(source)) {
+    if (/\b(broken|not working|fused|damaged|dead)\b|टूटी|खराब|बंद/i.test(source)) {
+      return "Broken street light";
+    }
+    return "Street light issue";
+  }
+
+  if (/\bpothole\b|गड्ढ/i.test(source)) {
+    return "Pothole on road";
+  }
+
+  if (/\bgarbage\b|\bwaste\b|कचरा/i.test(source)) {
+    return "Garbage collection issue";
+  }
+
+  if (/\bwater\b|\bleak\b|पानी|लीकेज/i.test(source)) {
+    return "Water supply issue";
+  }
+
+  if (/\bdrain\b|\bsewer\b|नाली|सीवर/i.test(source)) {
+    return "Drainage issue";
+  }
+
   const compact = source.split(/[.!?]/)[0].trim();
   return compact.length > 80 ? `${compact.slice(0, 77).trim()}...` : compact;
 }
@@ -405,6 +531,7 @@ function inferIntentHeuristically(message = "", detectedLanguage = "en") {
   }
 
   if (wantsRegister) {
+    const inferredDepartment = inferDepartmentFromDescription(description);
     return {
       language: detectedLanguage,
       intent: "register_complaint",
@@ -412,7 +539,7 @@ function inferIntentHeuristically(message = "", detectedLanguage = "en") {
       complaintDraft: {
         title: buildComplaintTitle(description),
         description,
-        department: "Other",
+        department: inferredDepartment,
         priority: "Medium",
         locationName,
       },
@@ -453,8 +580,15 @@ async function analyzeAssistantRequest(
         .slice(-8)
         .map(
           (item) =>
-            `${item.role || "user"}: ${sanitizeInput(String(item.text || item.content || ""), 300)}`,
+            `${item.role || "user"}: ${sanitizeInput(
+              normalizeAssistantHistoryText(
+                String(item.text || item.content || ""),
+                Boolean(item.generatedContinuation),
+              ),
+              300,
+            )}`,
         )
+        .filter((line) => !/(^user:\s*$|^assistant:\s*$)/i.test(line))
         .join("\n");
 
       const prompt = `
@@ -530,6 +664,16 @@ Return exactly this shape:
         const mergedLocationName = parsed?.complaintDraft?.locationName
           ? String(parsed.complaintDraft.locationName).trim()
           : heuristicLocation || null;
+        const heuristicDepartment = inferDepartmentFromDescription(
+          mergedDescription,
+        );
+        const parsedDepartment = parsedComplaintDraft.department
+          ? String(parsedComplaintDraft.department).trim()
+          : "";
+        const mergedDepartment =
+          parsedDepartment && parsedDepartment !== "Other"
+            ? parsedDepartment
+            : heuristicDepartment;
         const mergedIntent =
           parsed.intent === "general" &&
           heuristicWantsRegister.intent === "register_complaint"
@@ -563,12 +707,10 @@ Return exactly this shape:
                   ? String(parsedComplaintDraft.title).trim()
                   : buildComplaintTitle(
                       mergedDescription,
-                      parsedComplaintDraft.department || "Other",
+                      mergedDepartment,
                     ),
                 description: mergedDescription,
-                department: parsedComplaintDraft.department
-                  ? String(parsedComplaintDraft.department).trim()
-                  : null,
+                department: mergedDepartment,
                 priority: normalizePriority(parsedComplaintDraft.priority),
                 locationName: mergedLocationName,
               }

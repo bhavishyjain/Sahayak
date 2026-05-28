@@ -142,6 +142,7 @@ function uniqueMissingFields(fields = []) {
 
 function computeRegistrationMissingFields({
   description,
+  locationName,
   coordinates,
   collectedImages,
 }) {
@@ -149,6 +150,10 @@ function computeRegistrationMissingFields({
 
   if (!String(description || "").trim()) {
     missingFields.push("description");
+  }
+
+  if (!String(locationName || "").trim()) {
+    missingFields.push("locationName");
   }
 
   if (!coordinates) {
@@ -166,13 +171,26 @@ function buildRegistrationFollowUpResponse(copy, language, missingFields = []) {
   const fields = uniqueMissingFields(missingFields);
 
   const hasDescription = fields.includes("description");
+  const hasLocationName = fields.includes("locationName");
   const hasCoordinates = fields.includes("coordinates");
   const hasImages = fields.includes("images");
+
+  if (hasDescription && hasLocationName && hasCoordinates && hasImages) {
+    return language === "hi"
+      ? "कृपया समस्या स्पष्ट बताइए, किसी पहचानने योग्य स्थान या कॉलोनी का नाम बताइए, अपनी वर्तमान लोकेशन कैप्चर करें, और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please describe the issue clearly, share a landmark or location name, capture your current location, and add at least one proof image so I can register the complaint.";
+  }
 
   if (hasDescription && hasCoordinates && hasImages) {
     return language === "hi"
       ? "कृपया समस्या स्पष्ट बताइए, अपनी वर्तमान लोकेशन कैप्चर करें, और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
       : "Please describe the issue clearly, capture your current location, and add at least one proof image so I can register the complaint.";
+  }
+
+  if (hasDescription && hasLocationName && hasCoordinates) {
+    return language === "hi"
+      ? "कृपया समस्या स्पष्ट बताइए, किसी पहचानने योग्य स्थान या कॉलोनी का नाम बताइए, और अपनी वर्तमान लोकेशन कैप्चर करें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please describe the issue clearly, share a landmark or location name, and capture your current location so I can register the complaint.";
   }
 
   if (hasDescription && hasCoordinates) {
@@ -181,14 +199,32 @@ function buildRegistrationFollowUpResponse(copy, language, missingFields = []) {
       : "Please describe the issue clearly and capture your current location so I can register the complaint.";
   }
 
+  if (hasDescription && hasLocationName && hasImages) {
+    return language === "hi"
+      ? "कृपया समस्या स्पष्ट बताइए, किसी पहचानने योग्य स्थान या कॉलोनी का नाम बताइए, और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please describe the issue clearly, share a landmark or location name, and add at least one proof image so I can register the complaint.";
+  }
+
   if (hasDescription && hasImages) {
     return language === "hi"
       ? "कृपया समस्या स्पष्ट बताइए और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
       : "Please describe the issue clearly and add at least one proof image so I can register the complaint.";
   }
 
+  if (hasLocationName && hasCoordinates && hasImages) {
+    return language === "hi"
+      ? "कृपया किसी पहचानने योग्य स्थान, कॉलोनी, या लैंडमार्क का नाम बताइए, अपनी वर्तमान लोकेशन कैप्चर करें, और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please share a location name or landmark, capture your current location, and add at least one proof image so I can register the complaint.";
+  }
+
   if (hasCoordinates && hasImages) {
     return copy.complaintNeedLocationAndImages;
+  }
+
+  if (hasDescription && hasLocationName) {
+    return language === "hi"
+      ? "कृपया समस्या स्पष्ट बताइए और किसी पहचानने योग्य स्थान, कॉलोनी, या लैंडमार्क का नाम बताइए, ताकि मैं शिकायत दर्ज कर सकूं।"
+      : "Please describe the issue clearly and share a location name or landmark so I can register the complaint.";
   }
 
   if (hasDescription) {
@@ -197,8 +233,26 @@ function buildRegistrationFollowUpResponse(copy, language, missingFields = []) {
       : "Please describe the issue clearly, and I will register the complaint.";
   }
 
+  if (hasLocationName && hasCoordinates) {
+    return language === "hi"
+      ? "कृपया किसी पहचानने योग्य स्थान, कॉलोनी, या लैंडमार्क का नाम बताइए और अपनी वर्तमान लोकेशन कैप्चर करें, ताकि मैं शिकायत सही जगह पर दर्ज कर सकूं।"
+      : "Please share a location name or landmark and capture your current location so I can register the complaint correctly.";
+  }
+
   if (hasCoordinates) {
     return copy.complaintNeedCoordinates;
+  }
+
+  if (hasLocationName && hasImages) {
+    return language === "hi"
+      ? "कृपया किसी पहचानने योग्य स्थान, कॉलोनी, या लैंडमार्क का नाम बताइए और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please share a location name or landmark and add at least one proof image so I can register the complaint.";
+  }
+
+  if (hasLocationName) {
+    return language === "hi"
+      ? "कृपया किसी पहचानने योग्य स्थान, कॉलोनी, या लैंडमार्क का नाम बताइए, ताकि मैं शिकायत सही जगह पर दर्ज कर सकूं।"
+      : "Please share a location name or landmark, such as your colony, area, or a nearby place, so I can register the complaint correctly.";
   }
 
   if (hasImages) {
@@ -380,12 +434,14 @@ async function transcribeWithWhisper(reqFile) {
 
 async function handleMessage(req, res) {
   try {
-    const { message } = req.body;
+    const message = String(req.body?.message || "").trim();
     const conversationHistory = parseConversationHistory(
       req.body?.conversationHistory,
     );
+    const hasUploadedImages = Array.isArray(req.files) && req.files.length > 0;
+    const hasIncomingCoordinates = Boolean(parseCoordinates(req.body?.coordinates));
 
-    if (!message) {
+    if (!message && !hasUploadedImages && !hasIncomingCoordinates) {
       return res.status(400).json({ error: "Message is required" });
     }
 
@@ -404,8 +460,7 @@ async function handleMessage(req, res) {
     const copy = await getLanguagePack(language);
     const fallbackTicketId = extractTicketId(message);
     const effectiveTicketId = analysis.ticketId || fallbackTicketId;
-    const hasIncomingCoordinates = Boolean(parseCoordinates(req.body?.coordinates));
-    const hasIncomingImages = Array.isArray(req.files) && req.files.length > 0;
+    const hasIncomingImages = hasUploadedImages;
     const hasComplaintDraftHints = Boolean(
       String(analysis?.complaintDraft?.description || "").trim() ||
       String(analysis?.complaintDraft?.locationName || "").trim(),
@@ -608,6 +663,7 @@ async function handleMessage(req, res) {
 
       const requiredMissingFields = computeRegistrationMissingFields({
         description: draft.description,
+        locationName: draft.locationName,
         coordinates,
         collectedImages,
       });
