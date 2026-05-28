@@ -1,0 +1,144 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="LX8RqpvlEy0z4PXdcQvL">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-1" parent="1" style="ellipse;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Start" vertex="1">
+          <mxGeometry height="60" width="120" x="740" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Citizen authenticates and opens complaint form" vertex="1">
+          <mxGeometry height="90" width="360" x="620" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Citizen enters description, selects images, and captures location" vertex="1">
+          <mxGeometry height="100" width="360" x="620" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-4" parent="1" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Input valid?" vertex="1">
+          <mxGeometry height="100" width="220" x="690" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Show validation error and ask citizen to correct input" vertex="1">
+          <mxGeometry height="85" width="300" x="1040" y="405" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Backend stores complaint and records AI suggestions if available" vertex="1">
+          <mxGeometry height="80" width="370" x="620" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Complaint enters departmental pending queue" vertex="1">
+          <mxGeometry height="70" width="300" x="650" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="HOD reviews complaint and decides assignment" vertex="1">
+          <mxGeometry height="80" width="320" x="640" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-9" parent="1" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Worker assigned?" vertex="1">
+          <mxGeometry height="110" width="230" x="685" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Complaint remains in queue until assignment" vertex="1">
+          <mxGeometry height="60" width="280" x="310" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Worker views assigned complaint and starts work" vertex="1">
+          <mxGeometry height="60" width="320" x="640" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Worker updates status and uploads completion evidence" vertex="1">
+          <mxGeometry height="70" width="340" x="630" y="1130" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="HOD reviews submitted work" vertex="1">
+          <mxGeometry height="60" width="280" x="660" y="1250" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-14" parent="1" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Approve completion?" vertex="1">
+          <mxGeometry height="120" width="290" x="655" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Send complaint for rework and notify worker" vertex="1">
+          <mxGeometry height="60" width="300" x="1050" y="1360" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-16" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Mark complaint resolved and notify citizen" vertex="1">
+          <mxGeometry height="60" width="320" x="640" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="Citizen reviews resolution and submits feedback / satisfaction vote" vertex="1">
+          <mxGeometry height="70" width="440" x="580" y="1630" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-18" parent="1" style="ellipse;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=#ffffff;fontSize=22;" value="End" vertex="1">
+          <mxGeometry height="50" width="120" x="740" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-19" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-1" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-20" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-2" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-21" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-3" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-22" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-4" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-6" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-23" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-4" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-5" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-24" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-5" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1190" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-25" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-6" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-26" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-7" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-27" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-8" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="_ShLPV_QVnCYvpM1LBQk-9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="803" y="871" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-28" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-9" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-11" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-29" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-9" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="590" y="920" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-30" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-10" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;exitX=0.537;exitY=-0.017;exitDx=0;exitDy=0;exitPerimeter=0;" target="_ShLPV_QVnCYvpM1LBQk-8">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="460" y="810" />
+            </Array>
+            <mxPoint x="450" y="890" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-31" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-11" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-32" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-12" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-33" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-13" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-34" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-14" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-16" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-35" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-14" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;entryX=-0.001;entryY=0.648;entryDx=0;entryDy=0;entryPerimeter=0;" target="_ShLPV_QVnCYvpM1LBQk-15" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1050" y="1410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-36" edge="1" parent="1" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-11">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1200" y="1060" />
+            </Array>
+            <mxPoint x="1200" y="1360" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-37" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-16" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_ShLPV_QVnCYvpM1LBQk-38" edge="1" parent="1" source="_ShLPV_QVnCYvpM1LBQk-17" style="endArrow=block;html=1;strokeColor=#000000;fontSize=22;" target="_ShLPV_QVnCYvpM1LBQk-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -98,7 +98,7 @@ export default function Login() {
         </View>
         <Image
           source={require("../../../assets/images/login-image-hero.png")}
-          style={{ width: 350, height: 350, marginBottom: 24 }}
+          style={{ width: 350, height: 250 }}
           resizeMode="contain"
         />
         <Text

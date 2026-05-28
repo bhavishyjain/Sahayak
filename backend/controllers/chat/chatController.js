@@ -131,6 +131,134 @@ function looksLikeStandaloneLocationMessage(message = "") {
   );
 }
 
+function removeMissingField(missingFields = [], field) {
+  const index = missingFields.indexOf(field);
+  if (index >= 0) missingFields.splice(index, 1);
+}
+
+function uniqueMissingFields(fields = []) {
+  return [...new Set((Array.isArray(fields) ? fields : []).filter(Boolean))];
+}
+
+function computeRegistrationMissingFields({
+  description,
+  coordinates,
+  collectedImages,
+}) {
+  const missingFields = [];
+
+  if (!String(description || "").trim()) {
+    missingFields.push("description");
+  }
+
+  if (!coordinates) {
+    missingFields.push("coordinates");
+  }
+
+  if (!Array.isArray(collectedImages) || collectedImages.length === 0) {
+    missingFields.push("images");
+  }
+
+  return missingFields;
+}
+
+function buildRegistrationFollowUpResponse(copy, language, missingFields = []) {
+  const fields = uniqueMissingFields(missingFields);
+
+  const hasDescription = fields.includes("description");
+  const hasCoordinates = fields.includes("coordinates");
+  const hasImages = fields.includes("images");
+
+  if (hasDescription && hasCoordinates && hasImages) {
+    return language === "hi"
+      ? "कृपया समस्या स्पष्ट बताइए, अपनी वर्तमान लोकेशन कैप्चर करें, और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please describe the issue clearly, capture your current location, and add at least one proof image so I can register the complaint.";
+  }
+
+  if (hasDescription && hasCoordinates) {
+    return language === "hi"
+      ? "कृपया समस्या स्पष्ट बताइए और अपनी वर्तमान लोकेशन कैप्चर करें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please describe the issue clearly and capture your current location so I can register the complaint.";
+  }
+
+  if (hasDescription && hasImages) {
+    return language === "hi"
+      ? "कृपया समस्या स्पष्ट बताइए और कम से कम एक प्रूफ इमेज जोड़ें, तभी मैं शिकायत दर्ज कर सकूंगा।"
+      : "Please describe the issue clearly and add at least one proof image so I can register the complaint.";
+  }
+
+  if (hasCoordinates && hasImages) {
+    return copy.complaintNeedLocationAndImages;
+  }
+
+  if (hasDescription) {
+    return language === "hi"
+      ? "कृपया समस्या थोड़ी स्पष्ट बताइए, मैं शिकायत दर्ज कर दूंगा।"
+      : "Please describe the issue clearly, and I will register the complaint.";
+  }
+
+  if (hasCoordinates) {
+    return copy.complaintNeedCoordinates;
+  }
+
+  if (hasImages) {
+    return copy.complaintNeedImages;
+  }
+
+  return copy.complaintNeedDetails;
+}
+
+function extractContinuationLocationName(message = "") {
+  const value = String(message || "").trim();
+  if (!value) return null;
+
+  const explicitPatterns = [
+    /(?:location|address)\s*(?:is|h|hai|:)?\s*([^.!?\n]{3,120})/i,
+    /(?:लोकेशन|स्थान|पता)\s*(?:है|:)?\s*([^.!?\n]{3,120})/i,
+    /(?:at|near|in)\s+([^.!?\n]{3,120})/i,
+    /(?:के\s+पास|के\s+सामने|में)\s+([^.!?\n]{3,120})/i,
+  ];
+
+  for (const pattern of explicitPatterns) {
+    const match = value.match(pattern);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+
+  const locationLikeSegment = value
+    .split(/[,.\n]/)
+    .map((segment) => segment.trim())
+    .find((segment) =>
+      /\b(colony|nagar|mandir|road|street|sector|block|area|gali|chowk|park|hospital|school)\b/i.test(
+        segment,
+      ) || /(कॉलोनी|नगर|रोड|सड़क|गली|चौराहा|मंदिर|पार्क|हॉस्पिटल|स्कूल)/.test(segment),
+    );
+
+  return locationLikeSegment || null;
+}
+
+function extractContinuationDescription(message = "") {
+  const value = String(message || "").trim();
+  if (!value) return null;
+
+  const normalized = value
+    .replace(
+      /(?:लोकेशन|स्थान|पता|location|address)\s*(?:is|h|hai|है|:)?\s*[^.!?\n]+/gi,
+      " ",
+    )
+    .replace(/\b(register|raise|file|lodge|check|show|track)\b/gi, " ")
+    .replace(/\b(complaint|issue|problem|status)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) return null;
+  if (/^\d+(\.\d+)?\s*,\s*\d+(\.\d+)?$/.test(normalized)) return null;
+  if (/^use these location coordinates/i.test(normalized)) return null;
+
+  return normalized.length >= 6 ? normalized : null;
+}
+
 function toComplaintCard(complaint) {
   if (!complaint) return null;
   const view = buildComplaintView(complaint);
@@ -165,9 +293,14 @@ function getOpenAIApiKey() {
     .replace(/^['\"]|['\"]$/g, "");
 }
 
-function resolveAudioMimeType(mimetype = "", originalname = "") {
+function resolveAudioMimeType(
+  mimetype = "",
+  originalname = "",
+  provider = "generic",
+) {
   const normalized = String(mimetype || "").toLowerCase();
   const fileName = String(originalname || "").toLowerCase();
+  const isGemini = String(provider || "").toLowerCase() === "gemini";
 
   if (
     normalized === "audio/m4a" ||
@@ -175,12 +308,12 @@ function resolveAudioMimeType(mimetype = "", originalname = "") {
     normalized === "audio/mp4" ||
     fileName.endsWith(".m4a")
   ) {
-    return "audio/mp4";
+    return isGemini ? "audio/aac" : "audio/mp4";
   }
 
   if (normalized === "application/octet-stream") {
     if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
-      return "audio/mp4";
+      return isGemini ? "audio/aac" : "audio/mp4";
     }
     if (fileName.endsWith(".mp4")) return "audio/mp4";
     if (fileName.endsWith(".wav")) return "audio/wav";
@@ -196,7 +329,11 @@ async function transcribeWithWhisper(reqFile) {
     throw new Error("OpenAI API key not configured");
   }
 
-  const mimeType = resolveAudioMimeType(reqFile.mimetype, reqFile.originalname);
+  const mimeType = resolveAudioMimeType(
+    reqFile.mimetype,
+    reqFile.originalname,
+    "whisper",
+  );
   const fileName = reqFile.originalname || "recording.m4a";
   const form = new FormData();
   form.append("file", new Blob([reqFile.buffer], { type: mimeType }), fileName);
@@ -267,6 +404,18 @@ async function handleMessage(req, res) {
     const copy = await getLanguagePack(language);
     const fallbackTicketId = extractTicketId(message);
     const effectiveTicketId = analysis.ticketId || fallbackTicketId;
+    const hasIncomingCoordinates = Boolean(parseCoordinates(req.body?.coordinates));
+    const hasIncomingImages = Array.isArray(req.files) && req.files.length > 0;
+    const hasComplaintDraftHints = Boolean(
+      String(analysis?.complaintDraft?.description || "").trim() ||
+      String(analysis?.complaintDraft?.locationName || "").trim(),
+    );
+    const shouldTreatAsRegistration =
+      analysis.intent === "register_complaint" ||
+      Boolean(pendingRegistrationContext) ||
+      ((hasIncomingCoordinates || hasIncomingImages || hasComplaintDraftHints) &&
+        analysis.intent !== "complaint_status" &&
+        analysis.intent !== "recent_complaints");
 
     if (analysis.intent === "recent_complaints") {
       if (!req.user?._id) {
@@ -358,10 +507,7 @@ async function handleMessage(req, res) {
       );
     }
 
-    if (
-      analysis.intent === "register_complaint" ||
-      pendingRegistrationContext
-    ) {
+    if (shouldTreatAsRegistration) {
       if (!req.user?._id) {
         return res.status(401).json({
           error: copy.complaintAuth,
@@ -387,13 +533,13 @@ async function handleMessage(req, res) {
         ...latestAttachmentState.images,
         ...uploadedImages,
       ]);
-      const missingFields = Array.isArray(
-        pendingRegistrationContext?.assistantMeta?.missingFields,
-      )
-        ? pendingRegistrationContext.assistantMeta.missingFields.filter(Boolean)
-        : Array.isArray(analysis.missingFields)
-        ? analysis.missingFields.filter(Boolean)
-        : [];
+      const missingFields = uniqueMissingFields(
+        Array.isArray(pendingRegistrationContext?.assistantMeta?.missingFields)
+          ? pendingRegistrationContext.assistantMeta.missingFields
+          : Array.isArray(analysis.missingFields)
+            ? analysis.missingFields
+            : [],
+      );
 
       if (
         forcedDraft &&
@@ -423,59 +569,68 @@ async function handleMessage(req, res) {
         missingFields.includes("locationName") &&
         looksLikeStandaloneLocationMessage(message)
       ) {
-        draft.locationName = String(message || "").trim();
-        const locationIndex = missingFields.indexOf("locationName");
-        if (locationIndex >= 0) missingFields.splice(locationIndex, 1);
+        draft.locationName =
+          extractContinuationLocationName(message) || String(message || "").trim();
+        removeMissingField(missingFields, "locationName");
       }
 
-      if (!draft.description && !missingFields.includes("description")) {
-        missingFields.push("description");
-      }
-      if (!draft.locationName && !missingFields.includes("locationName")) {
-        missingFields.push("locationName");
-      }
-      if (
-        !coordinates &&
-        !missingFields.includes("coordinates")
-      ) {
-        missingFields.push("coordinates");
-      } else if (coordinates) {
-        const index = missingFields.indexOf("coordinates");
-        if (index >= 0) missingFields.splice(index, 1);
-      }
-
-      if (collectedImages.length === 0 && !missingFields.includes("images")) {
-        missingFields.push("images");
-      } else if (collectedImages.length > 0) {
-        const index = missingFields.indexOf("images");
-        if (index >= 0) missingFields.splice(index, 1);
-      }
-
-      if (
-        missingFields.length > 0 ||
-        (!pendingRegistrationContext && !analysis.shouldCreateComplaint)
-      ) {
-        let response = copy.complaintNeedDetails;
-        if (
-          missingFields.includes("coordinates") &&
-          missingFields.includes("images")
-        ) {
-          response = copy.complaintNeedLocationAndImages;
-        } else if (missingFields.includes("coordinates")) {
-          response = copy.complaintNeedCoordinates;
-        } else if (missingFields.includes("images")) {
-          response = copy.complaintNeedImages;
-        } else if (
-          missingFields.length === 1 &&
-          missingFields[0] === "locationName"
-        ) {
-          response = copy.complaintNeedLocation;
+      if (forcedDraft) {
+        if (!draft.description) {
+          const inferredDescription = extractContinuationDescription(message);
+          if (inferredDescription) {
+            draft.description = inferredDescription;
+          }
         }
+
+        if (!draft.locationName) {
+          const inferredLocationName = extractContinuationLocationName(message);
+          if (inferredLocationName) {
+            draft.locationName = inferredLocationName;
+          }
+        }
+      }
+
+      if (draft.description) {
+        removeMissingField(missingFields, "description");
+      }
+
+      if (coordinates) {
+        removeMissingField(missingFields, "coordinates");
+      }
+
+      if (draft.locationName) {
+        removeMissingField(missingFields, "locationName");
+      }
+
+      if (collectedImages.length > 0) {
+        removeMissingField(missingFields, "images");
+      }
+
+      const requiredMissingFields = computeRegistrationMissingFields({
+        description: draft.description,
+        coordinates,
+        collectedImages,
+      });
+      const shouldCreateComplaint =
+        requiredMissingFields.length === 0 &&
+        Boolean(String(draft.description || "").trim());
+
+      if (
+        requiredMissingFields.length > 0 ||
+        (!pendingRegistrationContext &&
+          !analysis.shouldCreateComplaint &&
+          !shouldCreateComplaint)
+      ) {
+        const response = buildRegistrationFollowUpResponse(
+          copy,
+          language,
+          requiredMissingFields,
+        );
         return res.json(
           createAssistantResponse(response, {
             intent: "register_complaint",
             created: false,
-            missingFields,
+            missingFields: requiredMissingFields,
             complaintDraft: draft,
             collectedCoordinates: coordinates,
             collectedImages,
@@ -587,6 +742,7 @@ async function handleSpeechToText(req, res) {
           const mimeType = resolveAudioMimeType(
             req.file.mimetype,
             req.file.originalname,
+            "gemini",
           );
           const prompt =
             "Please transcribe this audio file to text. Only return the transcribed text, nothing else.";

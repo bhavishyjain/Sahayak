@@ -96,6 +96,15 @@ const ROMANIZED_HINDI_HINTS = [
   "gali",
 ];
 
+const LOCATION_SEGMENT_REGEX =
+  /\b(?:location(?:\s+is|\s+h|\s+hai)?|loc(?:ation)?|address(?:\s+is)?|at|in|near|around|behind|beside|opposite)\b[\s:,-]*([^.!?\n]{3,120})/i;
+const HINDI_LOCATION_SEGMENT_REGEX =
+  /(?:लोकेशन|स्थान|पता)\s*(?:है|:)?\s*([^.!?\n]{3,120})/i;
+const LOCATION_KEYWORD_REGEX =
+  /\b(colony|nagar|road|street|sector|block|area|gali|mandir|chowk|bridge|market|hospital|school|park)\b/i;
+const HINDI_LOCATION_KEYWORD_REGEX =
+  /(कॉलोनी|नगर|रोड|सड़क|गली|चौराहा|मंदिर|पार्क|मार्केट|हॉस्पिटल|स्कूल)/;
+
 function hasGeminiClient() {
   return Boolean(genAI);
 }
@@ -228,14 +237,50 @@ function normalizePriority(value = "") {
 
 function extractLocationFromText(message = "") {
   const value = String(message || "").trim();
-  const match = value.match(
-    /\b(?:at|near|in|behind|beside|opposite|around)\s+([a-z0-9 ,.-]{3,80})/i,
+  if (!value) return null;
+
+  const explicitEnglish = value.match(LOCATION_SEGMENT_REGEX);
+  if (explicitEnglish?.[1]) {
+    return explicitEnglish[1].trim();
+  }
+
+  const explicitHindi = value.match(HINDI_LOCATION_SEGMENT_REGEX);
+  if (explicitHindi?.[1]) {
+    return explicitHindi[1].trim();
+  }
+
+  const englishMatch = value.match(
+    /\b(?:at|near|in|behind|beside|opposite|around)\s+([a-z0-9 ,.'-]{3,100})/i,
   );
-  return match ? match[1].trim() : null;
+  if (englishMatch?.[1]) {
+    return englishMatch[1].trim();
+  }
+
+  const hindiMatch = value.match(
+    /(?:के\s+पास|के\s+सामने|में|के\s+निकट)\s+([^.!?\n]{3,100})/i,
+  );
+  if (hindiMatch?.[1] && (LOCATION_KEYWORD_REGEX.test(hindiMatch[1]) || HINDI_LOCATION_KEYWORD_REGEX.test(hindiMatch[1]))) {
+    return hindiMatch[1].trim();
+  }
+
+  const tailWithKeyword = value
+    .split(/[,.\n]/)
+    .map((segment) => segment.trim())
+    .find(
+      (segment) =>
+        LOCATION_KEYWORD_REGEX.test(segment) ||
+        HINDI_LOCATION_KEYWORD_REGEX.test(segment),
+    );
+
+  return tailWithKeyword || null;
 }
 
 function extractComplaintDescription(message = "") {
   return String(message || "")
+    .replace(
+      /(?:लोकेशन|स्थान|पता|location|address)\s*(?:is|h|hai|है|:)?\s*[^.!?\n]+/gi,
+      " ",
+    )
     .replace(/\b(register|raise|file|lodge|check|show|track)\b/gi, "")
     .replace(/\b(complaint|issue|problem|status)\b/gi, "")
     .replace(/\s+/g, " ")
@@ -311,7 +356,14 @@ function inferIntentHeuristically(message = "", detectedLanguage = "en") {
     lower.includes("problem") ||
     lower.includes("issue") ||
     lower.includes("shikayat") ||
-    lower.includes("complaint");
+    lower.includes("complaint") ||
+    lower.includes("light") ||
+    lower.includes("street light") ||
+    lower.includes("pothole") ||
+    lower.includes("gadde") ||
+    lower.includes("broken") ||
+    lower.includes("toot") ||
+    lower.includes("kharab");
 
   const description = extractComplaintDescription(message);
   const locationName = extractLocationFromText(message);
@@ -459,35 +511,66 @@ Return exactly this shape:
       const jsonCandidate = extractJsonObject(raw);
       if (jsonCandidate) {
         const parsed = JSON.parse(jsonCandidate);
+        const parsedComplaintDraft =
+          parsed?.complaintDraft && typeof parsed.complaintDraft === "object"
+            ? parsed.complaintDraft
+            : {};
+        const heuristicDescription = extractComplaintDescription(message);
+        const heuristicLocation = extractLocationFromText(message);
+        const heuristicWantsRegister = inferIntentHeuristically(
+          message,
+          preferredLanguage,
+        );
+        const rawMissingFields = Array.isArray(parsed.missingFields)
+          ? parsed.missingFields.filter(Boolean)
+          : [];
+        const mergedDescription = parsed?.complaintDraft?.description
+          ? String(parsed.complaintDraft.description).trim()
+          : heuristicDescription || null;
+        const mergedLocationName = parsed?.complaintDraft?.locationName
+          ? String(parsed.complaintDraft.locationName).trim()
+          : heuristicLocation || null;
+        const mergedIntent =
+          parsed.intent === "general" &&
+          heuristicWantsRegister.intent === "register_complaint"
+            ? "register_complaint"
+            : parsed.intent || "general";
+        const normalizedMissingFields = rawMissingFields.filter((field) => {
+          if (field === "description" && mergedDescription) return false;
+          if (field === "locationName" && mergedLocationName) return false;
+          return true;
+        });
+
         return {
           language: normalizeLanguageCode(
             preferredLanguage !== "en"
               ? preferredLanguage
               : parsed.language || preferredLanguage,
           ),
-          intent: parsed.intent || "general",
+          intent: mergedIntent,
           ticketId: parsed.ticketId
             ? String(parsed.ticketId).trim().toUpperCase()
             : null,
-          shouldCreateComplaint: Boolean(parsed.shouldCreateComplaint),
-          missingFields: Array.isArray(parsed.missingFields)
-            ? parsed.missingFields.filter(Boolean)
-            : [],
-          complaintDraft: parsed.complaintDraft
+          shouldCreateComplaint:
+            Boolean(parsed.shouldCreateComplaint) ||
+            (mergedIntent === "register_complaint" &&
+              Boolean(mergedDescription) &&
+              Boolean(mergedLocationName)),
+          missingFields: normalizedMissingFields,
+          complaintDraft: parsed.complaintDraft || heuristicWantsRegister.complaintDraft
             ? {
-                title: parsed.complaintDraft.title
-                  ? String(parsed.complaintDraft.title).trim()
+                title: parsedComplaintDraft.title
+                  ? String(parsedComplaintDraft.title).trim()
+                  : buildComplaintTitle(
+                      mergedDescription,
+                      parsedComplaintDraft.department || "Other",
+                    ),
+                description: mergedDescription,
+                department: parsedComplaintDraft.department
+                  ? String(parsedComplaintDraft.department).trim()
                   : null,
-                description: parsed.complaintDraft.description
-                  ? String(parsed.complaintDraft.description).trim()
-                  : null,
-                department: parsed.complaintDraft.department
-                  ? String(parsed.complaintDraft.department).trim()
-                  : null,
-                priority: normalizePriority(parsed.complaintDraft.priority),
-                locationName: parsed.complaintDraft.locationName
-                  ? String(parsed.complaintDraft.locationName).trim()
-                  : null,
+                priority: normalizePriority(parsedComplaintDraft.priority),
+                locationName: mergedLocationName,
               }
             : null,
           generalResponse: String(parsed.generalResponse || "").trim(),

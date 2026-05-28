@@ -691,7 +691,10 @@ export default function Assistant() {
         text1: t(
           "assistant.voiceFailed",
         ),
-        text2: error?.response?.data?.error || t("assistant.errorResponse"),
+        text2:
+          error?.response?.data?.details ||
+          error?.response?.data?.error ||
+          t("assistant.errorResponse"),
       });
     } finally {
       setVoiceLoading(false);
