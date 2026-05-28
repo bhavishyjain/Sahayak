@@ -1,7 +1,19 @@
 const { Resend } = require("resend");
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient = null;
+
+function getResendClient() {
+  const apiKey = String(process.env.RESEND_API_KEY || "").trim();
+  if (!apiKey) {
+    throw new Error("Email service is not configured (missing RESEND_API_KEY)");
+  }
+
+  if (!resendClient) {
+    resendClient = new Resend(apiKey);
+  }
+
+  return resendClient;
+}
 
 function getAppWebBaseUrl() {
   return String(process.env.APP_LINK_BASE_URL).trim().replace(/\/+$/, "");
@@ -81,6 +93,7 @@ async function sendTransactionalEmail({
   attachments,
 }) {
   assertEmailConfigured();
+  const resend = getResendClient();
   const recipients = normalizeRecipients(to);
 
   if (recipients.length === 0) {
