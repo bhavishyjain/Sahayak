@@ -24,6 +24,8 @@ const {
   uploadComplaintImages,
 } = require("../../services/complaintService");
 
+const REGISTRATION_CONTEXT_TTL_MS = 3 * 60 * 60 * 1000;
+
 function parseConversationHistory(rawConversationHistory) {
   if (Array.isArray(rawConversationHistory)) {
     return rawConversationHistory;
@@ -47,6 +49,18 @@ function createAssistantResponse(response, assistant = {}) {
     assistant,
     timestamp: new Date().toISOString(),
   };
+}
+
+function toTimestampMs(value) {
+  const date = value ? new Date(value) : null;
+  const ms = date instanceof Date ? date.getTime() : Number.NaN;
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isPendingRegistrationEntryExpired(entry = {}) {
+  const createdAtMs = toTimestampMs(entry?.timestamp);
+  if (!createdAtMs) return false;
+  return Date.now() - createdAtMs > REGISTRATION_CONTEXT_TTL_MS;
 }
 
 function getActiveConversationWindow(conversationHistory = []) {
@@ -75,6 +89,9 @@ function getPendingRegistrationContext(conversationHistory = []) {
       entry?.assistant?.intent === "register_complaint" &&
       entry?.assistant?.created !== true
     ) {
+      if (isPendingRegistrationEntryExpired(entry)) {
+        return null;
+      }
       return {
         assistantMeta: entry.assistant || {},
       };
@@ -146,6 +163,19 @@ function looksLikeStandaloneLocationMessage(message = "") {
     /\b(colony|nagar|mandir|road|street|sector|block|area|gali|near|paas|ke paas|opposite|behind|beside)\b/i.test(
       value,
     )
+  );
+}
+
+function looksLikeRegistrationContinuationMessage(message = "") {
+  const value = String(message || "").trim();
+  if (!value) return false;
+
+  return (
+    looksLikeStandaloneLocationMessage(value) ||
+    /\b(location|address|landmark|colony|area|sector|block|road|street|nagar|mandir|near|opposite|behind)\b/i.test(
+      value,
+    ) ||
+    /(लोकेशन|स्थान|पता|कॉलोनी|एरिया|नगर|मंदिर|के\s+पास|के\s+सामने)/.test(value)
   );
 }
 
@@ -501,9 +531,14 @@ async function handleMessage(req, res) {
       String(analysis?.complaintDraft?.description || "").trim() ||
       String(analysis?.complaintDraft?.locationName || "").trim(),
     );
+    const looksLikeContinuation = looksLikeRegistrationContinuationMessage(message);
     const shouldTreatAsRegistration =
       analysis.intent === "register_complaint" ||
-      Boolean(pendingRegistrationContext) ||
+      (Boolean(pendingRegistrationContext) &&
+        (hasIncomingCoordinates ||
+          hasIncomingImages ||
+          hasComplaintDraftHints ||
+          looksLikeContinuation)) ||
       ((hasIncomingCoordinates || hasIncomingImages || hasComplaintDraftHints) &&
         analysis.intent !== "complaint_status" &&
         analysis.intent !== "recent_complaints");

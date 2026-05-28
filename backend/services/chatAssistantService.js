@@ -636,9 +636,23 @@ function inferIntentHeuristically(message = "", detectedLanguage = "en") {
     lower.includes("recent complaint") ||
     lower.includes("last complaint") ||
     lower.includes("my complaints") ||
+    lower.includes("show my complaints") ||
+    lower.includes("show recent complaints") ||
+    lower.includes("all complaints") ||
+    lower.includes("recent complaints") ||
     lower.includes("meri complaint") ||
+    lower.includes("meri sari complaint") ||
+    lower.includes("meri saari complaint") ||
+    lower.includes("meri complaint dikhao") ||
     lower.includes("meri shikayat") ||
-    lower.includes("recent status");
+    lower.includes("meri sari shikayat") ||
+    lower.includes("meri saari shikayat") ||
+    lower.includes("meri shikayat dikhao") ||
+    lower.includes("recent status") ||
+    lower.includes("recent saari shikayat") ||
+    lower.includes("recent sari shikayat") ||
+    lower.includes("saari shikayat dikhao") ||
+    lower.includes("sari shikayat dikhao");
 
   const wantsStatus =
     lower.includes("status") ||
@@ -781,10 +795,12 @@ Supported intents:
 Available department names: ${departmentNames.join(", ")}
 
 Rules:
-1. Detect the user's primary language and return a short language code in "language". Use codes like "en", "hi", "mr", "gu", "ta", "te", "bn", "pa", "ur", "ar", "fr", "es" when possible.
-2. If the text is romanized Hindi, return "hi".
-3. If the user wants to register a complaint and enough details are present, set "shouldCreateComplaint" to true.
-4. For complaint registration, extract:
+1. This assistant is for multilingual Indian civic complaints. Expect inputs in English, Hindi, Marathi, Bengali, Tamil, Telugu, Gujarati, Punjabi, Urdu, Malayalam, Kannada, Odia, and mixed-language or romanized text.
+2. Detect the user's primary language and return a short language code in "language". Use codes like "en", "hi", "mr", "bn", "ta", "te", "gu", "pa", "ur", "ml", "kn", "or" when possible.
+3. If the text is romanized Hindi, romanized Marathi, romanized Bengali, or mixed Hindi-English/Marathi-English/Bengali-English, infer the best matching language code from the user's phrasing. If unsure between mixed Indian languages, prefer the dominant Indian language rather than defaulting to English.
+4. If the user explicitly asks to show, list, or check recent complaints / all complaints / complaint history / latest complaint status, prefer "recent_complaints" or "complaint_status" over continuing any pending complaint registration flow.
+5. If the user wants to register a complaint and enough details are present, set "shouldCreateComplaint" to true.
+6. For complaint registration, extract:
    - title: a short, clear complaint heading of 2-6 words focused on the civic issue only.
      It must not be a full sentence.
      It must not include filler like "please", "register complaint", "help", "my house", "mere ghar", "kr do", "darj kr do".
@@ -793,16 +809,16 @@ Rules:
      Do not summarize, shorten, clean up, or translate it.
      Do not replace it with a location-only continuation message.
    - department: must be exactly one value from the available department names list above.
-     Choose the closest matching department even if the user uses slang, romanized Hindi, Hindi, or mixed language.
+     Choose the closest matching department even if the user uses slang, regional phrasing, Hindi, Marathi, Bengali, Tamil, Telugu, Gujarati, Punjabi, Urdu, or romanized mixed language.
      Do not return "Other" unless the issue genuinely does not fit any listed department.
    - priority ("Low" | "Medium" | "High")
    - locationName: only if the user gave a real colony, area, locality, road name, or landmark. Return null for vague phrases like "my house", "in front of my home", or generic relative descriptions.
-5. For status checks, extract "ticketId" if present. If the user asks for the latest/recent complaint, use intent "recent_complaints".
-6. If key registration details are missing, list them in "missingFields". Use only: "description", "locationName".
-7. Never invent a ticket ID.
-8. "generalResponse" should be a short helpful reply in the same language as the user.
-9. If the current message is only a location reply or landmark reply for a pending complaint, do not overwrite the original complaint description with that location reply.
-10. If multiple issues are mentioned in one complaint, choose the primary civic issue for title and department, but keep the full original user complaint text in description.
+7. For status checks, extract "ticketId" if present. If the user asks for the latest/recent complaint, use intent "recent_complaints".
+8. If key registration details are missing, list them in "missingFields". Use only: "description", "locationName".
+9. Never invent a ticket ID.
+10. "generalResponse" should be a short helpful reply in the same language as the user.
+11. If the current message is only a location reply or landmark reply for a pending complaint, do not overwrite the original complaint description with that location reply.
+12. If multiple issues are mentioned in one complaint, choose the primary civic issue for title and department, but keep the full original user complaint text in description.
 
 Conversation history:
 ${history || "none"}
@@ -979,7 +995,9 @@ async function generateChatResponse(
 Respond helpfully to their query: "${safeMessage}"
 
 Keep responses concise, friendly, and relevant to municipal services. If they ask about complaints, guide them to register or check status.
-Respond in ${language === "hi" ? "Hindi" : "English"}.
+Respond fully in the user's detected language.
+Detected language code: ${language}
+If the language is romanized Hindi, reply in natural romanized Hindi.
 `;
 
       return await runGeminiWithFallback(prompt);

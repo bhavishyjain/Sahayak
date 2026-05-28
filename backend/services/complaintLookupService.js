@@ -7,9 +7,15 @@ function wantsRecentComplaints(message = "") {
   return (
     lower.includes("meri complaint") ||
     lower.includes("meri complaints") ||
+    lower.includes("meri complaint dikhao") ||
     lower.includes("meri shikayat") ||
+    lower.includes("meri shikayat dikhao") ||
+    lower.includes("meri saari shikayat") ||
+    lower.includes("meri sari shikayat") ||
     lower.includes("my complaint") ||
     lower.includes("my complaints") ||
+    lower.includes("show my complaints") ||
+    lower.includes("recent complaints") ||
     lower.includes("recent complaint") ||
     lower.includes("complaint history")
   );
